@@ -13,6 +13,12 @@
 --   forceRole (Role Lab): moves a player to any rung, logging when that exceeds the rung's cap.
 -- Body changes go through Possession:swap (rule 12: Possession's onHandoff wires SweptCollision and
 -- MoveValidator). Pure Luau over injected deps, so Lune drives it with PlayerLike stubs.
+-- Money: a member's purse is the town wallet's when deps.purse is given (Economy/Credits: wallet.purse, a
+-- face on the one wallet; Boot/Game opens the account first), so Ladder pay lands in the one wallet, under a
+-- plain reason (Economy/EconomyRules.payWhy: "work", "a gig"), never the rule's id. stats.cents (the human
+-- queue's money term) is read from the purse every time, whoever changed it (a shop, a pass, wages): the
+-- purse's `counted` when it has one (the wallet's: the balance less pocket money still unspent, because a
+-- hand-out buys no place in the queue), else its balance.
 -- No side effects on require.
 -- Interface: new(deps) -> Roles; Roles:onJoin(player) -> JoinResult, onLeave(player), admittedCount(),
 --            report(event) -> {Transition}, roleOf(player) -> (rung?, subrole?), stats(player), queue(rung),
@@ -22,6 +28,7 @@
 local Import = require("../Import")
 local Ladder = Import.shared("Roles/Ladder") :: typeof(require("../../shared/Roles/Ladder"))
 local Wallet = Import.shared("Economy/Wallet") :: typeof(require("../../shared/Economy/Wallet"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local ReputationRules =
 	Import.shared("Reputation/ReputationRules") :: typeof(require("../../shared/Reputation/ReputationRules"))
 local Log = Import.shared("Util/Log") :: typeof(require("../../shared/Util/Log"))
@@ -42,10 +49,17 @@ type Ctx = { [string]: any }
 type Stats = { [string]: any }
 type Purse = {
 	cents: number,
+	counted: number?, -- the wallet's purse: the cents that count toward the queue
 	history: { any },
 	credit: (any, number, string) -> (boolean, string?),
 	debit: (any, number, string) -> (boolean, string?),
 }
+
+-- The money the human queue counts: the wallet's `counted` where the purse has it, else the balance.
+local function queueCents(purse: Purse): number
+	local counted = purse.counted
+	return if type(counted) == "number" then counted else purse.cents
+end
 
 export type JoinResult = "admitted" | "possessed" | "kicked"
 
@@ -57,6 +71,7 @@ export type Deps = {
 	now: (() -> number)?, -- seconds (default os.clock)
 	notify: ((player: any, kind: string, data: any) -> ())?, -- offers, idle warnings, toasts
 	onTransition: ((t: Transition) -> ())?, -- InfectionService, PoliceService, HUD hooks
+	purse: ((player: any) -> Purse)?, -- the town wallet's purse for a joining player (default: one of its own, at 0)
 }
 
 export type Member = LadderPlayer & { player: any, purse: Purse, jailedUntil: number? }
@@ -131,6 +146,10 @@ function RoleService.new(deps: Deps): Roles
 	} :: Roles
 
 	local function players(self: Roles): { [any]: LadderPlayer }
+		-- the queue's money term is the purse as it stands now (money is spent and earned outside the Ladder too)
+		for _, m in self.members do
+			m.stats.cents = queueCents(m.purse)
+		end
 		return self.members :: any
 	end
 
@@ -239,8 +258,8 @@ function RoleService.new(deps: Deps): Roles
 			end
 			local pay = (t.pay or 0) + (t.tip or 0)
 			if pay > 0 then
-				m.purse:credit(pay, t.rule)
-				m.stats.cents = m.purse.cents
+				m.purse:credit(pay, EconomyRules.payWhy(t.rule))
+				m.stats.cents = queueCents(m.purse)
 			end
 			if t.penalty then
 				m.stats.nuts = math.floor((m.stats.nuts or 0) * (1 - t.penalty.nutsLostPct))
@@ -306,12 +325,13 @@ function RoleService.new(deps: Deps): Roles
 		end
 		self.admitted[key] = true
 		self.admittedN += 1
+		local purse: Purse = if deps.purse then deps.purse(player) else Wallet.purse(0)
 		local m = {
 			id = key,
 			player = player,
 			rung = "human",
-			stats = { activeMinutes = 0, activeGameDays = 0, cents = 0, reputation = 0 },
-			purse = Wallet.purse(0),
+			stats = { activeMinutes = 0, activeGameDays = 0, cents = queueCents(purse), reputation = 0 },
+			purse = purse,
 		} :: Member
 		self.members[key] = m
 		self.lastInput[key] = clock()
@@ -368,6 +388,9 @@ function RoleService.new(deps: Deps): Roles
 
 	function roles.stats(self: Roles, player: any): Stats?
 		local m = self.members[player.UserId]
+		if m then
+			m.stats.cents = queueCents(m.purse)
+		end
 		return if m then m.stats else nil
 	end
 

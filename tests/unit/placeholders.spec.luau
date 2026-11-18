@@ -273,13 +273,18 @@ return function(t)
 			t.near(root.Size.X, box.width, 1e-4)
 			t.near(root.Size.Y, box.height, 1e-4)
 			t.near(root.Size.Z, box.length, 1e-4)
-			-- every visible part stays inside the box (what you see is what kills, D9)
+			-- every visible part stays inside the box (what you see is what kills, D9); a turned part
+			-- (the shaped sedan's upright corner cylinders) is measured as it lies, by |R| * size
 			for _, d in model:GetDescendants() do
 				if d:IsA("BasePart") and d.Transparency < 1 then
-					local p, s = d.CFrame.Position, d.Size
-					t.truthy(math.abs(p.X) + s.X / 2 <= box.width / 2 + 0.05, `{kind}.{d.Name} x`)
-					t.truthy(math.abs(p.Y) + s.Y / 2 <= box.height / 2 + 0.05, `{kind}.{d.Name} y`)
-					t.truthy(math.abs(p.Z) + s.Z / 2 <= box.length / 2 + 0.05, `{kind}.{d.Name} z`)
+					local cf, s = d.CFrame, d.Size
+					local p, x, y, z = cf.Position, cf.XVector, cf.YVector, cf.ZVector
+					local hx = (math.abs(x.X) * s.X + math.abs(y.X) * s.Y + math.abs(z.X) * s.Z) / 2
+					local hy = (math.abs(x.Y) * s.X + math.abs(y.Y) * s.Y + math.abs(z.Y) * s.Z) / 2
+					local hz = (math.abs(x.Z) * s.X + math.abs(y.Z) * s.Y + math.abs(z.Z) * s.Z) / 2
+					t.truthy(math.abs(p.X) + hx <= box.width / 2 + 0.05, `{kind}.{d.Name} x`)
+					t.truthy(math.abs(p.Y) + hy <= box.height / 2 + 0.05, `{kind}.{d.Name} y`)
+					t.truthy(math.abs(p.Z) + hz <= box.length / 2 + 0.05, `{kind}.{d.Name} z`)
 				end
 			end
 		end

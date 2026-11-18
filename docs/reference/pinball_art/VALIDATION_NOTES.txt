@@ -1,0 +1,79 @@
+PINBALL ASSET VALIDATION
+
+Result
+------
+The unmodified supplied check_glb.py reports: 24 of 24 files pass.
+The supplemental audit reports: 24 of 24 files pass.
+The assets consist of 21 GLB models and three backglass PNG images.
+
+Measured assembled geometry
+---------------------------
+Acorn Attack:   15,304 triangles
+Spicy Rodent:   14,194 triangles
+Space Squirrel: 15,696 triangles
+These totals include one cabinet, each machine-specific file, two flippers,
+three pop bumpers, one plunger and one gate. Game-generated balls, lamps,
+rollovers, score text and other runtime objects are outside these totals.
+Every model also stays within its individual triangle budget.
+
+Mechanical contract
+-------------------
+The supplied checker validates the original required names and world origins,
+reference contact footprints, height bounds and file-specific triangle limits.
+Every required reference object is present. The maximum measured origin error
+is 0.00002899 mm, against the allowed 1 mm.
+
+The supplemental audit also verifies applied unit scale, one material and one
+primitive per mesh object, at most ten extra Deco_ objects per file, embedded
+resources, and no exported cameras, lights, skins or animations. Contact objects
+are not shorter than their references, within a 0.01 mm numeric tolerance.
+All playfield objects other than ramps stay below the 0.14 m glass plane.
+
+All 432 sampled positions on the original upward-facing ramp track
+surfaces are retained within the supplemental 1 mm threshold. This checks the
+original riding surfaces as well as the supplied checker's overall footprint.
+
+Artwork and materials
+---------------------
+Each Board carries one embedded 486 x 1024 image. Apron images are embedded and
+remain within the 1024-pixel limit. Each backglass PNG is exactly 854 x 1024.
+Only Board and Apron meshes carry image textures. No normal, roughness,
+occlusion or emissive texture maps are exported. Glass and ramp tracks are the
+only transparent objects; Glass uses alpha blend at approximately 5% opacity.
+
+Source review confirms that all 48 painted labels and 74 lamp-ring centres
+are drawn directly from pinball_data.json. Board UVs map the back of the table
+to the top of each image. Backglass artwork preserves dark, subdued areas in
+all five reserved score/text bands and contains no baked live scoreboard text.
+
+Visual review
+-------------
+The three Board textures, three Backglass images, cabinet detail and assembled
+hardware were inspected. The three themes use original woodland, heat and
+space illustrations. No gambling imagery, protected red-cross emblem, green
+rodent, gore or profanity was observed. The FREE PLAY cabinet text is legible
+and contains no coin slot artwork.
+
+Visible overlapping rail surfaces found in early previews were rebuilt as
+continuous exterior surfaces. The final hardware review shows clean arches,
+OAK-guide corners and plastic-guide junctions without the earlier black facets.
+The final three-machine presentation render and all three assembled top-down
+playfield renders were also reviewed. Cabinet joins are clean, the table art
+is upright and legible, and the finished guide surfaces no longer show the
+earlier overlap artifacts. No further visual correction was identified.
+
+Practical limits
+----------------
+This is a visual asset package for the already-existing pinball game. It does
+not replace ball physics, controls, collisions, lamps, rollovers or scoreboard
+logic. The supplied pack contains no executable Roblox project, so interactive
+play, Roblox import behaviour and phone frame rates have not been tested here.
+Triangle counts are a geometry budget check, not a device-performance benchmark.
+
+Evidence
+--------
+final_CHECK_RESULTS.txt is the supplied checker's unchanged console output.
+audit_results.txt is the supplemental audit's console output.
+audit_results.json records per-file geometry, materials, image sizes, origins,
+ramp samples, byte sizes and SHA-256 hashes.
+asset_SHA256SUMS.txt contains checksums of the exact 24 checked asset files.

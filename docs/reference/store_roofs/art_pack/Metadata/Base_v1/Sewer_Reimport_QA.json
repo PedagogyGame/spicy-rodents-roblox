@@ -1,0 +1,43 @@
+[
+  {
+    "file": "01_Brick_Sewer_Passage.glb",
+    "meshes": 31,
+    "triangles": 5660,
+    "images": 12,
+    "material_count": 11,
+    "all_images_loaded": true,
+    "port_names": [
+      "PORT_01_North",
+      "PORT_01_South"
+    ],
+    "renderer": "Blender Cycles, actual GLB reimport"
+  },
+  {
+    "file": "02_Four_Way_Sewer_Junction.glb",
+    "meshes": 53,
+    "triangles": 9016,
+    "images": 12,
+    "material_count": 9,
+    "all_images_loaded": true,
+    "port_names": [
+      "PORT_02_North",
+      "PORT_02_South",
+      "PORT_02_West",
+      "PORT_02_East"
+    ],
+    "renderer": "Blender Cycles, actual GLB reimport"
+  },
+  {
+    "file": "03_Concrete_Maintenance_Tunnel.glb",
+    "meshes": 36,
+    "triangles": 7088,
+    "images": 6,
+    "material_count": 11,
+    "all_images_loaded": true,
+    "port_names": [
+      "PORT_03_North",
+      "PORT_03_South"
+    ],
+    "renderer": "Blender Cycles, actual GLB reimport"
+  }
+]

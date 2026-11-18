@@ -61,6 +61,7 @@ return function(t)
 		end
 		t.eq((PlayRules.deathMessage("traffic")), "RUN OVER!")
 		t.eq((PlayRules.deathMessage("kick")), "KICKED OUT!")
+		t.eq((PlayRules.deathMessage("guard")), "THE GUARDS!")
 	end)
 
 	t.test("Power per brief v2 §15: +100 a bite, +150 high up, +130 an officer, -19 a kick", function()

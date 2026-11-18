@@ -1,14 +1,20 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Main
 -- Client entry of the first playable build (owner directive 2026-11-09; BUILD_PLAN §1.3, §4.4 #5):
--- the day cycle (World/Sky) and the loading screen first (UI/PlayMenu: server boot progress, then the climbing
--- routes prepared on this computer), then the AnimationDriver over every body (D3), the traffic ghosts
--- (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
+-- the day cycle (World/Sky), what spins (World/Spinners) and the loading screen first (UI/PlayMenu: server boot
+-- progress, then the climbing routes prepared on this computer), then the AnimationDriver over every body (D3), the
+-- traffic ghosts (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
+-- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- Inside a storm drain World/SewerAmbience gives the look, the lamps and the key hints, and rewords the
+-- controls' refusals (every PossessionClient toast passes through its filter); World/SewerArt draws the
+-- owner's modules near the body.
+-- The sky lift (Client/Rides/SkyLiftView: the six cabins drawn from the shared clock) and the Lookout's telescope
+-- (Client/Rides/Telescope, entered on the server's "telescope" event) start after the minigames.
 -- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
@@ -31,10 +37,22 @@ local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local SpeechBubbles = require("./UI/SpeechBubbles")
+local WalletHud = require("./UI/WalletHud")
+local ItemClient = require("./UI/ItemClient")
+local KiteSteer = require("./UI/KiteSteer")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
+local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
+local SewerAmbience = require("./World/SewerAmbience")
+local LoungeMusic = require("./World/LoungeMusic")
+local SeatGetUp = require("./World/SeatGetUp")
+local SewerArt = require("./World/SewerArt")
+local FarTown = require("./Render/FarTown")
+local SkyLiftView = require("./Rides/SkyLiftView")
+local SneakMeter = require("./UI/SneakMeter")
+local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -60,6 +78,8 @@ local skyOk, skyErr = pcall(Sky.start)
 if not skyOk then
 	warn(`Client: the sky did not start: {skyErr}`)
 end
+-- what spins on this computer only: the alley's rooftop fan (World/Spinners)
+Spinners.start()
 
 local pickRemote: RemoteEvent? = nil
 local menu = PlayMenu.start(function(choice: string)
@@ -96,6 +116,17 @@ local kickRemote = kickR :: RemoteEvent
 local eventRemote = eventR :: RemoteEvent
 
 AnimationDriver.start({ container = bodies })
+-- the wallet in the corner, always (the server writes the balance on the Player: Server/Economy/Credits)
+local walletOk, walletErr = pcall(WalletHud.start)
+if not walletOk then
+	warn(`Client: WalletHud failed: {walletErr}`)
+	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
+end
+-- the squirrel's eye over the alley's lanes while people below might see it (the server's RafterService fills it)
+local sneakOk, sneakErr = pcall(SneakMeter.start)
+if not sneakOk then
+	warn(`Client: SneakMeter failed: {sneakErr}`)
+end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()
 	local okS, errS = pcall(SpeechBubbles.start, { bodies = bodies :: Instance })
@@ -116,10 +147,18 @@ task.spawn(function()
 		world.ignore({ ghosts })
 	end
 end)
+-- the controls' toasts pass through the storm drains' wording ("No room to jump down here") once it has started
+local sewer: SewerAmbience.Handle? = nil
 local started, clientOrErr = pcall(PossessionClient.start, {
 	bodies = bodies :: Instance,
 	overview = { position = Vector3.new(0, 120, 260), lookAt = Vector3.zero },
-	hud = { set = hud.set, toast = menu.toast, meter = hud.meter },
+	hud = {
+		set = hud.set,
+		toast = function(text: string, seconds: number?)
+			menu.toast(if sewer then sewer.filter(text) else text, seconds)
+		end,
+		meter = hud.meter,
+	},
 })
 if not started then
 	warn(`Client: PossessionClient failed: {clientOrErr}`)
@@ -127,6 +166,40 @@ if not started then
 	return
 end
 local client = clientOrErr :: PossessionClient.Client
+
+-- inside a storm drain: the grade, the lamps, the echo, "E: down the drain" and "W: climb out" (World/SewerAmbience)
+local okSewer, sewerOrErr = pcall(SewerAmbience.start, {
+	current = client.current,
+	state = client.state,
+	toast = menu.toast,
+})
+if okSewer then
+	sewer = sewerOrErr
+else
+	warn(`Client: SewerAmbience failed: {sewerOrErr}`)
+end
+-- inside a storm drain: the owner's modules near the body, the parts lining hidden here only (World/SewerArt)
+local okArt, artErr = pcall(SewerArt.start, { current = client.current })
+if not okArt then
+	warn(`Client: SewerArt failed: {artErr}`)
+end
+-- inside THE GILDED ACORN: the jazz, here only (World/LoungeMusic; silent until the library ids are filled in)
+local okJazz, jazzErr = pcall(LoungeMusic.start, { current = client.current })
+if not okJazz then
+	warn(`Client: LoungeMusic failed: {jazzErr}`)
+end
+
+-- THE GILDED ACORN's seats: moving gets up, as jump does (World/SeatGetUp)
+local okSeat, seatErr = pcall(SeatGetUp.start, { current = client.current })
+if not okSeat then
+	warn(`Client: SeatGetUp failed: {seatErr}`)
+end
+
+-- the corner store's kite in the air: A/D lean it, W/S let out and reel in (UI/KiteSteer; the server flies it)
+local okKite, kiteErr = pcall(KiteSteer.start)
+if not okKite then
+	warn(`Client: KiteSteer failed: {kiteErr}`)
+end
 
 -- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E
 task.spawn(function()
@@ -141,6 +214,44 @@ task.spawn(function()
 		warn(`Client: MinigameClient failed: {errM}`)
 	end
 end)
+
+-- the sky lift's cabins (drawn here from the clock) and the Lookout's telescope (its HUD lines; no walking while
+-- looking; the usual HUD and camera back after)
+local okSL, errSL = pcall(SkyLiftView.start)
+if not okSL then
+	warn(`Client: SkyLiftView failed: {errSL}`)
+end
+-- the town from far off (the Lookout, the cabins, the drone): far houses with roofs and lit windows, lamp dots
+-- and tree crowns where the real lots have streamed out
+local okFar, errFar = pcall(FarTown.start)
+if not okFar then
+	warn(`Client: FarTown failed: {errFar}`)
+end
+-- the wait for a booked cabin, counted down on the HUD (the usual HUD back once seated or given up)
+pcall(SkyLiftView.watchWait, function(title: string?, hint: string?)
+	if title then
+		hud.set(title, hint or "")
+	else
+		client.refreshCamera()
+	end
+end)
+pcall(Telescope.start, {
+	hud = function(title: string?, hint: string?)
+		if title then
+			hud.set(title, hint or "")
+		else
+			client.refreshCamera()
+		end
+	end,
+	onChange = function(on: boolean)
+		InputMap.setCharacterControls(not on and client.state().device == nil)
+		-- the server streams the town the telescope looks at; stepping back gives the Lookout back
+		local look = if on then nil else game:GetService("ReplicatedStorage"):FindFirstChild("SkyLiftLook")
+		if look and look:IsA("RemoteEvent") then
+			look:FireServer("off")
+		end
+	end,
+})
 
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil
@@ -158,14 +269,16 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 	if InputMap.ignore(io, processed) then
 		return
 	end
-	if io.KeyCode == Enum.KeyCode.F or io.KeyCode == Enum.KeyCode.ButtonX then
+	-- (not while a minigame is open: F and gamepad X are that game's keys then)
+	if InputMap.kicks(io.KeyCode.Name, Players.LocalPlayer:GetAttribute("InMinigame")) then
 		local st = client.state()
 		if st.species == "human" and st.device == nil then
 			kickRemote:FireServer()
 		elseif io.KeyCode == Enum.KeyCode.F then
 			menu.toast(
-				if st.device
-					then "Get out first (E), then F kicks"
+				if st.device == "ride"
+					then "No kicking from a sky-lift cabin"
+					elseif st.device then "Get out first (E), then F kicks"
 					elseif st.species then "Only people can kick: animals pounce with a left click"
 					else "Pick a body from the menu first (M)",
 				2
@@ -188,6 +301,21 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
 		menu.toast(tostring(msg.text), 3)
+	elseif kind == "telescope" then
+		-- the Lookout's telescope (Server/Rides/SkyLiftService): look through the baked one
+		local exp = workspace:FindFirstChild("Expansion")
+		local hill = exp and exp:FindFirstChild("F4") and (exp :: any).F4:FindFirstChild("f3_hilltop")
+		local scope = hill and hill:FindFirstChild("Telescope", true)
+		local post = workspace:FindFirstChild("SkyLiftService")
+		local prompt = post
+			and post:FindFirstChild("TelescopePost")
+			and (post :: any).TelescopePost:FindFirstChild("SkyLiftPrompt", true)
+		if scope == nil or not Telescope.enter(scope, prompt) then
+			menu.toast(tostring(msg.text or "The telescope has not loaded yet"), 3)
+		end
+	elseif kind == "item" then
+		-- a corner-store item that needs this screen (the chalk's words, the camera's shot): UI/ItemClient
+		ItemClient.handle(msg, menu.toast)
 	elseif kind == "notice" then
 		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
 		menu.toast(tostring(msg.text), 4)

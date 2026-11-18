@@ -36,14 +36,29 @@
 -- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
 -- Shift Lock is off (StarterPlayer.EnableMouseLockOption, Player.DevEnableMouseLock) because Shift is
 -- sprint. A "picked" event carries a `note` when the police car or the drone was not free.
+-- Money (Economy/Credits, the town's one wallet): Game.wallet(deps) makes it on the day clock with every hook
+-- the game hangs on it, and start() only plugs those hooks in (so the wiring itself is driven by a spec on a
+-- fake engine: tests/isolated/wallet.luau). A joining player gets an account and pocket money when
+-- RoleService asks for their purse (ActorsRuntime opts.purse = hooks.purse: join, then the wallet's face),
+-- with the once-a-second sweep as the safety net; a leaving player's account is closed and kept; the
+-- minigames' ctx.town.charge is wallet.spend and ctx.town.pass is wallet.pass; wallet.tell(player, words) is
+-- the "notice" toast on that player's screen. Every later shop, door and counter takes this same `wallet`.
 -- Engine only inside the functions; no side effects on require.
--- Interface: start(opts?) -> Game { runtime, traffic, movement, pick(player, choice) -> (ok, why?),
+-- Interface: start(opts?) -> Game { runtime, traffic, movement, wallet (Economy/Credits: spend, add, balance,
+--   pass), pick(player, choice) -> (ok, why?),
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
---   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
+--   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
+--   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
+--   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
+--   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
+--   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start),
+--   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
---   putBack(free, possessable) -> boolean (pure)
+--   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
+--   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
+--   cents, why), pass } (the town's wallet as start() wires it; no engine but what deps hands in)
 -- For a bitten player the hospital's door is published as the Workspace attribute HospitalDoor (a
 -- Vector3): the client draws a marker over it and the distance to it (Client/UI/PlayMenu).
 
@@ -52,6 +67,8 @@ local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local LightingPreset = Import.shared("World/LightingPreset") :: typeof(require("../../shared/World/LightingPreset"))
 local PlayRules = Import.shared("Combat/PlayRules") :: typeof(require("../../shared/Combat/PlayRules"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local PowerRules = Import.shared("Rodent/PowerRules") :: typeof(require("../../shared/Rodent/PowerRules"))
 local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
@@ -63,10 +80,21 @@ local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
+local SewerService = require("../World/SewerService")
+local SkyLiftService = require("../Rides/SkyLiftService")
+local RafterService = require("../Attractions/RafterService")
+local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
+local Credits = require("../Economy/Credits")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
+local PinballArt = require("../Assets/PinballArt")
+local ShopArt = require("../Assets/ShopArt")
+local CornerStore = require("../Items/CornerStore")
+local YardHazards = require("../Wildlife/YardHazards")
+local WhackArt = require("../Assets/WhackArt")
+local LoungeArt = require("../Assets/LoungeArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -124,12 +152,85 @@ function Game.pickOfficer(people: { OfficerCandidate }): any?
 	return fallback
 end
 
+-- gameSeconds(serverTime, epoch, base, rate): the game clock as Boot/DayClock publishes it (and as
+-- Shared/Time/Clock reads it on every client): what the wallet's passes are timed on.
+function Game.gameSeconds(serverTime: number, epoch: number, base: number, rate: number): number
+	return base + (serverTime - epoch) * rate
+end
+
+-- What the town's wallet is wired to: where the day clock is published, the clock both sides share, the
+-- game's own way of sending a player an event, and who is in the game.
+export type WalletDeps = {
+	clock: any, -- the Instance Boot/DayClock published on (ReplicatedStorage): ClockEpoch, ClockBase, ClockRate
+	published: { epoch: number, base: number, rate: number }, -- what DayClock.publish answered (read if an attribute is gone)
+	serverTime: () -> number, -- workspace:GetServerTimeNow
+	fire: (player: any, payload: { [string]: any }) -> (), -- one PlayNet event to one player
+	players: () -> { any }, -- Players:GetPlayers
+	log: ((line: string) -> ())?, -- (a spec's; default the server's output)
+	warn: ((line: string) -> ())?,
+}
+export type WalletHooks = {
+	wallet: Credits.Wallet,
+	purse: (player: any) -> Credits.Purse, -- RoleService's: the account is opened (pocket money) and its face handed over
+	sweep: () -> (), -- once a second: anyone in the game whose join was missed is joined
+	leave: (player: any) -> (), -- PlayerRemoving: closed and kept
+	charge: (player: any, cents: number, why: string) -> (boolean, string?), -- the minigames' ctx.town.charge
+	pass: Credits.Pass, -- the minigames' ctx.town.pass
+}
+
+-- The town's one wallet, as the game runs it: on the game clock (a pass is sold in in-game days; the clock's
+-- attributes are read each time, so a re-anchored clock is followed), speaking through the "notice" toast.
+-- Nobody is given an account by being charged: only by arriving (purse, sweep). A key that never came
+-- through the door (a computer player, a stand-in) is refused with "You have no wallet yet."
+function Game.wallet(deps: WalletDeps): WalletHooks
+	local function attr(name: string, fallback: number): number
+		local v = deps.clock:GetAttribute(name)
+		return if type(v) == "number" then v else fallback
+	end
+	local wallet = Credits.new({
+		tell = function(player: any, text: string)
+			deps.fire(player, { kind = "notice", text = text })
+		end,
+		gameSeconds = function(): number
+			return Game.gameSeconds(
+				deps.serverTime(),
+				attr("ClockEpoch", deps.published.epoch),
+				attr("ClockBase", deps.published.base),
+				attr("ClockRate", deps.published.rate)
+			)
+		end,
+		daySeconds = DayClock.REAL_SECONDS_PER_DAY,
+		log = deps.log,
+		warn = deps.warn,
+	})
+	return {
+		wallet = wallet,
+		purse = function(player: any): Credits.Purse
+			wallet.join(player)
+			return wallet.purse(player)
+		end,
+		sweep = function()
+			for _, player in deps.players() do
+				wallet.join(player) -- (nothing for someone already here)
+			end
+		end,
+		leave = function(player: any)
+			wallet.leave(player) -- closed and kept: nothing more can be spent, a refund still lands
+		end,
+		charge = function(player: any, cents: number, why: string): (boolean, string?)
+			return wallet.spend(player, cents, why)
+		end,
+		pass = wallet.pass,
+	}
+end
+
 type PState = {
 	role: string?,
 	power: any, -- Rodent/PowerRules.State (types do not cross Import)
 	bites: number,
 	lastKick: number,
 	lastPick: number,
+	lastBiteAt: number?, -- the server clock (`now`) at the rodent's last bite: fed while within a game day
 }
 
 local function setAttr(player: any, key: string, value: any)
@@ -185,7 +286,25 @@ function Game.start(opts: Opts?): any
 	-- 1. sky ------------------------------------------------------------------------------------
 	stage(0.03, "Setting up the sky and the afternoon sun")
 	LightingPreset.apply(game:GetService("Lighting"))
-	DayClock.publish(ReplicatedStorage) -- the day cycle: every client derives it (Client/World/Sky)
+	local dayClock = DayClock.publish(ReplicatedStorage) -- the day cycle: every client derives it (Client/World/Sky)
+	-- the town's one wallet (Game.wallet above has the wiring; the remotes it speaks through come later)
+	local fireLater: ((player: any, payload: { [string]: any }) -> ())? = nil
+	local money = Game.wallet({
+		clock = ReplicatedStorage,
+		published = dayClock,
+		serverTime = function(): number
+			return workspace:GetServerTimeNow()
+		end,
+		fire = function(player: any, payload: { [string]: any })
+			if fireLater then
+				fireLater(player, payload)
+			end
+		end,
+		players = function(): { any }
+			return Players:GetPlayers()
+		end,
+	})
+	local wallet = money.wallet
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
 	if town then
@@ -281,6 +400,7 @@ function Game.start(opts: Opts?): any
 		movement = movement,
 		engine = o.engine,
 		players = o.players,
+		purse = money.purse, -- RoleService: a joining player's purse is the wallet's (pocket money comes with it)
 	})
 	if o.heartbeat == false then
 		rt.stop() -- the smoke steps frames by hand
@@ -291,6 +411,9 @@ function Game.start(opts: Opts?): any
 	local world = rt.world
 	local possession = rt.possession
 	local devices = rt.devices
+	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
+	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
+	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
 		for _, model in devices.models do
@@ -350,6 +473,23 @@ function Game.start(opts: Opts?): any
 			table.insert(player.events, payload) -- PlayerLike stub (engine smoke): what the client would get
 		end
 	end
+	fireLater = fire -- wallet.tell: a shop's or a door's words for one player, as the toast every refusal uses
+
+	-- who holds a town body ("ai" | "player"), and an attribute on it (Say is remembered for the speech log):
+	-- what Infection/InfectionService and World/SewerService ask of the town
+	local function controllerOfTown(id: number): string
+		local actor = rt.byTownId[id]
+		return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
+	end
+	local function setTownAttr(id: number, name: string, value: any)
+		local actor = rt.byTownId[id]
+		if actor then
+			(actor.body :: Model):SetAttribute(name, value)
+		end
+		if name == "Say" then
+			lastSay[id] = value
+		end
+	end
 
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
@@ -359,19 +499,12 @@ function Game.start(opts: Opts?): any
 			world = world,
 			traffic = traffic,
 			data = data,
-			controllerOf = function(id: number): string
+			controllerOf = controllerOfTown,
+			busy = function(id: number): boolean
 				local actor = rt.byTownId[id]
-				return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
+				return actor ~= nil and (actor.body :: Model):GetAttribute("Ride") ~= nil
 			end,
-			setAttr = function(id: number, name: string, value: any)
-				local actor = rt.byTownId[id]
-				if actor then
-					(actor.body :: Model):SetAttribute(name, value)
-				end
-				if name == "Say" then
-					lastSay[id] = value
-				end
-			end,
+			setAttr = setTownAttr,
 			setPossessable = function(id: number, value: boolean)
 				local actor = rt.byTownId[id]
 				if actor then
@@ -435,6 +568,63 @@ function Game.start(opts: Opts?): any
 			pcall(dead.shutdown, dead)
 			warn("[SpicyRodents] the infection service keeps failing: switched off (bites still score)")
 		end
+	end
+
+	-- the storm drains (World/SewerService): the carve (after the terrain write above), cover, the police at the grate
+	local sewers: any = nil
+	local sewersBaked = workspace:FindFirstChild("Sewers") ~= nil
+	if not sewersBaked then
+		warn(
+			"[SpicyRodents] Workspace.Sewers missing (run lune run tools/bake/sewers.luau and rebuild): no drains carved"
+				.. " and nobody hidden, but the drains' routes are still in the data (E at a corner goes down into the"
+				.. " ground): do not publish this place"
+		)
+	end
+	local okW, errW = pcall(function()
+		sewers = SewerService.start({
+			world = world,
+			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it), and nobody hidden in
+			-- solid ground. The routes are in the data either way, and every bake is optional in the project files
+			-- (a fresh tree builds before it is baked), so the warning above is the guard: bake before a publish
+			carve = o.terrain ~= false and sewersBaked,
+			cover = sewersBaked,
+			speech = infection and infection.speech,
+			clock = function(): number
+				return if infection then infection.now else world.now
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+			controllerOf = controllerOfTown,
+			setAttr = setTownAttr,
+		})
+	end)
+	if not okW then
+		sewers = nil
+		warn(`[SpicyRodents] the storm drains did not start (the pipes run, nobody loses the rodent there): {errW}`)
+	end
+	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
+	-- that does not load leaves its drains in the bake's plain parts
+	if sewersBaked then
+		local store = ReplicatedStorage:FindFirstChild("SewerArt")
+		if store == nil then
+			local f = Instance.new("Folder")
+			f.Name = "SewerArt"
+			f.Parent = ReplicatedStorage
+			store = f
+		end
+		task.spawn(function()
+			local okA, loaded, failed =
+				pcall(SewerService.loadArt, workspace:FindFirstChild("Sewers") :: Instance, store)
+			if not okA then
+				warn(`[SpicyRodents] the sewer modules did not load (the drains stay in plain parts): {loaded}`)
+				return
+			end
+			for module, why in failed do
+				warn(`[SpicyRodents] sewer module {module} did not load (its drains stay in plain parts): {why}`)
+			end
+			print(`[SpicyRodents] sewer modules loaded: {table.concat(loaded, ", ")}`)
+		end)
 	end
 
 	local function stateOf(player: any): PState
@@ -538,6 +728,11 @@ function Game.start(opts: Opts?): any
 			return false, "unknown choice"
 		end
 		local s = stateOf(player)
+		local riding = if skylift then skylift:refusal(player, "pick") else nil
+		if riding then
+			fire(player, { kind = "refused", text = riding })
+			return false, "riding"
+		end
 		local clock = os.clock()
 		if clock - s.lastPick < Game.PICK_COOLDOWN then
 			return false, "one moment…"
@@ -814,7 +1009,12 @@ function Game.start(opts: Opts?): any
 			local actor = possession:actorOf(player)
 			if s.role == "rodent" and actor and actor.variant == "spicy" then
 				local root = (actor.body :: Model).PrimaryPart
-				if root then
+				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody; nor while
+				-- the water gun has it stunned (Items/ItemWorld)
+				local tid = townIdOf[actor.id]
+				local stunnedUntil = (actor.body :: Model):GetAttribute(PossessionState.ATTR.StunnedUntil)
+				local stunned = type(stunnedUntil) == "number" and workspace:GetServerTimeNow() < stunnedUntil
+				if root and not stunned and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
 					if humans == nil then
 						humans = {}
 						for _, a in world.actors do
@@ -847,6 +1047,7 @@ function Game.start(opts: Opts?): any
 							s.power,
 							{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(p.Y) }
 						)
+						s.lastBiteAt = now
 						s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
 						(actor.body :: Model):SetAttribute("BiteAt", now)
 						shoutN += 1
@@ -909,6 +1110,7 @@ function Game.start(opts: Opts?): any
 		end
 		fadeAcc += dt
 		if fadeAcc >= 1 then
+			money.sweep() -- (everyone joined through RoleService already: this only catches a join that was missed)
 			-- a joining player is handed a townsperson by RoleService (Ladder: lowest rank)
 			for _, player in Players:GetPlayers() do
 				persist(player) -- the join's townsperson and any body change made elsewhere
@@ -931,12 +1133,33 @@ function Game.start(opts: Opts?): any
 			end
 			for player, s in states do
 				if s.role == "rodent" then
-					if PowerRules.fade(s.power, fadeAcc) > 0 then
+					local changed = PowerRules.fade(s.power, fadeAcc) > 0
+					-- a refuge heals the fed rodent (World/SewerService: the hollow rate down a drain, D33 rev 4)
+					local actor = possession:actorOf(player)
+					local tid = if actor then townIdOf[actor.id] else nil
+					if sewers and actor and tid and actor.variant == "spicy" then
+						local h = healthOf(actor.id)
+						local healed =
+							sewers:heal(tid, h, PlayRules.HEALTH, fadeAcc, SewerService.fed(s.lastBiteAt, now))
+						if healed ~= h then
+							health[actor.id] = healed
+							changed = true
+						end
+					end
+					if changed then
 						publish(player)
 					end
 				end
 			end
 			fadeAcc = 0
+		end
+		if rafters then
+			local okR, errR = pcall(rafters.step, rafters, dt)
+			if not okR then
+				warn(`[SpicyRodents] the rafter watch stopped: {errR}`)
+				pcall(rafters.stop, rafters)
+				rafters = nil
+			end
 		end
 	end
 
@@ -967,6 +1190,7 @@ function Game.start(opts: Opts?): any
 			states[player] = nil
 			persisted[player] = nil
 			sickShown[player] = nil
+			money.leave(player)
 		end)
 	)
 	table.insert(conns, Players.PlayerAdded:Connect(noShiftLock))
@@ -998,7 +1222,11 @@ function Game.start(opts: Opts?): any
 					return false, "Pick a person from the menu first (M)"
 				end
 				if actor.species ~= "human" then
-					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
+					return false, "Only people can play. Animals can watch"
+				end
+				local lift = if skylift then skylift:refusal(player, "play") else nil
+				if lift then
+					return false, lift
 				end
 				if
 					devices
@@ -1013,6 +1241,47 @@ function Game.start(opts: Opts?): any
 				local actor = possession:actorOf(player)
 				return if actor then actor.body :: Model else nil
 			end,
+			-- what the games may ask of the rest of the town (Server/Minigames/ServerGame.Town): `people`, and
+			-- `charge` and `pass`, which are the town's wallet and its one pass. There is nobody to lend as a
+			-- computer player's body and no profile for a personal best yet, so the service's own stand-ins answer
+			-- for those.
+			games = {
+				charge = money.charge,
+				pass = money.pass,
+				people = function(): { { [string]: any } }
+					local out = {}
+					for _, player in Players:GetPlayers() do
+						local actor = possession:actorOf(player)
+						local body = actor and actor.body :: Model?
+						local r = body and body.PrimaryPart
+						if actor and r then
+							local q = r.Position
+							table.insert(out, {
+								key = player,
+								name = if player.DisplayName ~= "" then player.DisplayName else player.Name,
+								species = actor.species,
+								x = q.X,
+								y = q.Y,
+								z = q.Z,
+							})
+						end
+					end
+					return out
+				end,
+			},
+			-- paintball (PaintballService.Deps): an infected player is refused at the arena door with "See a
+			-- doctor first." (decision D6), so nobody collapses in a match. Its pass desk sells the town's one
+			-- pass, games.pass above (the wallet's), so a pass bought there opens both lounges too
+			paintball = {
+				fit = function(player: any): (boolean, string?)
+					local actor = possession:actorOf(player)
+					local townId = if actor then townIdOf[actor.id] else nil
+					if infection and townId and infection:statusOf(townId) ~= nil then
+						return false, "infected"
+					end
+					return true, nil
+				end,
+			},
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
 				local out = {}
@@ -1059,6 +1328,108 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] bowling alley failed to open: {errA}`)
 	end
 
+	-- 6. the sky lift up the hill to the Lookout (Workspace.Expansion.F4; people only; brief v2 line 250)
+	stage(0.98, "Starting the sky lift")
+	local okL, errL = pcall(function()
+		skylift = SkyLiftService.start({
+			game = {
+				possession = possession,
+				runtime = rt,
+				devices = devices,
+				fire = fire,
+				attractions = function(): any
+					return attractions
+				end,
+			},
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okL then
+		warn(`[SpicyRodents] sky lift failed to start: {errL}`)
+	end
+	if skylift and devices then
+		-- E mid-ride: no car from a cabin (the client says so too); true, so the client is not told "released"
+		devices.interact = skylift:guardInteract(devices.interact, function(player: any, text: string)
+			fire(player, { kind = "refused", text = text })
+		end)
+	end
+
+	-- 6b. the people under the alley's rafters spot a squirrel that does not creep (Attractions/RafterService:
+	-- addendum D9), and a guard's kick does not reach into the roof vent
+	local okR, errR = pcall(function()
+		rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire, attractions = attractions })
+	end)
+	if not okR then
+		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
+	end
+
+	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
+	local dogs: any = nil
+	local okD, errD = pcall(function()
+		dogs = YardHazards.start({
+			world = world,
+			runtime = rt,
+			possession = possession,
+			fire = fire,
+			groundAt = Height.at,
+			heartbeat = o.heartbeat ~= false,
+		})
+	end)
+	if not okD then
+		warn(`[SpicyRodents] the yard dogs failed to start: {errD}`)
+	end
+
+	-- 6c. Pepper's Corner Store (Workspace.Expansion.F1): pick up off the shelves, pay once at the till through the
+	-- town's wallet, nothing out unpaid (Items/CornerStore)
+	local cornerStore: any = nil
+	local okC, errC = pcall(function()
+		local expansionData = data:module("Expansion") :: any
+		cornerStore = CornerStore.start({
+			expansion = workspace:FindFirstChild("Expansion"),
+			runtime = rt,
+			zones = if expansionData then expansionData.zones else nil,
+			dogs = dogs,
+			wallet = wallet,
+			possession = possession,
+			fire = fire,
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okC then
+		warn(`[SpicyRodents] the corner store failed to open: {errC}`)
+	end
+
+	-- 6d. THE GILDED ACORN, the 1940s lounge (Workspace.Expansion.LoungeClassic; addendum D14): the door lets a
+	-- person with the wallet's one pass in (first person inside), the guards knock out any squirrel at the door
+	-- (kill, cause "guard"), the bar sells its four drinks (Attractions/LoungeService)
+	local okLo, errLo = pcall(function()
+		lounge = LoungeService.start({
+			town = LoungeService.gameTown({
+				possession = possession,
+				runtime = rt,
+				wallet = wallet,
+				squirrels = function(): { LoungeService.Squirrel }
+					local out = {}
+					for _, a in world.actors do
+						local actor = rt.byTownId[a.id]
+						if actor and isSquirrelFamily(actor) then
+							table.insert(out, { actor = actor, x = a.x, y = a.y - a.hip, z = a.z })
+						end
+					end
+					return out
+				end,
+				kill = kill,
+			}),
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okLo then
+		warn(`[SpicyRodents] the lounge failed to open: {errLo}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1081,10 +1452,28 @@ function Game.start(opts: Opts?): any
 		end)
 	end
 
+	-- The owner's Neighbourhood Shop (Workspace.Expansion.NeighbourhoodShop, addendum D12): its shell is baked;
+	-- Assets/ShopArt carves the terrain inside it and loads his interior and roof off the boot path
+	ShopArt.start(
+		workspace:FindFirstChild("Expansion"),
+		{ terrain = o.terrain ~= false, heartbeat = o.heartbeat ~= false }
+	)
+
+	-- The owner's finished pinball models (Workspace.Attractions.<alley>.GamesRoom.Pinball<i>): Assets/PinballArt
+	-- puts them on the baked machines off the boot path, once every Model is uploaded (until then it says so once)
+	PinballArt.start(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
+	-- and the owner's whack-a-mole cabinet in the same games room (Assets/WhackArt; nothing while it has no id)
+	WhackArt.startIn(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
+	-- and THE GILDED ACORN's Blender pieces (Assets/LoungeArt; nothing while Shared/Attractions/LoungeArt has no id)
+	if o.heartbeat ~= false then
+		LoungeArt.start()
+	end
+
 	return {
 		runtime = rt,
 		traffic = traffic,
 		movement = movement,
+		wallet = wallet,
 		timings = timings,
 		pick = pick,
 		kick = kick,
@@ -1096,12 +1485,30 @@ function Game.start(opts: Opts?): any
 			if attractions and o.heartbeat == false then
 				attractions.step(dt)
 			end
+			if skylift and o.heartbeat == false then
+				skylift:step(dt)
+			end
+			if lounge and o.heartbeat == false then
+				lounge:step(dt)
+			end
+			if cornerStore and o.heartbeat == false then
+				cornerStore:step()
+			end
+			if dogs and o.heartbeat == false then
+				dogs.step(dt)
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
 		placeAI = placeAI,
 		attractions = attractions,
 		infection = infection,
+		sewers = sewers,
+		skylift = skylift,
+		rafters = rafters,
+		lounge = lounge,
+		cornerStore = cornerStore,
+		dogs = dogs,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1109,6 +1516,24 @@ function Game.start(opts: Opts?): any
 			rt.stop()
 			if attractions then
 				attractions.stop()
+			end
+			if sewers then
+				sewers:stop()
+			end
+			if skylift then
+				skylift:stop()
+			end
+			if rafters then
+				rafters:stop()
+			end
+			if lounge then
+				lounge:stop()
+			end
+			if cornerStore and cornerStore.stop then
+				cornerStore.stop()
+			end
+			if dogs then
+				dogs.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

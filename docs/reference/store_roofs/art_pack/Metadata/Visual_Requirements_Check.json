@@ -1,0 +1,26 @@
+{
+  "source": "Final GLB named nodes/buffers; updated render inspection; preserved original menu/poster artwork.",
+  "checks": {
+    "exactly_five_cafe_stools": true,
+    "exactly_nine_boards_in_full_shop": true,
+    "seven_original_board_files_byte_identical": true,
+    "two_special_complete_boards": true,
+    "separate_retail_and_cafe_counters": true,
+    "office_furnished_and_beaded": true,
+    "flags_present": true,
+    "spice_squirrels_original_poster_preserved": true,
+    "wood_boat_truck_and_portraits_preserved": true,
+    "bamboo_plants_and_windows_preserved": true,
+    "vintage_register_and_blank_price_menus_preserved": true,
+    "night_route_jacket_display_prop_present": true,
+    "all_final_glb_texture_images_embedded": true,
+    "all_uvs_within_zero_to_one": true,
+    "normal_attributes_present": true,
+    "original_game_files_not_modified": true
+  },
+  "not_performed": [
+    "Roblox Studio import/playtest",
+    "runtime collision or navigation test",
+    "final v2 Blender helper execution"
+  ]
+}

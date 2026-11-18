@@ -1,0 +1,28 @@
+AER / 01 — delivery validation
+Date: November 12, 2026 (America/Chicago)
+
+Blender: 5.4.0 Alpha. Original geometry modeled and rendered in background Blender.
+GLB: glTF 2.0 binary; valid header/chunks; self-contained buffers/materials.
+Four named pivots and two player cameras verified. Dynamic part world heights verified.
+Evaluated runtime model: 131,268 triangles, 13 materials.
+Runtime geometry: finite positions/normals, valid material references and triangle indices.
+
+Unreal: 5.8.4, Apple Silicon, Development Editor target.
+Final build: SUCCEEDED.
+Final headless runtime smoke: AER_ARENA_READY; correct material parents; clean exit.
+Interactive native checks: table rendering, readable graphics, both first-person positions,
+Space serve, Tab switching, P pause, R reset, V overhead camera; both goals visible.
+Observed AI goals and first-to-seven match completion in the native game.
+
+C++ physics checks: PASS — fast rail shots, end rails, one-time goal scoring,
+rounded goal posts, goal-channel side walls, stationary/moving mallets, pause,
+match reset, mallet bounds, and a 120-second finite simulation with speed limits.
+JavaScript physics checks: PASS — rails, scoring, posts, final goal-channel behavior,
+and a 120-second finite simulation with speed limits.
+Portable browser checks: title screen, model rendering, first-person views, start,
+serving, side switching, pause, reset, and overhead framing. WebGL 2 renderer verified.
+Portable HTML: all model data, code and synthesized audio embedded; no external URLs.
+
+Delivery scope: editable Blender scene, GLB model, native Unreal source project and
+compiled Mac editor module, complete offline HTML game, readable sources and tests.
+No separately cooked standalone Unreal executable is included.

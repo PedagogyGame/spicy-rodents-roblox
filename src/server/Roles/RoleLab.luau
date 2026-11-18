@@ -64,8 +64,16 @@ function RoleLab.new(roles: any, opts: { isDev: ((player: any) -> boolean)? }?):
 			end
 			stats[name] = value
 			if name == "cents" then
-				local m = self.roles:member(player.UserId)
-				m.purse.cents = value
+				-- through the purse, so the wallet's log and the balance on screen follow. What is set is the
+				-- money the queue counts (the wallet's purse leaves unspent pocket money out of it)
+				local purse = self.roles:member(player.UserId).purse
+				local have = if type(purse.counted) == "number" then purse.counted else purse.cents
+				local delta = value - have
+				local ok = if delta >= 0 then purse:credit(delta, "role lab") else purse:debit(-delta, "role lab")
+				if not ok then
+					stats.cents = have
+					return false, "cents must be a whole number from 0 up"
+				end
 			end
 			return true, "ok"
 		elseif cmd == "event" then

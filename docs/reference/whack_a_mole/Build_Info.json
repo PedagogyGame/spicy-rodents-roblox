@@ -1,0 +1,16 @@
+{
+  "objects": 253,
+  "mesh_objects": 246,
+  "mole_roots": [
+    "Mole_01_ROOT",
+    "Mole_02_ROOT",
+    "Mole_03_ROOT",
+    "Mole_04_ROOT",
+    "Mole_05_ROOT"
+  ],
+  "frames": 240,
+  "fps": 30,
+  "units": "metres",
+  "hero_frame": 96,
+  "blender_version": "4.3.2"
+}

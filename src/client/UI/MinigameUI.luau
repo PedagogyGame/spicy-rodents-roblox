@@ -1,18 +1,26 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.UI.MinigameUI
 -- The on-screen side of every minigame (brief v2 §15 "every minigame ironed out carefully"; HANDOFF owner rule:
--- always say what you are looking at and what to press): a How-to-play card with the game's controls (H hides
--- it), a big banner for STRIKE / BUST / your turn, a status line (whose turn, lobby countdown, end card), the
--- scorecard (bowling's ten-frame sheet, darts' 501 or cricket marks), the power / timing meter with its sweet
--- spot, and buttons that work by mouse and touch (Leave, Start now, Play again, 501 / Cricket, and the bowling
--- touch controls). For bowling also: the turn clock (it turns red with a plain warning before an idle turn is
--- skipped), the hook indicator (five pips), and the end card (ranked scores, strikes, spares, misses, Play
--- again / Leave, the reset countdown). Pure layout: the game controllers (Client/Minigames/*) feed it.
+-- always say what you are looking at and what to press). It names no game: it is the widgets every game shares,
+-- and each game draws its own scorecard into the card frame from its own file (Client/Minigames/Games/<Game>,
+-- through ClientGame.card) with the kit below. The widgets: a How-to-play card with the game's controls (H hides
+-- it), a big banner (STRIKE / BUST / your turn), a status line (whose turn, lobby countdown, end card), the
+-- scorecard frame, the power / timing meter with its sweet spot, buttons that work by mouse and touch (Leave,
+-- Start now, Play again, a lobby's choices) and hold buttons for touch players, the turn clock (it turns red
+-- with a plain warning before an idle turn is skipped), a notch indicator (bowling's hook: five pips), a paper
+-- card (the fortune teller's), and the end card (ranked rows in the game's own columns, Play again / Leave, the
+-- reset countdown). Pure layout: the game controllers (Client/Minigames/*) feed it.
 -- Interface: new() -> UI; UI:open(game, title, help: { how: {string}, keys: {string} }); UI:close();
---   UI:banner(text, big?); UI:status(text); UI:scoreBowling(view, you); UI:scoreDarts(view, you);
+--   UI:banner(text, big?); UI:status(text); UI.card (the scorecard Frame); UI:clearCard();
 --   UI:meter(value?, sweet?: {lo, hi}, label?); UI:buttons(list: { {id, text} }, onClick); UI:touch(list, onDown,
---   onUp); UI:card(title, text, seconds); UI:isOpen(); UI:clock(seconds?, warning?); UI:hook(notch?, notches?);
---   UI:summary(summary?, you?, secondsLeft?, onAgain?, onLeave?) (Shared/Minigames/Bowling/Referee.summary)
+--   onUp) (an item whose id is "bowl" or whose third entry is "wide" is the wide main button); UI:paper(title,
+--   text, seconds) (seconds <= 0 takes the card away; so do open and close); UI:isOpen(); UI:clock(seconds?,
+--   warning?); UI:hook(notch?, notches?);
+--   UI:summary(summary?, you?, secondsLeft?, onAgain?, onLeave?): summary = { line, rows = { { seat, name, place,
+--   gone, ... } }, title?, cols? = { { title, key, x, w, strong? } } (fractions of the card; key "place" and
+--   "name" are drawn as rank and name), foot? (a format with one %d: the seconds left) };
+--   kit = { C (palette: NAVY, GOLD, CYAN, WHITE), label(parent, text, size, pos, color?, font?) -> TextLabel,
+--   corner(parent, radius), button(parent, text, width) -> TextButton }
 
 local CameraRig = require("../Camera/CameraRig")
 
@@ -249,6 +257,7 @@ function MinigameUI.new(): any
 
 	-- the fortune card
 	local fcard = Instance.new("Frame")
+	fcard.Name = "Paper"
 	fcard.BackgroundColor3 = Color3.fromRGB(246, 236, 210)
 	fcard.Size = UDim2.fromOffset(460, 200)
 	fcard.Position = UDim2.new(0.5, -230, 0.5, -60)
@@ -301,6 +310,15 @@ function MinigameUI.isOpen(self: any): boolean
 	return self.gui.Enabled
 end
 
+-- Empty the scorecard frame (a game's card function then draws into UI.card).
+function MinigameUI.clearCard(self: any)
+	for _, c in self.card:GetChildren() do
+		if not c:IsA("UICorner") then
+			c:Destroy()
+		end
+	end
+end
+
 function MinigameUI.open(self: any, _game: string, title: string, help: { how: { string }, keys: { string } })
 	self.gui.Enabled = true
 	self.helpFrame.Visible = true
@@ -319,6 +337,8 @@ function MinigameUI.open(self: any, _game: string, title: string, help: { how: {
 	self.helpText.Text = table.concat(lines, "\n")
 	self:status("")
 	self:meter(nil)
+	-- (the last game's paper card does not follow the player to the next one)
+	self:paper("", "", 0)
 	for _, c in self.card:GetChildren() do
 		c:Destroy()
 	end
@@ -328,6 +348,7 @@ end
 
 function MinigameUI.close(self: any)
 	self.gui.Enabled = false
+	self:paper("", "", 0)
 	self:meter(nil)
 	self:clock(nil)
 	self:hook(nil)
@@ -390,6 +411,9 @@ local function makeButton(parent: Instance, text: string, width: number): TextBu
 	return b
 end
 
+-- What a game draws its own card with (Client/Minigames/ClientGame.card): the same palette, labels and corners.
+MinigameUI.kit = { C = C, label = label, corner = corner, button = makeButton }
+
 -- buttons({ {id, text} }, onClick(id))
 function MinigameUI.buttons(self: any, list: { { string } }, onClick: (id: string) -> ())
 	-- buttons need a cursor: the orbit camera gives the mouse back while any are up
@@ -420,7 +444,8 @@ function MinigameUI.touch(self: any, list: { { string } }, onDown: (id: string) 
 	local UIS = game:GetService("UserInputService")
 	self.touchBar.Visible = UIS.TouchEnabled
 	for _, item in list do
-		local b = makeButton(self.touchBar, item[2], if item[1] == "bowl" then 150 elseif #item[2] > 3 then 86 else 60)
+		local wide = item[1] == "bowl" or item[3] == "wide"
+		local b = makeButton(self.touchBar, item[2], if wide then 150 elseif #item[2] > 3 then 86 else 60)
 		b.BackgroundColor3 = Color3.fromRGB(40, 50, 100)
 		b.MouseButton1Down:Connect(function()
 			onDown(item[1])
@@ -499,7 +524,15 @@ function MinigameUI.hook(self: any, notch: number?, notches: number?)
 		else `HOOK: {if math.abs(notch) >= n then "full" else "half"} {if notch < 0 then "left" else "right"}`
 end
 
--- The bowling end card: ranked rows from Referee.summary, who won, and what to press. nil hides it.
+-- The end card: ranked rows in the game's own columns, who won, and what to press. nil hides it.
+type Column = { title: string, key: string, x: number, w: number, strong: boolean? }
+local DEFAULT_COLS: { Column } = {
+	{ title = "", key = "place", x = 0.02, w = 0.07 },
+	{ title = "PLAYER", key = "name", x = 0.1, w = 0.5 },
+	{ title = "SCORE", key = "total", x = 0.62, w = 0.3, strong = true },
+}
+local DEFAULT_FOOT = "The table resets in %d s. Anyone can walk up and start a new game."
+
 function MinigameUI.summary(
 	self: any,
 	sum: { [string]: any }?,
@@ -517,9 +550,14 @@ function MinigameUI.summary(
 		return
 	end
 	self.summaryAgain, self.summaryLeave = onAgain, onLeave
+	local cols: { Column } = sum.cols or DEFAULT_COLS
 	local parts = { tostring(you), tostring(sum.line) }
 	for _, r in sum.rows do
-		table.insert(parts, `{r.seat}:{r.name}:{r.total}:{r.strikes}:{r.spares}:{r.misses}:{r.gone}`)
+		local cells = { tostring(r.seat), tostring(r.gone) }
+		for _, c in cols do
+			table.insert(cells, tostring(r[c.key]))
+		end
+		table.insert(parts, table.concat(cells, ":"))
 	end
 	local sig = table.concat(parts, "|")
 	if sig ~= self.summarySig then
@@ -533,7 +571,14 @@ function MinigameUI.summary(
 		local h = 150 + #rows * 32
 		frame.Size = UDim2.fromOffset(520, h)
 		frame.Position = UDim2.new(0.5, -260, 0.5, -h / 2 - 20)
-		label(frame, "GAME OVER", UDim2.new(1, -20, 0, 30), UDim2.fromOffset(10, 8), C.GOLD, Enum.Font.FredokaOne)
+		label(
+			frame,
+			tostring(sum.title or "GAME OVER"),
+			UDim2.new(1, -20, 0, 30),
+			UDim2.fromOffset(10, 8),
+			C.GOLD,
+			Enum.Font.FredokaOne
+		)
 		label(
 			frame,
 			tostring(sum.line),
@@ -543,14 +588,6 @@ function MinigameUI.summary(
 			Enum.Font.GothamBold
 		)
 		-- the card's columns: heading, where it starts and how wide it is (fractions of the card)
-		local cols: { { title: string, x: number, w: number } } = {
-			{ title = "", x = 0.02, w = 0.07 },
-			{ title = "BOWLER", x = 0.1, w = 0.36 },
-			{ title = "SCORE", x = 0.47, w = 0.13 },
-			{ title = "STRIKES", x = 0.61, w = 0.13 },
-			{ title = "SPARES", x = 0.74, w = 0.12 },
-			{ title = "MISSES", x = 0.87, w = 0.12 },
-		}
 		for _, c in cols do
 			label(frame, c.title, UDim2.new(c.w, 0, 0, 16), UDim2.new(c.x, 0, 0, 72), C.CYAN, Enum.Font.GothamBold)
 		end
@@ -563,17 +600,19 @@ function MinigameUI.summary(
 			row.Position = UDim2.fromOffset(8, y)
 			row.Parent = frame
 			corner(row, 6)
-			local name = r.name .. (if mine then " (you)" else "") .. (if r.gone then " (left)" else "")
-			local cells =
-				{ `{r.place}.`, name, tostring(r.total), tostring(r.strikes), tostring(r.spares), tostring(r.misses) }
-			for k, c in cols do
+			local name = tostring(r.name) .. (if mine then " (you)" else "") .. (if r.gone then " (left)" else "")
+			for _, c in cols do
+				local cell = if c.key == "place"
+					then `{r.place}.`
+					elseif c.key == "name" then name
+					else tostring(r[c.key])
 				label(
 					row,
-					cells[k],
+					cell,
 					UDim2.fromScale(c.w, 0.8),
 					UDim2.fromScale(c.x, 0.1),
-					if k == 3 then C.GOLD else C.WHITE,
-					if k == 3 then Enum.Font.FredokaOne else Enum.Font.GothamBold
+					if c.strong then C.GOLD else C.WHITE,
+					if c.strong then Enum.Font.FredokaOne else Enum.Font.GothamBold
 				)
 			end
 		end
@@ -601,201 +640,24 @@ function MinigameUI.summary(
 	frame.Visible = true
 	local foot = self.summaryFoot :: TextLabel?
 	if foot then
-		foot.Text =
-			`The lane resets in {math.max(0, math.ceil(secondsLeft or 0))} s. Anyone can walk up and start a new game.`
+		foot.Text = string.format(tostring(sum.foot or DEFAULT_FOOT), math.max(0, math.ceil(secondsLeft or 0)))
 	end
 end
 
-function MinigameUI.card(self: any, title: string, text: string, seconds: number)
+-- A printed paper card in the middle of the screen for a while (the fortune teller's). (It was a method named
+-- `card`, which the scorecard frame of the same name hid: calling it failed. `paper` is its working name.)
+-- seconds <= 0 takes the card away now. Opening or closing the UI takes it away too: a card never outlives the
+-- game it was dealt in.
+function MinigameUI.paper(self: any, title: string, text: string, seconds: number)
+	if seconds <= 0 then
+		self.fortuneCard.Visible = false
+		self.fortuneUntil = 0
+		return
+	end
 	self.fortuneTitle.Text = title
 	self.fortuneText.Text = text
 	self.fortuneCard.Visible = true
 	self.fortuneUntil = os.clock() + seconds
-end
-
--- Scorecards --------------------------------------------------------------------------------------------------
-local function clearCard(self: any)
-	for _, c in self.card:GetChildren() do
-		if not c:IsA("UICorner") then
-			c:Destroy()
-		end
-	end
-end
-
-function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number?)
-	clearCard(self)
-	local g = view.game
-	local seats = view.seats or {}
-	local n = math.max(1, #seats)
-	self.card.Size = UDim2.fromOffset(600, 26 + n * 38)
-	self.card.Position = UDim2.new(1, -612, 1, -(38 + n * 38))
-	local fw = 1 / 13.2
-	for f = 1, 10 do
-		label(
-			self.card,
-			tostring(f),
-			UDim2.new(fw, -2, 0, 18),
-			UDim2.new(0.16 + (f - 1) * fw, 0, 0, 4),
-			C.CYAN,
-			Enum.Font.GothamBold
-		)
-	end
-	label(self.card, "TOTAL", UDim2.new(0.08, 0, 0, 18), UDim2.new(0.91, 0, 0, 4), C.CYAN, Enum.Font.GothamBold)
-	for s, seat in seats do
-		local y = 24 + (s - 1) * 38
-		local gs = if g then g.seats[s] else nil
-		local up = view.turn == s and view.phase == "playing"
-		local row = Instance.new("Frame")
-		row.BackgroundColor3 = if up then Color3.fromRGB(28, 96, 104) else Color3.fromRGB(26, 32, 66)
-		row.Size = UDim2.new(1, -8, 0, 34)
-		row.Position = UDim2.fromOffset(4, y)
-		row.Parent = self.card
-		corner(row, 6)
-		local name = seat.name .. (if s == you then " (you)" else "") .. (if seat.gone then " (left)" else "")
-		label(
-			row,
-			name,
-			UDim2.fromScale(0.15, 0.8),
-			UDim2.fromScale(0.005, 0.1),
-			if up then C.GOLD else C.WHITE,
-			Enum.Font.GothamBold
-		)
-		for f = 1, 10 do
-			local cell = Instance.new("Frame")
-			cell.BackgroundColor3 = Color3.fromRGB(16, 20, 44)
-			cell.Size = UDim2.new(fw, -2, 1, -4)
-			cell.Position = UDim2.new(0.16 + (f - 1) * fw, 0, 0, 2)
-			cell.Parent = row
-			local marks = if gs and gs.marks[f] then gs.marks[f] else {}
-			local boxes = if f == 10 then 3 else 2
-			for b = 1, boxes do
-				local m = marks[b] or ""
-				label(
-					cell,
-					m,
-					UDim2.fromScale(1 / boxes, 0.5),
-					UDim2.fromScale((b - 1) / boxes, 0),
-					if m == "X" or m == "/" then C.GOLD else C.WHITE,
-					Enum.Font.Code
-				)
-			end
-			label(
-				cell,
-				tostring(if gs then gs.totals[f] else ""),
-				UDim2.fromScale(1, 0.5),
-				UDim2.fromScale(0, 0.5),
-				C.CYAN,
-				Enum.Font.GothamBold
-			)
-		end
-		label(
-			row,
-			if gs then tostring(gs.total) else "0",
-			UDim2.fromScale(0.08, 0.8),
-			UDim2.fromScale(0.91, 0.1),
-			C.GOLD,
-			Enum.Font.FredokaOne
-		)
-	end
-end
-
-local CRICKET = { "20", "19", "18", "17", "16", "15", "25" }
-local function cricketMark(n: number): string
-	return if n <= 0 then "" elseif n == 1 then "/" elseif n == 2 then "X" else "(X)"
-end
-
-function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
-	clearCard(self)
-	local g = view.game
-	local seats = view.seats or {}
-	local n = math.max(1, #seats)
-	local mode = (g and g.mode) or view.mode or "501"
-	if mode == "cricket" then
-		self.card.Size = UDim2.fromOffset(120 + n * 110, 250)
-		self.card.Position = UDim2.new(1, -(132 + n * 110), 1, -262)
-		label(self.card, "CRICKET", UDim2.fromOffset(110, 24), UDim2.fromOffset(6, 4), C.GOLD, Enum.Font.FredokaOne)
-		for i, seat in seats do
-			local x = 116 + (i - 1) * 110
-			local up = view.turn == i
-			label(
-				self.card,
-				seat.name .. (if i == you then "*" else ""),
-				UDim2.fromOffset(104, 22),
-				UDim2.fromOffset(x, 4),
-				if up then C.GOLD else C.WHITE,
-				Enum.Font.GothamBold
-			)
-			for r, lab in CRICKET do
-				local m = if g then g.seats[i].marks[lab] or 0 else 0
-				label(
-					self.card,
-					cricketMark(m),
-					UDim2.fromOffset(104, 22),
-					UDim2.fromOffset(x, 4 + r * 26),
-					C.WHITE,
-					Enum.Font.GothamBold
-				)
-			end
-			label(
-				self.card,
-				if g then tostring(g.seats[i].score) else "0",
-				UDim2.fromOffset(104, 24),
-				UDim2.fromOffset(x, 214),
-				C.GOLD,
-				Enum.Font.FredokaOne
-			)
-		end
-		for r, lab in CRICKET do
-			label(
-				self.card,
-				if lab == "25" then "BULL" else lab,
-				UDim2.fromOffset(90, 22),
-				UDim2.fromOffset(10, 4 + r * 26),
-				C.CYAN,
-				Enum.Font.GothamBold
-			)
-		end
-	else
-		self.card.Size = UDim2.fromOffset(420, 34 + n * 40)
-		self.card.Position = UDim2.new(1, -432, 1, -(46 + n * 40))
-		label(
-			self.card,
-			"501  (finish on a double)",
-			UDim2.new(1, -12, 0, 24),
-			UDim2.fromOffset(6, 4),
-			C.GOLD,
-			Enum.Font.FredokaOne
-		)
-		for i, seat in seats do
-			local y = 32 + (i - 1) * 40
-			local gs = if g then g.seats[i] else nil
-			local up = view.turn == i
-			label(
-				self.card,
-				(if up then "> " else "") .. seat.name .. (if i == you then " (you)" else ""),
-				UDim2.new(0.42, 0, 0, 30),
-				UDim2.fromOffset(6, y),
-				if up then C.GOLD else C.WHITE,
-				Enum.Font.GothamBold
-			)
-			label(
-				self.card,
-				if gs then tostring(gs.score) else "501",
-				UDim2.new(0.22, 0, 0, 34),
-				UDim2.new(0.44, 0, 0, y - 2),
-				C.GOLD,
-				Enum.Font.FredokaOne
-			)
-			label(
-				self.card,
-				if gs and gs.darts then table.concat(gs.darts, "  ") else "",
-				UDim2.new(0.32, 0, 0, 26),
-				UDim2.new(0.67, 0, 0, y + 2),
-				C.CYAN,
-				Enum.Font.GothamBold
-			)
-		end
-	end
 end
 
 return MinigameUI

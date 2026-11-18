@@ -8,7 +8,9 @@
 -- Situations: spotting (a person sees the Spicy Rodent or an infected squirrel), fleeing (running
 -- from it), bitten (the victim, at the bite), witness (someone who saw a bite), bystander (in the
 -- crowd at a scene), patient (the victim on the ground), symptoms (the delayed tell), crew (the
--- ambulance crew at the patient), cured (leaving the hospital).
+-- ambulance crew at the patient), cured (leaving the hospital), rafters (people in the bowling alley who notice a
+-- squirrel in the rafters over the lanes), drain (someone who saw a squirrel go down a storm drain, BRIEF_ADDENDUM
+-- D8), stakeout (the officer standing over the grate the rodent went down).
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
 -- Pure. No side effects on require.
@@ -82,6 +84,22 @@ Lines.GROUPS = table.freeze({
 		"Good as new. Thank you, nurse!",
 		"No more squirrels for me.",
 	}),
+	-- people in the bowling alley's lane hall who notice a squirrel in the rafters (Stealth/RafterWatch, addendum D9)
+	rafters = table.freeze({
+		"Is that a squirrel up there?",
+		"There's a squirrel in the rafters!",
+		"Look, up in the beams!",
+		"Something's running across the ceiling!",
+	}),
+	drain = table.freeze({
+		"Where did it go?",
+		"Did that squirrel just go into the sewer?",
+		"I am NOT following it down there.",
+		"It's gone down a grate!",
+	}),
+	stakeout = table.freeze({
+		"It went down the drain!",
+	}),
 }) :: { [string]: { string } }
 
 Lines.SITUATIONS = table.freeze({
@@ -94,6 +112,9 @@ Lines.SITUATIONS = table.freeze({
 	"symptoms",
 	"crew",
 	"cured",
+	"rafters",
+	"drain",
+	"stakeout",
 })
 
 function Lines.of(situation: string): { string }

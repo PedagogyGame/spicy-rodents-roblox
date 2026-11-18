@@ -274,6 +274,28 @@ return function(t)
 		t.eq(wd.possession.stats.recovered, 100)
 	end)
 
+	t.test(
+		"recover leaves a body riding the sky lift on its seat (review: Reset flashed it to the platform)",
+		function()
+			local wd = world(1, 0)
+			local p = { UserId = 6, Name = "r", Character = nil }
+			local a = wd.actors:get("human_1") :: any
+			wd.possession:possess(p, a)
+			local body = a.body
+			local attrs = { Ride = "2/3" }
+			body.GetAttribute = function(_self: any, k: string): any
+				return attrs[k]
+			end
+			local y0 = body.y
+			t.eq(wd.possession:recover(p), false)
+			t.near(body.y, y0, 1e-9)
+			t.eq(wd.possession.stats.recovered, 0)
+			attrs.Ride = nil
+			t.eq(wd.possession:recover(p), true)
+			t.near(body.y, y0 + 3, 1e-9)
+		end
+	)
+
 	t.test("soak: 500 possess/release cycles, 0 leaks, 0 errors, owners match, AI resumes <= 0.2 s", function()
 		local wd = world(6, 3)
 		local players = {}

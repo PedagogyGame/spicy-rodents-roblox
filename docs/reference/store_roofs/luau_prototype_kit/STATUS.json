@@ -1,0 +1,16 @@
+{
+  "version": "Spicy Rodent Luau Prototype Kit v1",
+  "status": "unintegrated opt-in code",
+  "runtime_tested": false,
+  "game_files_modified": false,
+  "notes": "No background work, no Roblox Studio test; static source checks only.",
+  "workstreams": {
+    "paintball": "partial_server_logic",
+    "sky_lift": "partial_single_rider_logic",
+    "pool": "entry_exit_zoning_only",
+    "alley": "humanoid_waypoint_patrol_only",
+    "wallet": "session_only_server_balance",
+    "roof_route": "local_graph_lookup_only",
+    "run_through_agents": "static_qc_and_manual_in_studio_test_plan_only"
+  }
+}

@@ -94,15 +94,18 @@ function SpatialIndex.entryCount(self: SpatialIndex): number
 	return self._entryCount
 end
 
--- nearest(x, y, z, maxDist, excludeRouteId?): the closest sample within maxDist, or nil
--- (nearestRoute L5718: scans +-ceil(maxDist / cell) cells, strict `d < best`).
+-- nearest(x, y, z, maxDist, excludeRouteId?, accept?): the closest sample within maxDist, or nil
+-- (nearestRoute L5718: scans +-ceil(maxDist / cell) cells, strict `d < best`). `accept(routeId, t)`, when given,
+-- skips the samples it refuses (Routes/Enclosure: an enclosed route is not reached through its wall); without it
+-- the search is exactly v5.4's.
 function SpatialIndex.nearest(
 	self: SpatialIndex,
 	x: number,
 	y: number,
 	z: number,
 	maxDist: number,
-	excludeRouteId: number?
+	excludeRouteId: number?,
+	accept: ((routeId: number, t: number) -> boolean)?
 ): Hit?
 	local cs = self.cellSize
 	local tx, ty, tz = math.floor(x / cs), math.floor(y / cs), math.floor(z / cs)
@@ -121,7 +124,7 @@ function SpatialIndex.nearest(
 						if id ~= excludeRouteId then
 							local dx, dy, dz = xs[e] - x, ys[e] - y, zs[e] - z
 							local d = math.sqrt(dx * dx + dy * dy + dz * dz)
-							if d < bd then
+							if d < bd and (accept == nil or accept(id, ts[e])) then
 								bd = d
 								best = { routeId = id, t = ts[e], d = d, x = xs[e], y = ys[e], z = zs[e] }
 							end

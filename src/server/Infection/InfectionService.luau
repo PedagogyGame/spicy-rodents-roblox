@@ -57,7 +57,8 @@
 -- Interface: new(opts) -> Service; :bite(victimId, biterId?, by?) -> boolean (a new infection began);
 --   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :stateOf(id) ->
 --   string?; :statusOf(id) -> string? (for the player holding `id`); :townPercent(); :trafficFlags(id)
---   -> boolean; :cases() -> { [id]: Case }; :walkRoute(x, z) -> ({ {x, z} }?, length);
+--   -> boolean; :cases() -> { [id]: Case }; :feared() -> { actor } (the squirrels people are afraid of now:
+--   the rodent and infected squirrels, not those hidden down a drain); :walkRoute(x, z) -> ({ {x, z} }?, length);
 --   :sidewalkRoute(x, z) -> ({ {x, z} }?, length) (the pavements only); :shutdown(); :stats();
 --   TOASTS; TICK; SINK
 -- Ids are TownAI actor ids. Positions in studs.
@@ -88,6 +89,8 @@ export type Opts = {
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	setAttr: ((id: number, name: string, value: any) -> ())?, -- replicate an attribute on the body
 	setPossessable: ((id: number, possessable: boolean) -> ())?,
+	-- the body is away on the sky lift (riding, or seated at the Lookout: its Ride attribute): its case waits
+	busy: ((id: number) -> boolean)?,
 	notify: ((id: number, payload: { [string]: any }) -> ())?, -- a message for the player holding `id`
 	driverOf: ((id: number) -> any?)?, -- who plays body `id` now (any value naming the player; nil: the AI)
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
@@ -190,6 +193,7 @@ export type Service = typeof(setmetatable(
 		controllerOf: (id: number) -> string,
 		setAttr: (id: number, name: string, value: any) -> (),
 		setPossessable: (id: number, possessable: boolean) -> (),
+		away: (id: number) -> boolean,
 		notify: (id: number, payload: { [string]: any }) -> (),
 		driverOf: (id: number) -> any?,
 		serverTime: () -> number,
@@ -257,6 +261,9 @@ function InfectionService.new(opts: Opts): Service
 		end,
 		setAttr = opts.setAttr or function() end,
 		setPossessable = opts.setPossessable or function() end,
+		away = opts.busy or function(): boolean
+			return false
+		end,
 		notify = opts.notify or function() end,
 		driverOf = opts.driverOf or function(): any?
 			return nil
@@ -666,15 +673,26 @@ end
 
 -- scenes -----------------------------------------------------------------------------------------
 
--- the squirrels people are afraid of, in sight: the Spicy Rodent and any infected squirrel
+-- the squirrels people are afraid of, in sight: the Spicy Rodent and any infected squirrel, unless something
+-- hides it (down a storm drain: AI/TownAI's cover), so nobody is scared by one under the street
 local function threats(self: Service): { any }
 	local out = {}
-	for _, o in self.world.actors do
-		if o.species == "squirrel" and (o.variant == "spicy" or o.infected == true) and (o.lift or 0) == 0 then
+	local world = self.world
+	for _, o in world.actors do
+		if
+			o.species == "squirrel"
+			and (o.variant == "spicy" or o.infected == true)
+			and (o.lift or 0) == 0
+			and TownAI.covered(world, o.id) == nil
+		then
 			table.insert(out, o)
 		end
 	end
 	return out
+end
+
+function InfectionService.feared(self: Service): { any }
+	return threats(self)
 end
 
 -- the threat within `r` studs of (x, z) that is nearest, if any
@@ -1536,6 +1554,11 @@ local function stepCase(self: Service, rec: Record)
 	if rec.gone then
 		rec.gone = false
 		a.infected = true
+	end
+	if self.away(rec.id) then
+		-- riding the sky lift or seated at the Lookout (Server/Rides/SkyLiftService): nobody collapses in a
+		-- cabin; the case waits for the platform
+		return
 	end
 	checkAmbulance(self, rec)
 	if rec.lingerUntil and self.now >= rec.lingerUntil then

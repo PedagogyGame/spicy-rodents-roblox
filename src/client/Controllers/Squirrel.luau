@@ -21,15 +21,21 @@
 -- rescue) shows up as a root that is not where the last frame left it; the motor restarts from there
 -- instead of writing the old position back over it.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
--- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
+-- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast, and so does
+-- what a route's own record says to do at its far end (its `hint`: the alley roof's ridge and bough say jump or drop)
+-- or on going on from there by itself (its `onwardHint`: out of the alley's vent into the rafters).
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
+-- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
+-- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
+-- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
---   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
+--   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
+--   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
---   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
+--   string (pure); launch(events, vy) -> action?, airSeconds? (pure); stunned(untilTime, now) -> boolean (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -39,6 +45,9 @@ local SquirrelVisual =
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
@@ -50,17 +59,62 @@ local HINTS: { [string]: string } = {
 	noTransfer = "Nothing to grab within reach: get right under a branch or wire",
 	nothingNear = "Nothing to grab here: run into a tree, pole or downspout to climb",
 	junctionAhead = "Junction ahead: A or D picks the way",
+	-- inside an enclosed run (Shared/Routes/Enclosure) away from its openings
+	noRoom = "No room to jump in here: run on to an opening",
 }
 
+-- The hint for arriving at the far end of `route` at `t` (pure; nil: nothing to say there): the route record's own
+-- `hint`. Only the far end (t = 1) has one: the other end leads on.
+function Squirrel.routeHint(route: { hint: string? }?, t: number?): string?
+	if route == nil or t == nil or t < 0.5 then
+		return nil
+	end
+	return route.hint
+end
+
+-- The camera zone for the route the body is on (pure): "tunnel" on any enclosed run (Shared/Routes/Enclosure.zone:
+-- the ball return, a hollow tree's inside, whatever its origin), so CameraPolicy puts the camera inside with it; nil
+-- elsewhere.
+function Squirrel.cameraZone(route: any?): string?
+	return if Enclosure.zone(route) ~= nil then "tunnel" else nil
+end
+
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
--- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now.
-function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any } }, onRoute: boolean): string?
+-- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now, `railT` where
+-- along it, `routeOf(id)` the route record of an id (a route with something to do at its far end says so on
+-- arriving there: routeHint; one whose far end carries on by itself says its onwardHint on the way out).
+function Squirrel.feedback(
+	frame: { [string]: any },
+	events: { { [string]: any } },
+	onRoute: boolean,
+	railT: number?,
+	routeOf: ((id: number) -> any)?
+): string?
+	local function route(id: number?): any
+		return if id ~= nil and routeOf then routeOf(id) else nil
+	end
 	for _, e in events do
 		if e.kind == "hint" and e.reason and HINTS[e.reason] then
 			return HINTS[e.reason]
 		end
+		if e.kind == "railEnd" then
+			local said = Squirrel.routeHint(route(e.routeId), railT)
+			if said then
+				return said
+			end
+		end
+		if e.kind == "autoSwitch" then
+			local from = route(e.fromRouteId)
+			if from and from.onwardHint then
+				return from.onwardHint
+			end
+		end
 		if e.kind == "winded" then
 			return "Out of fumes: sprint comes back in a few seconds"
+		end
+		if e.kind == "lip" then
+			-- the head out of an enclosed run's opening (the ball return's hood over the rack, a knothole)
+			return "Space jumps out, click pounces, Q drops, S goes back in"
 		end
 	end
 	local attached = false
@@ -102,6 +156,13 @@ end
 Squirrel.OUTSIDE_SLACK = 2
 function Squirrel.movedFromOutside(gap: number, speed: number, frameDt: number): boolean
 	return gap > Squirrel.OUTSIDE_SLACK + speed * math.max(frameDt, 0) * 2
+end
+
+-- Whether the body is stunned now (the water gun: its StunnedUntil attribute, server time, against `now`):
+-- the motor then gets no input at all, so the body stands (or falls, or rolls to a stop) as if nothing were
+-- pressed, which the server's MoveValidator already takes as honest. Pure.
+function Squirrel.stunned(untilTime: any, now: number): boolean
+	return type(untilTime) == "number" and now < untilTime
 end
 
 -- What the held body is doing, for a rig that plays clips (KinematicPose.mode): on a rail it is on a
@@ -154,6 +215,9 @@ function Squirrel.start(
 		blockedHalf = world.blockedHalf,
 		clamp = world.clamp,
 	}
+	local function routeOf(id: number): any
+		return motorWorld.registry:get(id)
+	end
 	local pos = root.Position
 	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
 	-- the root's height above the soles is the body's own HipHeight (PuppetSpec), not the gap to the
@@ -250,6 +314,12 @@ function Squirrel.start(
 			mi.fw = 1
 			mi.cameraYaw = state.yaw + math.pi
 		end
+		-- (the server clock is read only for a body that has ever been stunned)
+		local stunnedUntil = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
+		if stunnedUntil ~= nil and Squirrel.stunned(stunnedUntil, workspace:GetServerTimeNow()) then
+			mi = SquirrelMotor.idleInput(f.cameraYaw)
+			holding = false
+		end
 		local wasOnRoute = state.routeId ~= nil
 		local _, events = SquirrelMotor.step(state, mi, dt, motorWorld :: any)
 		for _, e in events do
@@ -262,7 +332,9 @@ function Squirrel.start(
 				metrics.lastEvent = "riverRecover"
 			end
 		end
-		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute) else nil
+		local say = if ctx.toast
+			then Squirrel.feedback(f :: any, events :: any, wasOnRoute, state.railT, routeOf)
+			else nil
 		local t = os.clock()
 		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
 			lastSaid, lastText = t, say
@@ -272,16 +344,16 @@ function Squirrel.start(
 			shownStamina, shownWinded = state.stamina, state.winded
 			ctx.meter(state.stamina, state.winded)
 		end
-		-- the bowling alley's ball-return tunnel (and its vent): the camera rides low behind (CameraPolicy zone)
-		local zone = nil
-		if state.routeId then
-			local r = motorWorld.registry:get(state.routeId)
-			if r and r.origin == "attraction" then
-				zone = "tunnel"
-			end
-		end
+		-- any enclosed run (the ball return, a hollow tree's inside): the camera rides low behind (CameraPolicy zone)
+		local zone = Squirrel.cameraZone(if state.routeId then motorWorld.registry:get(state.routeId) else nil)
 		if body:GetAttribute("CameraZone") ~= zone then
 			body:SetAttribute("CameraZone", zone)
+		end
+		-- on an enclosed run, the way off it A or D picked (kept by the motor until it is passed): World/SewerAmbience
+		-- names it at drain 1's crossing
+		local picked = if zone ~= nil then state.selectedJunction else nil
+		if body:GetAttribute("ExitPicked") ~= picked then
+			body:SetAttribute("ExitPicked", picked)
 		end
 		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
 		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)

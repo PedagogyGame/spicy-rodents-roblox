@@ -18,7 +18,10 @@ local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
 local TreeArt = require("./lib/TreeArt")
+local PinballArt = require("./lib/PinballArt")
+local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
+local Sewers = require("./lib/Sewers")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -441,6 +444,26 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	if attractionsModule then
 		table.insert(w1.modules, attractionsModule)
 	end
+	-- data/sewers.json: the storm drains under the town (Shared/World/SewerLayout) and their enclosed routes
+	local otherIds: { [number]: boolean } = {}
+	for _, r in (if attractionsModule then attractionsModule.value.routes else {}) :: { any } do
+		otherIds[r.id] = true
+	end
+	local sewersModule = Sewers.compile({
+		repo = repo,
+		routeIds = routeIds,
+		otherIds = otherIds,
+		invariant = invariant,
+		compare = compare,
+		schemaError = function(path: string, errs: { Schema.Error })
+			errorsTotal += #errs
+			filesValidated += 1
+			stdio.ewrite("compile: schema errors in " .. path .. "\n" .. Schema.formatErrors(path, errs) .. "\n")
+		end,
+	})
+	if sewersModule then
+		table.insert(w1.modules, sewersModule)
+	end
 	-- data/expansion.json: the batch 2 town expansion layout (docs/waves/BATCH2_SPEC.md), checked against the town
 	local terrainExtensions = nil
 	for _, m in w1.modules do
@@ -471,6 +494,16 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local treeArtModule = TreeArt.compile({ repo = repo, invariant = invariant, compare = compare })
 	if treeArtModule then
 		table.insert(w1.modules, treeArtModule)
+	end
+	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
+	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })
+	if shopArtModule then
+		table.insert(w1.modules, shopArtModule)
+	end
+	-- data/art/pinball.json: the owner's finished pinball models (Server/Assets/PinballArt)
+	local pinballArtModule = PinballArt.compile({ repo = repo, invariant = invariant, compare = compare })
+	if pinballArtModule then
+		table.insert(w1.modules, pinballArtModule)
 	end
 
 	for _, c in comparisons do

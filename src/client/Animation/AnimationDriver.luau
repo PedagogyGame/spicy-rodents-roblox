@@ -64,7 +64,7 @@
 --   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
 --   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
 --   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
---   medPose(med, footDrop) -> { clip, drop, flat } (pure); gaitClip(current, pace, runAbove?) -> "walk" |
+--   seated(seatPart, ride) -> boolean (pure); medPose(med, footDrop) -> { clip, drop, flat } (pure); gaitClip(current, pace, runAbove?) -> "walk" |
 --   "run" (pure); pace(prev, inst, dt) -> studs/s (pure); sway(med, t, seed) -> roll, pitch (pure);
 --   FLAT_JOINTS
 
@@ -291,6 +291,13 @@ AnimationDriver.DEFAULT_CLIPS = {
 -- collapsed person sits on the ground; a patient in a bed sits up on the cot; both with their legs
 -- out in front of them. Anything else (symptomatic, walked to the ambulance, in transit, healthy)
 -- keeps its usual animation.
+-- Whether a body sits: in a car seat (Humanoid.SeatPart), or on the sky lift (its Ride attribute: the server
+-- moves a rider at line speed, so without this the clip would follow the root's speed and run). The Ride
+-- attribute alone is enough; nobody has checked Seat:Sit on an anchored root in the engine.
+function AnimationDriver.seated(seatPart: any, ride: any): boolean
+	return seatPart ~= nil or ride ~= nil
+end
+
 function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
 	if med == "down" then
 		return { clip = "sit", drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT), flat = true }
@@ -882,7 +889,7 @@ function AnimationDriver.start(opts: Opts): Driver
 	local function choose(e: Entry): string
 		local set: ClipSet = clips[e.species] or {}
 		local hum = e.humanoid
-		if set.sit and hum and hum.SeatPart ~= nil then
+		if set.sit and AnimationDriver.seated(if hum then hum.SeatPart else nil, e.body:GetAttribute("Ride")) then
 			return "sit"
 		end
 		-- a patient (AI bodies only: a held body keeps its own animation)
@@ -941,6 +948,13 @@ function AnimationDriver.start(opts: Opts): Driver
 			return
 		end
 		local anchored = e.root.Anchored
+		if e.body:GetAttribute("Ride") ~= nil then
+			-- on the sky lift (Client/Rides/SkyLiftView puts the root on its seat each frame): no settle, no probe
+			e.settle.live = false
+			e.fix, e.fixTarget = 0, 0
+			applyOffset(e, 0)
+			return
+		end
 		if KinematicPose.get(e.body) then
 			if not e.kin then
 				e.kin = true

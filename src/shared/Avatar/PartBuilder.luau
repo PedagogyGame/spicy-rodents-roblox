@@ -5,7 +5,7 @@
 -- Interface: instantiate(spec, lib) -> Model; partCount(spec); names(spec) -> {parts, joints, attachments};
 --            hex(s) -> {r, g, b} (0-1); cf(spec, lib) helpers.
 --
--- A ModelSpec lists parts (box, ball or cylinder; position relative to the PrimaryPart, optional yaw /
+-- A ModelSpec lists parts (box, ball, cylinder or wedge; position relative to the PrimaryPart, optional yaw /
 -- roll in radians), joints (Motor6D or Weld, joint frame at `at` or at Part1's centre, identity rotation),
 -- attachments (sockets) and extra children (Humanoid, AnimationController, HumanoidDescription). Names
 -- come from the caller, which takes them from Actors/RigSpec (final bone, socket and region names), so a
@@ -24,7 +24,11 @@ export type PartSpec = {
 	roll: number?, -- radians about +Z (wheels: pi/2 turns a cylinder's axis from X to... see shape)
 	pitch: number?, -- radians about +X
 	color: Rgb,
-	shape: string?, -- "Block" (default) | "Ball" | "Cylinder" (axis along local X)
+	-- "Block" (default) | "Ball" | "Cylinder" (axis along local X) | "Wedge" (a Roblox WedgePart: the
+	-- bottom and the +Z face are whole, and the slope runs from the bottom edge at local -Z up to the top
+	-- edge at local +Z, so on a rig that faces -Z an unturned wedge is a windscreen and yaw = pi a rear
+	-- window; the same convention as worldgen/Spec "Wedge")
+	shape: string?,
 	material: string?, -- Enum.Material name (default SmoothPlastic)
 	transparency: number?,
 	reflectance: number?,
@@ -105,7 +109,8 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 	local parts: { [string]: any } = {}
 	local local_: { [string]: any } = {}
 	for _, p in spec.parts do
-		local inst = Instance.new("Part")
+		local wedge = p.shape == "Wedge"
+		local inst = Instance.new(if wedge then "WedgePart" else "Part")
 		inst.Name = p.name
 		inst.Size = Vector3.new(p.size[1], p.size[2], p.size[3])
 		local rel = partCFrame(p, lib)
@@ -113,7 +118,9 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 		inst.CFrame = base * rel
 		inst.Color = Color3.new(p.color.r, p.color.g, p.color.b)
 		inst.Material = (Enum.Material :: any)[p.material or "SmoothPlastic"]
-		inst.Shape = (Enum.PartType :: any)[p.shape or "Block"]
+		if not wedge then
+			inst.Shape = (Enum.PartType :: any)[p.shape or "Block"]
+		end
 		inst.Transparency = p.transparency or 0
 		inst.Reflectance = p.reflectance or 0
 		inst.TopSurface = Enum.SurfaceType.Smooth

@@ -115,17 +115,25 @@ Tunables.tree = {
 	           stinkFillPerMin = { v = 1.2 }, stinkFireMin = { v = 95 }, stinkCost = { v = 30 },
 	           stinkRepelRadius = { v = 8, unit = "u" }, stinkRepelSecs = { v = 4, unit = "s" } },
 	economy = { minWageCentsPerHour = { v = 2, src = "brief v2 §13a" }, robuxToCents = { v = 400, src = "about 1 R$ = 4 S$" },
+	            pocketMoneyCents = { v = 300, unit = "Spicy cents", src = "plan default until jobs pay: a player is given S$3.00 once per server, on first joining (every corner-store item once is 204c)" },
 	            paintballPassCents = { v = 20 }, paintballPassDays = { v = 5, unit = "game days", src = "Q2" }, garbSetCents = { v = 100 },
 	            fashionUnlockLifetimeCents = { v = 150, src = "v5.4's 150 lifetime coins gate the fashion stand (rev 4, CR3 VD-3)" } },
 	reputation = { votesPerDay = { v = { up = 5, down = 5 }, unit = "per game day", src = "v2 §13a (Q2)" }, voteWeightClamp = { v = { 0.25, 1.5 } },
 	               cafeTickPerHour = { v = 1 }, rankGateDays = { v = "Ladder.params", src = "ladder number; not here" } },
-	paintball = { projectileSpeed = { v = 90, unit = "st/s" }, drop = { v = 9.8 }, magazine = { v = 5 }, lagHistorySecs = { v = 1.0 },
+	paintball = { projectileSpeed = { v = 150, unit = "st/s", src = "paintball review 2026-11-13 (Contract.FEEL)" }, drop = { v = 19.6 }, magazine = { v = 5 }, lagHistorySecs = { v = 1.0 },
 	              matchSecs = { v = 480 }, teamSize = { v = { 4, 8 } }, sprintMult = { v = 1.4 } },
 	minigames = { inputDelayBudgetMs = { v = 120, src = "S13 pass bar (shooter's local feel)" }, jengaBlocks = { v = 54 }, dartsWobble = { v = 0.04 },
 	              labyrinthTiltDegPerS = { v = 25 } },
 	lighting = { enableRadius = { v = 180, unit = "st" }, flickerFraction = { v = 0.07 }, maxRealLights = { v = 300, src = "S17" } },
 	interior = { doorHold = { v = 3, unit = "s" }, hideNoSight = { v = 2, unit = "s" }, searchPerSpot = { v = 1.5, unit = "s" } },
 	recovery = { safeHistory = { v = 3, unit = "s" }, riverToQuay = { v = true, src = "worldgen_districts_art §16" } },
+	-- the storm drains (BRIEF_ADDENDUM D8; Shared/World/SewerLayout). speedMult is compiled into every sewer route's
+	-- speedMult (tools/compile lib/Sewers): change it, recompile. The motor and the server's caps read it
+	-- (Motion.routeSpeed, SquirrelMotor.routeCap).
+	-- sprintMult: a sprint's extra on top of it (the owner, 18 November: "make sprinting down there 4% faster").
+	sewer = { speedMult = { v = 1.25, src = "D8 survey default: 1.25 x the street pace inside a pipe, so every pipe beats its surface way" },
+	          sprintMult = { v = 1.04, src = "owner 2026-11-18: sprinting in the pipes 4 % faster" },
+	          stakeoutSecs = { v = 15, unit = "s", src = "D8 survey default: an officer stands over the grate the rodent went down" } },
 	policeCoord = { tier2Pair = { v = true }, cutoffLookahead = { v = 30, unit = "u" }, perimeterPoints = { v = 3 } },
 	ai = { thinkHz = { v = { near = 10, mid = 4, far = 1 } }, lodNear = { v = 150, unit = "st" }, lodMid = { v = 500, unit = "st" }, budgetMs = { v = 4 },
 	       arenaBudgetMs = { v = 1.5, src = "S18" } },

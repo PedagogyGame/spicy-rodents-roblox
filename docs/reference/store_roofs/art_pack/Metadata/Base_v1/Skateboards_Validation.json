@@ -1,0 +1,5506 @@
+{
+  "validation": "GLB structure, geometry, embedding and budget checks; not an engine playtest",
+  "budgets": {
+    "max_scene_triangles": 30000,
+    "max_bytes": 2000000,
+    "strict_size": true
+  },
+  "all_passed": true,
+  "assets": [
+    {
+      "file": "GLB/Skateboards/01_Lunar_Moth.glb",
+      "name": "01_Lunar_Moth.glb",
+      "size_bytes": 132488,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Lunar_Moth",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 9186
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Lunar_Moth",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Lunar_Moth",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Lunar_Moth_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Lunar_Moth",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.003",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.010",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.002",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Lunar_Moth_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Lunar_Moth",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Lunar_Moth_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Lunar_Moth",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Lunar_Moth_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Lunar_Moth",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Lunar_Moth_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Lunar_Moth",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Lunar_Moth",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Lunar Moth",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Lunar_Moth",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Lunar_Moth",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Lunar_Moth",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Lunar_Moth",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Lunar_Moth",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Lunar_Moth",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Lunar_Moth",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Lunar_Moth",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Lunar_Moth",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/02_Static_Weekend.glb",
+      "name": "02_Static_Weekend.glb",
+      "size_bytes": 134696,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Static_Weekend",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 11305
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Static_Weekend",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Static_Weekend",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Static_Weekend_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Static_Weekend",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.017",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.024",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.004",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.006",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Static_Weekend_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Static_Weekend",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Static_Weekend_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Static_Weekend",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Static_Weekend_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Static_Weekend",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Static_Weekend_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Static_Weekend",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Static_Weekend",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Static Weekend",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Static_Weekend",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Static_Weekend",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Static_Weekend",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Static_Weekend",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Static_Weekend",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Static_Weekend",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Static_Weekend",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Static_Weekend",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Static_Weekend",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/03_Ochre_Run.glb",
+      "name": "03_Ochre_Run.glb",
+      "size_bytes": 129148,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Ochre_Run",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 5861
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Ochre_Run",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Ochre_Run",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Ochre_Run_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Ochre_Run",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.031",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.038",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.008",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.010",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Ochre_Run_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ochre_Run",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Ochre_Run_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ochre_Run",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Ochre_Run_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ochre_Run",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Ochre_Run_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ochre_Run",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Ochre_Run",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Ochre Run",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Ochre_Run",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Ochre_Run",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Ochre_Run",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Ochre_Run",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Ochre_Run",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Ochre_Run",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Ochre_Run",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Ochre_Run",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Ochre_Run",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/04_Concrete_Fern.glb",
+      "name": "04_Concrete_Fern.glb",
+      "size_bytes": 132560,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Concrete_Fern",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 9197
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Concrete_Fern",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Concrete_Fern",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Concrete_Fern_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Concrete_Fern",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.045",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.052",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.012",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.014",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Concrete_Fern_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Concrete_Fern",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Concrete_Fern_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Concrete_Fern",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Concrete_Fern_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Concrete_Fern",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Concrete_Fern_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Concrete_Fern",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Concrete_Fern",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Concrete Fern",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Concrete_Fern",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Concrete_Fern",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Concrete_Fern",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Concrete_Fern",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Concrete_Fern",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Concrete_Fern",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Concrete_Fern",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Concrete_Fern",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Concrete_Fern",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/05_Tidal_Check.glb",
+      "name": "05_Tidal_Check.glb",
+      "size_bytes": 129652,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Tidal_Check",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 6331
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Tidal_Check",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Tidal_Check",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Tidal_Check_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Tidal_Check",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.059",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.066",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.016",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.018",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Tidal_Check_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Tidal_Check",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Tidal_Check_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Tidal_Check",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Tidal_Check_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Tidal_Check",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Tidal_Check_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Tidal_Check",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Tidal_Check",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Tidal Check",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Tidal_Check",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Tidal_Check",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Tidal_Check",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Tidal_Check",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Tidal_Check",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Tidal_Check",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Tidal_Check",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Tidal_Check",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Tidal_Check",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/06_Ghost_Fish.glb",
+      "name": "06_Ghost_Fish.glb",
+      "size_bytes": 130000,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Ghost_Fish",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 6711
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Ghost_Fish",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Ghost_Fish",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Ghost_Fish_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Ghost_Fish",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.073",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.080",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.020",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.022",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Ghost_Fish_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ghost_Fish",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Ghost_Fish_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ghost_Fish",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Ghost_Fish_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ghost_Fish",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Ghost_Fish_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Ghost_Fish",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Ghost_Fish",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Ghost Fish",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Ghost_Fish",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Ghost_Fish",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Ghost_Fish",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Ghost_Fish",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Ghost_Fish",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Ghost_Fish",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Ghost_Fish",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Ghost_Fish",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Ghost_Fish",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    },
+    {
+      "file": "GLB/Skateboards/07_Violet_Comet.glb",
+      "name": "07_Violet_Comet.glb",
+      "size_bytes": 129728,
+      "status": "PASS",
+      "errors": [],
+      "warnings": [],
+      "asset": {
+        "generator": "Khronos glTF Blender I/O v4.3.47",
+        "version": "2.0"
+      },
+      "embedded_buffers": true,
+      "all_images_embedded": true,
+      "extensions_used": [],
+      "extensions_required": [],
+      "mesh_count": 9,
+      "primitive_count": 19,
+      "material_count": 8,
+      "unique_mesh_triangles": 1232,
+      "scene_triangles": 1232,
+      "degenerate_triangles": 0,
+      "world_bounds_min": [
+        -0.105,
+        0.0,
+        -0.41
+      ],
+      "world_bounds_max": [
+        0.105,
+        0.139,
+        0.41
+      ],
+      "dimensions_meters_xyz": [
+        0.21,
+        0.139,
+        0.82
+      ],
+      "active_scene": 0,
+      "scene_root_indices": [
+        9
+      ],
+      "node_count": 10,
+      "ports": [],
+      "lights": [],
+      "images": [
+        {
+          "index": 0,
+          "name": "grip",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 55984
+        },
+        {
+          "index": 1,
+          "name": "Violet_Comet",
+          "mime_type": "image/png",
+          "embedded": true,
+          "bytes": 6397
+        }
+      ],
+      "materials": [
+        {
+          "index": 0,
+          "name": "Grip_Charcoal",
+          "base_color_texture": 0,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.9599999785423279,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 1,
+          "name": "Graphic_Violet_Comet",
+          "base_color_texture": 1,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5799999833106995,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 2,
+          "name": "Maple_Ply_Edge",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.6299999952316284,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 3,
+          "name": "Dark_Fasteners",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.6499999761581421,
+          "roughness_factor": 0.41999998688697815,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 4,
+          "name": "Brushed_Aluminium",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.7799999713897705,
+          "roughness_factor": 0.3199999928474426,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 5,
+          "name": "Truck_Rubber_Bushings",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.7599999904632568,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 6,
+          "name": "Wheels_Violet_Comet",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0,
+          "roughness_factor": 0.5,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        },
+        {
+          "index": 7,
+          "name": "Wheel_Core",
+          "base_color_texture": null,
+          "normal_texture": null,
+          "metallic_roughness_texture": null,
+          "occlusion_texture": null,
+          "metallic_factor": 0.44999998807907104,
+          "roughness_factor": 0.4300000071525574,
+          "double_sided": true,
+          "alpha_mode": "OPAQUE"
+        }
+      ],
+      "meshes": [
+        {
+          "index": 0,
+          "name": "Deck_Violet_Comet_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 0,
+              "material_name": "Grip_Charcoal",
+              "bounds_min": [
+                -0.105,
+                0.1,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 184,
+              "triangles": 112,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 1,
+              "material_name": "Graphic_Violet_Comet",
+              "bounds_min": [
+                -0.105,
+                0.092,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.131,
+                0.41
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 112,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 2,
+              "material_name": "Maple_Ply_Edge",
+              "bounds_min": [
+                -0.105,
+                0.097,
+                -0.41
+              ],
+              "bounds_max": [
+                0.105,
+                0.139,
+                0.41
+              ]
+            }
+          ],
+          "triangles": 296
+        },
+        {
+          "index": 1,
+          "name": "Cylinder.087",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                -0.2713
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                -0.2287
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 2,
+          "name": "Cylinder.094",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 144,
+              "triangles": 80,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.023858,
+                0.098,
+                0.2287
+              ],
+              "bounds_max": [
+                0.023858,
+                0.102,
+                0.2713
+              ]
+            }
+          ],
+          "triangles": 80
+        },
+        {
+          "index": 3,
+          "name": "Cube.024",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                -0.278
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                -0.222
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                -0.255
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                -0.245
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                -0.263795
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                -0.231205
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 4,
+          "name": "Cube.026",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 96,
+              "triangles": 52,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 4,
+              "material_name": "Brushed_Aluminium",
+              "bounds_min": [
+                -0.067,
+                0.027,
+                0.222
+              ],
+              "bounds_max": [
+                0.067,
+                0.09,
+                0.278
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 3,
+              "material_name": "Dark_Fasteners",
+              "bounds_min": [
+                -0.105,
+                0.0225,
+                0.245
+              ],
+              "bounds_max": [
+                0.105,
+                0.0325,
+                0.255
+              ]
+            },
+            {
+              "index": 2,
+              "vertices": 48,
+              "triangles": 28,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": true,
+              "material": 5,
+              "material_name": "Truck_Rubber_Bushings",
+              "bounds_min": [
+                -0.007,
+                0.045074,
+                0.236205
+              ],
+              "bounds_max": [
+                0.007,
+                0.083926,
+                0.268795
+              ]
+            }
+          ],
+          "triangles": 108
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Violet_Comet_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Violet_Comet",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Violet_Comet_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Violet_Comet",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Violet_Comet_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Violet_Comet",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Violet_Comet_mesh",
+          "primitives": [
+            {
+              "index": 0,
+              "vertices": 48,
+              "triangles": 72,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 6,
+              "material_name": "Wheels_Violet_Comet",
+              "bounds_min": [
+                -0.013,
+                -0.0275,
+                -0.0275
+              ],
+              "bounds_max": [
+                0.013,
+                0.0275,
+                0.0275
+              ]
+            },
+            {
+              "index": 1,
+              "vertices": 72,
+              "triangles": 68,
+              "degenerate_triangles": 0,
+              "normals": true,
+              "uv0": false,
+              "material": 7,
+              "material_name": "Wheel_Core",
+              "bounds_min": [
+                -0.013,
+                -0.021,
+                -0.021
+              ],
+              "bounds_max": [
+                0.013,
+                0.021,
+                0.021
+              ]
+            }
+          ],
+          "triangles": 140
+        }
+      ],
+      "nodes": [
+        {
+          "index": 9,
+          "name": "ROOT_Violet_Comet",
+          "mesh": null,
+          "parent": null,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {
+            "asset_type": "assembled_skateboard",
+            "product_name": "Violet Comet",
+            "units": "meters",
+            "wheel_count": 4,
+            "truck_count": 2,
+            "deck_length_m": 0.82,
+            "deck_width_m": 0.21,
+            "local_pivot": "floor; center between four wheels",
+            "forward_blender": "+Y"
+          }
+        },
+        {
+          "index": 0,
+          "name": "Deck_Violet_Comet",
+          "mesh": 0,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 1,
+          "name": "Fasteners_Front_Violet_Comet",
+          "mesh": 1,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 2,
+          "name": "Fasteners_Rear_Violet_Comet",
+          "mesh": 2,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 3,
+          "name": "Truck_Front_Violet_Comet",
+          "mesh": 3,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 4,
+          "name": "Truck_Rear_Violet_Comet",
+          "mesh": 4,
+          "parent": 9,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 5,
+          "name": "Wheel_FrontL_Violet_Comet",
+          "mesh": 5,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 6,
+          "name": "Wheel_FrontR_Violet_Comet",
+          "mesh": 6,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            -0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 7,
+          "name": "Wheel_RearL_Violet_Comet",
+          "mesh": 7,
+          "parent": 9,
+          "position": [
+            -0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        },
+        {
+          "index": 8,
+          "name": "Wheel_RearR_Violet_Comet",
+          "mesh": 8,
+          "parent": 9,
+          "position": [
+            0.091,
+            0.0275,
+            0.25
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "project": "Midnight Arcade Whack-a-Mole",
+  "version": "1.0",
+  "files": [
+    {
+      "path": "Whack_A_Mole.blend",
+      "bytes": 8379076,
+      "sha256": "b6d6f8c013543afe072942d9c4410811260ec9c863081fddf41c0db7d59b9ade"
+    },
+    {
+      "path": "Whack_A_Mole.glb",
+      "bytes": 6555352,
+      "sha256": "ec9c779be4446668473469d518d4d78a1ba9ea939e6b8118d1178046b706c917"
+    },
+    {
+      "path": "Play_Whack_A_Mole.html",
+      "bytes": 27777,
+      "sha256": "3391f15e596e3c72bb452c9b543db8214a4f43e8776ee058a7797e5fa2d419e8"
+    },
+    {
+      "path": "Preview.png",
+      "bytes": 3216585,
+      "sha256": "868837b8a970864c082eca12a8e32ff1fde0f9198922fd7f171a7e36a8abc1bd"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 3096,
+      "sha256": "dea564f47ee3a601a488897f06a5c9bbe5ea14ecbece2061266e86fd264ad349"
+    },
+    {
+      "path": "source/build_whack_a_mole.py",
+      "bytes": 23978,
+      "sha256": "f4415aff785095b93d59966176b50caae44191862089b75ed93489418b9aa0f1"
+    },
+    {
+      "path": "source/play_whack_a_mole.py",
+      "bytes": 19107,
+      "sha256": "ebb319aed638ed4793635d16baa1b6a97d81e8c143d9edfa4e302d108b2f36c9"
+    },
+    {
+      "path": "Build_Info.json",
+      "bytes": 267,
+      "sha256": "fe033bdbad3640aa120df8c2cd9cefafcb407f64922f0a97a8f2a631da552886"
+    },
+    {
+      "path": "Verification.json",
+      "bytes": 1398,
+      "sha256": "50442ef14318330e49a588623c0711b3d8614d05ae99297f80dff0f89076242d"
+    }
+  ]
+}
