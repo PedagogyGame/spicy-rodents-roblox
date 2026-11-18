@@ -8,7 +8,8 @@
 -- (Shared/World/LightingPreset.apply). What the cases show: the words on screen at the right moments; the inside look
 -- comes in and goes; exactly that space's lights are on while inside and every light is back as baked after; the
 -- reverb is set and put back; Lighting is never touched; the cues fire in the right places and never outside; the
--- alligator; a body handed over mid-pipe; stop() leaves nothing behind. Nothing here shows how it looks or sounds.
+-- alligator; a body handed over mid-pipe; stop() leaves nothing behind; the real Controllers/Squirrel puts the side
+-- arm A or D picked on the body (ExitPicked) and clears it. Nothing here shows how it looks or sounds.
 -- Interface: return function(t) (the spec shape)
 local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
@@ -432,6 +433,81 @@ return function(t)
 			pose(r, { x = m.x + 20, y = m.y, z = m.z, yaw = 0 })
 			t.eq(prompt.Visible, false)
 			r.handle.stop()
+		end)
+	end)
+
+	t.test("the controller marks the side arm A or D picked on the body (ExitPicked), and clears it", function()
+		FakeEngine.with(function()
+			-- the real Controllers/Squirrel holding a body on P1's north-west grate, its keys scripted
+			local w = motorWorld()
+			local a, b = layout.mouth("P1.NW") :: Mouth, layout.mouth("P1.SE") :: Mouth
+			local body = FakeEngine.model("Squirrel", roblox.CFrame.new(a.x, a.y, a.z), workspace)
+			local root = FakeEngine.part("Root", roblox.CFrame.new(a.x, a.y + HIP, a.z), body)
+			body.PrimaryPart = root
+			body:SetAttribute("HipHeight", HIP)
+			-- what BodyDriver reads to cancel gravity on the held root
+			root.AssemblyMass = 1
+			rawset(workspace, "Gravity", 196.2)
+			local cam = BakedWorld.cameraYawToward(b.x - a.x, b.z - a.z)
+			local keys: { [string]: any } = {}
+			local input = {
+				sample = function(_self: any, _yaw: number): { [string]: any }
+					local f = {
+						fw = keys.fw or 0,
+						side = 0,
+						sprint = false,
+						focus = false,
+						cameraYaw = cam,
+						leap = false,
+						drop = false,
+						grab = keys.grab == true,
+						choose = keys.choose or 0,
+						pounce = false,
+						nightVision = false,
+					}
+					keys.grab, keys.choose = nil, nil
+					return f
+				end,
+			}
+			local stop = SquirrelController.start(body, { holdSeconds = 0 }, {}, {
+				world = {
+					rail = function(): any
+						return w
+					end,
+					groundAt = w.groundAt,
+				},
+				input = input,
+			})
+			local function frames(n: number)
+				for _ = 1, n do
+					FakeEngine.renderStep(1 / 60)
+				end
+			end
+			frames(2)
+			t.eq(body:GetAttribute("ExitPicked"), nil, "on the street: nothing picked")
+			keys.grab = true
+			frames(1)
+			keys.fw = 1
+			frames(20)
+			t.eq(body:GetAttribute("CameraZone"), "tunnel", "in the drain")
+			t.eq(body:GetAttribute("ExitPicked"), nil, "running in: nothing picked yet")
+			keys.choose = 1
+			frames(1)
+			local picked = body:GetAttribute("ExitPicked")
+			t.truthy(type(picked) == "number" and layout.spaceOf(picked) == a.space, `D: a side arm ({picked})`)
+			frames(5)
+			t.eq(body:GetAttribute("ExitPicked"), picked, "kept while running on")
+			keys.choose = 1
+			frames(1)
+			t.eq(body:GetAttribute("ExitPicked"), nil, "D again: cleared (straight on)")
+			keys.choose = -1
+			frames(1)
+			local other = body:GetAttribute("ExitPicked")
+			t.truthy(type(other) == "number" and other ~= picked, `A: the other side arm ({other})`)
+			-- on along it: the arm is taken at the crossing and the pick goes with it
+			frames(60 * 6)
+			t.eq(body:GetAttribute("ExitPicked"), nil, "taken at the crossing: nothing picked")
+			stop()
 		end)
 	end)
 
