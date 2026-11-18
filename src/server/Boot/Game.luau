@@ -80,6 +80,7 @@ local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
+local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
@@ -1277,6 +1278,10 @@ function Game.start(opts: Opts?): any
 		workspace:FindFirstChild("Expansion"),
 		{ terrain = o.terrain ~= false, heartbeat = o.heartbeat ~= false }
 	)
+
+	-- The owner's finished pinball models (Workspace.Attractions.<alley>.GamesRoom.Pinball<i>): Assets/PinballArt
+	-- puts them on the baked machines off the boot path, once every Model is uploaded (until then it says so once)
+	PinballArt.start(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
 
 	return {
 		runtime = rt,

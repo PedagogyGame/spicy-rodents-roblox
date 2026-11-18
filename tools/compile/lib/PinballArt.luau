@@ -28,6 +28,8 @@ PinballArt.NEEDS = {
 	rodent = { "Board", "Apron", "BackglassArt", "Sling1", "Sling2" },
 	space = { "Board", "Apron", "BackglassArt", "Sling1", "Sling2" },
 }
+-- materials drawn as Metal (a word in the material's name)
+PinballArt.METAL = { "metal", "chrome", "steel", "wire", "Pivot" }
 -- what a machine takes from THEMES (the materials the export marks recolourable)
 PinballArt.THEME_KEYS = { "body", "trim", "legs", "glow", "bumper", "cap" }
 
@@ -45,6 +47,11 @@ local function mesh(m: any): any
 	end
 	if m.alpha then
 		rec.alpha = m.alpha
+	end
+	for _, word in PinballArt.METAL do
+		if string.find(m.material, word, 1, true) then
+			rec.metal = true
+		end
 	end
 	rec.tris = m.tris
 	return rec

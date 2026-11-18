@@ -22,8 +22,9 @@
 -- own machine is heard flat; anyone else's from the cabinet, quieter with distance (HEAR_NEAR, HEAR_FAR). A hit
 -- is as loud as it was hard (loudness), and each pop bumper rings at its own pitch.
 -- The parts are found lazily and may be missing (streaming, a place without the cabinet): then nothing is drawn
--- and nothing breaks. A cabinet is drawn only while it is awake (a message about it came, and this player's
--- body is within SLEEP studs); the render step is unbound when none is.
+-- and nothing breaks; they are found again when the server puts the finished models in (Server/Assets/
+-- PinballArt). A cabinet is drawn only while it is awake (a message about it came, and this player's body is
+-- within SLEEP studs); the render step is unbound when none is.
 -- Interface: get(station, place?, index?, tableId?) -> Cab; sync(cab, msg) -> bool; segment(cab, msg) -> bool;
 --   retire(cab, msg) (a seat that has gone, from a tick on); rebase(cab); idle(cab); over(cab, msg);
 --   show(cab, frame, dt?) (the controller's live frames); cue(cab, cue, a, b) (one cue: its sound and its flash);
@@ -178,6 +179,7 @@ local function find(cab: Cab): any
 	local def = cab.tbl.def
 	local parts: any = {
 		model = model,
+		art = model:GetAttribute("ArtLoaded"), -- (Server/Assets/PinballArt swaps the parts once: then found again)
 		balls = kids(N.ball, CabinetLayout.BALLS),
 		flippers = kids(N.flipper, #def.flippers),
 		drops = kids(N.drop, #def.targets),
@@ -322,7 +324,7 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 	cab.clock += step
 	cab.drawn = f
 	local parts = cab.parts
-	if parts == nil or parts.model.Parent == nil then
+	if parts == nil or parts.model.Parent == nil or parts.model:GetAttribute("ArtLoaded") ~= parts.art then
 		if cab.clock - cab.findAt < 0.5 and parts == nil then
 			return
 		end
