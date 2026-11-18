@@ -1,0 +1,10871 @@
+{
+ "$schema": "art/trees v2",
+ "src": "tools/blender/trees (build_trees.py: treegen.py geometry, textures.py maps; check_promises.py, check_hollows.py; publish.py: the upload). Procedural Blender only.",
+ "units": "studs, Roblox axes (+Y up). pivot = the tree's root on the ground (data/harvest/trees.json root x 2.5).",
+ "placement": "model = InsertService:LoadAsset(assetId):GetChildren()[1]; its pivot is the FBX origin = the tree root, so model:PivotTo(CFrame.new(pivot)) puts every MeshPart at pivot + parts[name].center, unrotated. Server/Assets/TreeArt swaps the baked tree's meshes for these (visual only: the baked proxies keep colliding). The trunk carries 3 studs of bark below the pivot.",
+ "partRoles": {
+  "Bark": "trunk, roots, boughs, bridges, side branches and twigs: one skin, the climbing surfaces (visual only in the game: the baked proxies collide)",
+  "LeavesShade": "leaf sprays under the canopy (alpha cards: DoubleSided, AlphaMode Transparency)",
+  "LeavesMid": "leaf sprays in half light (alpha cards)",
+  "LeavesSun": "leaf sprays that see the sky (alpha cards)",
+  "Apples": "fruit"
+ },
+ "count": 95,
+ "totals": {
+  "bark": 929089,
+  "leaves": 1028174,
+  "fruit": 16128,
+  "total": 1973391,
+  "fbxBytes": 565002820
+ },
+ "trees": [
+  {
+   "index": 0,
+   "label": "BUR OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 220,
+   "routes": [
+    220,
+    221,
+    224,
+    225,
+    227,
+    223,
+    226,
+    228,
+    222,
+    229,
+    230
+   ],
+   "pivot": [
+    -85.0,
+    0.0,
+    -82.5
+   ],
+   "heightStuds": 72.5,
+   "assetId": null,
+   "displayName": "SR tree v2 000 BUR OAK",
+   "moderation": "not uploaded",
+   "sha": "f1063c88ae680bc2",
+   "fbxBytes": 6364828,
+   "tris": {
+    "bark": 10984,
+    "leaves": 11248,
+    "fruit": 0,
+    "total": 22232
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -6.814,
+      32.05,
+      -3.798
+     ],
+     "size": [
+      98.052,
+      73.48,
+      94.086
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.076,
+      44.332,
+      -4.747
+     ],
+     "size": [
+      85.285,
+      36.319,
+      81.718
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      100,
+      141,
+      73
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -4.785,
+      47.127,
+      -0.792
+     ],
+     "size": [
+      93.152,
+      41.993,
+      91.36
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      100,
+      141,
+      73
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -3.399,
+      51.689,
+      -0.736
+     ],
+     "size": [
+      101.566,
+      48.203,
+      97.926
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      100,
+      141,
+      73
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H3",
+    "hollowBoardMargin": 0.13
+   }
+  },
+  {
+   "index": 1,
+   "label": "AMERICAN ELM",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 231,
+   "routes": [
+    231,
+    237,
+    238,
+    232,
+    233,
+    234,
+    235,
+    236,
+    239,
+    240
+   ],
+   "pivot": [
+    80.0,
+    0.0,
+    -92.5
+   ],
+   "heightStuds": 85.0,
+   "assetId": null,
+   "displayName": "SR tree v2 001 AMERICAN ELM",
+   "moderation": "not uploaded",
+   "sha": "401d241d200ad77c",
+   "fbxBytes": 5998396,
+   "tris": {
+    "bark": 10965,
+    "leaves": 10760,
+    "fruit": 0,
+    "total": 21725
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.54,
+      35.177,
+      2.091
+     ],
+     "size": [
+      116.357,
+      81.681,
+      115.55
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      4.772,
+      54.371,
+      6.346
+     ],
+     "size": [
+      114.566,
+      30.531,
+      108.17
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      108,
+      152,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.39,
+      56.707,
+      5.836
+     ],
+     "size": [
+      125.047,
+      35.193,
+      116.972
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      108,
+      152,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.697,
+      59.624,
+      5.743
+     ],
+     "size": [
+      125.986,
+      39.66,
+      120.36
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      108,
+      152,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H12",
+    "hollowBoardMargin": 0.108
+   }
+  },
+  {
+   "index": 2,
+   "label": "SYCAMORE",
+   "species": "sycamore",
+   "category": "named",
+   "trunkRoute": 241,
+   "routes": [
+    241,
+    242,
+    243,
+    244,
+    245,
+    247,
+    246,
+    248,
+    249,
+    250
+   ],
+   "pivot": [
+    -92.5,
+    0.0,
+    72.5
+   ],
+   "heightStuds": 80.0,
+   "assetId": null,
+   "displayName": "SR tree v2 002 SYCAMORE",
+   "moderation": "not uploaded",
+   "sha": "207bae3008a21148",
+   "fbxBytes": 5250764,
+   "tris": {
+    "bark": 10837,
+    "leaves": 11520,
+    "fruit": 0,
+    "total": 22357
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.09,
+      36.232,
+      2.475
+     ],
+     "size": [
+      112.327,
+      83.415,
+      106.494
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -5.352,
+      54.571,
+      -1.489
+     ],
+     "size": [
+      103.134,
+      38.794,
+      100.319
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      125,
+      161,
+      83
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.537,
+      55.864,
+      0.425
+     ],
+     "size": [
+      119.998,
+      41.4,
+      109.417
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      125,
+      161,
+      83
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.516,
+      64.055,
+      -0.522
+     ],
+     "size": [
+      125.596,
+      38.058,
+      116.655
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      125,
+      161,
+      83
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H2",
+    "hollowBoardMargin": 0.106
+   }
+  },
+  {
+   "index": 3,
+   "label": "RED MAPLE",
+   "species": "maple",
+   "category": "named",
+   "trunkRoute": 251,
+   "routes": [
+    251,
+    255,
+    256,
+    257,
+    259,
+    253,
+    254,
+    260,
+    252,
+    258,
+    261,
+    262
+   ],
+   "pivot": [
+    85.0,
+    0.0,
+    85.0
+   ],
+   "heightStuds": 67.5,
+   "assetId": null,
+   "displayName": "SR tree v2 003 RED MAPLE",
+   "moderation": "not uploaded",
+   "sha": "1b613eff95d68ada",
+   "fbxBytes": 5710476,
+   "tris": {
+    "bark": 11092,
+    "leaves": 11024,
+    "fruit": 0,
+    "total": 22116
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      12.46,
+      30.878,
+      5.586
+     ],
+     "size": [
+      96.829,
+      70.825,
+      100.575
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.516,
+      46.125,
+      6.405
+     ],
+     "size": [
+      80.011,
+      29.791,
+      77.337
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      3.032,
+      47.256,
+      3.816
+     ],
+     "size": [
+      85.302,
+      33.907,
+      88.362
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      3.603,
+      50.142,
+      2.767
+     ],
+     "size": [
+      93.181,
+      38.626,
+      92.792
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 4,
+   "label": "STREET OAK 0",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 283,
+   "routes": [
+    283,
+    284,
+    285,
+    286,
+    287,
+    288,
+    289
+   ],
+   "pivot": [
+    -363.775,
+    2.54,
+    -298.064
+   ],
+   "heightStuds": 76.67,
+   "assetId": null,
+   "displayName": "SR tree v2 004 STREET OAK 0",
+   "moderation": "not uploaded",
+   "sha": "53a936e69c706801",
+   "fbxBytes": 6294924,
+   "tris": {
+    "bark": 9590,
+    "leaves": 12188,
+    "fruit": 0,
+    "total": 21778
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      3.332,
+      35.795,
+      2.817
+     ],
+     "size": [
+      66.624,
+      80.041,
+      67.663
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.537,
+      54.123,
+      1.5
+     ],
+     "size": [
+      65.819,
+      35.902,
+      71.614
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.693,
+      57.625,
+      2.335
+     ],
+     "size": [
+      72.476,
+      35.443,
+      78.148
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.199,
+      61.2,
+      1.195
+     ],
+     "size": [
+      77.971,
+      41.308,
+      76.897
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 5,
+   "label": "STREET ELM 1",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 290,
+   "routes": [
+    290,
+    291,
+    292,
+    293,
+    294,
+    295,
+    296,
+    297
+   ],
+   "pivot": [
+    -556.598,
+    7.076,
+    -76.978
+   ],
+   "heightStuds": 90.56,
+   "assetId": null,
+   "displayName": "SR tree v2 005 STREET ELM 1",
+   "moderation": "not uploaded",
+   "sha": "fd749be67856227a",
+   "fbxBytes": 5995692,
+   "tris": {
+    "bark": 10385,
+    "leaves": 12572,
+    "fruit": 0,
+    "total": 22957
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      5.604,
+      44.255,
+      1.08
+     ],
+     "size": [
+      72.149,
+      96.682,
+      72.004
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      5.067,
+      65.053,
+      1.937
+     ],
+     "size": [
+      77.688,
+      46.766,
+      72.81
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      5.154,
+      67.059,
+      -0.283
+     ],
+     "size": [
+      80.343,
+      50.235,
+      78.931
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      3.871,
+      69.104,
+      0.084
+     ],
+     "size": [
+      81.37,
+      54.877,
+      82.852
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 6,
+   "label": "STREET SYCAMORE 2",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 298,
+   "routes": [
+    298,
+    299,
+    300,
+    301,
+    302,
+    303,
+    304,
+    305
+   ],
+   "pivot": [
+    -577.683,
+    11.028,
+    -517.772
+   ],
+   "heightStuds": 76.6,
+   "assetId": null,
+   "displayName": "SR tree v2 006 STREET SYCAMORE 2",
+   "moderation": "not uploaded",
+   "sha": "402f43ca1348eec6",
+   "fbxBytes": 4965596,
+   "tris": {
+    "bark": 9700,
+    "leaves": 12092,
+    "fruit": 0,
+    "total": 21792
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.207,
+      37.349,
+      -1.543
+     ],
+     "size": [
+      64.998,
+      83.216,
+      57.097
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.966,
+      53.305,
+      -1.981
+     ],
+     "size": [
+      67.387,
+      42.435,
+      58.353
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.291,
+      54.691,
+      -0.785
+     ],
+     "size": [
+      74.161,
+      44.315,
+      65.456
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.948,
+      62.505,
+      -1.471
+     ],
+     "size": [
+      76.155,
+      38.859,
+      73.818
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 7,
+   "label": "STREET MAPLE 3",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 306,
+   "routes": [
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314
+   ],
+   "pivot": [
+    -244.341,
+    0.25,
+    -575.165
+   ],
+   "heightStuds": 67.27,
+   "assetId": null,
+   "displayName": "SR tree v2 007 STREET MAPLE 3",
+   "moderation": "not uploaded",
+   "sha": "361556a3e43a6205",
+   "fbxBytes": 5770060,
+   "tris": {
+    "bark": 10468,
+    "leaves": 11460,
+    "fruit": 0,
+    "total": 21928
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.687,
+      32.009,
+      -3.373
+     ],
+     "size": [
+      70.318,
+      72.554,
+      61.707
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.363,
+      47.584,
+      -3.909
+     ],
+     "size": [
+      68.407,
+      30.367,
+      61.946
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.428,
+      49.441,
+      -3.426
+     ],
+     "size": [
+      75.062,
+      35.349,
+      67.426
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.369,
+      52.919,
+      -2.937
+     ],
+     "size": [
+      78.442,
+      40.506,
+      72.173
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 8,
+   "label": "STREET OAK 4",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 315,
+   "routes": [
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324,
+    325
+   ],
+   "pivot": [
+    -80.278,
+    0.25,
+    -513.822
+   ],
+   "heightStuds": 74.84,
+   "assetId": null,
+   "displayName": "SR tree v2 008 STREET OAK 4",
+   "moderation": "not uploaded",
+   "sha": "e051ddc03a0ec484",
+   "fbxBytes": 6277676,
+   "tris": {
+    "bark": 10625,
+    "leaves": 11268,
+    "fruit": 0,
+    "total": 21893
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.48,
+      35.382,
+      -1.366
+     ],
+     "size": [
+      79.594,
+      80.576,
+      70.453
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.956,
+      49.815,
+      -3.091
+     ],
+     "size": [
+      68.287,
+      44.182,
+      73.165
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.953,
+      51.707,
+      -2.809
+     ],
+     "size": [
+      78.048,
+      44.775,
+      77.663
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -2.268,
+      64.782,
+      -1.432
+     ],
+     "size": [
+      83.269,
+      29.112,
+      81.477
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 9,
+   "label": "STREET OAK 5",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 326,
+   "routes": [
+    326,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332
+   ],
+   "pivot": [
+    68.563,
+    8.606,
+    -582.351
+   ],
+   "heightStuds": 59.12,
+   "assetId": null,
+   "displayName": "SR tree v2 009 STREET OAK 5",
+   "moderation": "not uploaded",
+   "sha": "8ced5134884cc3d0",
+   "fbxBytes": 6287228,
+   "tris": {
+    "bark": 9760,
+    "leaves": 11944,
+    "fruit": 0,
+    "total": 21704
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.084,
+      28.525,
+      -1.911
+     ],
+     "size": [
+      63.669,
+      65.007,
+      59.965
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.142,
+      43.592,
+      -3.421
+     ],
+     "size": [
+      61.108,
+      27.913,
+      62.183
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.081,
+      44.241,
+      -2.372
+     ],
+     "size": [
+      71.265,
+      30.445,
+      67.789
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.847,
+      47.207,
+      -1.617
+     ],
+     "size": [
+      74.588,
+      33.704,
+      70.271
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 10,
+   "label": "STREET ELM 6",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 333,
+   "routes": [
+    333,
+    334,
+    335,
+    336,
+    337,
+    338,
+    339,
+    340
+   ],
+   "pivot": [
+    272.739,
+    1.48,
+    -309.866
+   ],
+   "heightStuds": 89.4,
+   "assetId": null,
+   "displayName": "SR tree v2 010 STREET ELM 6",
+   "moderation": "not uploaded",
+   "sha": "8fbd345a6b745beb",
+   "fbxBytes": 5988028,
+   "tris": {
+    "bark": 10439,
+    "leaves": 12492,
+    "fruit": 0,
+    "total": 22931
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.806,
+      43.944,
+      -22.711
+     ],
+     "size": [
+      81.979,
+      95.943,
+      117.4
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.237,
+      65.477,
+      -3.714
+     ],
+     "size": [
+      81.484,
+      46.92,
+      75.883
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.707,
+      66.701,
+      -2.621
+     ],
+     "size": [
+      88.979,
+      50.754,
+      81.143
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.63,
+      68.371,
+      -5.166
+     ],
+     "size": [
+      89.38,
+      51.215,
+      91.77
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 11,
+   "label": "STREET SYCAMORE 7",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 341,
+   "routes": [
+    341,
+    342,
+    343,
+    344,
+    345,
+    346,
+    347,
+    348,
+    349
+   ],
+   "pivot": [
+    399.854,
+    4.769,
+    -298.321
+   ],
+   "heightStuds": 83.08,
+   "assetId": null,
+   "displayName": "SR tree v2 011 STREET SYCAMORE 7",
+   "moderation": "not uploaded",
+   "sha": "2514c02d7255eeaa",
+   "fbxBytes": 4977020,
+   "tris": {
+    "bark": 9834,
+    "leaves": 12148,
+    "fruit": 0,
+    "total": 21982
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.491,
+      39.889,
+      0.264
+     ],
+     "size": [
+      70.074,
+      88.395,
+      62.615
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.334,
+      58.952,
+      -2.205
+     ],
+     "size": [
+      71.817,
+      45.916,
+      60.659
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -3.16,
+      61.284,
+      -2.77
+     ],
+     "size": [
+      78.619,
+      45.151,
+      68.818
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.247,
+      66.777,
+      1.538
+     ],
+     "size": [
+      79.229,
+      46.868,
+      76.74
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 12,
+   "label": "STREET MAPLE 8",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 350,
+   "routes": [
+    350,
+    351,
+    352,
+    353,
+    354,
+    355,
+    356,
+    357,
+    358
+   ],
+   "pivot": [
+    576.761,
+    14.913,
+    -518.303
+   ],
+   "heightStuds": 88.39,
+   "assetId": null,
+   "displayName": "SR tree v2 012 STREET MAPLE 8",
+   "moderation": "not uploaded",
+   "sha": "e69408cb2ba30f7b",
+   "fbxBytes": 5786780,
+   "tris": {
+    "bark": 10490,
+    "leaves": 11764,
+    "fruit": 0,
+    "total": 22254
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.535,
+      42.549,
+      0.505
+     ],
+     "size": [
+      58.866,
+      93.715,
+      58.74
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.35,
+      66.283,
+      -0.157
+     ],
+     "size": [
+      58.165,
+      38.409,
+      61.884
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.058,
+      67.774,
+      0.43
+     ],
+     "size": [
+      63.852,
+      43.713,
+      66.753
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.458,
+      79.912,
+      1.227
+     ],
+     "size": [
+      70.3,
+      30.062,
+      74.027
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 13,
+   "label": "STREET OAK 9",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 359,
+   "routes": [
+    359,
+    360,
+    361,
+    362,
+    363,
+    364,
+    365,
+    366,
+    367,
+    368,
+    369
+   ],
+   "pivot": [
+    580.649,
+    0.25,
+    -64.436
+   ],
+   "heightStuds": 90.11,
+   "assetId": null,
+   "displayName": "SR tree v2 013 STREET OAK 9",
+   "moderation": "not uploaded",
+   "sha": "46d60413303851bc",
+   "fbxBytes": 6316812,
+   "tris": {
+    "bark": 10583,
+    "leaves": 11964,
+    "fruit": 0,
+    "total": 22547
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.535,
+      44.763,
+      -3.279
+     ],
+     "size": [
+      70.753,
+      97.902,
+      73.671
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.231,
+      60.347,
+      -1.093
+     ],
+     "size": [
+      58.938,
+      55.605,
+      67.747
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.46,
+      65.659,
+      -2.169
+     ],
+     "size": [
+      70.693,
+      52.005,
+      78.699
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.599,
+      73.895,
+      -1.567
+     ],
+     "size": [
+      81.164,
+      50.698,
+      84.738
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 14,
+   "label": "STREET OAK 10",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 370,
+   "routes": [
+    370,
+    371,
+    372,
+    373,
+    374,
+    375,
+    376
+   ],
+   "pivot": [
+    394.728,
+    3.306,
+    -74.887
+   ],
+   "heightStuds": 55.32,
+   "assetId": null,
+   "displayName": "SR tree v2 014 STREET OAK 10",
+   "moderation": "not uploaded",
+   "sha": "2fee4322ce9049bb",
+   "fbxBytes": 6277228,
+   "tris": {
+    "bark": 9514,
+    "leaves": 11852,
+    "fruit": 0,
+    "total": 21366
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.334,
+      26.218,
+      0.912
+     ],
+     "size": [
+      68.599,
+      60.821,
+      66.653
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.224,
+      39.612,
+      0.428
+     ],
+     "size": [
+      71.436,
+      24.693,
+      69.168
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.859,
+      40.926,
+      0.355
+     ],
+     "size": [
+      73.967,
+      27.846,
+      72.338
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.946,
+      44.53,
+      0.715
+     ],
+     "size": [
+      75.407,
+      26.707,
+      76.247
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 15,
+   "label": "STREET ELM 11",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 377,
+   "routes": [
+    377,
+    378,
+    379,
+    380,
+    381,
+    382,
+    383,
+    384
+   ],
+   "pivot": [
+    251.008,
+    0.0,
+    68.947
+   ],
+   "heightStuds": 95.53,
+   "assetId": null,
+   "displayName": "SR tree v2 015 STREET ELM 11",
+   "moderation": "not uploaded",
+   "sha": "5297d3cf86097865",
+   "fbxBytes": 5992540,
+   "tris": {
+    "bark": 10228,
+    "leaves": 12648,
+    "fruit": 0,
+    "total": 22876
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.453,
+      44.721,
+      0.105
+     ],
+     "size": [
+      73.037,
+      97.973,
+      73.414
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.753,
+      65.398,
+      0.476
+     ],
+     "size": [
+      75.598,
+      42.797,
+      74.096
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.67,
+      67.983,
+      0.025
+     ],
+     "size": [
+      80.226,
+      47.866,
+      78.81
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.49,
+      70.593,
+      -0.926
+     ],
+     "size": [
+      83.081,
+      53.234,
+      85.202
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 16,
+   "label": "STREET SYCAMORE 12",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 385,
+   "routes": [
+    385,
+    386,
+    387,
+    388,
+    389,
+    390,
+    391,
+    392,
+    393
+   ],
+   "pivot": [
+    594.852,
+    1.283,
+    32.429
+   ],
+   "heightStuds": 74.24,
+   "assetId": null,
+   "displayName": "SR tree v2 016 STREET SYCAMORE 12",
+   "moderation": "not uploaded",
+   "sha": "574958ec825b192c",
+   "fbxBytes": 4969308,
+   "tris": {
+    "bark": 9681,
+    "leaves": 12120,
+    "fruit": 0,
+    "total": 21801
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.423,
+      37.479,
+      2.12
+     ],
+     "size": [
+      75.619,
+      83.13,
+      65.468
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.093,
+      53.085,
+      2.248
+     ],
+     "size": [
+      74.45,
+      42.497,
+      60.528
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.145,
+      55.735,
+      0.879
+     ],
+     "size": [
+      81.248,
+      44.931,
+      72.728
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -2.111,
+      60.557,
+      1.261
+     ],
+     "size": [
+      85.651,
+      46.508,
+      76.511
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 17,
+   "label": "STREET MAPLE 13",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 394,
+   "routes": [
+    394,
+    395,
+    396,
+    397,
+    398,
+    399,
+    400,
+    401,
+    402
+   ],
+   "pivot": [
+    597.492,
+    7.733,
+    562.066
+   ],
+   "heightStuds": 65.16,
+   "assetId": null,
+   "displayName": "SR tree v2 017 STREET MAPLE 13",
+   "moderation": "not uploaded",
+   "sha": "3cf04b9abc59794d",
+   "fbxBytes": 5787740,
+   "tris": {
+    "bark": 10452,
+    "leaves": 11740,
+    "fruit": 0,
+    "total": 22192
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.672,
+      29.898,
+      1.651
+     ],
+     "size": [
+      66.965,
+      68.341,
+      60.321
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.985,
+      47.149,
+      -1.074
+     ],
+     "size": [
+      69.45,
+      30.864,
+      61.53
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.392,
+      48.767,
+      0.36
+     ],
+     "size": [
+      72.954,
+      31.765,
+      66.679
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.759,
+      50.841,
+      0.684
+     ],
+     "size": [
+      74.808,
+      31.228,
+      69.478
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 18,
+   "label": "STREET OAK 14",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 403,
+   "routes": [
+    403,
+    404,
+    405,
+    406,
+    407,
+    408,
+    409,
+    410,
+    411,
+    412
+   ],
+   "pivot": [
+    274.578,
+    0.25,
+    602.987
+   ],
+   "heightStuds": 79.33,
+   "assetId": null,
+   "displayName": "SR tree v2 018 STREET OAK 14",
+   "moderation": "not uploaded",
+   "sha": "a821067da1d42d2a",
+   "fbxBytes": 6285852,
+   "tris": {
+    "bark": 10561,
+    "leaves": 11412,
+    "fruit": 0,
+    "total": 21973
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -3.667,
+      38.353,
+      -1.318
+     ],
+     "size": [
+      69.885,
+      85.299,
+      66.815
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.705,
+      53.519,
+      -2.032
+     ],
+     "size": [
+      66.593,
+      43.116,
+      62.9
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -3.923,
+      59.269,
+      -2.083
+     ],
+     "size": [
+      74.463,
+      40.107,
+      72.539
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.819,
+      64.705,
+      -2.133
+     ],
+     "size": [
+      82.791,
+      40.577,
+      79.27
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 19,
+   "label": "STREET OAK 15",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 413,
+   "routes": [
+    413,
+    414,
+    415,
+    416,
+    417,
+    418,
+    419
+   ],
+   "pivot": [
+    30.765,
+    9.925,
+    551.479
+   ],
+   "heightStuds": 87.62,
+   "assetId": null,
+   "displayName": "SR tree v2 019 STREET OAK 15",
+   "moderation": "not uploaded",
+   "sha": "d30cbadc78a2da19",
+   "fbxBytes": 6325740,
+   "tris": {
+    "bark": 9770,
+    "leaves": 12584,
+    "fruit": 0,
+    "total": 22354
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.122,
+      43.395,
+      -1.84
+     ],
+     "size": [
+      66.3,
+      94.87,
+      67.826
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.592,
+      59.495,
+      -4.866
+     ],
+     "size": [
+      66.12,
+      54.491,
+      56.086
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.203,
+      64.896,
+      -6.431
+     ],
+     "size": [
+      76.207,
+      49.575,
+      65.982
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.58,
+      74.813,
+      -2.186
+     ],
+     "size": [
+      79.839,
+      42.843,
+      78.779
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 20,
+   "label": "STREET ELM 16",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 420,
+   "routes": [
+    420,
+    421,
+    422,
+    423,
+    424,
+    425,
+    426
+   ],
+   "pivot": [
+    -268.032,
+    16.183,
+    573.854
+   ],
+   "heightStuds": 68.94,
+   "assetId": null,
+   "displayName": "SR tree v2 020 STREET ELM 16",
+   "moderation": "not uploaded",
+   "sha": "2cb697676b74f10f",
+   "fbxBytes": 5953420,
+   "tris": {
+    "bark": 10319,
+    "leaves": 11880,
+    "fruit": 0,
+    "total": 22199
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.043,
+      33.728,
+      0.299
+     ],
+     "size": [
+      71.148,
+      76.256,
+      63.623
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.434,
+      49.326,
+      0.251
+     ],
+     "size": [
+      65.809,
+      35.153,
+      63.354
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.833,
+      52.047,
+      -0.553
+     ],
+     "size": [
+      74.669,
+      40.417,
+      68.611
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.312,
+      54.113,
+      0.069
+     ],
+     "size": [
+      77.196,
+      40.97,
+      71.903
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 21,
+   "label": "STREET SYCAMORE 17",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 427,
+   "routes": [
+    427,
+    428,
+    429,
+    430,
+    431,
+    432,
+    433,
+    434
+   ],
+   "pivot": [
+    -579.504,
+    8.351,
+    559.606
+   ],
+   "heightStuds": 70.14,
+   "assetId": null,
+   "displayName": "SR tree v2 021 STREET SYCAMORE 17",
+   "moderation": "not uploaded",
+   "sha": "487c7a3c5b16321c",
+   "fbxBytes": 4953196,
+   "tris": {
+    "bark": 9756,
+    "leaves": 11856,
+    "fruit": 0,
+    "total": 21612
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      3.454,
+      35.167,
+      -1.887
+     ],
+     "size": [
+      71.497,
+      78.315,
+      59.93
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      4.762,
+      51.592,
+      0.023
+     ],
+     "size": [
+      68.738,
+      40.06,
+      61.661
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      4.182,
+      53.109,
+      -1.688
+     ],
+     "size": [
+      74.941,
+      39.504,
+      68.071
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.823,
+      58.405,
+      -1.899
+     ],
+     "size": [
+      81.817,
+      38.734,
+      72.859
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 22,
+   "label": "STREET MAPLE 18",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 435,
+   "routes": [
+    435,
+    436,
+    437,
+    438,
+    439,
+    440,
+    441,
+    442,
+    443,
+    444
+   ],
+   "pivot": [
+    -581.051,
+    0.25,
+    70.497
+   ],
+   "heightStuds": 64.72,
+   "assetId": null,
+   "displayName": "SR tree v2 022 STREET MAPLE 18",
+   "moderation": "not uploaded",
+   "sha": "65439d0dabf3cd7a",
+   "fbxBytes": 5761932,
+   "tris": {
+    "bark": 10518,
+    "leaves": 11232,
+    "fruit": 0,
+    "total": 21750
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -4.912,
+      30.312,
+      -0.879
+     ],
+     "size": [
+      62.188,
+      68.856,
+      59.257
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.294,
+      45.988,
+      -1.027
+     ],
+     "size": [
+      62.075,
+      32.96,
+      54.046
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -3.785,
+      48.594,
+      0.884
+     ],
+     "size": [
+      65.098,
+      32.224,
+      65.335
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -4.433,
+      54.248,
+      0.979
+     ],
+     "size": [
+      69.178,
+      29.843,
+      67.857
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 23,
+   "label": "STREET OAK 19",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 445,
+   "routes": [
+    445,
+    446,
+    447,
+    448,
+    449,
+    450,
+    451,
+    452,
+    453,
+    454,
+    455
+   ],
+   "pivot": [
+    -385.394,
+    2.462,
+    62.958
+   ],
+   "heightStuds": 82.32,
+   "assetId": null,
+   "displayName": "SR tree v2 023 STREET OAK 19",
+   "moderation": "held: broken promise",
+   "sha": "35e9fcf6464dbf87",
+   "fbxBytes": 6304540,
+   "tris": {
+    "bark": 10586,
+    "leaves": 11720,
+    "fruit": 0,
+    "total": 22306
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.86,
+      40.83,
+      -0.5
+     ],
+     "size": [
+      66.81,
+      90.213,
+      70.834
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.716,
+      53.925,
+      3.328
+     ],
+     "size": [
+      69.883,
+      35.548,
+      68.542
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.651,
+      59.04,
+      0.301
+     ],
+     "size": [
+      74.207,
+      43.466,
+      78.393
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.219,
+      68.288,
+      1.096
+     ],
+     "size": [
+      80.012,
+      43.956,
+      83.074
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 24,
+   "label": "STREET OAK 20",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 456,
+   "routes": [
+    456,
+    457,
+    458,
+    459,
+    460,
+    461
+   ],
+   "pivot": [
+    -273.552,
+    0.12,
+    -278.534
+   ],
+   "heightStuds": 56.48,
+   "assetId": null,
+   "displayName": "SR tree v2 024 STREET OAK 20",
+   "moderation": "not uploaded",
+   "sha": "48df1818de56e5b4",
+   "fbxBytes": 6306844,
+   "tris": {
+    "bark": 9403,
+    "leaves": 12484,
+    "fruit": 0,
+    "total": 21887
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.35,
+      27.38,
+      1.267
+     ],
+     "size": [
+      67.2,
+      63.532,
+      68.267
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      4.137,
+      39.399,
+      -3.322
+     ],
+     "size": [
+      63.87,
+      32.588,
+      63.744
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.531,
+      42.084,
+      0.528
+     ],
+     "size": [
+      74.358,
+      35.239,
+      74.554
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.427,
+      44.236,
+      0.626
+     ],
+     "size": [
+      75.581,
+      38.571,
+      75.519
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 25,
+   "label": "STREET ELM 21",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 462,
+   "routes": [
+    462,
+    463,
+    464,
+    465,
+    466,
+    467,
+    468,
+    469
+   ],
+   "pivot": [
+    -238.12,
+    0.874,
+    299.71
+   ],
+   "heightStuds": 96.1,
+   "assetId": null,
+   "displayName": "SR tree v2 025 STREET ELM 21",
+   "moderation": "not uploaded",
+   "sha": "cc1b59f13b4e1a48",
+   "fbxBytes": 5974332,
+   "tris": {
+    "bark": 10398,
+    "leaves": 12220,
+    "fruit": 0,
+    "total": 22618
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.629,
+      45.387,
+      20.806
+     ],
+     "size": [
+      70.274,
+      98.896,
+      126.486
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.105,
+      65.928,
+      -0.357
+     ],
+     "size": [
+      74.369,
+      43.337,
+      89.81
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.469,
+      68.048,
+      0.749
+     ],
+     "size": [
+      80.189,
+      47.675,
+      93.218
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.559,
+      71.946,
+      5.092
+     ],
+     "size": [
+      81.787,
+      55.198,
+      96.435
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 26,
+   "label": "STREET SYCAMORE 22",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 470,
+   "routes": [
+    470,
+    471,
+    472,
+    473,
+    474,
+    475,
+    476,
+    477,
+    478
+   ],
+   "pivot": [
+    -61.477,
+    3.145,
+    352.383
+   ],
+   "heightStuds": 75.85,
+   "assetId": null,
+   "displayName": "SR tree v2 026 STREET SYCAMORE 22",
+   "moderation": "not uploaded",
+   "sha": "bdca1029b84225a9",
+   "fbxBytes": 4940812,
+   "tris": {
+    "bark": 10224,
+    "leaves": 11320,
+    "fruit": 0,
+    "total": 21544
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.164,
+      36.348,
+      6.733
+     ],
+     "size": [
+      68.153,
+      81.335,
+      60.965
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.981,
+      55.839,
+      6.817
+     ],
+     "size": [
+      73.611,
+      36.289,
+      59.042
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.035,
+      57.26,
+      7.274
+     ],
+     "size": [
+      77.02,
+      38.601,
+      66.311
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.775,
+      61.044,
+      5.972
+     ],
+     "size": [
+      79.309,
+      38.533,
+      70.508
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 27,
+   "label": "STREET MAPLE 23",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 479,
+   "routes": [
+    479,
+    480,
+    481,
+    482,
+    483,
+    484,
+    485,
+    486,
+    487,
+    488
+   ],
+   "pivot": [
+    60.811,
+    0.0,
+    257.578
+   ],
+   "heightStuds": 60.17,
+   "assetId": null,
+   "displayName": "SR tree v2 027 STREET MAPLE 23",
+   "moderation": "not uploaded",
+   "sha": "eec253ed3423a58c",
+   "fbxBytes": 5723036,
+   "tris": {
+    "bark": 10523,
+    "leaves": 10652,
+    "fruit": 0,
+    "total": 21175
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.364,
+      27.297,
+      -2.279
+     ],
+     "size": [
+      58.292,
+      63.125,
+      60.716
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.658,
+      43.472,
+      -1.253
+     ],
+     "size": [
+      57.408,
+      25.422,
+      57.721
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.274,
+      44.691,
+      -1.026
+     ],
+     "size": [
+      64.13,
+      30.611,
+      65.072
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.829,
+      49.426,
+      -2.072
+     ],
+     "size": [
+      68.662,
+      30.364,
+      68.65
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 28,
+   "label": "STREET OAK 24",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 489,
+   "routes": [
+    489,
+    490,
+    491,
+    492,
+    493,
+    494,
+    495,
+    496,
+    497,
+    498,
+    499
+   ],
+   "pivot": [
+    231.525,
+    0.59,
+    292.112
+   ],
+   "heightStuds": 70.95,
+   "assetId": null,
+   "displayName": "SR tree v2 028 STREET OAK 24",
+   "moderation": "not uploaded",
+   "sha": "54f6c8d412d9f24f",
+   "fbxBytes": 6283276,
+   "tris": {
+    "bark": 10622,
+    "leaves": 11324,
+    "fruit": 0,
+    "total": 21946
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.281,
+      34.317,
+      31.762
+     ],
+     "size": [
+      72.23,
+      77.327,
+      119.994
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.006,
+      48.682,
+      0.798
+     ],
+     "size": [
+      59.323,
+      43.862,
+      56.12
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.398,
+      50.219,
+      1.58
+     ],
+     "size": [
+      75.483,
+      45.706,
+      67.452
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -3.173,
+      56.707,
+      9.404
+     ],
+     "size": [
+      82.369,
+      41.682,
+      92.272
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 29,
+   "label": "STREET OAK 25",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 500,
+   "routes": [
+    500,
+    501,
+    502,
+    503,
+    504,
+    505
+   ],
+   "pivot": [
+    -603.498,
+    10.197,
+    -590.65
+   ],
+   "heightStuds": 59.96,
+   "assetId": null,
+   "displayName": "SR tree v2 029 STREET OAK 25",
+   "moderation": "not uploaded",
+   "sha": "53bef94d0118d3fa",
+   "fbxBytes": 6256284,
+   "tris": {
+    "bark": 9996,
+    "leaves": 11256,
+    "fruit": 0,
+    "total": 21252
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.81,
+      28.126,
+      0.28
+     ],
+     "size": [
+      65.32,
+      64.683,
+      76.737
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.393,
+      43.901,
+      0.417
+     ],
+     "size": [
+      67.395,
+      27.865,
+      75.709
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.113,
+      46.446,
+      0.227
+     ],
+     "size": [
+      70.076,
+      29.349,
+      78.812
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.962,
+      50.561,
+      0.296
+     ],
+     "size": [
+      74.143,
+      28.434,
+      83.967
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 30,
+   "label": "STREET ELM 26",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 506,
+   "routes": [
+    506,
+    507,
+    508,
+    509,
+    510,
+    511,
+    512,
+    513
+   ],
+   "pivot": [
+    -113.204,
+    0.409,
+    -312.739
+   ],
+   "heightStuds": 57.24,
+   "assetId": null,
+   "displayName": "SR tree v2 030 STREET ELM 26",
+   "moderation": "not uploaded",
+   "sha": "a37236c2ff90d89c",
+   "fbxBytes": 5969580,
+   "tris": {
+    "bark": 10393,
+    "leaves": 12168,
+    "fruit": 0,
+    "total": 22561
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      19.778,
+      26.076,
+      0.555
+     ],
+     "size": [
+      107.156,
+      60.579,
+      71.219
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.207,
+      37.232,
+      0.662
+     ],
+     "size": [
+      65.498,
+      21.758,
+      75.675
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.93,
+      38.197,
+      0.219
+     ],
+     "size": [
+      69.1,
+      23.445,
+      78.035
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      3.227,
+      42.476,
+      -0.186
+     ],
+     "size": [
+      82.408,
+      31.93,
+      75.612
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 31,
+   "label": "STREET SYCAMORE 27",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 514,
+   "routes": [
+    514,
+    515,
+    516,
+    517,
+    518,
+    519,
+    520,
+    521,
+    522
+   ],
+   "pivot": [
+    375.946,
+    2.534,
+    308.276
+   ],
+   "heightStuds": 97.32,
+   "assetId": null,
+   "displayName": "SR tree v2 031 STREET SYCAMORE 27",
+   "moderation": "not uploaded",
+   "sha": "66f95160a24efae6",
+   "fbxBytes": 5001660,
+   "tris": {
+    "bark": 10257,
+    "leaves": 12300,
+    "fruit": 0,
+    "total": 22557
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -4.998,
+      49.105,
+      0.12
+     ],
+     "size": [
+      65.013,
+      106.291,
+      66.079
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.95,
+      67.279,
+      2.13
+     ],
+     "size": [
+      69.227,
+      55.026,
+      73.71
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -4.396,
+      73.762,
+      -0.075
+     ],
+     "size": [
+      79.036,
+      48.373,
+      78.472
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -4.025,
+      82.337,
+      -0.057
+     ],
+     "size": [
+      83.132,
+      51.436,
+      83.216
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 32,
+   "label": "STREET MAPLE 28",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 523,
+   "routes": [
+    523,
+    524,
+    525,
+    526,
+    527,
+    528,
+    529,
+    530,
+    531,
+    532
+   ],
+   "pivot": [
+    -406.239,
+    0.19,
+    321.599
+   ],
+   "heightStuds": 90.03,
+   "assetId": null,
+   "displayName": "SR tree v2 032 STREET MAPLE 28",
+   "moderation": "not uploaded",
+   "sha": "1a8c29656fa76cb6",
+   "fbxBytes": 5765484,
+   "tris": {
+    "bark": 10569,
+    "leaves": 11280,
+    "fruit": 0,
+    "total": 21849
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.724,
+      44.365,
+      -1.727
+     ],
+     "size": [
+      62.852,
+      97.339,
+      74.94
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.339,
+      67.8,
+      1.139
+     ],
+     "size": [
+      66.214,
+      40.735,
+      70.454
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.156,
+      68.202,
+      -1.833
+     ],
+     "size": [
+      73.741,
+      45.2,
+      80.999
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.846,
+      73.262,
+      -2.102
+     ],
+     "size": [
+      77.865,
+      47.998,
+      83.26
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 33,
+   "label": "STREET OAK 29",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 533,
+   "routes": [
+    533,
+    534,
+    535,
+    536,
+    537,
+    538,
+    539,
+    540,
+    541,
+    542
+   ],
+   "pivot": [
+    244.109,
+    16.394,
+    -589.216
+   ],
+   "heightStuds": 70.3,
+   "assetId": null,
+   "displayName": "SR tree v2 033 STREET OAK 29",
+   "moderation": "not uploaded",
+   "sha": "7489727575792c0d",
+   "fbxBytes": 6281548,
+   "tris": {
+    "bark": 10580,
+    "leaves": 11404,
+    "fruit": 0,
+    "total": 21984
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -4.639,
+      33.513,
+      -2.612
+     ],
+     "size": [
+      67.698,
+      75.382,
+      62.517
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -4.749,
+      49.199,
+      -2.151
+     ],
+     "size": [
+      69.237,
+      32.979,
+      62.94
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -4.171,
+      51.864,
+      -0.849
+     ],
+     "size": [
+      77.859,
+      34.973,
+      67.229
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -3.779,
+      56.084,
+      -1.733
+     ],
+     "size": [
+      77.36,
+      40.198,
+      72.861
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 34,
+   "label": "STREET OAK 30",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 543,
+   "routes": [
+    543,
+    544,
+    545,
+    546,
+    547,
+    548,
+    549
+   ],
+   "pivot": [
+    -244.341,
+    0.0,
+    39.334
+   ],
+   "heightStuds": 55.92,
+   "assetId": null,
+   "displayName": "SR tree v2 034 STREET OAK 30",
+   "moderation": "not uploaded",
+   "sha": "cbab366cc8601103",
+   "fbxBytes": 6255052,
+   "tris": {
+    "bark": 9158,
+    "leaves": 11704,
+    "fruit": 0,
+    "total": 20862
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.446,
+      25.779,
+      3.84
+     ],
+     "size": [
+      60.843,
+      60.077,
+      52.213
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.113,
+      39.725,
+      2.922
+     ],
+     "size": [
+      66.691,
+      28.72,
+      53.735
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.015,
+      41.429,
+      3.21
+     ],
+     "size": [
+      67.459,
+      29.395,
+      59.852
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.521,
+      44.905,
+      3.886
+     ],
+     "size": [
+      68.21,
+      29.998,
+      60.832
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 35,
+   "label": "STREET ELM 31",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 550,
+   "routes": [
+    550,
+    551,
+    552,
+    553,
+    554,
+    555,
+    556,
+    557
+   ],
+   "pivot": [
+    24.853,
+    0.016,
+    -266.933
+   ],
+   "heightStuds": 93.84,
+   "assetId": null,
+   "displayName": "SR tree v2 035 STREET ELM 31",
+   "moderation": "not uploaded",
+   "sha": "e6a4eaceb95913c0",
+   "fbxBytes": 5981132,
+   "tris": {
+    "bark": 10443,
+    "leaves": 12328,
+    "fruit": 0,
+    "total": 22771
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -3.799,
+      44.715,
+      -0.796
+     ],
+     "size": [
+      71.877,
+      97.496,
+      70.545
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.71,
+      65.703,
+      0.75
+     ],
+     "size": [
+      68.03,
+      45.03,
+      70.366
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.462,
+      67.049,
+      0.728
+     ],
+     "size": [
+      75.847,
+      47.611,
+      75.216
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -3.325,
+      73.012,
+      0.124
+     ],
+     "size": [
+      82.104,
+      53.023,
+      78.135
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 36,
+   "label": "STREET SYCAMORE 32",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 558,
+   "routes": [
+    558,
+    559,
+    560,
+    561,
+    562,
+    563,
+    564,
+    565
+   ],
+   "pivot": [
+    576.1,
+    0.25,
+    -240.901
+   ],
+   "heightStuds": 78.76,
+   "assetId": null,
+   "displayName": "SR tree v2 036 STREET SYCAMORE 32",
+   "moderation": "not uploaded",
+   "sha": "fff4101ebd868eea",
+   "fbxBytes": 4962092,
+   "tris": {
+    "bark": 10291,
+    "leaves": 11656,
+    "fruit": 0,
+    "total": 21947
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.587,
+      38.912,
+      0.561
+     ],
+     "size": [
+      68.36,
+      85.87,
+      62.144
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.918,
+      56.636,
+      -0.008
+     ],
+     "size": [
+      61.838,
+      39.0,
+      65.268
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.03,
+      60.011,
+      0.1
+     ],
+     "size": [
+      74.671,
+      41.761,
+      72.862
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.324,
+      64.467,
+      1.519
+     ],
+     "size": [
+      81.977,
+      48.737,
+      74.371
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 37,
+   "label": "STREET MAPLE 33",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 566,
+   "routes": [
+    566,
+    567,
+    568,
+    569,
+    570,
+    571,
+    572,
+    573,
+    574,
+    575
+   ],
+   "pivot": [
+    -58.646,
+    15.254,
+    610.699
+   ],
+   "heightStuds": 73.82,
+   "assetId": null,
+   "displayName": "SR tree v2 037 STREET MAPLE 33",
+   "moderation": "not uploaded",
+   "sha": "68174f335e32387c",
+   "fbxBytes": 5760844,
+   "tris": {
+    "bark": 10460,
+    "leaves": 11264,
+    "fruit": 0,
+    "total": 21724
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.865,
+      36.509,
+      0.095
+     ],
+     "size": [
+      63.502,
+      81.088,
+      58.436
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.129,
+      57.236,
+      -3.862
+     ],
+     "size": [
+      57.82,
+      35.256,
+      50.824
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.083,
+      57.162,
+      0.622
+     ],
+     "size": [
+      71.728,
+      38.687,
+      67.879
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.768,
+      61.047,
+      0.425
+     ],
+     "size": [
+      76.633,
+      38.626,
+      72.262
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 38,
+   "label": "STREET OAK 34",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 576,
+   "routes": [
+    576,
+    577,
+    578,
+    579,
+    580,
+    581,
+    582,
+    583,
+    584,
+    585,
+    586
+   ],
+   "pivot": [
+    -578.621,
+    2.694,
+    310.161
+   ],
+   "heightStuds": 87.74,
+   "assetId": null,
+   "displayName": "SR tree v2 038 STREET OAK 34",
+   "moderation": "not uploaded",
+   "sha": "4f3cba98d0455fc7",
+   "fbxBytes": 6310284,
+   "tris": {
+    "bark": 10667,
+    "leaves": 11720,
+    "fruit": 0,
+    "total": 22387
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -3.807,
+      42.27,
+      16.465
+     ],
+     "size": [
+      70.489,
+      92.493,
+      114.221
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -4.662,
+      59.566,
+      -2.314
+     ],
+     "size": [
+      69.322,
+      54.166,
+      73.653
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -4.233,
+      60.724,
+      -2.482
+     ],
+     "size": [
+      77.533,
+      52.583,
+      79.406
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -4.051,
+      65.37,
+      1.611
+     ],
+     "size": [
+      82.83,
+      52.715,
+      94.369
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 39,
+   "label": "STREET OAK 35",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 587,
+   "routes": [
+    587,
+    588,
+    589,
+    590,
+    591,
+    592,
+    593
+   ],
+   "pivot": [
+    398.001,
+    0.529,
+    579.894
+   ],
+   "heightStuds": 75.96,
+   "assetId": null,
+   "displayName": "SR tree v2 039 STREET OAK 35",
+   "moderation": "not uploaded",
+   "sha": "e6164b6d4534205a",
+   "fbxBytes": 6300908,
+   "tris": {
+    "bark": 10288,
+    "leaves": 11840,
+    "fruit": 0,
+    "total": 22128
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      4.966,
+      37.585,
+      -3.88
+     ],
+     "size": [
+      65.195,
+      85.171,
+      62.185
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      4.775,
+      56.902,
+      -4.88
+     ],
+     "size": [
+      64.637,
+      40.34,
+      66.184
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      4.754,
+      58.036,
+      -4.509
+     ],
+     "size": [
+      71.652,
+      40.395,
+      70.029
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      4.015,
+      62.466,
+      -3.278
+     ],
+     "size": [
+      76.907,
+      42.046,
+      73.49
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 40,
+   "label": "SENTINEL OAK",
+   "species": "oak",
+   "category": "giant",
+   "trunkRoute": 594,
+   "routes": [
+    594,
+    595,
+    596,
+    597,
+    598,
+    599,
+    600,
+    601,
+    602,
+    603
+   ],
+   "pivot": [
+    -252.5,
+    0.121,
+    -365.0
+   ],
+   "heightStuds": 152.5,
+   "assetId": null,
+   "displayName": "SR tree v2 040 SENTINEL OAK",
+   "moderation": "not uploaded",
+   "sha": "2a7341262702dc9a",
+   "fbxBytes": 6279740,
+   "tris": {
+    "bark": 11080,
+    "leaves": 11996,
+    "fruit": 0,
+    "total": 23076
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.648,
+      69.071,
+      -2.88
+     ],
+     "size": [
+      115.882,
+      149.556,
+      130.351
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -3.85,
+      112.895,
+      -10.922
+     ],
+     "size": [
+      116.416,
+      42.769,
+      111.284
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      95,
+      133,
+      71
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.788,
+      115.467,
+      -3.393
+     ],
+     "size": [
+      126.636,
+      47.798,
+      131.236
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      95,
+      133,
+      71
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.18,
+      122.977,
+      -2.353
+     ],
+     "size": [
+      134.386,
+      62.869,
+      137.467
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      95,
+      133,
+      71
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H6",
+    "hollowBoardMargin": 0.245
+   }
+  },
+  {
+   "index": 41,
+   "label": "HIGHLAND ELM",
+   "species": "elm",
+   "category": "giant",
+   "trunkRoute": 604,
+   "routes": [
+    604,
+    605,
+    606,
+    607,
+    608,
+    609,
+    610,
+    611,
+    612,
+    613
+   ],
+   "pivot": [
+    220.0,
+    2.55,
+    347.5
+   ],
+   "heightStuds": 175.0,
+   "assetId": null,
+   "displayName": "SR tree v2 041 HIGHLAND ELM",
+   "moderation": "not uploaded",
+   "sha": "829cddc0f0377889",
+   "fbxBytes": 5677964,
+   "tris": {
+    "bark": 11082,
+    "leaves": 9584,
+    "fruit": 0,
+    "total": 20666
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.056,
+      79.494,
+      -5.064
+     ],
+     "size": [
+      129.229,
+      169.834,
+      127.066
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.284,
+      124.95,
+      -6.531
+     ],
+     "size": [
+      133.235,
+      39.891,
+      123.883
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      99,
+      141,
+      76
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.157,
+      130.49,
+      -4.93
+     ],
+     "size": [
+      141.053,
+      50.975,
+      134.18
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      99,
+      141,
+      76
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.038,
+      137.279,
+      -2.333
+     ],
+     "size": [
+      145.329,
+      64.543,
+      141.079
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      99,
+      141,
+      76
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H1",
+    "hollowBoardMargin": 0.148
+   }
+  },
+  {
+   "index": 42,
+   "label": "OLD WATCH SYCAMORE",
+   "species": "sycamore",
+   "category": "giant",
+   "trunkRoute": 614,
+   "routes": [
+    614,
+    615,
+    616,
+    617,
+    618,
+    619,
+    620,
+    621,
+    622,
+    623
+   ],
+   "pivot": [
+    540.0,
+    0.868,
+    -272.5
+   ],
+   "heightStuds": 162.5,
+   "assetId": null,
+   "displayName": "SR tree v2 042 OLD WATCH SYCAMORE",
+   "moderation": "not uploaded",
+   "sha": "c7efa63aa8d3530c",
+   "fbxBytes": 5108092,
+   "tris": {
+    "bark": 10996,
+    "leaves": 11632,
+    "fruit": 0,
+    "total": 22628
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.072,
+      76.029,
+      -6.908
+     ],
+     "size": [
+      128.996,
+      163.57,
+      134.131
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      8.417,
+      119.757,
+      -12.271
+     ],
+     "size": [
+      114.533,
+      44.503,
+      129.188
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      79
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.318,
+      123.903,
+      -8.354
+     ],
+     "size": [
+      137.921,
+      52.676,
+      142.427
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      79
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.544,
+      132.464,
+      -4.83
+     ],
+     "size": [
+      147.503,
+      69.9,
+      148.743
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      79
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H5",
+    "hollowBoardMargin": 0.197
+   }
+  },
+  {
+   "index": 43,
+   "label": "ESTATE GATE OAK",
+   "species": "oak",
+   "category": "estate",
+   "trunkRoute": 630,
+   "routes": [
+    630,
+    631,
+    632,
+    633,
+    634,
+    635,
+    636,
+    669
+   ],
+   "pivot": [
+    -575.0,
+    13.699,
+    -822.5
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 043 ESTATE GATE OAK",
+   "moderation": "not uploaded",
+   "sha": "25264d7ad3fbca09",
+   "fbxBytes": 6334316,
+   "tris": {
+    "bark": 10707,
+    "leaves": 11588,
+    "fruit": 0,
+    "total": 22295
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      6.006,
+      35.399,
+      27.955
+     ],
+     "size": [
+      99.198,
+      80.897,
+      161.133
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      8.642,
+      56.143,
+      -4.319
+     ],
+     "size": [
+      96.434,
+      32.355,
+      101.802
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      5.317,
+      58.88,
+      -2.409
+     ],
+     "size": [
+      108.063,
+      33.048,
+      107.42
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      6.421,
+      60.962,
+      9.572
+     ],
+     "size": [
+      112.508,
+      36.44,
+      134.021
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 44,
+   "label": "ESTATE GATE OAK",
+   "species": "oak",
+   "category": "estate",
+   "trunkRoute": 637,
+   "routes": [
+    637,
+    638,
+    639,
+    640,
+    641,
+    642,
+    643,
+    670
+   ],
+   "pivot": [
+    575.0,
+    9.574,
+    -822.5
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 044 ESTATE GATE OAK",
+   "moderation": "not uploaded",
+   "sha": "378758fc17d4df6a",
+   "fbxBytes": 6327356,
+   "tris": {
+    "bark": 10700,
+    "leaves": 11476,
+    "fruit": 0,
+    "total": 22176
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.116,
+      34.095,
+      29.911
+     ],
+     "size": [
+      99.157,
+      78.211,
+      157.413
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.809,
+      53.003,
+      2.196
+     ],
+     "size": [
+      102.033,
+      35.502,
+      93.162
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.573,
+      54.98,
+      9.711
+     ],
+     "size": [
+      106.305,
+      35.472,
+      114.975
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.743,
+      57.971,
+      7.795
+     ],
+     "size": [
+      107.595,
+      38.547,
+      124.847
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 45,
+   "label": "ESTATE GATE OAK",
+   "species": "oak",
+   "category": "estate",
+   "trunkRoute": 644,
+   "routes": [
+    644,
+    645,
+    646,
+    647,
+    648,
+    649,
+    650
+   ],
+   "pivot": [
+    -547.5,
+    14.062,
+    -1132.5
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 045 ESTATE GATE OAK",
+   "moderation": "not uploaded",
+   "sha": "a629c6476bbae68f",
+   "fbxBytes": 6317932,
+   "tris": {
+    "bark": 10631,
+    "leaves": 11376,
+    "fruit": 0,
+    "total": 22007
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.907,
+      35.944,
+      6.68
+     ],
+     "size": [
+      97.673,
+      81.665,
+      98.733
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.988,
+      56.587,
+      2.545
+     ],
+     "size": [
+      100.337,
+      33.337,
+      100.303
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.045,
+      57.631,
+      6.797
+     ],
+     "size": [
+      106.026,
+      35.429,
+      106.267
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.332,
+      60.354,
+      6.786
+     ],
+     "size": [
+      107.199,
+      36.295,
+      109.613
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 46,
+   "label": "ESTATE GATE OAK",
+   "species": "oak",
+   "category": "estate",
+   "trunkRoute": 651,
+   "routes": [
+    651,
+    652,
+    653,
+    654,
+    655,
+    656,
+    657
+   ],
+   "pivot": [
+    547.5,
+    14.613,
+    -1140.0
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 046 ESTATE GATE OAK",
+   "moderation": "not uploaded",
+   "sha": "edd54d08fddd1de6",
+   "fbxBytes": 6345372,
+   "tris": {
+    "bark": 10558,
+    "leaves": 11876,
+    "fruit": 0,
+    "total": 22434
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.037,
+      35.143,
+      3.967
+     ],
+     "size": [
+      90.376,
+      80.023,
+      82.591
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.93,
+      57.005,
+      2.421
+     ],
+     "size": [
+      86.505,
+      37.543,
+      87.611
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.177,
+      57.846,
+      3.7
+     ],
+     "size": [
+      95.3,
+      36.554,
+      93.165
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.314,
+      60.6,
+      3.435
+     ],
+     "size": [
+      98.195,
+      37.51,
+      92.445
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 47,
+   "label": "PARK OAK 90",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 672,
+   "routes": [
+    672,
+    673,
+    674,
+    675,
+    676,
+    677,
+    733
+   ],
+   "pivot": [
+    -552.5,
+    6.0,
+    887.5
+   ],
+   "heightStuds": 68.31,
+   "assetId": null,
+   "displayName": "SR tree v2 047 PARK OAK 90",
+   "moderation": "not uploaded",
+   "sha": "12a6c23617322cbc",
+   "fbxBytes": 6330092,
+   "tris": {
+    "bark": 9559,
+    "leaves": 12752,
+    "fruit": 0,
+    "total": 22311
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.143,
+      33.582,
+      4.356
+     ],
+     "size": [
+      60.017,
+      75.232,
+      67.127
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.083,
+      48.15,
+      -1.532
+     ],
+     "size": [
+      59.987,
+      38.298,
+      51.343
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.18,
+      49.408,
+      3.42
+     ],
+     "size": [
+      64.896,
+      41.178,
+      71.437
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.721,
+      54.557,
+      3.027
+     ],
+     "size": [
+      69.18,
+      40.257,
+      77.077
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 48,
+   "label": "PARK ELM 91",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 678,
+   "routes": [
+    678,
+    679,
+    680,
+    681,
+    682,
+    683,
+    684
+   ],
+   "pivot": [
+    -462.5,
+    10.699,
+    782.5
+   ],
+   "heightStuds": 95.51,
+   "assetId": null,
+   "displayName": "SR tree v2 048 PARK ELM 91",
+   "moderation": "not uploaded",
+   "sha": "d93ec8a7c51de239",
+   "fbxBytes": 5984444,
+   "tris": {
+    "bark": 10310,
+    "leaves": 12484,
+    "fruit": 0,
+    "total": 22794
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.8,
+      47.788,
+      1.295
+     ],
+     "size": [
+      71.232,
+      104.079,
+      69.062
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.175,
+      69.46,
+      1.244
+     ],
+     "size": [
+      65.108,
+      50.797,
+      65.577
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      3.707,
+      71.02,
+      1.063
+     ],
+     "size": [
+      75.229,
+      54.114,
+      72.844
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.535,
+      73.071,
+      0.578
+     ],
+     "size": [
+      81.138,
+      58.23,
+      79.01
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 49,
+   "label": "PARK SYCAMORE 92",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 685,
+   "routes": [
+    685,
+    686,
+    687,
+    688,
+    689,
+    690,
+    691,
+    692,
+    734
+   ],
+   "pivot": [
+    -287.5,
+    6.734,
+    1030.0
+   ],
+   "heightStuds": 71.9,
+   "assetId": null,
+   "displayName": "SR tree v2 049 PARK SYCAMORE 92",
+   "moderation": "held: broken promise",
+   "sha": "f8a2ac5859392a00",
+   "fbxBytes": 4998412,
+   "tris": {
+    "bark": 10371,
+    "leaves": 12188,
+    "fruit": 0,
+    "total": 22559
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -4.521,
+      34.916,
+      -4.142
+     ],
+     "size": [
+      66.883,
+      78.443,
+      69.026
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -4.661,
+      53.695,
+      1.038
+     ],
+     "size": [
+      69.999,
+      35.47,
+      55.514
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -4.393,
+      54.799,
+      -4.091
+     ],
+     "size": [
+      76.524,
+      36.465,
+      77.326
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -2.958,
+      59.984,
+      -3.552
+     ],
+     "size": [
+      77.303,
+      36.73,
+      79.832
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 50,
+   "label": "PARK MAPLE 93",
+   "species": "maple",
+   "category": "outer",
+   "trunkRoute": 693,
+   "routes": [
+    693,
+    694,
+    695,
+    696,
+    697,
+    698,
+    699,
+    700,
+    701
+   ],
+   "pivot": [
+    -160.0,
+    17.57,
+    792.5
+   ],
+   "heightStuds": 65.26,
+   "assetId": null,
+   "displayName": "SR tree v2 050 PARK MAPLE 93",
+   "moderation": "not uploaded",
+   "sha": "43ecbfe4acdf31a3",
+   "fbxBytes": 5754988,
+   "tris": {
+    "bark": 10450,
+    "leaves": 11196,
+    "fruit": 0,
+    "total": 21646
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.701,
+      31.141,
+      -4.092
+     ],
+     "size": [
+      58.83,
+      70.711,
+      65.174
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.918,
+      48.879,
+      -3.412
+     ],
+     "size": [
+      58.583,
+      31.475,
+      65.793
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.433,
+      49.932,
+      -3.673
+     ],
+     "size": [
+      64.678,
+      32.742,
+      73.263
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.375,
+      54.374,
+      -4.232
+     ],
+     "size": [
+      68.997,
+      31.447,
+      74.338
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      146,
+      168,
+      104
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 51,
+   "label": "PARK OAK 94",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 702,
+   "routes": [
+    702,
+    703,
+    704,
+    705,
+    706,
+    707,
+    708,
+    709,
+    710,
+    711
+   ],
+   "pivot": [
+    35.0,
+    1.896,
+    987.5
+   ],
+   "heightStuds": 68.34,
+   "assetId": null,
+   "displayName": "SR tree v2 051 PARK OAK 94",
+   "moderation": "not uploaded",
+   "sha": "1d674d4a617f5879",
+   "fbxBytes": 6280140,
+   "tris": {
+    "bark": 10563,
+    "leaves": 11352,
+    "fruit": 0,
+    "total": 21915
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.254,
+      33.534,
+      3.101
+     ],
+     "size": [
+      64.327,
+      75.589,
+      64.207
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.491,
+      47.66,
+      0.422
+     ],
+     "size": [
+      62.529,
+      37.184,
+      55.019
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.902,
+      48.798,
+      2.82
+     ],
+     "size": [
+      71.171,
+      40.17,
+      67.397
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.727,
+      56.347,
+      2.946
+     ],
+     "size": [
+      73.903,
+      36.888,
+      73.275
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 52,
+   "label": "PARK OAK 95",
+   "species": "oak",
+   "category": "outer",
+   "trunkRoute": 712,
+   "routes": [
+    712,
+    713,
+    714,
+    715,
+    716,
+    717,
+    735
+   ],
+   "pivot": [
+    225.0,
+    12.535,
+    895.0
+   ],
+   "heightStuds": 83.31,
+   "assetId": null,
+   "displayName": "SR tree v2 052 PARK OAK 95",
+   "moderation": "held: broken promise",
+   "sha": "dfbe27544c976da5",
+   "fbxBytes": 6294092,
+   "tris": {
+    "bark": 9246,
+    "leaves": 12296,
+    "fruit": 0,
+    "total": 21542
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -2.669,
+      41.418,
+      0.061
+     ],
+     "size": [
+      64.493,
+      91.387,
+      56.242
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.843,
+      60.904,
+      -0.091
+     ],
+     "size": [
+      51.485,
+      42.021,
+      54.572
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -3.419,
+      64.727,
+      -1.178
+     ],
+     "size": [
+      70.194,
+      44.509,
+      62.581
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -2.673,
+      70.724,
+      -1.039
+     ],
+     "size": [
+      78.496,
+      48.082,
+      68.517
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 53,
+   "label": "PARK ELM 96",
+   "species": "elm",
+   "category": "outer",
+   "trunkRoute": 718,
+   "routes": [
+    718,
+    719,
+    720,
+    721,
+    722,
+    723,
+    724
+   ],
+   "pivot": [
+    -37.5,
+    0.702,
+    1065.0
+   ],
+   "heightStuds": 62.58,
+   "assetId": null,
+   "displayName": "SR tree v2 053 PARK ELM 96",
+   "moderation": "not uploaded",
+   "sha": "1ec2b3980983a925",
+   "fbxBytes": 5974748,
+   "tris": {
+    "bark": 10315,
+    "leaves": 12268,
+    "fruit": 0,
+    "total": 22583
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.228,
+      30.972,
+      0.107
+     ],
+     "size": [
+      66.698,
+      70.141,
+      66.003
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.615,
+      45.438,
+      0.33
+     ],
+     "size": [
+      71.252,
+      33.146,
+      67.855
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.125,
+      47.961,
+      1.274
+     ],
+     "size": [
+      72.192,
+      34.206,
+      73.266
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.16,
+      51.888,
+      1.034
+     ],
+     "size": [
+      71.792,
+      34.305,
+      72.277
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      122,
+      156,
+      86
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 54,
+   "label": "PARK SYCAMORE 97",
+   "species": "sycamore",
+   "category": "outer",
+   "trunkRoute": 725,
+   "routes": [
+    725,
+    726,
+    727,
+    728,
+    729,
+    730,
+    731,
+    732
+   ],
+   "pivot": [
+    -595.0,
+    7.905,
+    992.5
+   ],
+   "heightStuds": 81.34,
+   "assetId": null,
+   "displayName": "SR tree v2 054 PARK SYCAMORE 97",
+   "moderation": "not uploaded",
+   "sha": "c2574667b30000c9",
+   "fbxBytes": 4966556,
+   "tris": {
+    "bark": 9431,
+    "leaves": 12232,
+    "fruit": 0,
+    "total": 21663
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.295,
+      39.062,
+      1.129
+     ],
+     "size": [
+      70.77,
+      86.104,
+      68.73
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -2.341,
+      58.085,
+      0.121
+     ],
+     "size": [
+      76.679,
+      40.218,
+      63.486
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.569,
+      60.786,
+      1.056
+     ],
+     "size": [
+      79.521,
+      42.822,
+      77.674
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.167,
+      68.57,
+      0.957
+     ],
+     "size": [
+      82.996,
+      38.897,
+      80.135
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      85,
+      127,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 55,
+   "label": "SHOP OAK A",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 792,
+   "routes": [
+    792,
+    796,
+    797,
+    802,
+    803,
+    794,
+    795,
+    798,
+    793,
+    799,
+    800,
+    801,
+    804
+   ],
+   "pivot": [
+    830.0,
+    3.388,
+    -60.0
+   ],
+   "heightStuds": 55.0,
+   "assetId": null,
+   "displayName": "SR tree v2 055 SHOP OAK A",
+   "moderation": "not uploaded",
+   "sha": "61aaa93e572c015c",
+   "fbxBytes": 6168524,
+   "tris": {
+    "bark": 11114,
+    "leaves": 10228,
+    "fruit": 0,
+    "total": 21342
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.418,
+      23.968,
+      -0.375
+     ],
+     "size": [
+      37.547,
+      58.932,
+      36.637
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.696,
+      33.092,
+      -0.618
+     ],
+     "size": [
+      40.547,
+      24.611,
+      38.703
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      111,
+      146,
+      67
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.16,
+      36.183,
+      -0.307
+     ],
+     "size": [
+      45.198,
+      27.313,
+      42.751
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      111,
+      146,
+      67
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.421,
+      42.696,
+      -0.778
+     ],
+     "size": [
+      47.28,
+      30.001,
+      45.423
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      111,
+      146,
+      67
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 56,
+   "label": "SHOP OAK B",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 805,
+   "routes": [
+    805,
+    811,
+    816,
+    806,
+    808,
+    809,
+    812,
+    814,
+    815,
+    807,
+    810,
+    813,
+    817
+   ],
+   "pivot": [
+    905.0,
+    11.443,
+    60.0
+   ],
+   "heightStuds": 60.0,
+   "assetId": null,
+   "displayName": "SR tree v2 056 SHOP OAK B",
+   "moderation": "held: broken promise",
+   "sha": "39de51a04cfb6e90",
+   "fbxBytes": 6249580,
+   "tris": {
+    "bark": 11225,
+    "leaves": 9800,
+    "fruit": 0,
+    "total": 21025
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.89,
+      27.186,
+      -0.261
+     ],
+     "size": [
+      38.618,
+      63.356,
+      44.199
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.274,
+      37.184,
+      -0.551
+     ],
+     "size": [
+      42.237,
+      22.269,
+      43.241
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      120,
+      154,
+      75
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.295,
+      41.805,
+      -1.148
+     ],
+     "size": [
+      46.242,
+      27.641,
+      47.554
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      120,
+      154,
+      75
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.14,
+      47.399,
+      -0.209
+     ],
+     "size": [
+      48.637,
+      30.733,
+      49.607
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      120,
+      154,
+      75
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 57,
+   "label": "CHILIS SYCAMORE",
+   "species": "sycamore",
+   "category": "named",
+   "trunkRoute": 818,
+   "routes": [
+    818,
+    819,
+    825,
+    830,
+    820,
+    821,
+    822,
+    826,
+    828,
+    829,
+    823,
+    824,
+    827,
+    831,
+    832
+   ],
+   "pivot": [
+    1030.0,
+    13.713,
+    -155.0
+   ],
+   "heightStuds": 67.5,
+   "assetId": null,
+   "displayName": "SR tree v2 057 CHILIS SYCAMORE",
+   "moderation": "not uploaded",
+   "sha": "373f1a57c0bf5e64",
+   "fbxBytes": 4995900,
+   "tris": {
+    "bark": 11394,
+    "leaves": 9536,
+    "fruit": 0,
+    "total": 20930
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.642,
+      30.182,
+      39.45
+     ],
+     "size": [
+      45.687,
+      71.641,
+      127.573
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.03,
+      42.369,
+      0.007
+     ],
+     "size": [
+      49.138,
+      26.306,
+      47.051
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      76
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.728,
+      44.94,
+      -0.245
+     ],
+     "size": [
+      52.282,
+      30.885,
+      50.91
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      76
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.34,
+      54.451,
+      20.62
+     ],
+     "size": [
+      56.352,
+      31.397,
+      98.626
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      130,
+      158,
+      76
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3,
+    "hollow": "H8",
+    "hollowBoardMargin": 0.135
+   }
+  },
+  {
+   "index": 58,
+   "label": "PUMP ELM",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 833,
+   "routes": [
+    833,
+    836,
+    835,
+    837,
+    838,
+    839,
+    841,
+    842,
+    834,
+    840,
+    843,
+    844
+   ],
+   "pivot": [
+    1170.0,
+    3.686,
+    85.0
+   ],
+   "heightStuds": 62.5,
+   "assetId": null,
+   "displayName": "SR tree v2 058 PUMP ELM",
+   "moderation": "not uploaded",
+   "sha": "9596221331d01e28",
+   "fbxBytes": 5963884,
+   "tris": {
+    "bark": 11046,
+    "leaves": 10888,
+    "fruit": 0,
+    "total": 21934
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.102,
+      30.4,
+      20.205
+     ],
+     "size": [
+      41.33,
+      71.585,
+      106.001
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.051,
+      41.583,
+      -1.007
+     ],
+     "size": [
+      43.116,
+      25.633,
+      39.447
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      144,
+      168,
+      85
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.963,
+      46.254,
+      -0.522
+     ],
+     "size": [
+      46.564,
+      34.913,
+      43.141
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      144,
+      168,
+      85
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.096,
+      49.014,
+      14.67
+     ],
+     "size": [
+      47.063,
+      40.209,
+      73.386
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      144,
+      168,
+      85
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3,
+    "hollow": "H4",
+    "hollowBoardMargin": 0.137
+   }
+  },
+  {
+   "index": 59,
+   "label": "ESTATE OAK SOUTH 1",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 845,
+   "routes": [
+    845,
+    849,
+    853,
+    856,
+    858,
+    846,
+    848,
+    850,
+    852,
+    857,
+    847,
+    851,
+    854,
+    855,
+    859
+   ],
+   "pivot": [
+    295.0,
+    7.547,
+    -890.0
+   ],
+   "heightStuds": 72.5,
+   "assetId": null,
+   "displayName": "SR tree v2 059 ESTATE OAK SOUTH 1",
+   "moderation": "held: broken promise",
+   "sha": "1fab335ebf775e39",
+   "fbxBytes": 6404972,
+   "tris": {
+    "bark": 11393,
+    "leaves": 9756,
+    "fruit": 0,
+    "total": 21149
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      3.179,
+      34.952,
+      -6.26
+     ],
+     "size": [
+      55.216,
+      79.387,
+      59.026
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.066,
+      49.783,
+      0.195
+     ],
+     "size": [
+      53.634,
+      31.479,
+      50.242
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      164,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.269,
+      53.124,
+      -0.12
+     ],
+     "size": [
+      55.574,
+      35.042,
+      55.818
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      164,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.031,
+      58.023,
+      -0.574
+     ],
+     "size": [
+      60.111,
+      42.233,
+      59.551
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      164,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 60,
+   "label": "ESTATE OAK SOUTH 2",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 860,
+   "routes": [
+    860,
+    861,
+    862,
+    863,
+    864,
+    865,
+    866,
+    868,
+    869,
+    870,
+    867,
+    871,
+    872
+   ],
+   "pivot": [
+    415.0,
+    12.034,
+    -817.5
+   ],
+   "heightStuds": 65.0,
+   "assetId": null,
+   "displayName": "SR tree v2 060 ESTATE OAK SOUTH 2",
+   "moderation": "not uploaded",
+   "sha": "6b1415c0780cd950",
+   "fbxBytes": 6285756,
+   "tris": {
+    "bark": 11193,
+    "leaves": 9504,
+    "fruit": 0,
+    "total": 20697
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -34.173,
+      30.793,
+      -2.412
+     ],
+     "size": [
+      113.706,
+      72.532,
+      212.294
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.161,
+      41.641,
+      0.566
+     ],
+     "size": [
+      49.436,
+      30.622,
+      42.559
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      124,
+      154,
+      71
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.172,
+      48.435,
+      -0.329
+     ],
+     "size": [
+      53.019,
+      30.521,
+      49.22
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      124,
+      154,
+      71
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -21.111,
+      52.714,
+      -0.207
+     ],
+     "size": [
+      94.739,
+      36.401,
+      143.41
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      124,
+      154,
+      71
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H9",
+    "hollowBoardMargin": 0.139
+   }
+  },
+  {
+   "index": 61,
+   "label": "ESTATE SYCAMORE SOUTH",
+   "species": "sycamore",
+   "category": "named",
+   "trunkRoute": 873,
+   "routes": [
+    873,
+    880,
+    881,
+    882,
+    884,
+    885,
+    886,
+    874,
+    875,
+    876,
+    877,
+    879,
+    883,
+    878,
+    887
+   ],
+   "pivot": [
+    570.0,
+    9.551,
+    -865.0
+   ],
+   "heightStuds": 75.0,
+   "assetId": null,
+   "displayName": "SR tree v2 061 ESTATE SYCAMORE SOUTH",
+   "moderation": "held: broken promise",
+   "sha": "c86eabd10bce83d7",
+   "fbxBytes": 5014092,
+   "tris": {
+    "bark": 11388,
+    "leaves": 9952,
+    "fruit": 0,
+    "total": 21340
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.146,
+      35.596,
+      0.356
+     ],
+     "size": [
+      50.387,
+      80.131,
+      46.815
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.254,
+      47.915,
+      1.447
+     ],
+     "size": [
+      48.025,
+      33.257,
+      49.508
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      129,
+      160,
+      78
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.242,
+      53.192,
+      0.235
+     ],
+     "size": [
+      55.943,
+      38.972,
+      55.594
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      129,
+      160,
+      78
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.533,
+      57.538,
+      -0.951
+     ],
+     "size": [
+      61.453,
+      44.158,
+      59.507
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      129,
+      160,
+      78
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 62,
+   "label": "VILLA ELM SOUTH",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 888,
+   "routes": [
+    888,
+    890,
+    894,
+    895,
+    896,
+    892,
+    893,
+    897,
+    899,
+    889,
+    891,
+    898
+   ],
+   "pivot": [
+    810.0,
+    1.143,
+    -832.5
+   ],
+   "heightStuds": 62.5,
+   "assetId": null,
+   "displayName": "SR tree v2 062 VILLA ELM SOUTH",
+   "moderation": "held: broken promise",
+   "sha": "71c2f375492b50ad",
+   "fbxBytes": 5979468,
+   "tris": {
+    "bark": 11113,
+    "leaves": 10928,
+    "fruit": 0,
+    "total": 22041
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.119,
+      30.239,
+      -2.122
+     ],
+     "size": [
+      40.087,
+      71.917,
+      42.762
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.695,
+      39.769,
+      -1.003
+     ],
+     "size": [
+      42.347,
+      22.029,
+      42.152
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      139,
+      168,
+      84
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.196,
+      41.213,
+      -0.258
+     ],
+     "size": [
+      45.907,
+      24.919,
+      44.787
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      139,
+      168,
+      84
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.603,
+      48.575,
+      -0.703
+     ],
+     "size": [
+      50.479,
+      38.263,
+      49.231
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      139,
+      168,
+      84
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 63,
+   "label": "VILLA OAK SOUTH",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 900,
+   "routes": [
+    900,
+    901,
+    906,
+    914,
+    903,
+    904,
+    905,
+    908,
+    909,
+    910,
+    902,
+    907,
+    911,
+    912,
+    913
+   ],
+   "pivot": [
+    942.5,
+    0.659,
+    -885.0
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 063 VILLA OAK SOUTH",
+   "moderation": "not uploaded",
+   "sha": "fe54c6c16b198873",
+   "fbxBytes": 6490924,
+   "tris": {
+    "bark": 11341,
+    "leaves": 10480,
+    "fruit": 0,
+    "total": 21821
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.938,
+      34.049,
+      -0.077
+     ],
+     "size": [
+      47.885,
+      77.855,
+      45.209
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.43,
+      41.625,
+      1.02
+     ],
+     "size": [
+      49.855,
+      27.193,
+      50.334
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.511,
+      46.847,
+      -0.219
+     ],
+     "size": [
+      54.996,
+      34.577,
+      52.741
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.549,
+      55.69,
+      -0.731
+     ],
+     "size": [
+      57.479,
+      43.925,
+      56.103
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 64,
+   "label": "VILLA SYCAMORE SOUTH",
+   "species": "sycamore",
+   "category": "named",
+   "trunkRoute": 915,
+   "routes": [
+    915,
+    919,
+    916,
+    917,
+    918,
+    920,
+    921,
+    922,
+    924,
+    925,
+    923,
+    926,
+    927
+   ],
+   "pivot": [
+    1095.0,
+    2.829,
+    -817.5
+   ],
+   "heightStuds": 67.5,
+   "assetId": null,
+   "displayName": "SR tree v2 064 VILLA SYCAMORE SOUTH",
+   "moderation": "held: broken promise",
+   "sha": "823febec5ee63f6d",
+   "fbxBytes": 5154060,
+   "tris": {
+    "bark": 11196,
+    "leaves": 10952,
+    "fruit": 0,
+    "total": 22148
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.746,
+      29.606,
+      -0.175
+     ],
+     "size": [
+      40.433,
+      72.301,
+      47.02
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.726,
+      41.615,
+      0.266
+     ],
+     "size": [
+      43.777,
+      28.947,
+      45.815
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      171,
+      89
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.087,
+      45.813,
+      0.896
+     ],
+     "size": [
+      49.462,
+      36.904,
+      51.795
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      171,
+      89
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.058,
+      50.714,
+      -0.148
+     ],
+     "size": [
+      53.098,
+      42.287,
+      55.108
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      171,
+      89
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 65,
+   "label": "TREEHOUSE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 928,
+   "routes": [
+    928,
+    929,
+    931,
+    930,
+    934,
+    935,
+    937,
+    939,
+    940,
+    932,
+    933,
+    936,
+    938,
+    941,
+    942,
+    943
+   ],
+   "pivot": [
+    -355.0,
+    3.801,
+    385.0
+   ],
+   "heightStuds": 77.5,
+   "assetId": null,
+   "displayName": "SR tree v2 065 TREEHOUSE OAK",
+   "moderation": "held: broken promise",
+   "sha": "a1c9bc5f1be103ce",
+   "fbxBytes": 6493564,
+   "tris": {
+    "bark": 11434,
+    "leaves": 10648,
+    "fruit": 0,
+    "total": 22082
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.972,
+      35.574,
+      51.43
+     ],
+     "size": [
+      57.183,
+      82.166,
+      149.275
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.657,
+      46.051,
+      0.185
+     ],
+     "size": [
+      53.022,
+      35.957,
+      54.872
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      166,
+      83
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.438,
+      48.821,
+      0.905
+     ],
+     "size": [
+      58.429,
+      40.425,
+      59.623
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      166,
+      83
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.978,
+      55.324,
+      28.903
+     ],
+     "size": [
+      63.897,
+      54.435,
+      116.691
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      136,
+      166,
+      83
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 1,
+    "promiseWarnings": 3,
+    "hollow": "H7",
+    "hollowBoardMargin": 0.148
+   }
+  },
+  {
+   "index": 66,
+   "label": "WESTSIDE 0 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 960,
+   "routes": [
+    960,
+    962,
+    961,
+    963,
+    964,
+    966,
+    965,
+    967,
+    968
+   ],
+   "pivot": [
+    -1007.5,
+    5.914,
+    -595.0
+   ],
+   "heightStuds": 85.0,
+   "assetId": null,
+   "displayName": "SR tree v2 066 WESTSIDE 0 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "e5487072fd9a642b",
+   "fbxBytes": 6340828,
+   "tris": {
+    "bark": 10844,
+    "leaves": 11112,
+    "fruit": 0,
+    "total": 21956
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      5.385,
+      36.885,
+      0.117
+     ],
+     "size": [
+      86.178,
+      84.972,
+      92.447
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.983,
+      52.457,
+      2.187
+     ],
+     "size": [
+      82.935,
+      43.005,
+      88.859
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.946,
+      55.575,
+      0.46
+     ],
+     "size": [
+      93.441,
+      49.172,
+      97.704
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.975,
+      63.204,
+      0.893
+     ],
+     "size": [
+      102.302,
+      47.921,
+      106.682
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 67,
+   "label": "WESTSIDE 1 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 969,
+   "routes": [
+    969,
+    979,
+    971,
+    973,
+    974,
+    975,
+    977,
+    978,
+    970,
+    972,
+    976
+   ],
+   "pivot": [
+    -1002.5,
+    11.735,
+    -360.0
+   ],
+   "heightStuds": 92.5,
+   "assetId": null,
+   "displayName": "SR tree v2 067 WESTSIDE 1 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "04608bcc49b98d85",
+   "fbxBytes": 6351644,
+   "tris": {
+    "bark": 10992,
+    "leaves": 11312,
+    "fruit": 0,
+    "total": 22304
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.921,
+      41.478,
+      2.963
+     ],
+     "size": [
+      103.074,
+      94.675,
+      98.357
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.905,
+      55.018,
+      -1.787
+     ],
+     "size": [
+      94.814,
+      43.185,
+      89.852
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.7,
+      58.378,
+      -1.929
+     ],
+     "size": [
+      108.395,
+      48.493,
+      96.687
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.893,
+      71.555,
+      2.09
+     ],
+     "size": [
+      116.454,
+      50.911,
+      114.153
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 68,
+   "label": "WESTSIDE 2 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 980,
+   "routes": [
+    980,
+    981,
+    982,
+    983,
+    984,
+    985,
+    986,
+    988,
+    989,
+    987
+   ],
+   "pivot": [
+    -997.5,
+    10.186,
+    -290.0
+   ],
+   "heightStuds": 100.0,
+   "assetId": null,
+   "displayName": "SR tree v2 068 WESTSIDE 2 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "41b4a8b9a5b0c542",
+   "fbxBytes": 6371996,
+   "tris": {
+    "bark": 10984,
+    "leaves": 11628,
+    "fruit": 0,
+    "total": 22612
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -7.343,
+      46.735,
+      5.749
+     ],
+     "size": [
+      101.051,
+      102.9,
+      110.003
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.714,
+      64.1,
+      4.309
+     ],
+     "size": [
+      78.563,
+      56.022,
+      106.313
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -7.219,
+      67.752,
+      2.953
+     ],
+     "size": [
+      104.255,
+      57.409,
+      117.9
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -5.774,
+      78.391,
+      7.032
+     ],
+     "size": [
+      113.274,
+      57.685,
+      123.41
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 69,
+   "label": "WESTSIDE 3 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 990,
+   "routes": [
+    990,
+    994,
+    991,
+    992,
+    993,
+    996,
+    998,
+    999,
+    995,
+    997
+   ],
+   "pivot": [
+    -1007.5,
+    7.886,
+    -55.0
+   ],
+   "heightStuds": 107.5,
+   "assetId": null,
+   "displayName": "SR tree v2 069 WESTSIDE 3 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "5dec8f3311d65488",
+   "fbxBytes": 6343148,
+   "tris": {
+    "bark": 11005,
+    "leaves": 11148,
+    "fruit": 0,
+    "total": 22153
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      5.025,
+      49.871,
+      0.695
+     ],
+     "size": [
+      103.881,
+      108.873,
+      106.246
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.619,
+      67.355,
+      2.722
+     ],
+     "size": [
+      96.769,
+      55.266,
+      101.149
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.674,
+      73.621,
+      -0.042
+     ],
+     "size": [
+      111.345,
+      59.228,
+      115.664
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      4.054,
+      81.074,
+      0.192
+     ],
+     "size": [
+      121.61,
+      64.606,
+      119.105
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 70,
+   "label": "WESTSIDE 4 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 1000,
+   "routes": [
+    1000,
+    1002,
+    1006,
+    1001,
+    1005,
+    1008,
+    1009,
+    1003,
+    1004,
+    1007,
+    1010
+   ],
+   "pivot": [
+    -1002.5,
+    10.366,
+    15.0
+   ],
+   "heightStuds": 115.0,
+   "assetId": null,
+   "displayName": "SR tree v2 070 WESTSIDE 4 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "62944b7a31cbd543",
+   "fbxBytes": 6448812,
+   "tris": {
+    "bark": 11092,
+    "leaves": 13004,
+    "fruit": 0,
+    "total": 24096
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.86,
+      52.256,
+      -0.473
+     ],
+     "size": [
+      120.941,
+      113.397,
+      122.085
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.534,
+      69.798,
+      -3.717
+     ],
+     "size": [
+      123.208,
+      55.635,
+      116.331
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.496,
+      78.119,
+      1.23
+     ],
+     "size": [
+      128.103,
+      61.422,
+      127.637
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.205,
+      89.217,
+      1.824
+     ],
+     "size": [
+      130.946,
+      64.61,
+      135.939
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2,
+    "hollow": "H10",
+    "hollowBoardMargin": 0.125
+   }
+  },
+  {
+   "index": 71,
+   "label": "WESTSIDE 5 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 1011,
+   "routes": [
+    1011,
+    1012,
+    1016,
+    1013,
+    1017,
+    1018,
+    1019,
+    1021,
+    1022,
+    1014,
+    1015,
+    1020
+   ],
+   "pivot": [
+    -997.5,
+    18.338,
+    250.0
+   ],
+   "heightStuds": 87.5,
+   "assetId": null,
+   "displayName": "SR tree v2 071 WESTSIDE 5 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "3c993608474a5764",
+   "fbxBytes": 6456620,
+   "tris": {
+    "bark": 11137,
+    "leaves": 12992,
+    "fruit": 0,
+    "total": 24129
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.866,
+      39.985,
+      0.556
+     ],
+     "size": [
+      89.867,
+      89.499,
+      90.831
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.698,
+      53.579,
+      -2.329
+     ],
+     "size": [
+      88.431,
+      43.959,
+      87.238
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.522,
+      57.916,
+      0.582
+     ],
+     "size": [
+      95.448,
+      52.649,
+      101.142
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.362,
+      61.517,
+      4.009
+     ],
+     "size": [
+      105.832,
+      58.35,
+      106.593
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 72,
+   "label": "WESTSIDE 6 SHADE OAK",
+   "species": "oak",
+   "category": "named",
+   "trunkRoute": 1023,
+   "routes": [
+    1023,
+    1027,
+    1024,
+    1025,
+    1026,
+    1028,
+    1029,
+    1030,
+    1031
+   ],
+   "pivot": [
+    -1007.5,
+    19.183,
+    320.0
+   ],
+   "heightStuds": 95.0,
+   "assetId": null,
+   "displayName": "SR tree v2 072 WESTSIDE 6 SHADE OAK",
+   "moderation": "not uploaded",
+   "sha": "cf6b62723c2023f0",
+   "fbxBytes": 6343836,
+   "tris": {
+    "bark": 10843,
+    "leaves": 11176,
+    "fruit": 0,
+    "total": 22019
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.418,
+      45.452,
+      -4.508
+     ],
+     "size": [
+      97.543,
+      101.967,
+      99.184
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.077,
+      61.946,
+      -3.379
+     ],
+     "size": [
+      93.425,
+      55.467,
+      99.817
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.117,
+      65.739,
+      -2.94
+     ],
+     "size": [
+      99.864,
+      55.556,
+      108.395
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      2.141,
+      74.691,
+      -4.291
+     ],
+     "size": [
+      109.144,
+      60.721,
+      110.514
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      106,
+      140,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 73,
+   "label": "WESTSIDE STREET ELM 0",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 1032,
+   "routes": [
+    1032,
+    1036,
+    1038,
+    1033,
+    1034,
+    1037,
+    1035,
+    1039,
+    1040
+   ],
+   "pivot": [
+    -797.5,
+    17.212,
+    -462.5
+   ],
+   "heightStuds": 75.0,
+   "assetId": null,
+   "displayName": "SR tree v2 073 WESTSIDE STREET ELM 0",
+   "moderation": "not uploaded",
+   "sha": "ac65369387250535",
+   "fbxBytes": 5992988,
+   "tris": {
+    "bark": 10817,
+    "leaves": 11280,
+    "fruit": 0,
+    "total": 22097
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.342,
+      34.904,
+      1.19
+     ],
+     "size": [
+      77.127,
+      79.795,
+      69.109
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.352,
+      53.05,
+      -1.187
+     ],
+     "size": [
+      70.752,
+      36.997,
+      65.492
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.377,
+      54.973,
+      1.635
+     ],
+     "size": [
+      76.483,
+      40.942,
+      74.151
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.353,
+      56.826,
+      0.599
+     ],
+     "size": [
+      79.043,
+      44.184,
+      80.69
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 74,
+   "label": "WESTSIDE STREET ELM 1",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 1041,
+   "routes": [
+    1041,
+    1046,
+    1049,
+    1042,
+    1043,
+    1045,
+    1048,
+    1044,
+    1047,
+    1050,
+    1051
+   ],
+   "pivot": [
+    -820.0,
+    15.611,
+    -225.0
+   ],
+   "heightStuds": 92.5,
+   "assetId": null,
+   "displayName": "SR tree v2 074 WESTSIDE STREET ELM 1",
+   "moderation": "not uploaded",
+   "sha": "92f015c58110184d",
+   "fbxBytes": 5972940,
+   "tris": {
+    "bark": 11143,
+    "leaves": 10796,
+    "fruit": 0,
+    "total": 21939
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      12.839,
+      41.481,
+      -0.691
+     ],
+     "size": [
+      101.623,
+      93.835,
+      69.648
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.708,
+      60.959,
+      -0.996
+     ],
+     "size": [
+      72.684,
+      36.787,
+      76.012
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.273,
+      62.561,
+      -0.113
+     ],
+     "size": [
+      80.46,
+      39.972,
+      80.41
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.765,
+      68.354,
+      0.403
+     ],
+     "size": [
+      83.671,
+      51.031,
+      82.337
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 75,
+   "label": "WESTSIDE STREET ELM 2",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 1052,
+   "routes": [
+    1052,
+    1054,
+    1053,
+    1056,
+    1059,
+    1060,
+    1061,
+    1055,
+    1057,
+    1058,
+    1062
+   ],
+   "pivot": [
+    -797.5,
+    8.504,
+    12.5
+   ],
+   "heightStuds": 75.0,
+   "assetId": null,
+   "displayName": "SR tree v2 075 WESTSIDE STREET ELM 2",
+   "moderation": "not uploaded",
+   "sha": "1bc84d2a5d1f6aaf",
+   "fbxBytes": 5972716,
+   "tris": {
+    "bark": 10970,
+    "leaves": 10884,
+    "fruit": 0,
+    "total": 21854
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.602,
+      33.391,
+      0.303
+     ],
+     "size": [
+      80.581,
+      77.893,
+      76.908
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -2.242,
+      49.125,
+      1.016
+     ],
+     "size": [
+      79.217,
+      29.18,
+      78.684
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -2.764,
+      52.208,
+      -0.445
+     ],
+     "size": [
+      80.751,
+      35.276,
+      81.98
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.307,
+      55.343,
+      -0.382
+     ],
+     "size": [
+      83.39,
+      41.292,
+      83.28
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 76,
+   "label": "WESTSIDE STREET ELM 3",
+   "species": "elm",
+   "category": "named",
+   "trunkRoute": 1063,
+   "routes": [
+    1063,
+    1068,
+    1070,
+    1071,
+    1072,
+    1064,
+    1065,
+    1067,
+    1069,
+    1066,
+    1073
+   ],
+   "pivot": [
+    -820.0,
+    10.519,
+    250.0
+   ],
+   "heightStuds": 92.5,
+   "assetId": null,
+   "displayName": "SR tree v2 076 WESTSIDE STREET ELM 3",
+   "moderation": "not uploaded",
+   "sha": "ba7aa994f7763efc",
+   "fbxBytes": 5961868,
+   "tris": {
+    "bark": 11075,
+    "leaves": 10648,
+    "fruit": 0,
+    "total": 21723
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      11.863,
+      41.183,
+      3.314
+     ],
+     "size": [
+      103.502,
+      93.634,
+      76.612
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.806,
+      60.207,
+      2.501
+     ],
+     "size": [
+      81.083,
+      35.281,
+      77.674
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.194,
+      62.706,
+      1.473
+     ],
+     "size": [
+      85.956,
+      40.304,
+      86.368
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.241,
+      68.47,
+      2.629
+     ],
+     "size": [
+      91.478,
+      51.629,
+      85.27
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      110,
+      144,
+      74
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 77,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1173,
+   "routes": [
+    1173,
+    1175,
+    1179,
+    1174,
+    1176,
+    1177,
+    1178,
+    1180
+   ],
+   "pivot": [
+    1787.5,
+    16.655,
+    -70.0
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 077 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "3dcde5206f78d267",
+   "fbxBytes": 7035084,
+   "tris": {
+    "bark": 9750,
+    "leaves": 10734,
+    "fruit": 0,
+    "total": 20484
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -48.844,
+      20.89,
+      -0.188
+     ],
+     "size": [
+      144.819,
+      53.678,
+      40.972
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      2.587,
+      22.285,
+      1.149
+     ],
+     "size": [
+      38.606,
+      31.442,
+      42.769
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.008,
+      27.337,
+      0.689
+     ],
+     "size": [
+      46.951,
+      34.555,
+      45.351
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -28.917,
+      31.539,
+      -0.373
+     ],
+     "size": [
+      110.227,
+      32.875,
+      45.046
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 78,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1181,
+   "routes": [
+    1181,
+    1182,
+    1183,
+    1185,
+    1184,
+    1186,
+    1187
+   ],
+   "pivot": [
+    1787.5,
+    18.567,
+    107.5
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 078 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "fd386a550922526f",
+   "fbxBytes": 6977676,
+   "tris": {
+    "bark": 8354,
+    "leaves": 10596,
+    "fruit": 0,
+    "total": 18950
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      45.6,
+      19.629,
+      14.556
+     ],
+     "size": [
+      126.427,
+      50.482,
+      72.861
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.78,
+      24.103,
+      0.416
+     ],
+     "size": [
+      30.201,
+      30.051,
+      46.257
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.73,
+      25.652,
+      1.231
+     ],
+     "size": [
+      41.962,
+      35.129,
+      48.223
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      27.807,
+      27.962,
+      8.004
+     ],
+     "size": [
+      101.989,
+      35.21,
+      69.022
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3
+   }
+  },
+  {
+   "index": 79,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1188,
+   "routes": [
+    1188,
+    1193,
+    1190,
+    1191,
+    1194,
+    1189,
+    1192,
+    1195
+   ],
+   "pivot": [
+    2510.0,
+    20.0,
+    197.5
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 079 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "fd30efbf7562ec12",
+   "fbxBytes": 7034412,
+   "tris": {
+    "bark": 9911,
+    "leaves": 10638,
+    "fruit": 0,
+    "total": 20549
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      14.582,
+      19.987,
+      7.095
+     ],
+     "size": [
+      71.114,
+      51.033,
+      64.82
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -1.212,
+      23.831,
+      1.928
+     ],
+     "size": [
+      42.232,
+      29.494,
+      39.896
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.161,
+      28.762,
+      -0.172
+     ],
+     "size": [
+      50.282,
+      28.501,
+      49.579
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      5.219,
+      32.461,
+      3.114
+     ],
+     "size": [
+      55.225,
+      27.621,
+      60.383
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 80,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1196,
+   "routes": [
+    1196,
+    1199,
+    1200,
+    1201,
+    1198,
+    1197,
+    1202
+   ],
+   "pivot": [
+    2770.0,
+    20.0,
+    130.0
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 080 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "e5f69bdd0f7c0539",
+   "fbxBytes": 7028268,
+   "tris": {
+    "bark": 9187,
+    "leaves": 10980,
+    "fruit": 0,
+    "total": 20167
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      2.697,
+      20.841,
+      -0.897
+     ],
+     "size": [
+      44.843,
+      50.651,
+      39.493
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.355,
+      24.34,
+      -1.157
+     ],
+     "size": [
+      41.115,
+      31.344,
+      36.527
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      2.029,
+      27.012,
+      -1.536
+     ],
+     "size": [
+      47.674,
+      31.148,
+      46.127
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.086,
+      30.242,
+      0.223
+     ],
+     "size": [
+      54.946,
+      28.857,
+      43.216
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 81,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1203,
+   "routes": [
+    1203,
+    1207,
+    1205,
+    1206,
+    1208,
+    1209,
+    1204
+   ],
+   "pivot": [
+    2735.0,
+    20.0,
+    480.0
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 081 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "9b8879394245ac00",
+   "fbxBytes": 7016076,
+   "tris": {
+    "bark": 9042,
+    "leaves": 10866,
+    "fruit": 0,
+    "total": 19908
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.408,
+      19.119,
+      0.692
+     ],
+     "size": [
+      48.645,
+      50.865,
+      46.549
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.895,
+      21.827,
+      0.436
+     ],
+     "size": [
+      46.553,
+      29.055,
+      46.388
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.733,
+      23.267,
+      0.411
+     ],
+     "size": [
+      52.886,
+      31.242,
+      50.822
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.979,
+      29.482,
+      0.874
+     ],
+     "size": [
+      52.429,
+      31.117,
+      50.34
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 3,
+    "hollow": "H11",
+    "hollowBoardMargin": 0.131
+   }
+  },
+  {
+   "index": 82,
+   "label": "QUAY WILLOW",
+   "species": "willow",
+   "category": "named",
+   "trunkRoute": 1210,
+   "routes": [
+    1210,
+    1211,
+    1212,
+    1213,
+    1214,
+    1215
+   ],
+   "pivot": [
+    2537.5,
+    20.0,
+    925.0
+   ],
+   "heightStuds": 47.5,
+   "assetId": null,
+   "displayName": "SR tree v2 082 QUAY WILLOW",
+   "moderation": "not uploaded",
+   "sha": "b2caec6ade9386ae",
+   "fbxBytes": 6945868,
+   "tris": {
+    "bark": 8769,
+    "leaves": 9684,
+    "fruit": 0,
+    "total": 18453
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.491,
+      21.807,
+      2.349
+     ],
+     "size": [
+      51.594,
+      54.284,
+      41.874
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -4.553,
+      22.888,
+      -0.864
+     ],
+     "size": [
+      44.953,
+      31.136,
+      37.535
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.066,
+      26.577,
+      -0.207
+     ],
+     "size": [
+      55.42,
+      33.333,
+      42.938
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -2.103,
+      32.504,
+      2.535
+     ],
+     "size": [
+      56.347,
+      33.668,
+      46.135
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      118,
+      141,
+      113
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 83,
+   "label": "APPLE 1",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1248,
+   "routes": [
+    1248,
+    1249,
+    1251,
+    1253,
+    1250,
+    1252,
+    1254
+   ],
+   "pivot": [
+    -210.0,
+    0.0,
+    -60.0
+   ],
+   "heightStuds": 24.19,
+   "assetId": null,
+   "displayName": "SR tree v2 083 APPLE 1",
+   "moderation": "not uploaded",
+   "sha": "9e5f86a0b4bf8a60",
+   "fbxBytes": 5473500,
+   "tris": {
+    "bark": 5411,
+    "leaves": 6612,
+    "fruit": 1344,
+    "total": 13367
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.472,
+      12.71,
+      0.208
+     ],
+     "size": [
+      32.162,
+      32.71,
+      28.102
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.782,
+      17.804,
+      0.682
+     ],
+     "size": [
+      31.61,
+      17.625,
+      31.537
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.139,
+      18.56,
+      0.279
+     ],
+     "size": [
+      37.66,
+      17.545,
+      33.525
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -1.045,
+      21.833,
+      0.593
+     ],
+     "size": [
+      38.522,
+      17.028,
+      36.792
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      -1.214,
+      15.908,
+      -0.524
+     ],
+     "size": [
+      37.664,
+      9.046,
+      35.848
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 84,
+   "label": "APPLE 2",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1255,
+   "routes": [
+    1255,
+    1256,
+    1258,
+    1260,
+    1257,
+    1259,
+    1261
+   ],
+   "pivot": [
+    -60.0,
+    0.0,
+    -210.0
+   ],
+   "heightStuds": 21.33,
+   "assetId": null,
+   "displayName": "SR tree v2 084 APPLE 2",
+   "moderation": "not uploaded",
+   "sha": "abbf6c53e400256c",
+   "fbxBytes": 5460844,
+   "tris": {
+    "bark": 5019,
+    "leaves": 6652,
+    "fruit": 1344,
+    "total": 13015
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.119,
+      10.108,
+      -0.267
+     ],
+     "size": [
+      30.573,
+      27.481,
+      29.485
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.597,
+      15.123,
+      -0.871
+     ],
+     "size": [
+      32.548,
+      17.129,
+      31.683
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.187,
+      16.378,
+      -0.624
+     ],
+     "size": [
+      34.943,
+      15.993,
+      33.693
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.335,
+      16.913,
+      0.207
+     ],
+     "size": [
+      36.568,
+      17.516,
+      37.449
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      -0.013,
+      12.9,
+      0.739
+     ],
+     "size": [
+      33.744,
+      9.127,
+      34.284
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 85,
+   "label": "APPLE 3",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1262,
+   "routes": [
+    1262,
+    1263,
+    1265,
+    1267,
+    1264,
+    1266,
+    1268
+   ],
+   "pivot": [
+    -60.0,
+    0.0,
+    200.0
+   ],
+   "heightStuds": 24.0,
+   "assetId": null,
+   "displayName": "SR tree v2 085 APPLE 3",
+   "moderation": "not uploaded",
+   "sha": "1fd74499db471c67",
+   "fbxBytes": 5426908,
+   "tris": {
+    "bark": 4921,
+    "leaves": 6108,
+    "fruit": 1344,
+    "total": 12373
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.847,
+      11.843,
+      0.172
+     ],
+     "size": [
+      30.514,
+      30.929,
+      30.385
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      3.213,
+      17.069,
+      -0.116
+     ],
+     "size": [
+      26.928,
+      17.875,
+      30.003
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.836,
+      18.077,
+      0.439
+     ],
+     "size": [
+      33.869,
+      18.26,
+      35.325
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.667,
+      19.783,
+      0.145
+     ],
+     "size": [
+      36.544,
+      18.438,
+      35.981
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      1.265,
+      15.27,
+      -0.193
+     ],
+     "size": [
+      34.965,
+      10.232,
+      35.385
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 86,
+   "label": "APPLE 4",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1269,
+   "routes": [
+    1269,
+    1270,
+    1272,
+    1274,
+    1271,
+    1273,
+    1275
+   ],
+   "pivot": [
+    200.0,
+    0.0,
+    60.0
+   ],
+   "heightStuds": 23.36,
+   "assetId": null,
+   "displayName": "SR tree v2 086 APPLE 4",
+   "moderation": "not uploaded",
+   "sha": "c8b3b708381f1fb9",
+   "fbxBytes": 5461180,
+   "tris": {
+    "bark": 5055,
+    "leaves": 6644,
+    "fruit": 1344,
+    "total": 13043
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.943,
+      11.457,
+      -1.426
+     ],
+     "size": [
+      33.028,
+      30.18,
+      31.676
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      -0.453,
+      16.801,
+      -0.34
+     ],
+     "size": [
+      35.744,
+      17.463,
+      34.669
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -1.226,
+      17.006,
+      -0.179
+     ],
+     "size": [
+      36.437,
+      18.11,
+      35.811
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -0.571,
+      19.123,
+      -0.857
+     ],
+     "size": [
+      39.05,
+      18.131,
+      38.134
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      -0.792,
+      14.985,
+      -1.019
+     ],
+     "size": [
+      39.625,
+      8.101,
+      37.81
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 87,
+   "label": "APPLE 5",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1276,
+   "routes": [
+    1276,
+    1277,
+    1279,
+    1281,
+    1278,
+    1280,
+    1282
+   ],
+   "pivot": [
+    -212.5,
+    16.085,
+    880.0
+   ],
+   "heightStuds": 23.62,
+   "assetId": null,
+   "displayName": "SR tree v2 087 APPLE 5",
+   "moderation": "not uploaded",
+   "sha": "074d851a88839d00",
+   "fbxBytes": 5452556,
+   "tris": {
+    "bark": 5153,
+    "leaves": 6416,
+    "fruit": 1344,
+    "total": 12913
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.332,
+      11.293,
+      0.715
+     ],
+     "size": [
+      29.553,
+      29.85,
+      29.812
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.027,
+      17.122,
+      0.558
+     ],
+     "size": [
+      31.716,
+      15.887,
+      33.561
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.829,
+      17.933,
+      0.411
+     ],
+     "size": [
+      34.702,
+      16.647,
+      34.984
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.191,
+      19.066,
+      0.667
+     ],
+     "size": [
+      36.428,
+      17.68,
+      36.982
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      1.388,
+      16.722,
+      0.608
+     ],
+     "size": [
+      36.174,
+      9.663,
+      37.106
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 88,
+   "label": "APPLE 6",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1283,
+   "routes": [
+    1283,
+    1284,
+    1286,
+    1288,
+    1285,
+    1287,
+    1289
+   ],
+   "pivot": [
+    -145.0,
+    8.103,
+    955.0
+   ],
+   "heightStuds": 22.4,
+   "assetId": null,
+   "displayName": "SR tree v2 088 APPLE 6",
+   "moderation": "not uploaded",
+   "sha": "98945e9543a381a9",
+   "fbxBytes": 5458908,
+   "tris": {
+    "bark": 5076,
+    "leaves": 6592,
+    "fruit": 1344,
+    "total": 13012
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.698,
+      10.702,
+      -1.107
+     ],
+     "size": [
+      32.392,
+      28.673,
+      31.6
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.181,
+      16.675,
+      -2.05
+     ],
+     "size": [
+      34.33,
+      14.62,
+      33.652
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -0.318,
+      17.064,
+      -1.126
+     ],
+     "size": [
+      37.125,
+      15.72,
+      36.293
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.114,
+      18.727,
+      -1.478
+     ],
+     "size": [
+      39.687,
+      18.317,
+      38.74
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      -0.195,
+      14.158,
+      -0.906
+     ],
+     "size": [
+      38.724,
+      10.506,
+      36.6
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 89,
+   "label": "APPLE 7",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1290,
+   "routes": [
+    1290,
+    1291,
+    1293,
+    1295,
+    1292,
+    1294,
+    1296
+   ],
+   "pivot": [
+    -70.0,
+    2.499,
+    997.5
+   ],
+   "heightStuds": 23.43,
+   "assetId": null,
+   "displayName": "SR tree v2 089 APPLE 7",
+   "moderation": "not uploaded",
+   "sha": "f89b6fe480417065",
+   "fbxBytes": 5465340,
+   "tris": {
+    "bark": 5308,
+    "leaves": 6548,
+    "fruit": 1344,
+    "total": 13200
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.542,
+      12.396,
+      -0.08
+     ],
+     "size": [
+      30.569,
+      32.052,
+      28.732
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      4.284,
+      17.716,
+      0.336
+     ],
+     "size": [
+      30.38,
+      18.129,
+      33.174
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.196,
+      18.351,
+      -0.456
+     ],
+     "size": [
+      36.195,
+      18.547,
+      34.321
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.564,
+      20.217,
+      0.211
+     ],
+     "size": [
+      37.302,
+      20.134,
+      35.927
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      3.435,
+      14.697,
+      0.383
+     ],
+     "size": [
+      35.448,
+      12.129,
+      33.773
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 90,
+   "label": "APPLE 8",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1297,
+   "routes": [
+    1297,
+    1298,
+    1300,
+    1302,
+    1299,
+    1301,
+    1303
+   ],
+   "pivot": [
+    95.0,
+    2.893,
+    1025.0
+   ],
+   "heightStuds": 22.12,
+   "assetId": null,
+   "displayName": "SR tree v2 090 APPLE 8",
+   "moderation": "not uploaded",
+   "sha": "a704b15437872341",
+   "fbxBytes": 5484188,
+   "tris": {
+    "bark": 5253,
+    "leaves": 6920,
+    "fruit": 1344,
+    "total": 13517
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.375,
+      10.72,
+      0.479
+     ],
+     "size": [
+      29.839,
+      28.694,
+      31.651
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.091,
+      16.447,
+      0.221
+     ],
+     "size": [
+      31.601,
+      16.089,
+      33.516
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.315,
+      16.435,
+      0.294
+     ],
+     "size": [
+      35.336,
+      16.722,
+      35.97
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.078,
+      18.026,
+      0.612
+     ],
+     "size": [
+      35.519,
+      17.612,
+      38.866
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      -0.125,
+      13.559,
+      -0.27
+     ],
+     "size": [
+      35.482,
+      7.534,
+      37.066
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 91,
+   "label": "APPLE 9",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1304,
+   "routes": [
+    1304,
+    1305,
+    1307,
+    1309,
+    1306,
+    1308,
+    1310
+   ],
+   "pivot": [
+    2470.0,
+    20.0,
+    -535.0
+   ],
+   "heightStuds": 22.53,
+   "assetId": null,
+   "displayName": "SR tree v2 091 APPLE 9",
+   "moderation": "not uploaded",
+   "sha": "2dbb494621025992",
+   "fbxBytes": 5475356,
+   "tris": {
+    "bark": 5248,
+    "leaves": 6760,
+    "fruit": 1344,
+    "total": 13352
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      1.806,
+      11.341,
+      -0.621
+     ],
+     "size": [
+      31.817,
+      29.959,
+      28.746
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.356,
+      17.006,
+      -0.538
+     ],
+     "size": [
+      35.104,
+      16.661,
+      32.661
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.615,
+      17.596,
+      -0.361
+     ],
+     "size": [
+      36.634,
+      17.32,
+      35.238
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.376,
+      19.173,
+      -0.477
+     ],
+     "size": [
+      37.6,
+      18.352,
+      36.902
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      1.576,
+      14.843,
+      -1.184
+     ],
+     "size": [
+      35.762,
+      10.974,
+      33.435
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 92,
+   "label": "APPLE 10",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1311,
+   "routes": [
+    1311,
+    1312,
+    1314,
+    1316,
+    1313,
+    1315,
+    1317
+   ],
+   "pivot": [
+    2545.0,
+    20.0,
+    -535.0
+   ],
+   "heightStuds": 23.03,
+   "assetId": null,
+   "displayName": "SR tree v2 092 APPLE 10",
+   "moderation": "not uploaded",
+   "sha": "b3e6894767f3f1ae",
+   "fbxBytes": 5466076,
+   "tris": {
+    "bark": 4947,
+    "leaves": 6776,
+    "fruit": 1344,
+    "total": 13067
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.578,
+      11.13,
+      1.009
+     ],
+     "size": [
+      30.807,
+      29.511,
+      29.257
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.266,
+      17.101,
+      2.434
+     ],
+     "size": [
+      32.678,
+      17.871,
+      28.333
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.691,
+      17.916,
+      1.343
+     ],
+     "size": [
+      35.582,
+      17.477,
+      34.139
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.451,
+      18.953,
+      0.459
+     ],
+     "size": [
+      37.155,
+      17.404,
+      36.791
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      0.186,
+      15.674,
+      0.209
+     ],
+     "size": [
+      35.324,
+      10.739,
+      31.017
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 93,
+   "label": "APPLE 11",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1318,
+   "routes": [
+    1318,
+    1319,
+    1321,
+    1323,
+    1320,
+    1322,
+    1324
+   ],
+   "pivot": [
+    2620.0,
+    20.0,
+    -535.0
+   ],
+   "heightStuds": 24.14,
+   "assetId": null,
+   "displayName": "SR tree v2 093 APPLE 11",
+   "moderation": "not uploaded",
+   "sha": "e5c96b3c40889775",
+   "fbxBytes": 5477596,
+   "tris": {
+    "bark": 5545,
+    "leaves": 6620,
+    "fruit": 1344,
+    "total": 13509
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.735,
+      12.288,
+      1.178
+     ],
+     "size": [
+      32.294,
+      31.812,
+      28.927
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.083,
+      17.373,
+      0.989
+     ],
+     "size": [
+      35.201,
+      16.93,
+      33.676
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.257,
+      18.234,
+      0.591
+     ],
+     "size": [
+      37.734,
+      19.045,
+      34.137
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      0.672,
+      20.624,
+      1.249
+     ],
+     "size": [
+      38.87,
+      22.659,
+      36.206
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      1.042,
+      15.044,
+      0.04
+     ],
+     "size": [
+      37.508,
+      11.052,
+      33.793
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  },
+  {
+   "index": 94,
+   "label": "APPLE 12",
+   "species": "apple",
+   "category": "apple",
+   "trunkRoute": 1325,
+   "routes": [
+    1325,
+    1326,
+    1328,
+    1330,
+    1327,
+    1329,
+    1331
+   ],
+   "pivot": [
+    2695.0,
+    20.0,
+    -535.0
+   ],
+   "heightStuds": 21.69,
+   "assetId": null,
+   "displayName": "SR tree v2 094 APPLE 12",
+   "moderation": "not uploaded",
+   "sha": "0933904d7c75e36e",
+   "fbxBytes": 5461676,
+   "tris": {
+    "bark": 4993,
+    "leaves": 6672,
+    "fruit": 1344,
+    "total": 13009
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      0.803,
+      11.233,
+      0.503
+     ],
+     "size": [
+      31.299,
+      29.747,
+      28.823
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      0.732,
+      15.599,
+      0.671
+     ],
+     "size": [
+      36.894,
+      17.874,
+      32.582
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      0.447,
+      16.359,
+      0.226
+     ],
+     "size": [
+      35.883,
+      19.485,
+      34.786
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      1.052,
+      18.281,
+      0.559
+     ],
+     "size": [
+      37.485,
+      19.932,
+      36.571
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      102,
+      133,
+      64
+     ]
+    },
+    "Apples": {
+     "center": [
+      0.964,
+      14.696,
+      1.741
+     ],
+     "size": [
+      37.407,
+      9.544,
+      34.138
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 2
+   }
+  }
+ ]
+}
