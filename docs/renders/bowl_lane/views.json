@@ -1,0 +1,37 @@
+{
+  "about": "Bowl Lane (xs_bowl_lane: tools/bake/bowl_lane -> Workspace.Expansion.F2) review views. Make: lune run tools/bake/main.luau; lune run tools/bake/editor_ground.luau; lune run tools/bake/attractions.luau; lune run tools/bake/backdrop.luau; lune run tools/bake/lounge_classic.luau; lune run tools/bake/bowl_lane.luau; lune run tools/review/export.luau (it takes in every build/Expansion_F*.rbxm); lune run tools/review/lounge_classic.luau --out build/review/bowl_scene.json; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/bowl_scene.json --views docs/renders/bowl_lane/views.json --out build/review/bowl_lane --threads 2. Eye-level views are a person's eye over the ground (aboveGround). The offline renderer draws the town's trees as nothing (they are uploaded meshes) and does not light the lamps by day.",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {
+      "name": "bl_01_from_junction",
+      "desc": "At the junction with the cross street (the name sign on the left), down the lane east: the sidewalks, kerbs, lamps, the steakhouse's empty site on the right.",
+      "pos": [899, 5.4, -306], "look": [1060, 3, -314], "fov": 62, "aboveGround": true
+    },
+    {
+      "name": "bl_02_alley_walk",
+      "desc": "Down the Alley Walk from Main Street's side, over the crossing, to the bowling alley's doors and ramp.",
+      "pos": [1322, 5.4, -262], "look": [1322, 4, -345], "fov": 62, "aboveGround": true
+    },
+    {
+      "name": "bl_03_alley_front",
+      "desc": "From the north sidewalk opposite, the alley's front on the lane: the steps walk, the ramp, the pylon.",
+      "pos": [1366, 5.4, -298], "look": [1322, 4, -350], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "bl_04_lounge",
+      "desc": "The south sidewalk in front of THE GILDED ACORN: its forecourt meets the paving at D -32.",
+      "pos": [1462, 5.4, -315], "look": [1490, 3, -336], "fov": 62, "aboveGround": true
+    },
+    {
+      "name": "bl_05_turning_bay",
+      "desc": "East to the turning bay at the end of the lane, its kerb on three sides.",
+      "pos": [1600, 5.4, -300], "look": [1695, 0, -314], "fov": 62, "aboveGround": true
+    },
+    {
+      "name": "bl_06_air",
+      "desc": "From 140 st up north of the lane: the whole of Bowl Lane from the cross street to the turning bay, the Alley Walk from Main Street.",
+      "pos": [1300, 260, -40], "look": [1300, 10, -330], "fov": 72, "aboveGround": false
+    }
+  ]
+}

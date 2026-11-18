@@ -13,6 +13,7 @@ local HospitalLayout = require("@shared/Infection/HospitalLayout")
 local InfectionRules = require("@shared/Infection/InfectionRules")
 local MedicalRoute = require("@shared/Infection/MedicalRoute")
 local FootPath = require("@shared/World/FootPath")
+local AlleyStaff = require("@shared/Attractions/AlleyStaff")
 local Lines = require("@shared/Speech/Lines")
 local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
@@ -44,6 +45,7 @@ return function(t)
 	local rail = nil :: any
 	local colliders = Colliders.fromData(data)
 	local layout = HospitalLayout.fromData(data) :: HospitalLayout.Layout
+	local alleyPlace = AlleyStaff.placeOf(data) :: any
 
 	-- `first` are the first dice (the bite's path and timer); after them a seeded generator
 	local function harness(seed: number, first: { number }?, tune: ((params: any) -> ())?): Harness
@@ -992,7 +994,7 @@ return function(t)
 			h.step(20)
 			-- everyone who stands where no pavement leads to the hospital: the police yard and station,
 			-- the shop floors, and the pavements the sidewalk graph does not join up
-			local cut, walkable = {}, 0
+			local cut, walkable, alleyFar = {}, 0, 0
 			for _, a in h.world.actors do
 				if
 					a.species == "human"
@@ -1005,6 +1007,13 @@ return function(t)
 						walkable += 1
 						t.deepEq(route[#route], layout.entrance, "every walk in ends at the door")
 						t.truthy(len <= h.svc.params.walkInMaxDist + 10)
+					elseif a.job ~= nil and AlleyStaff.inside(alleyPlace, a.x, a.z) then
+						-- the bowling alley's employees (Shared/Attractions/AlleyStaff) walk out by the alley's
+						-- ways and its main doors (Shared/Attractions/AlleyWalk), then 2,450 studs and more to the
+						-- hospital's door: from most of the building that is over the walk-in limit, and they
+						-- collapse instead (the ambulance comes); tests/unit/infection_alley holds the walks
+						-- they do have to the doors
+						alleyFar += 1
 					end
 				end
 			end
@@ -1013,8 +1022,8 @@ return function(t)
 			)
 			t.truthy(#cut >= 15, `only {#cut} people off the pavements (the test has no teeth)`)
 			t.truthy(
-				walkable >= #cut - 3,
-				`only {walkable} of {#cut} have a way in (the three beyond the river may not)`
+				walkable >= #cut - 3 - alleyFar,
+				`only {walkable} of {#cut} have a way in (the three beyond the river may not, nor {alleyFar} of the alley's staff)`
 			)
 			-- and when they collapse instead: the crew can walk from the nearest road to every person in
 			-- town, round the buildings, but for the few beyond the river (those are taken in out of
@@ -1914,7 +1923,7 @@ return function(t)
 	end
 
 	t.test(
-		"everyone runs when bitten: all 38 people with no lane, indoors without leaving the building, outdoors on clear ground",
+		"everyone runs when bitten: all 43 people with no lane, indoors without leaving the building, outdoors on clear ground",
 		function()
 			local h = harness(71, nil, function(params: any)
 				params.immediateChance = 0
@@ -1961,7 +1970,7 @@ return function(t)
 					table.insert(ran, { a = a, x = x0, z = z0, len = len })
 				end
 			end
-			t.eq(n, 38, "shop workers, hospital staff, crews, police")
+			t.eq(n, 43, "shop workers, hospital staff, crews, police, the bowling alley's employees")
 			t.truthy(indoorsN >= 25, `{indoorsN} of them work inside a building (they never ran before)`)
 			h.world.possessed[h.rodent] = nil
 			h.step(1.5)

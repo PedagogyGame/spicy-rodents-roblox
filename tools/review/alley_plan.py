@@ -201,7 +201,7 @@ def draw_plan(data):
             pn.rect(ax - pl["x"] - path["w"] / 2, ax - pl["x"] + path["w"] / 2, pl["z"] - az, pl["z"] - bz,
                     fill=(190, 190, 186, 255))
     pn.text((VIEW["x0"] + VIEW["x1"]) / 2, -93,
-            "BOWL LANE's south sidewalk (planned street, not built yet); Main Street is 290 studs further this way",
+            "BOWL LANE's south sidewalk (tools/bake/bowl_lane); Main Street is 290 studs further this way",
             13, bold=True)
 
     # rooms
@@ -543,14 +543,47 @@ def legend(data, width, height):
     return img.crop((0, 0, width, min(height, y)))
 
 
+STAFF_COL = [(214, 60, 60), (40, 110, 200), (30, 150, 90), (230, 140, 20), (150, 60, 170)]
+
+
+def draw_staff(pn, data):
+    # each employee's loop (Shared/Attractions/AlleyStaff): the walk a solid line, a work stop a square with its act
+    for i, e in enumerate(data.get("staff", [])):
+        col = STAFF_COL[i % len(STAFF_COL)]
+        pts = [(s["x"], s["d"]) for s in e["stops"]]
+        pn.line(pts + [pts[0]], col + (230,), 4)
+        for s in e["stops"]:
+            if s["hold"] > 0:
+                u, v = pn.P(s["x"], s["d"])
+                pn.d.rectangle([u - 6, v - 6, u + 6, v + 6], fill=col + (255,), outline=(255, 255, 255, 255))
+                pn.d.text((u + 9, v), s.get("act", ""), font=font(11, True), fill=col + (255,), anchor="lm")
+
+
+def staff_legend(data, width):
+    img = Image.new("RGB", (width, 40 + 24 * len(data.get("staff", []))), PAPER)
+    d = ImageDraw.Draw(img, "RGBA")
+    d.text((0, 0), "The employees (each on a loop; a square is work)", font=font(17, True), fill=INK)
+    y = 30
+    for i, e in enumerate(data.get("staff", [])):
+        col = STAFF_COL[i % len(STAFF_COL)]
+        d.rectangle([2, y + 2, 20, y + 16], fill=col)
+        acts = sorted({s["act"] for s in e["stops"] if s["hold"] > 0})
+        d.text((30, y + 9), f'{e["title"]}: {", ".join(acts)}', font=font(13), fill=INK, anchor="lm")
+        y += 24
+    return img
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="build/review_alley/plan.json")
     ap.add_argument("--out", default="docs/renders/alley18/00_plan.png")
+    ap.add_argument("--staff", action="store_true", help="draw the employees' work loops (AlleyStaff) over the plan")
     args = ap.parse_args()
     data = json.load(open(args.data))
 
     pn = draw_plan(data)
+    if args.staff:
+        draw_staff(pn, data)
     side = 600
     margin = 28
     title_h = 84
@@ -561,16 +594,23 @@ def main():
     d.text((margin, 16), "BELLWETHER BOWL: the eighteen-lane floor plan", font=font(34, True), fill=INK)
     d.text((margin, 58),
            "Drawn as you walk in: the street and the main doors at the bottom, lane 1 on the left, the pins and the "
-           "back of house at the top. Everything shown is built. The shops are "
-           "finished empty rooms: fittings and staff come next.",
+           "back of house at the top. Everything shown is built, the shops fitted out (tools/bake/alley/Shops)."
+           + (" Over it: the five employees' work loops." if args.staff else ""),
            font=font(14), fill=INK)
     img.paste(pn.img, (margin, title_h))
     d.rectangle([margin - 1, title_h - 1, margin + pn.w, title_h + pn.h], outline=INK, width=2)
 
     x = margin + pn.w + margin
     leg = legend(data, side, 1100)
-    img.paste(leg, (x, title_h))
-    y = title_h + leg.height + 6
+    if args.staff:
+        sl = staff_legend(data, side)
+        img.paste(sl, (x, title_h))
+        leg = leg.crop((0, 0, side, max(1, leg.height - sl.height - 8)))
+        img.paste(leg, (x, title_h + sl.height + 8))
+        y = title_h + sl.height + 8 + leg.height + 6
+    else:
+        img.paste(leg, (x, title_h))
+        y = title_h + leg.height + 6
     d.text((x, y), "On its site (south up, like the plan)", font=font(17, True), fill=INK)
     site = draw_site(data, side)
     img.paste(site, (x, y + 28))

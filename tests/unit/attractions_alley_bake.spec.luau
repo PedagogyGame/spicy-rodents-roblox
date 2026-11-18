@@ -21,6 +21,8 @@ local Data = require("@shared/Data")
 local Games = require("@shared/Minigames/Games")
 local Alley = require("../../tools/bake/alley/Alley")
 local Kit = require("../../tools/bake/alley/Kit")
+local Shops = require("../../tools/bake/alley/Shops")
+local StreetFront = require("../../tools/bake/alley/StreetFront")
 
 local L = AlleyLayout
 local CELL, HALF = 0.5, 1.0
@@ -89,15 +91,26 @@ return function(t)
 				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint and the annex`)
 			end
 		end
-		-- the budget: the building with the games' furniture (the shop rooms are still empty). It was set at 6,200
+		-- the budget: the building with the games' furniture and the shops' fittings. It was set at 6,200
 		-- over 5,598 parts with the pool tables as stand-ins (48 parts each, 24 for bumper pool); the real tables
 		-- (tools/bake/games/Pool, BumperPool: a cut bed, six round leather pockets with their wells, jawed
 		-- cushions, sights, sixteen numbered and striped balls, a three-shade lamp, a score board and a cue stand:
 		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The roof run's raised roof, vent, stairs and yard
 		-- (tools/bake/alley/Roof 673, RoofVent 101, RoofStairs 113, Yard 285 with the owner's ridge perches and
 		-- gutter brackets) add 1,172 less the 108 of the flat roof, its ceiling and lights they take over from Shell
-		-- and Lanes: 7,415. The bound keeps the ~600 parts the shop rooms were given over that.
-		t.truthy(#boxes > 4500 and #boxes < 8000, `{#boxes} parts`)
+		-- and Lanes: 7,415. The bound kept ~600 parts for the shop rooms over that; whack-a-mole and the stair's
+		-- fence came to 7,753, the shops' fittings (tools/bake/alley/Shops, budget 200) to 7,936 and the street front
+		-- on Bowl Lane (tools/bake/alley/StreetFront, budget 70) to 7,985; the bound is 8,100.
+		t.truthy(#boxes > 4500 and #boxes < 8100, `{#boxes} parts`)
+		local shops = (perTop.BallShop or 0)
+			+ (perTop.ShoeRental or 0)
+			+ (perTop.GiftShop or 0)
+			+ (perTop.SnackKitchen or 0)
+		t.truthy(shops > 0 and shops <= Shops.BUDGET, `the shops' fittings are {shops} parts`)
+		t.truthy(
+			(perTop.StreetFront or 0) > 0 and perTop.StreetFront <= StreetFront.BUDGET,
+			`the street front is {perTop.StreetFront} parts`
+		)
 		t.truthy(perTop.HallRoof <= 700, `the raised hall roof is {perTop.HallRoof} parts`)
 		t.truthy(perTop.Yard <= 300, `the yard is {perTop.Yard} parts`)
 		t.truthy(perTop.RoofVent <= 140, `the rooftop vent is {perTop.RoofVent} parts`)

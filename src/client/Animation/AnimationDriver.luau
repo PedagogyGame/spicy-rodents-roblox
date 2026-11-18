@@ -64,7 +64,9 @@
 --   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
 --   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
 --   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
---   seated(seatPart, ride) -> boolean (pure); medPose(med, footDrop) -> { clip, drop, flat } (pure); gaitClip(current, pace, runAbove?) -> "walk" |
+--   seated(seatPart, ride) -> boolean (pure); medPose(med, footDrop) -> { clip, drop, flat } (pure);
+--   taskPose(task, footDrop) -> { clip, drop, flat } (pure: a member of staff at work, the body's Task attribute);
+--   pose(med, task, footDrop) -> the one that applies (pure); gaitClip(current, pace, runAbove?) -> "walk" |
 --   "run" (pure); pace(prev, inst, dt) -> studs/s (pure); sway(med, t, seed) -> roll, pitch (pure);
 --   FLAT_JOINTS
 
@@ -153,6 +155,8 @@ type Entry = {
 		wrote: { [any]: CFrame },
 	}?,
 	med: any, -- the body's Med attribute (a patient's pose)
+	task: any, -- the body's Task attribute (a member of staff at work: Shared/Attractions/AlleyStaff)
+	taskConn: RBXScriptConnection?,
 	medConn: RBXScriptConnection?,
 	drop: number, -- studs the pose lowers the body by, now (eased)
 	pace: number, -- studs/s, smoothed more slowly than `speed`: only picks walk or run
@@ -309,6 +313,30 @@ function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, d
 		}
 	end
 	return { clip = nil, drop = 0, flat = false }
+end
+
+-- taskPose(task, footDrop): how an AI member of staff at work is posed (the body's Task attribute, written by the
+-- server from Brains/Staff's work stops). "kneel" (the alley's mechanic at a pinsetter) is the sit clip lowered
+-- KNEEL_SHARE of the way to the floor: down on the heels, legs bent. Every other task keeps the usual animation
+-- (the employee stands facing the work).
+AnimationDriver.KNEEL_SHARE = 0.6
+function AnimationDriver.taskPose(task: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
+	if task == "kneel" then
+		return {
+			clip = "sit",
+			drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT) * AnimationDriver.KNEEL_SHARE,
+			flat = false,
+		}
+	end
+	return { clip = nil, drop = 0, flat = false }
+end
+
+-- pose(med, task, footDrop): a patient's pose wins over a task's.
+function AnimationDriver.pose(med: any, task: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
+	if med ~= nil then
+		return AnimationDriver.medPose(med, footDrop)
+	end
+	return AnimationDriver.taskPose(task, footDrop)
 end
 
 -- gaitClip(current, pace, runAbove?): walk or run for a body moving at `pace` studs/s, given the clip
@@ -797,6 +825,12 @@ function AnimationDriver.start(opts: Opts): Driver
 				e.med = model:GetAttribute("Med")
 			end
 		end)
+		local taskConn = model:GetAttributeChangedSignal("Task"):Connect(function()
+			local e = entries[model]
+			if e then
+				e.task = model:GetAttribute("Task")
+			end
+		end)
 		entries[model] = {
 			body = model,
 			root = root,
@@ -828,6 +862,8 @@ function AnimationDriver.start(opts: Opts): Driver
 			creep = nil,
 			med = model:GetAttribute("Med"),
 			medConn = medConn,
+			task = model:GetAttribute("Task"),
+			taskConn = taskConn,
 			drop = 0,
 			pace = 0,
 			legs = {},
@@ -867,6 +903,9 @@ function AnimationDriver.start(opts: Opts): Driver
 			if e.medConn then
 				e.medConn:Disconnect()
 			end
+			if e.taskConn then
+				e.taskConn:Disconnect()
+			end
 			for _, t in e.tracks do
 				t:Stop(0)
 			end
@@ -892,9 +931,9 @@ function AnimationDriver.start(opts: Opts): Driver
 		if set.sit and AnimationDriver.seated(if hum then hum.SeatPart else nil, e.body:GetAttribute("Ride")) then
 			return "sit"
 		end
-		-- a patient (AI bodies only: a held body keeps its own animation)
-		if e.med ~= nil and e.root.Anchored then
-			local clip = AnimationDriver.medPose(e.med, e.footDrop).clip
+		-- a patient or a member of staff at work (AI bodies only: a held body keeps its own animation)
+		if (e.med ~= nil or e.task ~= nil) and e.root.Anchored then
+			local clip = AnimationDriver.pose(e.med, e.task, e.footDrop).clip
 			if clip and (set :: any)[clip] then
 				return clip
 			end
@@ -1013,7 +1052,9 @@ function AnimationDriver.start(opts: Opts): Driver
 		e.fix += (e.fixTarget - e.fix) * (1 - math.exp(-dt * 8))
 		off += e.fix
 		-- a patient's pose lowers the visible body (sitting on the ground, or up on the cot)
-		local wantDrop = if anchored and e.med ~= nil then AnimationDriver.medPose(e.med, e.footDrop).drop else 0
+		local wantDrop = if anchored and (e.med ~= nil or e.task ~= nil)
+			then AnimationDriver.pose(e.med, e.task, e.footDrop).drop
+			else 0
 		if wantDrop ~= e.drop then
 			e.drop += (wantDrop - e.drop) * (1 - math.exp(-dt * AnimationDriver.POSE_RATE))
 			if math.abs(wantDrop - e.drop) < 0.005 then

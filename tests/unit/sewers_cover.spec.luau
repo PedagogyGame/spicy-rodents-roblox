@@ -177,7 +177,10 @@ return function(t)
 			t.eq(TownAI.covered(world, rodent.id), "sewer.crossroads")
 			t.eq(r.svc:underground(rodent.id), "sewer.crossroads")
 			t.eq(spotsOf(r, rodent.id), 0, "spots of the rodent under the crossing")
-			-- the same rodent straight up in the road, half a stud off the ground: seen within 2 s
+			-- the same rodent straight up in the road, half a stud off the ground, the crowd back round the crossing
+			-- (in a minute they walk off along the sidewalks; how many stay near depends on the town's head count):
+			-- seen within 2 s
+			crowd(world)
 			local seenAt: number? = nil
 			for f = 1, 120 do
 				hold(world, rodent, 0, 0.5, 0)

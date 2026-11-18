@@ -1,0 +1,14 @@
+{
+  "about": "The bowling alley's shops (tools/bake/alley/Shops) and its street front on Bowl Lane (tools/bake/alley/StreetFront). Local to world: x = 1300 + X, y = 16.5 + Y, z = -420 - D; eye height is the floor + 5.2. Make: lune run tools/bake/main.luau; lune run tools/bake/editor_ground.luau; lune run tools/bake/attractions.luau; lune run tools/bake/backdrop.luau; lune run tools/bake/lounge_classic.luau; lune run tools/bake/bowl_lane.luau; lune run tools/review/export.luau; lune run tools/review/lounge_classic.luau --out build/review/bowl_scene.json; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/bowl_scene.json --views docs/renders/alley_front/views.json --out build/review/alley_front --threads 2. The renderer draws the alley's house lights but not the game's lighting: the rooms read darker than they will. The employees (Shared/Attractions/AlleyStaff) are computer-run town people, not part of the bake: 00_staff_plan.png draws their loops on the floor plan (lune run tools/review/alley_plan.luau; python3 -I tools/review/alley_plan.py --staff).",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["attractions", "terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {"name": "af_01_ball_shop", "desc": "The bowling ball shop from inside its door: the wall of balls, the glass case and till, the drilling bench.", "pos": [1288, 21.7, -369], "look": [1275, 18.6, -360], "fov": 78},
+    {"name": "af_02_shoe_desk", "desc": "The shoe rental from the lobby, over the desk: the till, the pairs, the cubbies by size behind.", "pos": [1320, 21.7, -365], "look": [1300, 19.5, -359], "fov": 72},
+    {"name": "af_03_shoe_cubbies", "desc": "Inside the shoe rental, from the returns window: the cubbies with their sizes, the spray bench.", "pos": [1311, 21.7, -370], "look": [1299, 19.0, -362], "fov": 74},
+    {"name": "af_04_gift_shop", "desc": "The gift shop from beside its lobby door: the souvenir shelves, the cash desk, a window table.", "pos": [1339, 21.7, -365], "look": [1356, 19.4, -360], "fov": 78},
+    {"name": "af_05_snack_kitchen", "desc": "The snack bar from the concourse, over the counter: the till, the grill and fryer under the hood, the fridge.", "pos": [1372, 21.7, -382], "look": [1374, 19.0, -354], "fov": 72},
+    {"name": "af_06_street_front", "desc": "The alley's front from Bowl Lane's south sidewalk: the benches, the bike rack, the planters under the windows.", "pos": [1352, 5.4, -327], "look": [1318, 2.5, -350], "fov": 72, "aboveGround": true, "groups": ["town", "attractions", "terrain"]},
+    {"name": "af_07_bike_rack", "desc": "The bike rack and the east bench, close.", "pos": [1346, 4.2, -332], "look": [1336, 1.2, -342], "fov": 64, "aboveGround": true, "groups": ["town", "attractions", "terrain"]}
+  ]
+}

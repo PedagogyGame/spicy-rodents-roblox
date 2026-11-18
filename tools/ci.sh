@@ -91,6 +91,11 @@ step "bake the lounge (tools/bake/lounge_classic.luau -> build/Expansion_LoungeC
 lune run tools/bake/lounge_classic.luau
 done_step
 
+# Bowl Lane, its sidewalks and the walks to the bowling alley (Workspace.Expansion.F2) are their own bake too.
+step "bake Bowl Lane (tools/bake/bowl_lane.luau -> build/Expansion_F2.rbxm)"
+lune run tools/bake/bowl_lane.luau
+done_step
+
 # The sky lift and the Lookout (Workspace.Expansion.F4) are their own bake too, for the same reason.
 step "bake the sky lift and the Lookout (tools/bake/skylift.luau -> build/Expansion_F4.rbxm)"
 lune run tools/bake/skylift.luau

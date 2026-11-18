@@ -3,7 +3,8 @@
 -- Client-side town dressing (FRB look pass; BUILD_PLAN §3.19, brief v2 §15 street lighting):
 --   * Street lamps: a pool of MAX_LIGHTS warm PointLights (data/authored/town/lighting.json warmth,
 --     no shadows) moved every half second onto the lamp heads nearest the camera within RADIUS; the
---     heads with Flicker = true flicker gently. Heads are Workspace.Town.Skyline "Head_*" parts.
+--     heads with Flicker = true flicker gently. Heads are Workspace.Town.Skyline "Head_*" parts, and every part
+--     tagged TAG (a bake's own street lamps: Bowl Lane, tools/bake/bowl_lane/Street) as it arrives.
 --   * Skyline massing: each building's far-view box (baked transparent) is shown only while that
 --     lot's own model is streamed out, so near the player the real roofs, windows and colours show.
 --   * Night-aware: the pool follows Lighting's StreetLamps attribute (0..1, written by Client/World/Sky from the
@@ -26,6 +27,7 @@ TownView.PERIOD = 0.5 -- seconds between re-assignments
 TownView.WARMTH = { 0.95, 0.75, 0.45 } -- lighting.json lamps.warmth
 TownView.RANGE = 26 -- studs
 TownView.BRIGHTNESS = 1.6
+TownView.TAG = "StreetLampHead" -- CollectionService tag of a lamp head the pool lights, outside the Skyline
 
 -- Indices of the `max` points nearest (x, z) within `radius`, nearest first. Pure.
 function TownView.nearest(points: { { number } }, x: number, z: number, max: number, radius: number): { number }
@@ -125,7 +127,7 @@ function TownView.start(): () -> ()
 		end
 		-- the light pool
 		local w = TownView.WARMTH
-		for i = 1, TownView.MAX_LIGHTS do
+		local function newLight(): PointLight
 			local l = Instance.new("PointLight")
 			l.Name = "StreetLight"
 			l.Color = Color3.new(w[1], w[2], w[3])
@@ -133,8 +135,40 @@ function TownView.start(): () -> ()
 			l.Brightness = TownView.BRIGHTNESS
 			l.Shadows = false
 			l.Enabled = false
-			lights[i] = l
+			return l
 		end
+		for i = 1, TownView.MAX_LIGHTS do
+			lights[i] = newLight()
+		end
+		-- the tagged heads (a bake's own lamps), now and as they arrive; one that leaves takes no pool light with it
+		local CollectionService = game:GetService("CollectionService")
+		local function addHead(p: Instance)
+			if p:IsA("BasePart") and table.find(heads, p) == nil then
+				table.insert(heads, p)
+				table.insert(points, { p.Position.X, p.Position.Z })
+			end
+		end
+		for _, p in CollectionService:GetTagged(TownView.TAG) do
+			addHead(p)
+		end
+		table.insert(conns, CollectionService:GetInstanceAddedSignal(TownView.TAG):Connect(addHead))
+		table.insert(
+			conns,
+			CollectionService:GetInstanceRemovedSignal(TownView.TAG):Connect(function(p: Instance)
+				local i = table.find(heads, p :: any)
+				if i then
+					table.remove(heads, i)
+					table.remove(points, i)
+				end
+				for k, l in lights do
+					if l.Parent == p and not pcall(function()
+						l.Parent = nil
+					end) then
+						lights[k] = newLight()
+					end
+				end
+			end)
+		)
 		local flickering: { [PointLight]: number } = {}
 		local acc = TownView.PERIOD
 		local t = 0
