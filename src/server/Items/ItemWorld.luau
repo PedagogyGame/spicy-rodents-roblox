@@ -11,7 +11,8 @@
 --              stops its motor), the computer's in its brain
 --   startle    the air horn: people hurry off, squirrels bolt, players are told
 --   vfx        bubbles from the wand for a few seconds
---   light      a spotlight in the flashlight's head (bright at night, faint by day); open: the umbrella's canopy
+--   light      a spotlight in the flashlight's head (bright at night, faint by day, following the clock while it
+--              is on); open: the umbrella's canopy
 --   playlist   the radio plays its cues one after another while it is on
 --   throw      a copy of the thing flies (the engine's physics: one loose part; a frisbee glides on a small lift)
 --              and lands; E picks it up (it is yours then); a person it hits in flight catches it; left alone 2
@@ -20,14 +21,14 @@
 --   tape       a strip of duct tape on what is ahead (5 minutes; 40 at most)
 --   place      a lawn chair (sat in at once; E folds it back up, its owner's; one each: a second folds the first; left
 --              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
---              whoopee cushion (the next person
---              to come within a stud and a half sets it off; E picks it up)
+--              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
 --   read, askText, screenshot   a message to the owner's client (Client/Items/ItemClient)
 --   kite       up on its string downwind of its flier, swaying; reeled in on the next use or out of the zone
 -- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
---   body change: toggles off, kite reeled in), stop() }; stunBody(body, now, secs); SOUNDS;
+--   body change: toggles off, kite reeled in), stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night)
+--   -> (brightness, range); relight(lit, night) -> count; chairs() -> ChairLedger; CHAIR; SOUNDS;
 --   KITE (the flight's numbers)
 -- Engine only inside the functions; no side effects on require.
 
@@ -114,6 +115,35 @@ local function newPart(name: string, size: Vector3, cf: CFrame, color: Color3, p
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
+end
+
+-- The town's night for the items (the flashlight's strong beam): before 6:00 or from 19:30, game time.
+function ItemWorld.isNight(hour: number): boolean
+	return hour < 6 or hour >= 19.5
+end
+
+-- The flashlight's beam (brightness, range) by night or by day.
+function ItemWorld.beamFor(night: boolean): (number, number)
+	if night then
+		return 4, 45
+	end
+	return 0.6, 14
+end
+
+-- Every lit beam (SpotLights in `lit`, as keys) set for the time of day; one gone or switched off leaves the set.
+-- Returns how many are still lit.
+function ItemWorld.relight(lit: { [any]: boolean? }, night: boolean): number
+	local brightness, range = ItemWorld.beamFor(night)
+	local n = 0
+	for beam in lit do
+		if beam.Parent == nil or not beam.Enabled then
+			lit[beam] = nil
+			continue
+		end
+		beam.Brightness, beam.Range = brightness, range
+		n += 1
+	end
+	return n
 end
 
 ItemWorld.CHAIR = table.freeze({
@@ -282,6 +312,13 @@ function ItemWorld.start(opts: StartOpts): World
 	end
 	local writings: { Instance } = {}
 	local tapes: { Instance } = {}
+	local lit: { [SpotLight]: boolean? } = {} -- the flashlights switched on
+	local function isNight(): boolean
+		local ok, h = pcall(function()
+			return clock:game().hour
+		end)
+		return ItemWorld.isNight(if ok then h else 12)
+	end
 	local chairs = ItemWorld.chairs()
 	-- a lawn chair folded back up: its sitter stands, and it is back in its owner's things (unless they left)
 	local function foldChair(owner: any, m: Instance, back: boolean)
@@ -608,8 +645,9 @@ function ItemWorld.start(opts: StartOpts): World
 				end
 				local b = beam :: SpotLight
 				b.Enabled = e.on == true
-				b.Brightness = if e.strong then 4 else 0.6
-				b.Range = if e.strong then 45 else 14
+				b.Brightness, b.Range = ItemWorld.beamFor(e.strong == true)
+				-- (a lit one follows the time of day: dusk brightens it, dawn dims it; step)
+				lit[b] = if b.Enabled then true else nil
 			end
 		elseif kind == "open" then
 			local t = toolOf(player, "umbrella")
@@ -926,13 +964,7 @@ function ItemWorld.start(opts: StartOpts): World
 			local a = actorOf(player)
 			return if a and a.body then a.species else nil
 		end,
-		night = function(): boolean
-			local ok, h = pcall(function()
-				return clock:game().hour
-			end)
-			local hour = if ok then h else 12
-			return hour < 6 or hour >= 19.5
-		end,
+		night = isNight,
 		zoneAt = function(x: number, z: number): string?
 			return ItemService.kiteZoneAt(opts.zones, x, z)
 		end,
@@ -981,7 +1013,14 @@ function ItemWorld.start(opts: StartOpts): World
 		end
 	end
 
+	local relightIn = 0
 	local function step()
+		-- lit flashlights follow the time of day (once a second is plenty for a dusk)
+		relightIn -= 1
+		if relightIn <= 0 and next(lit) ~= nil then
+			relightIn = 10
+			ItemWorld.relight(lit, isNight())
+		end
 		-- kites: up on the string, swaying downwind; reeled in on a second use, out of the zone or without a flier
 		local K = ItemWorld.KITE
 		for i = #kites, 1, -1 do
