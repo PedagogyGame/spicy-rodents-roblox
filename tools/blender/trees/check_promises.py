@@ -23,7 +23,8 @@ TRUNK (src/shared/Routes/Motion.luau visualPose, kind "trunk"; src/shared/Moveme
   error = bark radius - tapered(t). + : the bark stands proud (the paws sink once it passes +0.3),
   - : the bark is thin (the squirrel floats). Rays that land on a bough's own bark (within JUNCTION of a
   bough centre line) are counted apart as junction rays; samples below the root-flare height
-  max(2.5, 1.2 tapered(0)) studs are reported apart and only warn.
+  max(2.5, 1.2 tapered(0)) studs are reported apart: there the squirrel climbs too, so a ray off by more than
+  FLARE_FAIL (0.5 stud: the paws deep in a buttress) fails, and one off by more than 0.1 warns.
 BOUGH (visualPose, kinds branch / bridge / lookout):
   feet = centre line + (0, lift, 0); lift = visualOffset, else 0.61 u on a lookout, else 0.5 u
   a branch with trunkClearance, while t < 0.2: feet also move horizontally along (pointAt(0.16) -
@@ -32,18 +33,22 @@ BOUGH (visualPose, kinds branch / bridge / lookout):
   stands on is the upward-facing surface nearest the feet; error = feet height - that surface.
   + : floats above the bark, - : sinks into it. The stretch where a branch's feet are pushed off the centre
   line (t < 0.2, "clr" columns) is reported apart from the rest of the bough; both fail unless
-  --clearance-warn. With --clearance-warn the pushed feet only warn (off the bark, or no bark under them)
-  and that stretch is measured on the bough's own top line instead (centre line + lift, where the game
-  now draws the squirrel), which fails like the rest of the bough. Where two walks of the tree cross (another
-  walk's top line within 0.8 stud of the column and at most 0.8 over the feet, the wood found over them no higher
-  than 0.15 above that line), wood over the feet is that walk's own bough: those samples are counted apart and
-  only warn. Samples whose feet are still over the trunk (inside
+  --clearance-warn. With --clearance-warn that stretch is measured on the bough's own top line instead
+  (centre line + lift, where the game draws the squirrel: SquirrelVisual.junctionT), which fails like the rest
+  of the bough. The game does so only on a branch whose centre line is trunkClearance out from its start (level)
+  by collarMax (0.7) of the stretch; on a branch that gets clear later ("late collar": junctionT is nil) the game
+  draws the squirrel at the pushed pose, and those pushed feet are reported apart, as a known game-side issue
+  (warn only: the bark cannot be under both). Where two walks of the tree cross (another walk's top line within
+  0.8 stud of the column and at most 0.8 over the feet, the wood found over them no higher than 0.15 above that
+  line), wood over the feet is that walk's own bough: those samples are counted apart and only warn, as long as
+  the wood is at most CROSS_DEEP (0.5) over the feet and for at most CROSS_RUN (4) samples in a row; deeper or
+  longer, they fail like any other. Samples whose feet are still over the trunk (inside
   tapered(t) + 0.1 of the trunk centre line) stand on trunk bark and are counted apart.
 TUNNEL (src/worldgen/Builders/Trees.luau header and clear()): no leaf geometry within 1.6 studs of the
   squirrel's body line on a bough (centre line + 2 studs up), nor within 2.2 studs of the trunk's climbing
   surface (distance to the trunk centre line < tapered + 2.2). Measured to the leaf triangles themselves
   (card geometry, not the alpha-cut texels: a card corner inside the tunnel counts even if transparent).
-BUDGET: Bark <= 12,000 triangles, all parts named Leaves* together <= 14,000.
+BUDGET: Bark <= 8,000 triangles (12,000 on the named and giant trees), all parts named Leaves* together <= 6,000.
 PARTS: names within Bark / LeavesShade / LeavesMid / LeavesSun / Apples, Bark present, and the mesh
   bounds equal to the json's "parts" (centre and size relative to the pivot, Roblox axes) within 0.01.
 """
@@ -63,8 +68,10 @@ STEP = 0.25
 TOL = 0.1
 RAYS = 16
 JUNCTION = 2.2  # a trunk ray landing this near a bough centre line hit the bough, not the trunk
-BARK_BUDGET = 12000
-LEAF_BUDGET = 14000
+BARK_BUDGET = 8000  # treegen.py BARK_BUDGET (street, park, estate, apple trees)
+BARK_BUDGET_BIG = 12000  # the named trees and the giants (treegen.py BARK_BUDGET_BIG)
+BIG_CATEGORIES = ("named", "giant")
+LEAF_BUDGET = 6000
 PART_NAMES = ("Bark", "LeavesShade", "LeavesMid", "LeavesSun", "Apples")
 # Motion.C / SquirrelVisual.params, in studs
 TRUNK_MIN_R = 0.32 * SPU
@@ -83,6 +90,10 @@ BODY_UP = 2.0
 TRUNK_TUNNEL = 2.2
 CROSSING = 0.8  # studs, level: another walk's top line this near the column through the feet ...
 CROSSING_UP = 0.8  # ... and no higher than this over them: the two walks cross there
+CROSS_DEEP = 0.5  # studs: a crossing's wood over the feet no deeper than this ...
+CROSS_RUN = 4  # ... for no more samples in a row (0.25 stud each) only warns
+FLARE_FAIL = 0.5  # studs: a root-flare ray off by more than this fails (the squirrel climbs there too)
+COLLAR_MAX = 0.7  # SquirrelVisual.params.collarMax
 
 
 # ---- the game's curve (three.js r160 CatmullRomCurve3, centripetal; Curve.luau) --------------------
@@ -150,6 +161,32 @@ def bough_lift(route):
     if route.get("visualOffset") is not None:
         return route["visualOffset"] * SPU
     return LOOKOUT_LIFT if route["kind"] == "lookout" else BRANCH_LIFT
+
+
+def bark_budget_of(info):
+    return BARK_BUDGET_BIG if info.get("category") in BIG_CATEGORIES else BARK_BUDGET
+
+
+def collar_t(c, need):
+    """SquirrelVisual collarT: the t (within the first fifth) at which the centre line is `need` studs out from its
+    start, level (20 steps, then 12 halvings; the fifth's end when it never is)."""
+    s0 = c.at(0.0)
+
+    def out(t):
+        p = c.at(t)
+        return math.hypot(p[0] - s0[0], p[2] - s0[2]) >= need
+    lo, hi = 0.0, CLEARANCE_T
+    for i in range(1, 21):
+        if out(CLEARANCE_T * i / 20):
+            lo, hi = CLEARANCE_T * (i - 1) / 20, CLEARANCE_T * i / 20
+            for _ in range(12):
+                mid = (lo + hi) / 2
+                if out(mid):
+                    hi = mid
+                else:
+                    lo = mid
+            break
+    return hi
 
 
 def sample_ts(length):
@@ -253,8 +290,10 @@ def check_tree(info, parts, routes, clearance_warn=False):
     bark_tris = tris.get("Bark", 0)
     leaf_tris = sum(v for n, v in tris.items() if n.startswith("Leaves"))
     rep["tris"] = dict(tris, bark=bark_tris, leaves=leaf_tris)
-    if bark_tris > BARK_BUDGET:
-        fail.append(f"bark {bark_tris} tris > {BARK_BUDGET}")
+    bark_budget = bark_budget_of(info)
+    rep["bark_budget"] = bark_budget
+    if bark_tris > bark_budget:
+        fail.append(f"bark {bark_tris} tris > {bark_budget}")
     if leaf_tris > LEAF_BUDGET:
         fail.append(f"leaves {leaf_tris} tris > {LEAF_BUDGET}")
     pivot = np.asarray(info["pivot"], float)
@@ -323,12 +362,18 @@ def check_tree(info, parts, routes, clearance_warn=False):
     if st["bad"] or miss:
         fail.append(f"trunk bark off the expected radius by > {TOL} st on {st['bad']} rays (min {st['min']}, "
                     f"max {st['max']}), {miss} rays found no bark")
-    if st["flare"]["bad"]:
-        warn.append(f"root flare: {st['flare']['bad']} rays off by > {TOL} st (max {st['flare']['max']})")
+    fl = st["flare"]
+    fl["deep"] = int((np.abs(np.asarray(flare, float)) > FLARE_FAIL).sum()) if flare else 0
+    fl["top"] = round(float(flare_top - TP[0][1]), 2)
+    if fl["deep"]:
+        fail.append(f"root flare: {fl['deep']} rays off the climbing radius by > {FLARE_FAIL} st in the lowest "
+                    f"{fl['top']} st of the climb (min {fl['min']}, max {fl['max']})")
+    elif fl["bad"]:
+        warn.append(f"root flare: {fl['bad']} rays off by > {TOL} st (max {fl['max']})")
 
     # boughs -----------------------------------------------------------------------------------------
     rep["boughs"] = []
-    all_e, all_c, all_x, tot_miss, tot_cmiss = [], [], [], 0, 0
+    all_e, all_c, all_x, all_late, tot_miss, tot_cmiss = [], [], [], [], 0, 0
     walk_tops = [(mm["id"], PP + np.array([0.0, bough_lift(mm), 0.0])) for mm, _, _, PP in bough
                  if mm["kind"] in ("branch", "bridge", "lookout")]
 
@@ -356,8 +401,9 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 k = (cl * SPU + CLEARANCE_PAD) * np.clip(1 - ts / CLEARANCE_T, 0, None) ** 2
                 feet[:, 0] += d[0] / l * k
                 feet[:, 2] += d[2] / l * k
-        e, ec, rows, miss, cmiss, over, cross = [], [], [], 0, 0, 0, []
+        e, ec, rows, miss, cmiss, over, cand = [], [], [], 0, 0, 0, []
         pushed = m["kind"] == "branch" and bool(cl)
+        late = pushed and collar_t(c, cl * SPU) / CLEARANCE_T > COLLAR_MAX
 
         def under(f):
             """Feet height minus the bark the squirrel stands on at f; "over" while the feet are still
@@ -370,7 +416,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 return None
             return float(f[1] - min(tops, key=lambda y: abs(y - f[1])))
 
-        for f, f0, t in zip(feet, top_line, ts):
+        for i, (f, f0, t) in enumerate(zip(feet, top_line, ts)):
             if pushed and t < CLEARANCE_T:
                 # the pushed feet (visualPose) are reported apart; with --clearance-warn the game draws
                 # the squirrel on the bough's own top line here, and that is what has to hold
@@ -387,18 +433,32 @@ def check_tree(info, parts, routes, clearance_warn=False):
             err = under(f)
             if err == "over":
                 over += 1
-            elif err is not None and err < -TOL and crossing(m, f, err):
-                cross.append(err)
+            elif err is not None and -CROSS_DEEP <= err < -TOL and crossing(m, f, err):
+                cand.append((i, err, {"s": float(t * c.length), "err": err}))
             elif err is None:
                 miss += 1
                 rows.append({"s": float(t * c.length), "err": 9.0})
             else:
                 e.append(err)
                 rows.append({"s": float(t * c.length), "err": err})
+        # crossing samples warn only in short runs: a longer run is wood over the feet like any other
+        cross, run = [], []
+        for x in cand + [None]:
+            if x is not None and run and x[0] == run[-1][0] + 1:
+                run.append(x)
+                continue
+            if len(run) > CROSS_RUN:
+                e += [r[1] for r in run]
+                rows += [r[2] for r in run]
+            else:
+                cross += [r[1] for r in run]
+            run = [x] if x is not None else []
         s = stats(e)
         s.update(route=m["id"], name=m["name"], kind=m["kind"], length=round(c.length, 1), lift=round(lift, 3),
                  samples=len(ts), over_trunk=over, miss=miss, worst=worst(rows, "err"), clearance=dict(stats(ec), miss=cmiss),
-                 crossing=stats(cross))
+                 crossing=stats(cross), late_collar=bool(late))
+        if late:
+            all_late.append((m["id"], stats(ec), cmiss))
         all_x += cross
         rep["boughs"].append(s)
         all_e += e
@@ -418,10 +478,21 @@ def check_tree(info, parts, routes, clearance_warn=False):
                     f"(wood over them, min {xt['min']} st)")
     ct = rep["clearance_total"]
     ct["miss"] = tot_cmiss
-    if ct["bad"] or tot_cmiss:
-        (warn if clearance_warn else fail).append(
+    if (ct["bad"] or tot_cmiss) and not clearance_warn:
+        fail.append(
             f"trunk-clearance stretch (branch, t < {CLEARANCE_T}, feet pushed off the centre line): off the bark by > {TOL} st "
             f"at {ct['bad']} of {ct['n']} samples (min {ct['min']}, max {ct['max']}), {tot_cmiss} with no bark under them")
+    # the branches the game still draws at the pushed pose (a known game-side issue: SquirrelVisual's collarMax)
+    lc = rep["late_collar"] = {
+        "branches": len(all_late), "routes": [r for r, _, _ in all_late],
+        "bad": sum(x["bad"] for _, x, _ in all_late), "miss": sum(k for _, _, k in all_late),
+        "n": sum(x["n"] for _, x, _ in all_late),
+        "worst": max([max(abs(x["min"]), abs(x["max"])) for _, x, _ in all_late if x["n"]] or [0.0]),
+    }
+    if clearance_warn and (lc["bad"] or lc["miss"]):
+        warn.append(f"late collar (game side, SquirrelVisual collarMax {COLLAR_MAX}): {lc['branches']} branches are drawn at "
+                    f"the pushed pose over their first fifth; there the feet are off the bark by > {TOL} st at {lc['bad']} "
+                    f"of {lc['n']} samples (worst {lc['worst']:.2f}), {lc['miss']} with no bark under them")
 
     # tunnel -----------------------------------------------------------------------------------------
     leaves = [(n, bvh(*parts[n])) for n in names if n.startswith("Leaves") or n == "Apples"]
@@ -468,7 +539,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
 def print_report(rep):
     print(f"\n=== tree {rep['index']:03d} {rep['label']}: {'BROKEN' if rep['fail'] else 'ok'} ===")
     t = rep.get("tris", {})
-    print(f"  tris   bark {t.get('bark', 0):>6} / {BARK_BUDGET}   leaves {t.get('leaves', 0):>6} / {LEAF_BUDGET}   parts "
+    print(f"  tris   bark {t.get('bark', 0):>6} / {rep.get('bark_budget', BARK_BUDGET)}   leaves {t.get('leaves', 0):>6} / {LEAF_BUDGET}   parts "
           + ", ".join(f"{n} {v}" for n, v in t.items() if n not in ("bark", "leaves"))
           + f"   bounds vs json {rep.get('bounds_err', 0)} st")
     if "trunk" in rep:
@@ -478,7 +549,7 @@ def print_report(rep):
               f"{s['p95_abs']:>7.3f}{s['bad']:>6}{s['miss']:>6}{'':>31}  r {s['r_foot']} -> {s['r_top']}, {s['junction_rays']} junction rays"
               + (f", worst at y={s['worst'][0]['y']} err {s['worst'][0]['err']}" if s["bad"] else ""))
         f = s["flare"]
-        print(f"  {'trunk root flare (warn only)':<44}{'trunk':<8}{'':>6}{f['n']:>6}{f['min']:>8.3f}{f['max']:>8.3f}"
+        print(f"  {f'trunk root flare (fails > {FLARE_FAIL})':<44}{'trunk':<8}{'':>6}{f['n']:>6}{f['min']:>8.3f}{f['max']:>8.3f}"
               f"{f['p95_abs']:>7.3f}{f['bad']:>6}")
         for b in rep["boughs"]:
             label = f"{b['route']} {b['name']}"[:43]

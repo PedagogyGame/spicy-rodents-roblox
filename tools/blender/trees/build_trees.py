@@ -629,7 +629,7 @@ def promise_check(rec, objs, routes):
         V = np.array([v.co[:] for v in me.vertices], float) @ M[:3, :3].T + M[:3, 3]
         R = np.stack([-V[:, 0], V[:, 2], V[:, 1]], axis=1) + np.asarray(rec["root"], float)
         parts[name] = (R, np.array([t.vertices[:] for t in me.loop_triangles], np.int64).reshape(-1, 3))
-    info = {"index": rec["index"], "label": rec["label"], "trunkRoute": rec["trunk"]["id"],
+    info = {"index": rec["index"], "label": rec["label"], "category": rec["category"], "trunkRoute": rec["trunk"]["id"],
             "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]], "pivot": list(rec["root"]),
             "parts": {k: bounds_roblox(o) for k, o in objs.items()}}
     return cp.check_tree(info, parts, routes, clearance_warn=True)

@@ -11,8 +11,9 @@ measured against the new Bark mesh instead: a level ray from the trunk route's a
 through the corner, to the first bark it meets.
   inside pieces (liner, floor, roof, tread, post, shelf): margin = bark distance - corner distance; < 0 pokes through.
   knotholes (the dark oval on the bark, seen from outside): its centre's distance - the bark's under it; < -0.06
-    (half the disc's 0.12 thickness) buries it in the bark, unless it lies inside the first quarter of a walk's
-    bough (where HollowLayout opens a shaft onto that bough): that only warns, no bark could show it.
+    (half the disc's 0.12 thickness) buries it in the bark. One where HollowLayout opens a shaft onto a walk's bough
+    (inside the first quarter of that bough) fails too: the generator opens the bough's collar round it
+    (treegen.py, the knothole's window), so the hole shows where the squirrel comes out.
 Exit status 1 when a board pokes through or a knothole is buried. --json PATH writes the numbers.
 """
 import argparse
@@ -85,8 +86,8 @@ def bark_distance(tree, axis_pt, q):
 
 def under_bough(q, info, routes):
     """Is the point inside a walk of the tree, where its bough's wood is (within UNDER_BOUGH of its centre line over
-    its first quarter)? A knothole the hollow puts where a bough leaves the bark (a shaft's top, onto that bough)
-    is under that bough's wood whatever the bark is: it is reported, and only warns."""
+    its first quarter)? A knothole the hollow puts where a bough leaves the bark (a shaft's top, onto that bough):
+    said in the report, to tell the generator's collar from its trunk."""
     for rid in info["routes"]:
         r = routes[rid]
         if rid == info["trunkRoute"] or r["kind"] not in ("branch", "bridge", "lookout"):
@@ -135,8 +136,10 @@ def check(info, parts, routes, hollow):
     if buried:
         rep["fail"].append(f"{len(buried)} knotholes buried in the bark (worst {min(buried):.3f} st)")
     covered = [k for k, ub in knots if k < KNOT_BURY and ub]
-    rep["warn"] = [f"{len(covered)} knotholes inside the bough they open onto (worst {min(covered):.3f} st): "
-                   f"HollowLayout puts them where that bough leaves the bark"] if covered else []
+    if covered:
+        rep["fail"].append(f"{len(covered)} knotholes buried in the collar of the bough they open onto (worst "
+                           f"{min(covered):.3f} st)")
+    rep["warn"] = []
     return rep
 
 

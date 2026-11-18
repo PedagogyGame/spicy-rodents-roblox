@@ -158,8 +158,13 @@ def main():
         "units": "studs, Roblox axes (+Y up). pivot = the tree's root on the ground (data/harvest/trees.json root x 2.5).",
         "placement": "model = InsertService:LoadAsset(assetId):GetChildren()[1]; its pivot is the FBX origin = the tree "
                      "root, so model:PivotTo(CFrame.new(pivot)) puts every MeshPart at pivot + parts[name].center, "
-                     "unrotated. Server/Assets/TreeArt swaps the baked tree's meshes for these (visual only: the "
-                     "baked proxies keep colliding). The trunk carries 3 studs of bark below the pivot.",
+                     "unrotated. The trunk carries 3 studs of bark below the pivot. To ship: after the upload, run "
+                     "tools/cloud/tasks/tree_load.luau on one Model (do the leaves take DoubleSided and AlphaMode "
+                     "Transparency?), then rebake from these (harvest_meshes.py --art data/art/trees_v2.json, then "
+                     "the bake: Lune writes DoubleSided and Box collision fidelity). Server/Assets/TreeArt's swap is "
+                     "the fallback: it lays these over a baked tree's meshes at runtime (visual only: the baked "
+                     "proxies keep colliding; Default fidelity, which a script cannot change) only where the leaves "
+                     "read both writes back, and otherwise keeps the baked tree.",
         "partRoles": {k: v for k, v in PART_ROLES.items()},
         "count": len(trees),
         "totals": totals,
