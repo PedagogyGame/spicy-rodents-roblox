@@ -11,6 +11,8 @@ local LoungeClassic = require("@shared/Attractions/LoungeClassic")
 local LoungeService = require("@server/Attractions/LoungeService")
 local LoungeFlow = require("@tests/engine/Lounge")
 local LoungeMusic = require("@client/World/LoungeMusic")
+local LoungeArt = require("@server/Assets/LoungeArt")
+local LoungeArtData = require("@shared/Attractions/LoungeArt")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
 
@@ -259,6 +261,66 @@ return function(t)
 				t.eq(h.level(), 0)
 				t.eq(sound.Volume, 0)
 				h.stop()
+			end)
+		end
+	)
+
+	t.test(
+		"the Blender pieces' loader: nothing without an id; with one, each piece in place and the parts hidden",
+		function()
+			FakeEngine.with(function()
+				local place = LoungeClassic.placeOf(LoungeService._venue(LoungeClassic.VENUE))
+				local root = FakeEngine.new("Model", LoungeClassic.VENUE)
+				local interior = FakeEngine.new("Model", "Interior")
+				interior.Parent = root
+				for _, n in LoungeArtData.REPLACES do
+					local p = FakeEngine.part(n, roblox.CFrame.new(0, 0, 0), interior)
+					p.CanCollide = n == "BarFront"
+				end
+				local keep = FakeEngine.part("Stage", roblox.CFrame.new(0, 0, 0), interior)
+				local report = LoungeArt.install(root, place, LoungeArtData)
+				t.eq(report.loaded, false)
+				t.eq(report.why, "no asset id")
+				t.eq(root:FindFirstChild("Art"), nil)
+				-- a stand-in for the uploaded Model: every piece by name, and one stray
+				local data = table.clone(LoungeArtData) :: any
+				data.ASSET_ID = "123"
+				local asked: number? = nil
+				report = LoungeArt.install(root, place, data, {
+					load = function(id: number): any
+						asked = id
+						local asset = FakeEngine.new("Model", "Asset")
+						local m = FakeEngine.new("Model", "Lounge")
+						m.Parent = asset
+						for _, p in LoungeArtData.PIECES do
+							FakeEngine.new("MeshPart", p.name).Parent = m
+						end
+						FakeEngine.new("MeshPart", "Stray").Parent = m
+						return asset
+					end,
+				})
+				t.eq(asked, 123)
+				t.eq(report.loaded, true)
+				t.eq(report.pieces, #LoungeArtData.PIECES)
+				t.eq(report.unknown, 1)
+				t.eq(report.hidden, #LoungeArtData.REPLACES)
+				local art = root:FindFirstChild("Art")
+				t.truthy(art ~= nil)
+				for _, p in LoungeArtData.PIECES do
+					local m = art:FindFirstChild(p.name)
+					t.truthy(m ~= nil, p.name)
+					local x, y, z = AlleyLayout.toWorld(place, p.centre[1], p.centre[2], p.centre[3])
+					t.near(m.CFrame.Position.X, x, 1e-3)
+					t.near(m.CFrame.Position.Y, y, 1e-3)
+					t.near(m.CFrame.Position.Z, z, 1e-3)
+					t.eq(m.CanCollide, false)
+					t.eq(m.Anchored, true)
+				end
+				t.eq(interior:FindFirstChild("BarFront").Transparency, 1)
+				t.eq(interior:FindFirstChild("BarFront").CanCollide, true)
+				t.eq(keep.Transparency, 0)
+				-- a second install does nothing
+				t.eq(LoungeArt.install(root, place, data).why, "already installed")
 			end)
 		end
 	)

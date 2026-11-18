@@ -75,6 +75,25 @@ Named but not placed yet (no Sound instance exists; the natural trigger is given
 | `Telescope.Click` | Client/Rides/Telescope in and out | the same click as the server's |
 | `Lookout.Fireplace`, `Lookout.DiningRoom`, `Lookout.TerraceWind` | looped at the fire, in the dining room, on the terrace | crackle; low murmur and cutlery; wind |
 
+### THE GILDED ACORN, the 1940s lounge (branch `feat/lounge-classic`; nothing uploaded, nothing synthesised)
+The jazz is stock, licensed music from Roblox's own library (B3: library first; no upload). The client plays it inside only (`src/client/World/LoungeMusic.luau`), from the playlist `src/shared/Attractions/LoungeClassic.luau` `JAZZ`; every id is empty, so it is silent until the lead fills them in:
+| Cue | Wanted (from the library) |
+|---|---|
+| `Lounge.Jazz1` | 1920s hot jazz, small band, instrumental |
+| `Lounge.Jazz2` | stride piano, solo, 1920s |
+| `Lounge.Jazz3` | slow jazz ballad, clarinet or muted trumpet, 1920s |
+| `Lounge.Jazz4` | swing, light and bright, instrumental |
+
+The server makes these as Sound instances with empty ids (`src/server/Attractions/LoungeService.luau`, table `CUES`):
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `Lounge.GuardSwat` | a guard knocks out a squirrel at the door | a quick whoosh and a soft thump (no hit or cry) |
+| `Lounge.Door` | the door's prompt, in or out | a heavy wooden door opening and closing |
+| `Lounge.CounterBell` | a drink is ordered at the bar | a small service bell |
+| `Lounge.Pour` | the drink is handed over | a pour into a china cup |
+
+No uploads: all eight can come from the library.
+
 ### Paintball (`src/client/Minigames/Games/Paintball.luau`, table `sounds`)
 Every cue below is timed and placed already. Until the owner chooses the set, eleven of them play a PLACEHOLDER that ships with every Roblox client (`rbxasset://sounds/...`, nothing uploaded, no licence needed), so the fire, the hits and the dry click can be judged at the playtest; `paintball.step` is empty (no single footstep ships with the client: the body's own stock footsteps are heard meanwhile). A placeholder that does not exist in the client is silent and the Output says it failed to load. Volumes are in `src/client/Minigames/Paintball/Tuning.luau`. Another player's cues are played from where they happened and dulled by each floor between (`World.luau`).
 

@@ -9,6 +9,7 @@ local Kit = require("../../tools/bake/alley/Kit")
 local Lounge = require("../../tools/bake/lounge_classic/Lounge")
 local Style = require("../../tools/bake/lounge_classic/Style")
 local Data = require("@shared/Data")
+local LoungeArt = require("@shared/Attractions/LoungeArt")
 
 local Vector3 = roblox.Vector3
 
@@ -294,5 +295,61 @@ return function(t)
 		end
 		-- (none comes within 6 studs today: the nearest is the alley yard's downspout, 68 studs off)
 		t.eq(near, 0)
+	end)
+
+	t.test("the Blender pieces: inside their triangle budget, each within the baked parts it stands in for", function()
+		local root, v = bake()
+		t.eq(LoungeArt.ASSET_ID, "") -- the lead uploads (tools/blender/lounge_classic/publish.py)
+		local total = 0
+		for _, p in LoungeArt.PIECES do
+			total += p.tris
+		end
+		t.eq(total, LoungeArt.TOTAL_TRIS)
+		t.truthy(total <= LoungeArt.BUDGET and LoungeArt.BUDGET <= 20000, `{total} triangles`)
+		-- every part it hides is in the bake, under Interior
+		local interior = root:FindFirstChild("Interior")
+		local bounds: { [string]: { lo: { number }, hi: { number } } } = {}
+		local function grow(key: string, lo: { number }, hi: { number })
+			local b = bounds[key]
+				or { lo = { math.huge, math.huge, math.huge }, hi = { -math.huge, -math.huge, -math.huge } }
+			for k = 1, 3 do
+				b.lo[k] = math.min(b.lo[k], lo[k])
+				b.hi[k] = math.max(b.hi[k], hi[k])
+			end
+			bounds[key] = b
+		end
+		-- which piece group a name belongs to: a booth's, the bar's (its rail and arm roll too) or the walls'
+		local function groupOf(name: string): string
+			local booth = string.match(name, "^(Booth%d)")
+			if booth then
+				return booth
+			end
+			for _, prefix in { "Bar", "ArmRoll", "FootRail", "RailBracket" } do
+				if string.sub(name, 1, #prefix) == prefix then
+					return "Bar"
+				end
+			end
+			return "Wall"
+		end
+		for _, n in LoungeArt.REPLACES do
+			local part = interior:FindFirstChild(n)
+			t.truthy(part ~= nil and part:IsA("BasePart"), `no baked part {n}`)
+			if part then
+				local lo, hi = localBounds(v, part)
+				grow(groupOf(n), lo, hi)
+			end
+		end
+		for _, p in LoungeArt.PIECES do
+			local key = groupOf(p.name)
+			local b = bounds[key]
+			t.truthy(b ~= nil, `no baked parts for {p.name}`)
+			for k = 1, 3 do
+				local lo, hi = p.centre[k] - p.size[k] / 2, p.centre[k] + p.size[k] / 2
+				t.truthy(
+					lo >= b.lo[k] - 0.7 and hi <= b.hi[k] + 0.7,
+					`{p.name} axis {k}: {lo}..{hi} outside {b.lo[k]}..{b.hi[k]}`
+				)
+			end
+		end
 	end)
 end

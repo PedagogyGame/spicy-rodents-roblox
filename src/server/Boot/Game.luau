@@ -88,6 +88,7 @@ local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
 local WhackArt = require("../Assets/WhackArt")
+local LoungeArt = require("../Assets/LoungeArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -1416,6 +1417,10 @@ function Game.start(opts: Opts?): any
 	PinballArt.start(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
 	-- and the owner's whack-a-mole cabinet in the same games room (Assets/WhackArt; nothing while it has no id)
 	WhackArt.startIn(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
+	-- and THE GILDED ACORN's Blender pieces (Assets/LoungeArt; nothing while Shared/Attractions/LoungeArt has no id)
+	if o.heartbeat ~= false then
+		LoungeArt.start()
+	end
 
 	return {
 		runtime = rt,
