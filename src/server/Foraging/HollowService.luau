@@ -5,6 +5,8 @@
 -- (Shared/World/HollowLayout over Shared/Routes/Enclosure; the motor runs them); this is what being in one means:
 --   * The shell: start() builds every hollow's inside as plain parts (World/HollowShell) under Workspace.HollowTrees.
 --   * Cover: a squirrel whose body is in a hollow's cavity (HollowLayout.contains) is out of AI/TownAI's threat grid
+--     (the computer's squirrel only on one of that hollow's own runs: its point is its route's line, and a trunk's
+--     line, the axis, runs up through the cavity while it climbs the bark outside)
 --     (TownAI.addCover, as the storm drains), so people do not see or hear it, the fox does not hunt it, the crowd's
 --     fears leave it out. A body let go inside is put at the hole, standing, facing out. Each hollow's cavities are a
 --     Combat/Cover shape while the service runs, so a kick or a bite does not reach through the bark either way.
@@ -31,7 +33,8 @@
 --   attributes); :carry(id, n) -> taken; :carried(id) -> n; :drop(id) (the carried nuts are lost: a knock-out; the
 --   body changing hands drops them by itself); :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) ->
 --   hollowId?; :mayBite(id); :isRefuge(id);
---   :healRate(id, fed); :heal(id, health, maxHealth, dt, fed); :surface(x, y, z) -> (x, y, z, yaw)?; :stop(); C
+--   :healRate(id, fed); :heal(id, health, maxHealth, dt, fed); :surface(x, y, z) -> (x, y, z, yaw)?; :stop(); C;
+--   under(layout, world, x, y, z, actor?) -> space? (the cover test)
 -- Studs and the HTML yaw (Brains/Common). Engine calls only in start and the tree's attributes. No side effects on
 -- require.
 
@@ -125,8 +128,11 @@ function HollowService.new(opts: Opts): Service
 		end
 	end
 	if opts.cover ~= false then
-		local uncoverAI = TownAI.addCover(opts.world, {
-			under = layout.contains,
+		local world = opts.world
+		local uncoverAI = TownAI.addCover(world, {
+			under = function(x: number, y: number, z: number, actor: any?): string?
+				return HollowService.under(layout, world, x, y, z, actor)
+			end,
 			surface = function(x: number, y: number, z: number): (number?, number?, number?, number?)
 				return self:surface(x, y, z)
 			end,
@@ -151,6 +157,21 @@ function HollowService.new(opts: Opts): Service
 		end
 	end
 	return self
+end
+
+-- under: the hollow space hiding a body at (x, y, z) (TownAI's cover test). A player's body is where it is drawn;
+-- the computer's squirrel on a route is hidden only on that hollow's own runs (on the outside trunk its point, the
+-- trunk's axis, is inside the cavity test)
+function HollowService.under(layout: Layout, world: TownAI.World, x: number, y: number, z: number, actor: any?): string?
+	local space = layout.contains(x, y, z)
+	if space == nil or actor == nil or world.possessed[actor.id] then
+		return space
+	end
+	local intent = actor.intent
+	if intent and intent.mode == "rail" and layout.spaceOf(intent.routeId) ~= space then
+		return nil
+	end
+	return space
 end
 
 -- start: the service and the shell in the workspace, each tree's model showing its meter and claim

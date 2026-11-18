@@ -9,6 +9,8 @@
 --   inside a hollow a squirrel is out of the threat grid and people around the tree never spot it; at the hole,
 --   in the open, they do; a body let go inside comes back at the hole facing out; no bites from inside; the fed
 --   rodent heals inside at the hollow rate; the log hides but is never claimed; the Spicy Rodent claims nothing
+--   the computer's squirrel on a hollow tree's trunk route (its point the axis, inside the cavity test) is not hidden;
+--   on the hollow's own runs it is
 --   a kick (PlayRules.kickTarget) or a bite (biteVictims) does not reach through the bark of any hollow or the log
 --   (each is a Combat/Cover shape while the service runs), at the hole in the open it does
 local Data = require("@shared/Data")
@@ -241,6 +243,45 @@ return function(t)
 			svc:stop()
 		end
 	)
+
+	t.test("the computer's squirrel climbing a hollow tree's bark is not hidden; on the hollow's runs it is", function()
+		local world = rig()
+		local a = squirrels(world)[1]
+		local reg = data:routes()
+		for _, h in layout.hollows do
+			if h.trunk == nil then
+				continue
+			end
+			-- on the trunk route its point is the trunk's line, the axis, which runs up through the cavity
+			a.intent.mode, a.intent.routeId = "rail", h.trunk
+			local tr = reg:get(h.trunk) :: any
+			local inCavity, hidden = 0, 0
+			for k = 0, 200 do
+				local p = reg:pointAt(tr, k / 200)
+				if layout.contains(p.x, p.y, p.z) then
+					inCavity += 1
+				end
+				if HollowService.under(layout, world, p.x, p.y, p.z, a) then
+					hidden += 1
+				end
+			end
+			t.eq(hidden, 0, `{h.id}: on the outside trunk ({inCavity} of its points in the cavity test)`)
+			-- on the hollow's own runs, inside: hidden
+			for _, c in h.chambers do
+				a.intent.mode, a.intent.routeId = "rail", c.route
+				t.eq(HollowService.under(layout, world, c.x, c.y + 0.5, c.z, a), h.space, `{h.id} {c.id}`)
+			end
+		end
+		-- the log (no trunk): on its run, hidden; a player's body is judged where it is drawn
+		local log = layout.hollow("LOG") :: HollowLayout.Hollow
+		a.intent.mode, a.intent.routeId = "rail", log.routes[1]
+		t.eq(HollowService.under(layout, world, log.x, log.y + 0.6, log.z, a), log.space)
+		TownAI.suspend(world, a.id)
+		local h2 = layout.hollow("H2") :: HollowLayout.Hollow
+		local c2 = h2.chambers[1]
+		a.intent.mode, a.intent.routeId = "rail", h2.trunk :: number
+		t.eq(HollowService.under(layout, world, c2.x, c2.y + 0.5, c2.z, a), h2.space, "a player's body in the cavity")
+	end)
 
 	t.test("cover: inside nobody spots it, at the hole they do; let go inside, back at the hole; rest", function()
 		local h = layout.hollow("H3") :: HollowLayout.Hollow
