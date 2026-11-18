@@ -11,7 +11,8 @@ measured against the new Bark mesh instead: a level ray from the trunk route's a
 through the corner, to the first bark it meets.
   inside pieces (liner, floor, roof, tread, post, shelf): margin = bark distance - corner distance; < 0 pokes through.
   knotholes (the dark oval on the bark, seen from outside): its centre's distance - the bark's under it; < -0.06
-    (half the disc's 0.12 thickness) buries it in the bark.
+    (half the disc's 0.12 thickness) buries it in the bark, unless it lies inside the first quarter of a walk's
+    bough (where HollowLayout opens a shaft onto that bough): that only warns, no bark could show it.
 Exit status 1 when a board pokes through or a knothole is buried. --json PATH writes the numbers.
 """
 import argparse
@@ -28,6 +29,7 @@ import check_promises as cp  # noqa: E402
 
 INSIDE = ("liner", "floor", "roof", "tread", "post", "shelf")
 KNOT_BURY = -0.06
+UNDER_BOUGH = 1.6  # studs from a walk's centre line
 
 
 def corners(pc):
@@ -81,6 +83,21 @@ def bark_distance(tree, axis_pt, q):
     return (None if hit[0] is None else float(hit[3])), n
 
 
+def under_bough(q, info, routes):
+    """Is the point inside a walk of the tree, where its bough's wood is (within UNDER_BOUGH of its centre line over
+    its first quarter)? A knothole the hollow puts where a bough leaves the bark (a shaft's top, onto that bough)
+    is under that bough's wood whatever the bark is: it is reported, and only warns."""
+    for rid in info["routes"]:
+        r = routes[rid]
+        if rid == info["trunkRoute"] or r["kind"] not in ("branch", "bridge", "lookout"):
+            continue
+        c = cp.Curve(np.asarray(r["points"], float) * cp.SPU)
+        P = np.array([c.at(u) for u in np.linspace(0.0, 0.25, 60)])
+        if float(np.linalg.norm(P - q[None], axis=1).min()) < UNDER_BOUGH:
+            return True
+    return False
+
+
 def check(info, parts, routes, hollow):
     V, F = parts["Bark"]
     tree = cp.bvh(V, F)
@@ -92,7 +109,7 @@ def check(info, parts, routes, hollow):
         if role == "knothole":
             q = np.asarray(pc["p"], float)
             b, n = bark_distance(tree, axis.at(q[1]), q)
-            knots.append(n - b if b is not None else 9.0)
+            knots.append((n - b if b is not None else 9.0, under_bough(q, info, routes)))
             continue
         if role not in INSIDE:
             continue
@@ -110,13 +127,16 @@ def check(info, parts, routes, hollow):
     inside.sort(key=lambda w: w[0])
     rep["min_margin"] = round(inside[0][0], 3) if inside else None
     rep["worst"] = [{"margin": round(w[0], 3), "role": w[1], "at": w[2]} for w in inside[:3]]
-    rep["knot_offsets"] = [round(k, 3) for k in knots]
+    rep["knot_offsets"] = [round(k, 3) for k, _ in knots]
     poke = [w for w in inside if w[0] < 0]
     if poke:
         rep["fail"].append(f"{len(poke)} pieces poke through the bark (worst {poke[0][0]:.3f} st, {poke[0][1]})")
-    buried = [k for k in knots if k < KNOT_BURY]
+    buried = [k for k, ub in knots if k < KNOT_BURY and not ub]
     if buried:
         rep["fail"].append(f"{len(buried)} knotholes buried in the bark (worst {min(buried):.3f} st)")
+    covered = [k for k, ub in knots if k < KNOT_BURY and ub]
+    rep["warn"] = [f"{len(covered)} knotholes inside the bough they open onto (worst {min(covered):.3f} st): "
+                   f"HollowLayout puts them where that bough leaves the bark"] if covered else []
     return rep
 
 
@@ -147,7 +167,7 @@ def main(argv):
         reps.append(rep)
         bad += 1 if rep["fail"] else 0
         print(f"{h['id']:>4} tree {info['index']:03d} {info['label']:<22} {rep['pieces']:>3} pieces  min margin "
-              f"{rep['min_margin']} st  knotholes {rep['knot_offsets']}  {'; '.join(rep['fail']) or 'ok'}", flush=True)
+              f"{rep['min_margin']} st  knotholes {rep['knot_offsets']}  {'; '.join(rep['fail']) or 'ok'}{''.join('  (warn: ' + w + ')' for w in rep['warn'])}", flush=True)
     print(f"\n{len(reps)} hollows checked, {bad} broken")
     if a.json:
         with open(a.json, "w") as fh:

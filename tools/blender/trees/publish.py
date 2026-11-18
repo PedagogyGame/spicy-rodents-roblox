@@ -7,7 +7,8 @@ Run first (headless Blender, tools/blender/trees):
   build_trees.py --ids all --fbx --out <build>            tree_NNN.fbx + tree_NNN.json (with the mesh digest "sha")
   check_promises.py --dir <build> --clearance-warn --json <build>/promises.json     the routes on the bark
   check_hollows.py --dir <build> --json <build>/hollows_check.json                   the hollow trees' boards
-A tree with a broken promise is never uploaded (and stops the run). For every other tree this runs
+A tree with a broken promise is held back: listed with its checks, never uploaded, so the game keeps its live tree.
+For every other tree this runs
   node tools/cloud/cloud.mjs upload_asset tree_NNN.fbx --type Model --name "SR tree v2 NNN <LABEL>"
 (the CLI holds the shared cloud write lock and token buckets; the proxy injects the key, nothing here handles one)
 and keeps each result in <build>/uploads/tree_NNN.json with the tree's mesh digest, so a rerun only uploads what
@@ -115,16 +116,21 @@ def main():
     hollows = {}
     for r in load_reports(a.hollows, "hollow").values():
         hollows[r["tree"]] = r
-    broken = [i["index"] for i in infos if i["index"] not in promises or promises[i["index"]]["fail"]]
-    broken += [t for t, r in hollows.items() if r["fail"]]
-    if broken:
-        sys.exit(f"not published: trees {sorted(set(broken))} have a broken promise or no check")
+    missing = [i["index"] for i in infos if i["index"] not in promises]
+    if missing:
+        sys.exit(f"not published: trees {missing} have not been checked")
+    held = {i["index"] for i in infos if promises[i["index"]]["fail"]} | {t for t, r in hollows.items() if r["fail"]}
+    if held:
+        print(f"held back (a broken promise: never uploaded, the live tree stays): {sorted(held)}")
     wanted = None if a.ids == "all" else {int(x) for x in a.ids.split(",") if x.strip()}
     trees, totals = [], {"bark": 0, "leaves": 0, "fruit": 0, "total": 0, "fbxBytes": 0}
     for info in infos:
         i = info["index"]
         skip = a.skip_upload or (wanted is not None and i not in wanted)
-        res = upload(build, info, skip)
+        if i in held:
+            res = {"assetId": None, "moderationState": "held: broken promise"}
+        else:
+            res = upload(build, info, skip)
         tris = info["tris"]
         leaves = tris["leaves_shade"] + tris["leaves_mid"] + tris["leaves_sun"]
         rep = promises[i]

@@ -5,7 +5,8 @@
 -- for the new ones: per trunk route the Model's asset id (nil until the lead uploads it; tools/blender/trees/
 -- publish.py), its world pivot and its triangles. STUDS, Roblox axes.
 -- Invariants: one record per trunk route; every tree passed check_promises.py (no broken promise) and, if it is
--- hollow, check_hollows.py; its bark and leaves inside the generator's budgets; an asset id is digits.
+-- hollow, check_hollows.py, before it has an id (one that did not is held back); its bark and leaves inside the
+-- generator's budgets; an asset id is digits.
 -- Interface: compile(ctx) -> Module? (nil when the file is absent)
 local fs = require("@lune/fs")
 local Json = require("./Json")
@@ -29,17 +30,18 @@ function TreeArtNext.compile(ctx: any): any?
 		local what = `tree art v2 {t.index} ({t.label})`
 		ctx.invariant(what .. ": one model per trunk route", not seen[t.trunkRoute])
 		seen[t.trunkRoute] = true
-		ctx.invariant(what .. ": no broken promise", t.checks.promisesBroken == 0)
-		ctx.invariant(
-			what .. ": its hollow's boards stay inside the bark",
-			t.checks.hollow == nil or (t.checks.hollowBoardMargin or -1) >= 0
-		)
 		ctx.invariant(what .. ": bark within budget", t.tris.bark <= TreeArtNext.BARK_BUDGET)
 		ctx.invariant(what .. ": leaves within budget", t.tris.leaves <= TreeArtNext.LEAF_BUDGET)
 		local id = t.assetId -- (JSON null decodes as nil)
 		if id == "" then
 			id = nil
 		end
+		-- a tree that broke a promise is held back (publish.py never uploads it): the live tree stays
+		ctx.invariant(what .. ": uploaded only with every promise kept", id == nil or t.checks.promisesBroken == 0)
+		ctx.invariant(
+			what .. ": uploaded only with its hollow's boards inside the bark",
+			id == nil or t.checks.hollow == nil or (t.checks.hollowBoardMargin or -1) >= 0
+		)
 		ctx.invariant(what .. ": an asset id is digits", id == nil or string.match(tostring(id), "^%d+$") ~= nil)
 		total += t.tris.total
 		table.insert(trees, {
