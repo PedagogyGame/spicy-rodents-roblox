@@ -352,4 +352,25 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("the spots and the back bar's strip shine down (a light's face, turned with its part)", function()
+		local root = bake()
+		local NORMALS = {
+			Right = Vector3.new(1, 0, 0),
+			Left = Vector3.new(-1, 0, 0),
+			Top = Vector3.new(0, 1, 0),
+			Bottom = Vector3.new(0, -1, 0),
+			Back = Vector3.new(0, 0, 1),
+			Front = Vector3.new(0, 0, -1),
+		}
+		local n = 0
+		for _, l in root:GetDescendants() do
+			if l:IsA("SpotLight") or l:IsA("SurfaceLight") then
+				local dir = l.Parent.CFrame:VectorToWorldSpace(NORMALS[l.Face.Name])
+				t.truthy(dir.Y < -0.99, `{l.Parent.Name}'s light points {dir}`)
+				n += 1
+			end
+		end
+		t.eq(n, 3)
+	end)
 end

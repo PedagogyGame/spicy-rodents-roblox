@@ -80,9 +80,10 @@ function Lamps.build(kit: Kit.Kit, root: any, _venue: any): (number, number)
 	end
 
 	-- the stage's two spots: black cans under the ceiling, shining down on the piano and the microphone
+	-- (a cylinder along Y is a part turned a quarter about its X: its Left face is the one that looks down)
 	for i, at in { { Style.PIANO[1], Style.PIANO[2] - 1 }, { -15.6, 16 } } do
 		local can = kit:cyl(m, `StageSpot{i}`, at[1], C - 0.9, at[2], 0.9, 0.7, "Y", Style.BLACK, "Metal", GHOST)
-		light(can, "SpotLight", { Brightness = 1.6, Range = 16, Angle = 50, Face = "Bottom", Shadows = i == 1 })
+		light(can, "SpotLight", { Brightness = 1.6, Range = 16, Angle = 50, Face = "Left", Shadows = i == 1 })
 	end
 
 	-- two soft fills under the ceiling: the lamps light down and the engine's lighting has no bounce, so without

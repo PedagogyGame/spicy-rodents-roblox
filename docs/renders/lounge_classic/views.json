@@ -25,8 +25,8 @@
     },
     {
       "name": "lc_05_from_bar",
-      "desc": "From behind the bar, where the bartender stands (local 0, 5.4, 20), back toward the door.",
-      "pos": [1487, 14.9, -382], "look": [1487, 13, -342], "fov": 75
+      "desc": "From behind the bar, beside the bartender (local 3, 5.4, 21), back toward the door.",
+      "pos": [1490, 14.9, -383], "look": [1487, 13, -342], "fov": 75
     },
     {
       "name": "lc_06_stage",
