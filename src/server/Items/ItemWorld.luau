@@ -1221,6 +1221,9 @@ function ItemWorld.start(opts: StartOpts): World
 			for _, c in conns do
 				c:Disconnect()
 			end
+			for _, k in kites do
+				flierAttr(k.player, false) -- (the flier's controls come back)
+			end
 			folder:Destroy()
 		end,
 	}
