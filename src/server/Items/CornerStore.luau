@@ -22,7 +22,7 @@
 --   start(opts) -> Store? (finds the bake, carves its inside, wires the prompts, steps on Heartbeat; nil without
 --   the bake);
 --   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; WORDS; CUES; SOUNDS; STORE (the model's
---   name); REMOTE
+--   name); REMOTE; STEER_REMOTE
 -- Engine only inside start/zoneOf/makeTool; no side effects on require.
 
 local Import = require("../Import")
@@ -39,6 +39,9 @@ type Baskets = { byKey: { [any]: { string } } }
 
 CornerStore.STORE = "f1_corner_store"
 CornerStore.REMOTE = "CornerStoreItemText" -- ReplicatedStorage: the client's words for the chalk
+-- ReplicatedStorage: the kite's steer keys from its flier's client (Client/UI/KiteSteer): two numbers, clamped and
+-- rate-limited by Items/ItemWorld.steer (Shared/Items/KiteFlight)
+CornerStore.STEER_REMOTE = "KiteSteer"
 
 CornerStore.WORDS = table.freeze({
 	animal = "Only people shop here.",
@@ -515,6 +518,17 @@ function CornerStore.start(opts: StartOpts): Store?
 			end
 		end)
 	)
+	local steer = Instance.new("RemoteEvent")
+	steer.Name = CornerStore.STEER_REMOTE
+	steer.Parent = game:GetService("ReplicatedStorage")
+	table.insert(
+		conns,
+		steer.OnServerEvent:Connect(function(player: Player, x: any, y: any)
+			if items then
+				items.steer(player, x, y)
+			end
+		end)
+	)
 	for _, d in root:GetDescendants() do
 		if d:IsA("ProximityPrompt") then
 			local itemId = d:GetAttribute("StoreItem")
@@ -604,6 +618,7 @@ function CornerStore.start(opts: StartOpts): Store?
 			items.stop()
 		end
 		net:Destroy()
+		steer:Destroy()
 	end
 	return store
 end
