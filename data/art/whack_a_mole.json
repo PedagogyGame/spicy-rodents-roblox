@@ -1,0 +1,1071 @@
+{
+ "$schema": "art/whack_a_mole v1",
+ "src": "tools/blender/whack_a_mole (export.py: the owner's .blend as one FBX in studs; publish.py: the upload).",
+ "placement": "InsertService:LoadAsset(assetId):GetChildren()[1] is a Model of MeshParts named as `pieces`; each MeshPart is unrotated in the alley's site frame (the bake's: X across, Y up, -D) and is put at its `centre` (cabinet frame, studs: Shared/Minigames/WhackAMole/Layout.toSite) by Server/Assets/WhackArt, which paints it Layout.COLORS[material] (a mole's fur its own) and parents a mole's pieces to its Mole model and the mallet's to the Mallet.",
+ "assets": {
+  "whack": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR Whack-a-Mole cabinet",
+   "fbxBytes": 552828,
+   "sha": "94be11d7e401696b"
+  }
+ },
+ "scale": 3.571428571428571,
+ "sources": {
+  "Whack_A_Mole.blend": "b6d6f8c013543afe072942d9c4410811260ec9c863081fddf41c0db7d59b9ade",
+  "Whack_A_Mole.glb": "ec9c779be4446668473469d518d4d78a1ba9ea939e6b8118d1178046b706c917"
+ },
+ "sourceTris": 104432,
+ "leftOut": {
+  "lettering": 127660,
+  "coin": 884,
+  "hidden": 188
+ },
+ "total": 12168,
+ "groups": {
+  "mallet": 746,
+  "moles": 4800,
+  "shell": 6622
+ },
+ "pieces": [
+  {
+   "name": "Mallet_black",
+   "group": "mallet",
+   "material": "black",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    34,
+    39,
+    41
+   ],
+   "tris": 150,
+   "from": 4800,
+   "sources": 5,
+   "centre": [
+    3.8653,
+    1.9796,
+    -0.8634
+   ],
+   "size": [
+    0.3079,
+    0.4891,
+    0.2247
+   ]
+  },
+  {
+   "name": "Mallet_brass",
+   "group": "mallet",
+   "material": "brass",
+   "robloxMaterial": "Metal",
+   "colour": [
+    208,
+    166,
+    97
+   ],
+   "tris": 196,
+   "from": 2428,
+   "sources": 3,
+   "centre": [
+    3.4211,
+    3.5399,
+    -0.7722
+   ],
+   "size": [
+    1.0853,
+    0.9876,
+    0.8943
+   ]
+  },
+  {
+   "name": "Mallet_cream",
+   "group": "mallet",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 1528,
+   "sources": 2,
+   "centre": [
+    3.4206,
+    3.5579,
+    -0.7731
+   ],
+   "size": [
+    1.2981,
+    0.925,
+    0.8486
+   ]
+  },
+  {
+   "name": "Mallet_rubber",
+   "group": "mallet",
+   "material": "rubber",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    121,
+    44,
+    53
+   ],
+   "tris": 200,
+   "from": 764,
+   "sources": 1,
+   "centre": [
+    3.4218,
+    3.5601,
+    -0.7698
+   ],
+   "size": [
+    1.1564,
+    0.9212,
+    0.8656
+   ]
+  },
+  {
+   "name": "Mallet_wood",
+   "group": "mallet",
+   "material": "wood",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    87,
+    29,
+    35
+   ],
+   "tris": 80,
+   "from": 508,
+   "sources": 1,
+   "centre": [
+    3.7255,
+    2.4777,
+    -0.8338
+   ],
+   "size": [
+    0.7044,
+    1.9926,
+    0.2831
+   ]
+  },
+  {
+   "name": "Mole1_cream",
+   "group": "mole",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 3544,
+   "sources": 8,
+   "centre": [
+    -1.6791,
+    3.0096,
+    0.3708
+   ],
+   "size": [
+    0.6515,
+    0.2202,
+    0.1595
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole1_eye",
+   "group": "mole",
+   "material": "eye",
+   "robloxMaterial": "Glass",
+   "colour": [
+    13,
+    16,
+    20
+   ],
+   "tris": 80,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    -1.6774,
+    3.3712,
+    0.4158
+   ],
+   "size": [
+    0.4063,
+    0.1074,
+    0.0659
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole1_fur",
+   "group": "mole",
+   "material": "fur",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    126,
+    95,
+    71
+   ],
+   "tris": 416,
+   "from": 2112,
+   "sources": 4,
+   "centre": [
+    -1.6782,
+    2.8134,
+    0.732
+   ],
+   "size": [
+    0.9247,
+    1.6974,
+    0.7484
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole1_glint",
+   "group": "mole",
+   "material": "glint",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    247,
+    242,
+    219
+   ],
+   "tris": 24,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    -1.6778,
+    3.3928,
+    0.3861
+   ],
+   "size": [
+    0.3232,
+    0.0317,
+    0.0199
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole1_muzzle",
+   "group": "mole",
+   "material": "muzzle",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    200,
+    166,
+    137
+   ],
+   "tris": 260,
+   "from": 2640,
+   "sources": 5,
+   "centre": [
+    -1.6784,
+    3.1766,
+    0.5071
+   ],
+   "size": [
+    0.8671,
+    0.6973,
+    0.415
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole1_nose",
+   "group": "mole",
+   "material": "nose",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    158,
+    95,
+    89
+   ],
+   "tris": 60,
+   "from": 528,
+   "sources": 1,
+   "centre": [
+    -1.6813,
+    3.2217,
+    0.2975
+   ],
+   "size": [
+    0.2134,
+    0.1428,
+    0.1611
+   ],
+   "mole": 1
+  },
+  {
+   "name": "Mole2_cream",
+   "group": "mole",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 3544,
+   "sources": 8,
+   "centre": [
+    0.002,
+    3.0091,
+    0.3705
+   ],
+   "size": [
+    0.6519,
+    0.221,
+    0.1588
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole2_eye",
+   "group": "mole",
+   "material": "eye",
+   "robloxMaterial": "Glass",
+   "colour": [
+    13,
+    16,
+    20
+   ],
+   "tris": 80,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    -0.0004,
+    3.3714,
+    0.4146
+   ],
+   "size": [
+    0.4109,
+    0.1069,
+    0.0602
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole2_fur",
+   "group": "mole",
+   "material": "fur",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    151,
+    132,
+    115
+   ],
+   "tris": 416,
+   "from": 2112,
+   "sources": 4,
+   "centre": [
+    0.0018,
+    2.8134,
+    0.7265
+   ],
+   "size": [
+    0.9218,
+    1.6974,
+    0.7599
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole2_glint",
+   "group": "mole",
+   "material": "glint",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    247,
+    242,
+    219
+   ],
+   "tris": 24,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    0.0005,
+    3.3937,
+    0.3864
+   ],
+   "size": [
+    0.3167,
+    0.0304,
+    0.0159
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole2_muzzle",
+   "group": "mole",
+   "material": "muzzle",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    200,
+    166,
+    137
+   ],
+   "tris": 260,
+   "from": 2640,
+   "sources": 5,
+   "centre": [
+    0.0009,
+    3.1772,
+    0.5073
+   ],
+   "size": [
+    0.8656,
+    0.6963,
+    0.4154
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole2_nose",
+   "group": "mole",
+   "material": "nose",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    158,
+    95,
+    89
+   ],
+   "tris": 60,
+   "from": 528,
+   "sources": 1,
+   "centre": [
+    0.0017,
+    3.2205,
+    0.2968
+   ],
+   "size": [
+    0.2145,
+    0.1421,
+    0.1562
+   ],
+   "mole": 2
+  },
+  {
+   "name": "Mole3_cream",
+   "group": "mole",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 3544,
+   "sources": 8,
+   "centre": [
+    1.6764,
+    3.0091,
+    0.3696
+   ],
+   "size": [
+    0.6456,
+    0.221,
+    0.1571
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole3_eye",
+   "group": "mole",
+   "material": "eye",
+   "robloxMaterial": "Glass",
+   "colour": [
+    13,
+    16,
+    20
+   ],
+   "tris": 80,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    1.6767,
+    3.3715,
+    0.4131
+   ],
+   "size": [
+    0.408,
+    0.107,
+    0.0664
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole3_fur",
+   "group": "mole",
+   "material": "fur",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    89,
+    82,
+    80
+   ],
+   "tris": 416,
+   "from": 2112,
+   "sources": 4,
+   "centre": [
+    1.6774,
+    2.8126,
+    0.7265
+   ],
+   "size": [
+    0.9232,
+    1.6957,
+    0.7599
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole3_glint",
+   "group": "mole",
+   "material": "glint",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    247,
+    242,
+    219
+   ],
+   "tris": 24,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    1.6791,
+    3.3928,
+    0.3857
+   ],
+   "size": [
+    0.3193,
+    0.0306,
+    0.0194
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole3_muzzle",
+   "group": "mole",
+   "material": "muzzle",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    200,
+    166,
+    137
+   ],
+   "tris": 260,
+   "from": 2640,
+   "sources": 5,
+   "centre": [
+    1.6773,
+    3.1771,
+    0.5073
+   ],
+   "size": [
+    0.8649,
+    0.6962,
+    0.4154
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole3_nose",
+   "group": "mole",
+   "material": "nose",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    158,
+    95,
+    89
+   ],
+   "tris": 60,
+   "from": 528,
+   "sources": 1,
+   "centre": [
+    1.679,
+    3.2216,
+    0.2964
+   ],
+   "size": [
+    0.2165,
+    0.1413,
+    0.1589
+   ],
+   "mole": 3
+  },
+  {
+   "name": "Mole4_cream",
+   "group": "mole",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 3544,
+   "sources": 8,
+   "centre": [
+    -0.8786,
+    3.0093,
+    -1.3442
+   ],
+   "size": [
+    0.649,
+    0.2206,
+    0.1581
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole4_eye",
+   "group": "mole",
+   "material": "eye",
+   "robloxMaterial": "Glass",
+   "colour": [
+    13,
+    16,
+    20
+   ],
+   "tris": 80,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    -0.8763,
+    3.3717,
+    -1.2991
+   ],
+   "size": [
+    0.4064,
+    0.1074,
+    0.0663
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole4_fur",
+   "group": "mole",
+   "material": "fur",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    151,
+    132,
+    115
+   ],
+   "tris": 416,
+   "from": 2112,
+   "sources": 4,
+   "centre": [
+    -0.875,
+    2.8126,
+    -0.9821
+   ],
+   "size": [
+    0.924,
+    1.6957,
+    0.7487
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole4_glint",
+   "group": "mole",
+   "material": "glint",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    247,
+    242,
+    219
+   ],
+   "tris": 24,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    -0.8747,
+    3.393,
+    -1.3284
+   ],
+   "size": [
+    0.3232,
+    0.0306,
+    0.0177
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole4_muzzle",
+   "group": "mole",
+   "material": "muzzle",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    200,
+    166,
+    137
+   ],
+   "tris": 260,
+   "from": 2640,
+   "sources": 5,
+   "centre": [
+    -0.8763,
+    3.1765,
+    -1.208
+   ],
+   "size": [
+    0.8641,
+    0.6966,
+    0.4203
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole4_nose",
+   "group": "mole",
+   "material": "nose",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    158,
+    95,
+    89
+   ],
+   "tris": 60,
+   "from": 528,
+   "sources": 1,
+   "centre": [
+    -0.875,
+    3.2204,
+    -1.4162
+   ],
+   "size": [
+    0.2174,
+    0.1459,
+    0.1556
+   ],
+   "mole": 4
+  },
+  {
+   "name": "Mole5_cream",
+   "group": "mole",
+   "material": "cream",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    234,
+    222,
+    191
+   ],
+   "tris": 120,
+   "from": 3544,
+   "sources": 8,
+   "centre": [
+    0.8781,
+    3.0094,
+    -1.3442
+   ],
+   "size": [
+    0.6503,
+    0.2204,
+    0.1581
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Mole5_eye",
+   "group": "mole",
+   "material": "eye",
+   "robloxMaterial": "Glass",
+   "colour": [
+    13,
+    16,
+    20
+   ],
+   "tris": 80,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    0.8733,
+    3.3707,
+    -1.2991
+   ],
+   "size": [
+    0.4072,
+    0.1064,
+    0.0635
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Mole5_fur",
+   "group": "mole",
+   "material": "fur",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    126,
+    95,
+    71
+   ],
+   "tris": 416,
+   "from": 2112,
+   "sources": 4,
+   "centre": [
+    0.8746,
+    2.8126,
+    -0.9821
+   ],
+   "size": [
+    0.9248,
+    1.6957,
+    0.7487
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Mole5_glint",
+   "group": "mole",
+   "material": "glint",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    247,
+    242,
+    219
+   ],
+   "tris": 24,
+   "from": 1056,
+   "sources": 2,
+   "centre": [
+    0.8754,
+    3.3934,
+    -1.3284
+   ],
+   "size": [
+    0.3189,
+    0.0295,
+    0.0154
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Mole5_muzzle",
+   "group": "mole",
+   "material": "muzzle",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    200,
+    166,
+    137
+   ],
+   "tris": 260,
+   "from": 2640,
+   "sources": 5,
+   "centre": [
+    0.8741,
+    3.1772,
+    -1.2098
+   ],
+   "size": [
+    0.8659,
+    0.696,
+    0.4167
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Mole5_nose",
+   "group": "mole",
+   "material": "nose",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    158,
+    95,
+    89
+   ],
+   "tris": 60,
+   "from": 528,
+   "sources": 1,
+   "centre": [
+    0.8726,
+    3.2195,
+    -1.4181
+   ],
+   "size": [
+    0.2126,
+    0.1441,
+    0.1561
+   ],
+   "mole": 5
+  },
+  {
+   "name": "Shell_black",
+   "group": "shell",
+   "material": "black",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    34,
+    39,
+    41
+   ],
+   "tris": 730,
+   "from": 7448,
+   "sources": 15,
+   "centre": [
+    0.0,
+    3.7724,
+    -0.042
+   ],
+   "size": [
+    5.6071,
+    7.5087,
+    3.9411
+   ]
+  },
+  {
+   "name": "Shell_brass",
+   "group": "shell",
+   "material": "brass",
+   "robloxMaterial": "Metal",
+   "colour": [
+    208,
+    166,
+    97
+   ],
+   "tris": 2478,
+   "from": 15940,
+   "sources": 52,
+   "centre": [
+    0.3705,
+    4.1688,
+    -0.0473
+   ],
+   "size": [
+    6.3304,
+    6.8589,
+    3.8554
+   ]
+  },
+  {
+   "name": "Shell_bulb",
+   "group": "shell",
+   "material": "bulb",
+   "robloxMaterial": "Neon",
+   "colour": [
+    255,
+    211,
+    137
+   ],
+   "tris": 578,
+   "from": 5984,
+   "sources": 17,
+   "centre": [
+    -0.0005,
+    5.9983,
+    1.2981
+   ],
+   "size": [
+    4.9545,
+    3.0316,
+    0.131
+   ]
+  },
+  {
+   "name": "Shell_dark",
+   "group": "shell",
+   "material": "dark",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    18,
+    20,
+    22
+   ],
+   "tris": 324,
+   "from": 4196,
+   "sources": 7,
+   "centre": [
+    -0.002,
+    3.7701,
+    -0.1017
+   ],
+   "size": [
+    4.3765,
+    3.7383,
+    2.7855
+   ]
+  },
+  {
+   "name": "Shell_felt",
+   "group": "shell",
+   "material": "felt",
+   "robloxMaterial": "Fabric",
+   "colour": [
+    34,
+    71,
+    69
+   ],
+   "tris": 700,
+   "from": 1512,
+   "sources": 1,
+   "centre": [
+    0.0,
+    3.9464,
+    -0.0179
+   ],
+   "size": [
+    5.4643,
+    0.0536,
+    3.6964
+   ]
+  },
+  {
+   "name": "Shell_gold",
+   "group": "shell",
+   "material": "gold",
+   "robloxMaterial": "Metal",
+   "colour": [
+    234,
+    209,
+    158
+   ],
+   "tris": 72,
+   "from": 1128,
+   "sources": 6,
+   "centre": [
+    0.0,
+    2.2143,
+    0.0
+   ],
+   "size": [
+    5.475,
+    1.3214,
+    1.7429
+   ]
+  },
+  {
+   "name": "Shell_wood",
+   "group": "shell",
+   "material": "wood",
+   "robloxMaterial": "SmoothPlastic",
+   "colour": [
+    87,
+    29,
+    35
+   ],
+   "tris": 1740,
+   "from": 2444,
+   "sources": 6,
+   "centre": [
+    0.0,
+    4.2714,
+    0.0741
+   ],
+   "size": [
+    5.7857,
+    6.8857,
+    4.1839
+   ]
+  }
+ ]
+}

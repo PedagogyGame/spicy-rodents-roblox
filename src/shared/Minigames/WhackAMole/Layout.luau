@@ -19,7 +19,8 @@
 --   -> (u, v, w); HOLES { { u, w } } (1, 2, 3 the back row left to right, 4, 5 the front); hole(i) -> (u, v, w)
 --   (the middle of the hole at the deck's face); DECK { ... }; MOLE { ... }; SIGN { ... }; WINDOWS { score,
 --   time }; MALLET { ... }; PLATE (the FREE PLAY plate); BODY (the cabinet's box); STANDING { x0, x1, d0, d1 };
---   STAND { u, w } (where the player stands); PROMPT { u, v, w }
+--   STAND { u, w } (where the player stands); PROMPT { u, v, w }; COLORS (name -> sRGB); NAMES; EYE, LOOK,
+--   camera(aspect) -> (eye, look, fov); framePoints(); inCamera(p) -> (x, y, z)
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 
@@ -167,6 +168,29 @@ Layout.MALLET = {
 
 -- The FREE PLAY plate, where the owner's coin door was (no coins, ever: brief v2 §13a, D13 rating).
 Layout.PLATE = { v = m(0.55), w = m(-0.539), width = m(0.295), height = m(0.27) }
+
+-- His materials as they look in his preview (sRGB): the baked parts are painted with them, and so are the meshes
+-- from his Blender file (src/server/Assets/WhackArt; a MeshPart has one colour). Never green on a mole.
+Layout.COLORS = {
+	wood = { 132, 26, 32 }, -- oxblood lacquered timber
+	black = { 28, 31, 34 }, -- ebony lacquer
+	brass = { 201, 154, 74 },
+	gold = { 226, 196, 136 }, -- champagne trim
+	cream = { 238, 222, 186 }, -- warm ivory enamel
+	felt = { 44, 104, 98 }, -- deep petrol leather (the deck, never a mole)
+	dark = { 16, 14, 16 }, -- the holes
+	amber = { 255, 150, 60 }, -- the score phosphor
+	bulb = { 255, 196, 120 },
+	cocoa = { 150, 104, 74 },
+	taupe = { 156, 132, 114 },
+	charcoal = { 96, 86, 82 },
+	muzzle = { 222, 176, 140 },
+	nose = { 200, 112, 104 },
+	eye = { 10, 10, 12 },
+	glint = { 240, 232, 200 }, -- the catchlight in a mole's eye
+	rubber = { 132, 28, 40 }, -- the mallet's padded head
+	handle = { 110, 24, 30 },
+} :: { [string]: { number } }
 
 -- The names the bake gives the parts the client moves and writes on (and the art loader keeps).
 Layout.NAMES = {

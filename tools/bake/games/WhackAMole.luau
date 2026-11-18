@@ -24,33 +24,14 @@
 -- COST: 149 parts (85 shell, 55 moles, 6 mallet, 3 windows; tests/unit/whack_bake.spec.luau prints it and holds it under
 -- BUDGET), no textures, no lights; the lettering is SurfaceGui text. The meshes from his Blender file replace the
 -- shell, the moles and the mallet when they are uploaded (src/server/Assets/WhackArt).
--- Interface: { build(kit, parent, station, venue) }; BUDGET; COLORS
+-- Interface: { build(kit, parent, station, venue) }; BUDGET; COLORS (= Layout.COLORS)
 
 local Layout = require("../../../src/shared/Minigames/WhackAMole/Layout")
 
 local Bake = {}
 Bake.BUDGET = 160 -- parts at most (a pinball machine's budget)
 
--- his materials, as they look in his preview (sRGB)
-Bake.COLORS = {
-	wood = { 132, 26, 32 }, -- oxblood lacquered timber
-	black = { 28, 31, 34 }, -- ebony lacquer
-	brass = { 201, 154, 74 },
-	gold = { 226, 196, 136 }, -- champagne trim
-	cream = { 238, 222, 186 }, -- warm ivory enamel
-	felt = { 44, 104, 98 }, -- deep petrol leather (the deck, never a mole)
-	dark = { 16, 14, 16 }, -- the holes
-	amber = { 255, 150, 60 }, -- the score phosphor
-	bulb = { 255, 196, 120 },
-	cocoa = { 150, 104, 74 },
-	taupe = { 156, 132, 114 },
-	charcoal = { 96, 86, 82 },
-	muzzle = { 222, 176, 140 },
-	nose = { 200, 112, 104 },
-	eye = { 10, 10, 12 },
-	rubber = { 132, 28, 40 }, -- the mallet's padded head
-	handle = { 110, 24, 30 },
-}
+Bake.COLORS = Layout.COLORS -- (his materials as they look in his preview: Layout keeps them for the art loader too)
 local C = Bake.COLORS
 local m = Layout.m
 
