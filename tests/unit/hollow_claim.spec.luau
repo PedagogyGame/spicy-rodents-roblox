@@ -30,46 +30,61 @@ return function(t)
 
 	t.test("the rules: carry cap, deposit to capacity, the claim at 70 %, theft refused, lapse by absence", function()
 		local max = Tunables.get("forage.carryMax")
+		local M = 0.1 -- forage.keepMargin
 		t.eq(max, 9)
+		t.eq(Tunables.get("forage.keepMargin"), M)
 		local held, took = HollowClaim.carry(7, 5, max)
 		t.eq(held, 9)
 		t.eq(took, 2)
 		local c = HollowClaim.new()
-		t.eq(HollowClaim.deposit(c, 1, 9, 0, 30, OWN), 9)
+		t.eq(HollowClaim.deposit(c, 1, 9, 0, 30, OWN, M), 9)
 		t.eq(c.owner, nil, "30 % is no claim")
-		t.eq(HollowClaim.deposit(c, 2, 9, 0.1, 30, OWN), 9)
+		t.eq(HollowClaim.deposit(c, 2, 9, 0.1, 30, OWN, M), 9)
 		t.eq(c.owner, nil, "60 %")
-		t.eq(HollowClaim.deposit(c, 2, 9, 0.2, 30, OWN), 9)
+		t.eq(HollowClaim.deposit(c, 2, 9, 0.2, 30, OWN, M), 9)
 		t.eq(c.owner, 2, "the squirrel that lifts it to 70 % owns it")
-		t.eq(HollowClaim.deposit(c, 1, 9, 0.3, 30, OWN), 3, "full at capacity: the rest stays carried")
-		t.eq(c.owner, 2, "filling it does not take it over")
+		t.eq(HollowClaim.deposit(c, 1, 9, 0.3, 30, OWN, M), 0, "nobody brings nuts into another's claimed tree")
+		t.eq(HollowClaim.deposit(c, 2, 9, 0.3, 30, OWN, M), 3, "full at capacity: the rest stays carried")
+		t.eq(c.owner, 2)
 		t.eq(HollowClaim.withdraw(c, 1, 5), 0, "nobody takes from another's claimed tree")
 		t.eq(HollowClaim.withdraw(c, 2, 2), 2, "the owner may")
 		-- visits keep it; three days away lose it
-		HollowClaim.update(c, 0.3, 30, OWN, 3, 0)
+		HollowClaim.update(c, 0.3, 30, OWN, 3, 0, M)
 		for day = 1, 9 do
 			HollowClaim.visit(c, 2, day)
-			t.eq(HollowClaim.update(c, day, 30, OWN, 3, 0), false, `day {day}`)
+			t.eq(HollowClaim.update(c, day, 30, OWN, 3, 0, M), false, `day {day}`)
 		end
 		t.eq(c.owner, 2)
-		t.eq(HollowClaim.update(c, 12.5, 30, OWN, 3, 0), true, "3.5 days away")
+		t.eq(HollowClaim.update(c, 12.5, 30, OWN, 3, 0, M), true, "3.5 days away")
 		t.eq(c.owner, nil)
-		t.eq(HollowClaim.withdraw(c, 1, 5), 5, "an unclaimed tree can be raided")
-		-- decay: the meter falls by decayPerDay of capacity each day and the claim goes under 70 %
+		-- a lapsed tree's store is not taken with one nut: the newcomer brings margin x capacity itself
+		t.truthy(HollowClaim.meter(c, 30) >= OWN)
+		t.eq(HollowClaim.withdraw(c, 1, 2), 2, "an unclaimed tree can be raided")
+		t.eq(HollowClaim.deposit(c, 3, 1, 13, 30, OWN, M), 1)
+		t.eq(c.owner, nil, "one nut takes nothing")
+		t.eq(HollowClaim.deposit(c, 3, 1, 13, 30, OWN, M), 1)
+		t.eq(c.owner, nil, "two")
+		t.eq(HollowClaim.deposit(c, 3, 1, 13, 30, OWN, M), 1)
+		t.eq(c.owner, 3, "three (10 % of 30) of its own: it owns it")
+		-- decay: the meter falls by decayPerDay of capacity each day; the owner keeps the tree down to 70 % less the
+		-- margin (a claim just made does not lapse with the first day's decay), and loses it under that
 		local d = HollowClaim.new()
-		HollowClaim.deposit(d, 4, 30, 0, 30, OWN)
-		t.eq(d.owner, 4)
-		HollowClaim.update(d, 0, 30, OWN, 3, 0.1)
-		HollowClaim.visit(d, 4, 2)
-		t.eq(HollowClaim.update(d, 2, 30, OWN, 3, 0.1), false)
-		t.near(HollowClaim.meter(d, 30), 0.8, 1e-9)
-		HollowClaim.visit(d, 4, 3.5)
-		t.eq(HollowClaim.update(d, 3.5, 30, OWN, 3, 0.1), true, "65 %: lapsed")
-		t.near(HollowClaim.meter(d, 30), 0.65, 1e-9)
+		HollowClaim.deposit(d, 4, 23, 0, 30, OWN, M)
+		t.eq(d.owner, 4, "claimed at 77 %")
+		HollowClaim.update(d, 0, 30, OWN, 3, 0.03, M)
+		for day = 1, 5 do
+			HollowClaim.visit(d, 4, day)
+			t.eq(HollowClaim.update(d, day, 30, OWN, 3, 0.03, M), false, `visited, day {day}`)
+		end
+		t.near(HollowClaim.meter(d, 30), 0.7667 - 0.15, 1e-3)
+		HollowClaim.visit(d, 4, 6)
+		t.eq(HollowClaim.update(d, 6, 30, OWN, 3, 0.03, M), true, "58.7 %: under 70 less 10: lapsed")
 	end)
 
 	local rail: any = nil
-	local function rig(): (TownAI.World, HollowService.Service, { [string]: { [string]: any } })
+	local function rig(
+		keyOf: ((id: number) -> HollowClaim.Who)?
+	): (TownAI.World, HollowService.Service, { [string]: { [string]: any } })
 		local world = TownAI.build({
 			data = data,
 			seed = 1,
@@ -91,8 +106,9 @@ return function(t)
 			show = function(id: string, attrs: { [string]: any })
 				shown[id] = attrs
 			end,
-			nameOf = function(id: number): string?
-				return if id == 1 then "Pip" else nil
+			keyOf = keyOf,
+			nameOf = function(key: HollowClaim.Who): string?
+				return if key == 1 then "Pip" else nil
 			end,
 		})
 		return world, svc, shown
@@ -142,7 +158,7 @@ return function(t)
 		t.eq(svc:owner("H3"), a.id)
 		t.truthy(svc:meter("H3") >= OWN)
 		t.eq(shown.H3.Claimed, true)
-		t.eq(shown.H3.Owner, a.id)
+		t.eq(shown.H3.Owner, tostring(a.id))
 		-- away for more than three game days: the claim lapses and the tree says so
 		hold(world, a, h.x + 30, h.y + 1, h.z)
 		TownAI.stepFrame(world, DT)
@@ -171,6 +187,60 @@ return function(t)
 		t.eq(svc:carried(rodent.id), 9, "the rodent stores nothing")
 		svc:stop()
 	end)
+
+	t.test(
+		"claims: the player's, not the body's; nuts drop when the body changes hands; none into another's tree",
+		function()
+			-- who holds each body: a player's key while they drive it, the computer's otherwise
+			local holder: { [number]: string } = {}
+			local world, svc = rig(function(id: number): HollowClaim.Who
+				return holder[id] or `body {id}`
+			end)
+			local sq = squirrels(world)
+			local a, b = sq[1], sq[2]
+			local h = layout.hollow("H3") :: HollowLayout.Hollow
+			local c = chamberOf("H3")
+			holder[a.id] = "player 7"
+			local day = 20
+			while svc:owner("H3") == nil and day < 22 do
+				hold(world, a, h.x + 30, h.y + 1, h.z)
+				TownAI.stepFrame(world, DT)
+				svc:carry(a.id, 9)
+				hold(world, a, c.x, c.y + 0.8, c.z)
+				TownAI.stepFrame(world, DT)
+				svc:step(day)
+				day += 0.05
+			end
+			t.eq(svc:owner("H3"), "player 7", "the player owns it")
+			-- another squirrel inside the claimed tree keeps what it carries
+			hold(world, b, c.x, c.y + 0.8, c.z)
+			TownAI.stepFrame(world, DT)
+			svc:step(day)
+			local before = svc:meter("H3")
+			t.eq(svc:carry(b.id, 9), 9)
+			svc:step(day)
+			t.eq(svc:carried(b.id), 9, "nothing brought into another's claimed tree")
+			t.eq(svc:meter("H3"), before)
+			-- the player lets the body go with nuts in its cheeks: the claim stays theirs, the nuts drop
+			hold(world, a, h.x + 30, h.y + 1, h.z)
+			TownAI.stepFrame(world, DT)
+			t.eq(svc:carry(a.id, 9), 9)
+			holder[a.id] = nil
+			svc:step(day + 0.01)
+			t.eq(svc:carried(a.id), 0, "changed hands: the nuts are gone")
+			t.eq(svc:owner("H3"), "player 7", "the claim is still the player's")
+			-- the computer's body inside the player's tree visits nothing for them; three days on the claim lapses
+			hold(world, a, c.x, c.y + 0.8, c.z)
+			TownAI.stepFrame(world, DT)
+			svc:step(day + 3.5)
+			t.eq(svc:owner("H3"), nil, "the player stayed away: lapsed")
+			-- a knock-out drops what a body carries
+			svc:carry(b.id, 9)
+			svc:drop(b.id)
+			t.eq(svc:carried(b.id), 0)
+			svc:stop()
+		end
+	)
 
 	t.test("cover: inside nobody spots it, at the hole they do; let go inside, back at the hole; rest", function()
 		local h = layout.hollow("H3") :: HollowLayout.Hollow

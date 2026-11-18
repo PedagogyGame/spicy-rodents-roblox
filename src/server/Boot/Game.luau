@@ -610,10 +610,19 @@ function Game.start(opts: Opts?): any
 	local okH, errH = pcall(function()
 		hollows = HollowService.start({
 			world = world,
-			nameOf = function(id: number): string?
+			-- a claim is the player's (by UserId), not the body's; the computer's bodies claim as themselves
+			keyOf = function(id: number): string
 				local actor = rt.byTownId[id]
 				local holder = if actor then possession:controllerOf(actor) else nil
-				return if typeof(holder) == "Instance" and holder:IsA("Player") then holder.DisplayName else nil
+				if typeof(holder) == "Instance" and holder:IsA("Player") then
+					return `player {holder.UserId}`
+				end
+				return `body {id}`
+			end,
+			nameOf = function(key: any): string?
+				local userId = tonumber(string.match(tostring(key), "^player (%-?%d+)$"))
+				local player = if userId then Players:GetPlayerByUserId(userId) else nil
+				return if player then player.DisplayName else nil
 			end,
 		})
 	end)
@@ -882,6 +891,9 @@ function Game.start(opts: Opts?): any
 			persist(driver)
 		end
 		local townId = townIdOf[actor.id]
+		if hollows and townId then
+			hollows:drop(townId) -- (the nuts it carried are lost)
+		end
 		local sp = spawn[townId]
 		local a = world.actorsById[townId]
 		if sp and a and actor.mode == "ai" then
