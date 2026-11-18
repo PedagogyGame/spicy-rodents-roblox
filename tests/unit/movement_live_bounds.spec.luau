@@ -298,6 +298,67 @@ return function(t)
 		end)
 	end
 
+	-- 3. THE SERVER'S BODY AGAINST THE PACKETS ---------------------------------------------------------------------------
+	-- (the server's root is what bites, hollows, the drains and the arena read: it may not sit far from the packets)
+	t.test("cheat: standing still, the root flicked 35 studs out and back every second: snapped every time", function()
+		local s0 = town.openStart()
+		local rig = LiveRig.new({
+			world = town.noWalls,
+			vworld = town.vworld,
+			link = { latency = 0.1, jitter = 0.05, loss = 0 },
+			seed = 11,
+			rootCheat = function(p: { x: number, y: number, z: number }, now: number, _s: State)
+				if now > 3 and (now % 1) < 0.1 then
+					p.x += 35
+				end
+			end,
+		})
+		rig:possess(s0, still)
+		-- every flick the server's root showed (out of a hold, where the server has the body) must be snapped
+		local shown, out = 0, false
+		for k = 1, 30 * 60 do
+			rig:at(k / 60, function()
+				local off = math.abs(rig.server.root.x - s0.x) > 20
+				if off and not out then
+					shown += 1
+				end
+				out = off
+			end)
+		end
+		rig:run(30)
+		local r = rig:result()
+		print(
+			`      {LiveRig.describe("root flicked 35 st", r)}; flicks the server's root showed {shown}, holds {r.holds}`
+		)
+		t.truthy(shown >= 5, "flicks shown")
+		t.truthy((r.reasons.drift or 0) >= shown, `every flick snapped ({r.reasons.drift or 0} of {shown})`)
+	end)
+
+	t.test(
+		"cheat: the root kept 30 studs off honest packets driving through the town: snapped within a second",
+		function()
+			local Rng = require("@tests/cheat/Rng")
+			local rng = Rng.new(12)
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = { latency = 0.1, jitter = 0.05, loss = 0 },
+				seed = 12,
+				rootCheat = function(p: { x: number, y: number, z: number }, now: number, _s: State)
+					if now > 3 then
+						p.x += 30
+					end
+				end,
+			})
+			rig:possess(town.startAt(rng), town.driven(rng))
+			rig:run(30)
+			local r = rig:result()
+			print(`      {LiveRig.describe("root 30 st off", r)}`)
+			t.truthy((r.reasons.drift or 0) >= 5, `snapped for drift ({r.reasons.drift or 0})`)
+			t.truthy(r.firstSnap ~= nil and (r.firstSnap :: number) < 4.2, `first snap at {r.firstSnap}`)
+		end
+	)
+
 	-- 5. JOINING ON A BIG TRUNK WHILE THE TOWN STREAMS IN ----------------------------------------------------------------
 	t.test(
 		"honest: a body taken high on any big trunk, 8 s of streaming, then on the bark: 0 snaps on every trunk",

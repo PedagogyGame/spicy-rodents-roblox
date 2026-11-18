@@ -17,24 +17,29 @@
 -- server put the body (the gate: C.GATE_SLACK and the fastest the squirrel goes in at most C.GATE_MOVE: the client's
 -- body is put there when it takes the move, so a first packet held back buys no reach) and the move to it is judged as
 -- a whole (MoveValidator.hop: no climb above a leap, no hanging in the air, no wall), or it is snapped to the gate.
+-- A squirrel's new body is the server's (engine.pin: anchored, its own) from the hand-off until its driver's first
+-- packet passes the gate: a client that never sends cannot move it, and nothing is judged while its town streams in.
 -- What packets cannot show, watch() does: the server's own view of the root (a client owns its body's physics), ten
 -- to fifteen times a second:
---   * drift: the root may not stray from the last accepted packet (before an epoch's first packet: the gate) by more
---     than C.DRIFT_BASE and the fastest the squirrel goes in the time since (plus C.DRIFT_LAG), at any age; for a
---     while after a move (C.IGNORED, and C.SETTLE after the first packet) the place before the move counts too (the
---     root's own updates sent before the client took the move may still be on their way);
---   * walls: between two samples of the root once an epoch has settled, off the rails, the live wall rays (a client
---     that stops sending still cannot walk through a house);
+--   * drift: the root against the last accepted packet by the packets' own pace (their speed over the packet's age,
+--     the spread of their arrivals or half the round trip, and a little: driftBounds); a leap's start not yet in a
+--     packet only for a moment (C.DRIFT_PERSIST); a root standing still judged against where the packets were when it
+--     last moved (its updates held up); before an epoch's first packet, against the gate; for a while after a move
+--     (ignoredFor: a round trip, twice, and a second) the place before it, within what the pace covers in a round trip;
+--     never more than C.DRIFT_BASE and the fastest the squirrel goes since (C.DRIFT_LAG);
+--   * walls: between two samples of the root once an epoch has settled, off the rails (the root itself near none), the
+--     live wall rays (a client that stops sending still cannot walk through a house);
 --   * the air: while no packet is fresh, a root off the rails higher above any floor than a leap may only fall
 --     (C.HIGH_LAG of a held update, then gravity): no hanging, no flying while silent;
 --   * silence: a body that moves C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped
---     sending, or ignores its correction) is snapped, and so is one still sending under an old epoch C.IGNORED after
---     the move it was told of.
+--     sending, or ignores its correction) is snapped, and one still sending under an old epoch ignoredFor after the
+--     move it was told of is told again under the same epoch (a packet under it may still be on its way).
 -- C.HOLD_AFTER snaps inside C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it
 -- still) for C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
 -- For C.STREAM_GRACE after a hand-off a wall alone does not snap (logged): the town around a new body may still be
 -- streaming in on its client, and a house it has not got yet is no wall to its motor. A packet with a number that is
--- not finite (SquirrelWire.sane) is snapped and never judged.
+-- not finite (SquirrelWire.sane) is snapped and never judged. No packet and no root sample costs more than a bounded
+-- time: the validator's rail scans and long lines are bounded (MoveValidator.C.RAIL_REACH_MAX, ValidatorWorld.C).
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
@@ -48,6 +53,9 @@ local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require(".
 local PoseHistory = require("../Paintball/PoseHistory")
 local MoveValidator = require("./MoveValidator")
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
+local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
+
 local ValidatorWorld = require("./ValidatorWorld")
 
 -- What the server says to a squirrel's driver ("Correction"): the new epoch, where the body is (feet), and for a
@@ -126,6 +134,12 @@ type Squirrel = {
 	rootAt: number,
 	highSince: number?, -- the root has been high in the air with nothing near since then, at highY
 	highY: number,
+	paces: { number }, -- the recent packets' speeds (studs/s: their velocity, or the step from the one before)
+	-- the recent packets' arrival offsets (server time - client clock) and the link's round trip then
+	offsets: { { at: number, off: number, ping: number } },
+	rootMovedAt: number, -- server time the root last moved (its updates come while it moves)
+	overSince: number?, -- the root has been beyond the packets' own pace since then
+	toldAt: number?, -- server time the driver was last told again of the move it ignores
 	pinned: boolean, -- a newly held body the server keeps (engine.pin) until its driver's first packet passes the gate
 	pinnedAt: number, -- server time it was first watched pinned (0: not yet)
 }
@@ -166,7 +180,17 @@ MovementService.C = table.freeze({
 	HOLD_SECONDS = 2,
 	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
-	RAIL_NEAR = 3, -- studs: a root this near a rail (feet on the bark) is not judged for walls or height
+	-- studs: a root this near a rail's samples (the feet drawn on a big trunk's bark are up to 5.95 off them) is not judged
+	-- for walls or height
+	RAIL_NEAR = 6.5,
+	DRIFT_FRESH_LAG = 0.1, -- seconds: what the root may lead the packets by beyond their arrivals' spread (the send rates)
+	DRIFT_DV = 55, -- studs/s: a leap's start from standing (the root may show it a moment before a packet does)
+	DRIFT_ACCEL = 80, -- studs/s^2: a fall's gain in speed (gravity) and a sprint's
+	DRIFT_PERSIST = 0.6, -- seconds the root may stay beyond the packets' own pace (a leap's start) before it is drift
+	SPREAD_WINDOW = 2, -- seconds of packet arrivals whose spread (latest less earliest arrival offset) is the jitter ...
+	SPREAD_MAX = 0.5, -- ... never counted above this (nor half the link's round trip)
+	ROOT_STALE_MAX = 1, -- seconds a root standing still may be judged against older packets (its updates held up)
+	PACE_PAIRS = 4, -- the pace is the fastest of this many recent packets (their own velocity, or their step)
 	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
 	PIN_LOG = 20, -- seconds a new body may stay pinned with no packet past the gate before it is logged (it stays)
 })
@@ -269,6 +293,10 @@ function MovementService.new(deps: Deps): Movement
 				highY = 0,
 				pinned = false,
 				pinnedAt = 0,
+				paces = {},
+				offsets = {},
+				overSince = nil,
+				rootMovedAt = 0,
 			}
 			self.squirrels[id] = sq
 		end
@@ -280,18 +308,36 @@ function MovementService.new(deps: Deps): Movement
 		return if v then v:fastest(id) else 60
 	end
 
+	local tell: (self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number) -> ()
+
+	-- ignoredFor(self, id): how long after telling its driver of a move the server waits for packets under the new
+	-- epoch before it takes the old one's for a client ignoring it (a correction and the first packet after it cross
+	-- the link twice: the engine's round trip, twice, and a second)
+	local function ignoredFor(self: Movement, id: any): number
+		local v = self.deps.validator
+		local ping = if v then v.pingOf(id) else nil
+		local p = if type(ping) == "number" and ping >= 0 and ping < 10 then ping else 0
+		return math.max(C.IGNORED, 2 * p + 1)
+	end
+
 	-- a new epoch from `target`: the validator forgets, the first packet of the epoch is gated there; the place before
 	-- the move (the root last seen, else the last packet) still counts for the drift a while
-	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate)
+	-- (`snapped`: the root was judged, so the place before is the last packet's, or the gate's, never the root's)
+	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate, snapped: boolean?)
 		local now = target.at
-		if sq.rootX then
+		local gate = sq.gate
+		if sq.rootX and not snapped then
 			sq.prior = { x = sq.rootX :: number, y = sq.rootY, z = sq.rootZ, at = now }
 		elseif sq.lastAt then
 			sq.prior = { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = now }
+		elseif gate and snapped then
+			sq.prior = { x = gate.x, y = gate.y, z = gate.z, at = now }
 		end
-		sq.priorUntil = now + C.IGNORED
+		sq.priorUntil = now + ignoredFor(self, id)
+		sq.toldAt = nil
 		sq.rootX = nil
 		sq.highSince = nil
+		sq.overSince = nil
 		sq.epoch = nextEpoch(self)
 		sq.gate = target
 		sq.lastAt = nil
@@ -322,7 +368,14 @@ function MovementService.new(deps: Deps): Movement
 		end
 		local t = to :: Gate
 		local gate: Gate = { x = t.x, y = t.y, z = t.z, at = now, snapshot = t.snapshot }
-		rebase(self, id, sq, gate)
+		rebase(self, id, sq, gate, true)
+		tell(self, id, sq, gate, why, now)
+	end
+
+	-- tell(self, id, sq, gate, why, now): the snap to `gate` under the current epoch: counted, logged, the body moved
+	-- there and its driver told; a run of them holds it
+	function tell(self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number)
+		local gate = t
 		local st = self._stats
 		st.snaps += 1
 		st.corrections += 1
@@ -385,12 +438,79 @@ function MovementService.new(deps: Deps): Movement
 		end
 	end
 
+	-- pace(self, id, sq, snapshot, now): an accepted packet's speed, arrival offset and the link's round trip, for the
+	-- drift's bounds
+	local function pace(self: Movement, id: any, sq: Squirrel, shot: { [string]: number | boolean }, now: number)
+		local vx, vy, vz = shot.vx :: number, shot.vy :: number, shot.vz :: number
+		local v = math.sqrt(vx * vx + vy * vy + vz * vz)
+		local clock = shot.clock :: number
+		local prev = sq.offsets[#sq.offsets]
+		if sq.lastAt and prev then
+			local dt = clock - (prev.at - prev.off)
+			if dt > 1e-3 then
+				local sx, sy, sz = shot.x :: number, shot.y :: number, shot.z :: number
+				v = math.max(v, dist(sx, sy, sz, sq.lastX, sq.lastY, sq.lastZ) / dt)
+			end
+		end
+		table.insert(sq.paces, v)
+		while #sq.paces > C.PACE_PAIRS do
+			table.remove(sq.paces, 1)
+		end
+		local validator = self.deps.validator
+		local ping = if validator then validator.pingOf(id) else nil
+		local p = if type(ping) == "number" and ping >= 0 and ping < 10 then ping else 0
+		table.insert(sq.offsets, { at = now, off = now - clock, ping = p })
+		while #sq.offsets > 1 and now - sq.offsets[1].at > C.SPREAD_WINDOW do
+			table.remove(sq.offsets, 1)
+		end
+	end
+
+	-- paceOf(sq) -> v, lead, ping: the recent packets' pace (studs/s), how far the root may lead or trail them in time
+	-- (the spread of their arrivals, or half the link's round trip: a latency that drops lets the root's updates overtake
+	-- packets in flight; C.SPREAD_MAX at most) and the link's round trip
+	local function paceOf(sq: Squirrel): (number, number, number)
+		local v = 0
+		for _, p in sq.paces do
+			v = math.max(v, p)
+		end
+		local lo, hi, ping = math.huge, -math.huge, 0
+		for _, o in sq.offsets do
+			lo, hi, ping = math.min(lo, o.off), math.max(hi, o.off), math.max(ping, o.ping)
+		end
+		return v, math.min(math.max(if hi >= lo then hi - lo else 0, ping / 2), C.SPREAD_MAX), ping
+	end
+
+	-- reachIn(v, window, fast): how far a body at pace v goes in `window` seconds, gaining speed as a fall or a sprint's
+	-- start does (C.DRIFT_ACCEL), never faster than the fastest
+	local function reachIn(v: number, window: number, fast: number): number
+		return math.min(v * window + 0.5 * C.DRIFT_ACCEL * window * window, fast * window)
+	end
+
+	-- driftBounds(sq, now, fast) -> tight, loose: how far the root may be from the last packet by the packets' own pace
+	-- (tight), and for a moment, a leap's start not yet in a packet (loose: C.DRIFT_DV more); never more than the fastest
+	-- allows. The time the root may be apart from the packets: the last packet's age, the lead (paceOf) and
+	-- C.DRIFT_FRESH_LAG
+	local function driftBounds(sq: Squirrel, now: number, fast: number): (number, number)
+		local v, lead = paceOf(sq)
+		local age = now - (sq.lastAt :: number)
+		local window = age + lead + C.DRIFT_FRESH_LAG
+		local most = C.DRIFT_BASE + fast * (age + C.DRIFT_LAG)
+		local tight = C.DRIFT_BASE + reachIn(v, window, fast)
+		local loose = C.DRIFT_BASE + reachIn(v + C.DRIFT_DV, window, fast)
+		return math.min(tight, most), math.min(loose, most)
+	end
+
 	-- the first packet passed the gate: the body is its driver's
-	local function unpin(self: Movement, id: any, sq: Squirrel)
+	local function unpin(self: Movement, id: any, sq: Squirrel, at: Gate?, now: number)
 		if not sq.pinned then
 			return
 		end
 		sq.pinned = false
+		if at then
+			-- (the root stays where it was pinned until the driver's own updates come, a round trip on)
+			sq.prior = { x = at.x, y = at.y, z = at.z, at = now }
+			sq.priorUntil = math.max(sq.priorUntil, now + ignoredFor(self, id))
+		end
 		local engine = self.deps.engine
 		if engine and engine.pin then
 			engine.pin(id, false)
@@ -435,11 +555,10 @@ function MovementService.new(deps: Deps): Movement
 			if now < sq.heldUntil then
 				return
 			end
-			-- given back: where it was held, under a new epoch
+			-- given back: where it was held, under a new epoch (and the root judged from there at once)
 			local h = sq.held :: Gate
 			sq.heldUntil, sq.held = nil, nil
 			self:teleported(actorId, h.x, h.y, h.z, "held", now)
-			return
 		end
 		local gate = sq.gate
 		if gate and gate.at == 0 then
@@ -455,23 +574,56 @@ function MovementService.new(deps: Deps): Movement
 			return
 		end
 		local fast = fastest(self, actorId)
-		local function within(px: number, py: number, pz: number, at: number): boolean
-			return dist(x, y, z, px, py, pz) <= C.DRIFT_BASE + fast * (now - at + C.DRIFT_LAG)
-		end
-		-- drift: from the last packet, else the gate (not before a hand-off's first packet: the body is the server's
-		-- until its driver starts), or the place before the move while its updates may still come
+		-- drift: the root against the last packet of this epoch (by the packets' own pace: driftBounds); before the
+		-- epoch's first packet, against the gate (where the server put the body: from there at the pace it had, and a
+		-- leap's start, since the move); for a while after a move, the place before it (the root's own updates sent
+		-- before the client took the move may still come: the last packet's place, or the root's, within what the pace
+		-- covers in a round trip). Not before a hand-off's first packet: the body is the server's until its driver starts
 		local ok = true
 		local refX, refY, refZ, refAt
+		local v, lead, ping = paceOf(sq)
+		local moved = sq.rootX == nil or dist(x, y, z, sq.rootX :: number, sq.rootY, sq.rootZ) > 0.05
 		if sq.lastAt then
 			refX, refY, refZ, refAt = sq.lastX, sq.lastY, sq.lastZ, sq.lastAt :: number
-			ok = within(refX, refY, refZ, refAt)
+			local tight, loose = driftBounds(sq, now, fast)
+			local d = dist(x, y, z, refX, refY, refZ)
+			-- a root that has not moved since its last update (held up behind the packets, which came on): judged
+			-- against where the packets were when it last moved, at most C.ROOT_STALE_MAX ago
+			local h = self.histories[actorId]
+			local movedAt = if moved then now else sq.rootMovedAt
+			if d > tight and h and h.count > 0 and now - movedAt > 0 and now - movedAt <= C.ROOT_STALE_MAX then
+				local ox, oy, oz = PoseHistory.sample(h, movedAt)
+				if dist(x, y, z, ox, oy, oz) <= C.DRIFT_BASE + reachIn(v, lead + C.DRIFT_FRESH_LAG, fast) then
+					d = 0
+				end
+			end
+			if d > loose then
+				-- (the client's own river recovery: the root on the quay a moment before the packet saying so)
+				ok = Recovery.riverLanding(
+					refX,
+					refZ,
+					x,
+					y,
+					z,
+					Motion.C.airGrab + fast * (now - refAt + C.DRIFT_LAG) + 1,
+					fast * math.min(now - refAt + C.DRIFT_LAG, SquirrelMotor.envelopeParams.maxDt) + 1
+				)
+			elseif d > tight then
+				-- (a leap's start the packets do not show yet: for a moment only)
+				sq.overSince = sq.overSince or now
+				ok = now - (sq.overSince :: number) <= C.DRIFT_PERSIST
+			else
+				sq.overSince = nil
+			end
 		elseif gate and sq.possessedAt ~= 0 then
 			refX, refY, refZ, refAt = gate.x, gate.y, gate.z, gate.at
-			ok = within(refX, refY, refZ, refAt)
+			local since = math.max(0, now - gate.at)
+			ok = dist(x, y, z, refX, refY, refZ) <= C.DRIFT_BASE + reachIn(v + C.DRIFT_DV, since, fast)
 		end
 		local prior = sq.prior
-		if not ok and prior and now <= sq.priorUntil and within(prior.x, prior.y, prior.z, prior.at) then
-			ok = true
+		if not ok and prior and now <= sq.priorUntil then
+			local window = ping + lead + C.DRIFT_FRESH_LAG
+			ok = dist(x, y, z, prior.x, prior.y, prior.z) <= C.DRIFT_BASE + reachIn(v, window, fast)
 		end
 		local why: string? = if ok then nil else "drift"
 		if why == nil and refX and now - refAt > C.SILENT and dist(x, y, z, refX, refY, refZ) > C.SILENT_MOVE then
@@ -479,6 +631,9 @@ function MovementService.new(deps: Deps): Movement
 		end
 		if why == nil then
 			why = self:_rootPath(actorId, sq, x, y, z, now)
+		end
+		if moved then
+			sq.rootMovedAt = now
 		end
 		sq.rootX, sq.rootY, sq.rootZ, sq.rootAt = x, y, z, now
 		if why then
@@ -504,8 +659,8 @@ function MovementService.new(deps: Deps): Movement
 		end
 		local reach = C.RAIL_NEAR
 		local index = world.index
-		local last = (validator :: any):last(actorId)
-		local onRail = (last and last.routeId ~= nil) or (index and index:nearest(x, y, z, reach) ~= nil)
+		-- (the root itself near a rail: a packet on a rail with the root far from any is still judged)
+		local onRail = index and index:nearest(x, y, z, reach) ~= nil
 		local apex = MoveValidator.apexAllowance()
 		-- walls between consecutive samples, once the epoch has settled and the town has streamed in
 		local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
@@ -581,10 +736,12 @@ function MovementService.new(deps: Deps): Movement
 					and sq.heldUntil == nil
 					and gate
 					and gate.at > 0
-					and now - gate.at > C.IGNORED
+					and now - (sq.toldAt or gate.at) > ignoredFor(self, actorId)
 				then
-					-- long after the move it was told of: the client ignores it (told again; a run of these holds it)
-					snap(self, actorId, "ignored", now, gate)
+					-- long after the move it was told of: the client ignores it. Told again under the same epoch (a packet
+					-- under it may be on its way: a new one would make that stale too); a run of these holds it
+					sq.toldAt = now
+					tell(self, actorId, sq, gate, "ignored", now)
 				end
 				return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
 			end
@@ -640,10 +797,11 @@ function MovementService.new(deps: Deps): Movement
 				end
 				sq.gate = nil
 			end
-			unpin(self, actorId, sq)
+			unpin(self, actorId, sq, gate, now)
 			local v = validator:accept(actorId, packet, now)
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
+				pace(self, actorId, sq, snapshot, now)
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
 				if sq.since == nil then
 					sq.since = now

@@ -304,10 +304,15 @@ function LiveRig.new(opts: Options): Rig
 					server.unpinnedAt = rig.t
 				end
 			end,
-			hold = function(_id: any, x: number, y: number, z: number, _seconds: number)
+			hold = function(_id: any, x: number, y: number, z: number, seconds: number)
+				-- (the server takes the body's physics: the client's root updates are not taken until it gives it back)
 				holds += 1
 				server.root = { x = x, y = y, z = z }
 				server.rootSent = rig.t
+				server.held = true
+				at(rig.t + seconds, function()
+					server.held = false
+				end)
 			end,
 		},
 	})
