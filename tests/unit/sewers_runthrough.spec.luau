@@ -5,24 +5,25 @@
 -- real SquirrelMotor driven with scripted keys, and the envelope the server's MoveValidator applies to every frame.
 --   in only at a mouth, with E (facing in, standing on it); not from beside it, not from the street over a pipe
 --   out at every street mouth on its feet, still running
---   each pipe against its surface way, measured on the motor with W held, walking and sprinting: P1 (against the
---   pavements round the crossing) and P2 (against the bridge) win at the street pace the motor runs today; P3 does
---   NOT (its two shafts make it longer than the straight walk over the top), pinned as the known gap N2 (the motor
---   does not apply route.speedMult, Tunables sewer.speedMult 1.25): flip it when the motor lane lands N2
+--   each pipe against its surface way, measured on the motor with W held, walking and sprinting: every pipe wins at
+--   the pipe pace (route.speedMult, Tunables sewer.speedMult 1.25, applied by Motion.routeSpeed in the motor and in
+--   the server's caps); P3 needs it (its two shafts make it longer than the straight walk over the top)
 --   nothing through walls: the body's section along every route meets no part of the stand-in; inside, Space, Q, a
 --   click and E do nothing; the server refuses a body put into a pipe from the street or out of one through the road
 --   P1's crossing: W runs straight on, A or D turns into a side arm
 -- And two known gaps, pinned so the motor lane sees them and a green run says nothing it should not:
 --   N3: walking onto a grate heading in also goes down, against the owner's default "E only, never by walking onto
 --   a grate" (Enclosure rule 1 has no E-only mouth: the survey's hatch mouth). A defect, not a default.
---   N2: P3 is slower than walking over the top at the street pace (above).
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
+local Motion = require("@shared/Routes/Motion")
 local RailWorld = require("@shared/Movement/RailWorld")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SewerLayout = require("@shared/World/SewerLayout")
 local Tunables = require("@shared/Config/Tunables")
 local BakedWorld = require("@tests/lib/BakedWorld")
+local MoveValidator = require("@server/Movement/MoveValidator")
+local Rng = require("@tests/cheat/Rng")
 local SewerStandIn = require("@tests/lib/SewerStandIn")
 
 type State = SquirrelMotor.State
@@ -237,7 +238,7 @@ return function(t)
 		end
 	)
 
-	t.test("each pipe against its way over the top, walking and sprinting (P3: the known gap N2)", function()
+	t.test("each pipe beats its way over the top, walking and sprinting, at the pipe pace on the motor", function()
 		local pace = Tunables.raw("sewer.speedMult")
 		for _, sprint in { false, true } do
 			for _, run in { { "P1.NW", "P1.SE" }, { "P1.NE", "P1.SW" }, { "P2.W", "P2.E" }, { "P3.S", "P3.N" } } do
@@ -245,41 +246,123 @@ return function(t)
 					return BakedWorld.keys(towards(mouth(run[1]), mouth(run[2])), { fw = 1, sprint = sprint })
 				end)
 				local over = walkOver(run[1], run[2], sprint)
-				-- the pace the motor ran the rails at, from the route lengths and the time on them
-				local a = mouth(run[1])
+				-- the pace the motor ran the rails at, from the route lengths and the time on them, against the street
+				-- rail pace (Motion.railSpeed: what every route without a pace of its own runs at)
 				local length = 0
 				for id in r.trace.routes do
 					length += (reg:get(id) :: any).length
 				end
 				local ran = length / r.railSeconds
-				-- what N2 would make of it: the rail time at the pipe pace (a projection, for the motor lane; asserted
-				-- only as that)
-				local atPace = r.seconds - r.railSeconds + r.railSeconds / pace
 				print(
 					string.format(
-						"      %s %s -> %s: pipe %.2f s on the motor (rails at %.1f st/s), over the top %.2f s; with N2 x%.2f: %.2f s",
+						"      %s %s -> %s: pipe %.2f s on the motor (rails at %.1f st/s), over the top %.2f s",
 						if sprint then "sprint" else "walk  ",
 						run[1],
 						run[2],
 						r.seconds,
 						ran,
-						over,
-						pace,
-						atPace
+						over
 					)
 				)
 				t.truthy(r.emerged, `{run[1]}: out`)
-				if a.pipe ~= "P3" then
-					t.truthy(r.seconds < over, `{run[1]}: the pipe beats the surface way on the motor`)
-				else
-					-- N2 (known gap): the motor runs P3 at the street pace and P3 does not win; this flips to
-					-- r.seconds < over when the motor applies route.speedMult
-					t.truthy(r.seconds >= over, `{run[1]}: N2 is still open (P3 {r.seconds} s, over the top {over} s)`)
-					t.truthy(atPace < over, `{run[1]}: at the pipe pace it would win`)
+				t.eq(r.trace.violations, 0, `{run[1]}: the server accepts every frame at the pipe pace`)
+				t.truthy(r.seconds < over, `{run[1]}: the pipe beats the surface way ({r.seconds} s against {over} s)`)
+				for id in r.trace.routes do
+					local route = reg:get(id) :: any
+					t.near(
+						SquirrelMotor.routeCap(route, false),
+						SquirrelMotor.railCap(false, false) * pace,
+						1e-9,
+						`route {id}: the server's cap carries the pipe pace`
+					)
+				end
+				if not sprint then
+					-- walking holds the full rail pace the whole way (sprinting runs the meter down in the culvert)
+					local street = Motion.railSpeed(false, false, false, false)
+					t.near(ran / street, pace, 0.03, `{run[1]}: the rails run at {pace} x the street pace`)
 				end
 			end
 		end
 	end)
+
+	-- the server's MoveValidator fed the client's packets through a link (every `every` ticks, 80 ms + up to 150 ms of
+	-- jitter, 2 % lost, delivered in arrival order), as tests/cheat/Harness does for the town; `cheat` runs the motor
+	-- twice per tick inside the pipe with an honest clock (the harness's speed2, sprinting)
+	local function overTheLink(
+		fromId: string,
+		toId: string,
+		every: number,
+		sprint: boolean,
+		cheat: boolean,
+		seed: number
+	): { violations: number, flagged: boolean, packets: number, emerged: boolean }
+		local a, b = mouth(fromId), mouth(toId)
+		local v = MoveValidator.new(w)
+		local rng = Rng.new(seed)
+		local s = onMouth(a)
+		local cam = towards(a, b)
+		local queue: { { seq: number, snap: SquirrelMotor.Snapshot, arrival: number } } = {}
+		local seq, now = 0, 0
+		local out = { violations = 0, flagged = false, packets = 0, emerged = false }
+		local function deliver(upTo: number)
+			while #queue > 0 and queue[1].arrival <= upTo do
+				local p = table.remove(queue, 1) :: any
+				local verdict = v:accept("sq", { seq = p.seq, snapshot = p.snap }, p.arrival)
+				out.violations += #verdict.violations
+				out.flagged = out.flagged or verdict.flagged
+				out.packets += 1
+			end
+		end
+		for f = 1, 60 * 40 do
+			local input = BakedWorld.keys(cam, if f == 1 then { grab = true } else { fw = 1, sprint = sprint })
+			local _, events = SquirrelMotor.step(s, input, 1 / 60, w)
+			if cheat and isSewer(s.routeId) then
+				local clock = s.clock
+				SquirrelMotor.step(s, input, 1 / 60, w)
+				s.clock = clock
+			end
+			for _, e in events do
+				out.emerged = out.emerged or e.kind == "emerge"
+			end
+			now += 1 / 60
+			if f % every == 0 and (f <= every or rng.next() >= 0.02) then
+				seq += 1
+				local arrival = now + 0.08 + rng.next() * 0.15
+				local i = #queue
+				while i >= 1 and queue[i].arrival > arrival do
+					i -= 1
+				end
+				table.insert(queue, i + 1, { seq = seq, snap = SquirrelMotor.serialize(s), arrival = arrival })
+			end
+			deliver(now)
+			if f > 2 and s.routeId == nil and out.emerged then
+				break
+			end
+		end
+		deliver(math.huge)
+		return out
+	end
+
+	t.test(
+		"the server over a lossy link: honest runs at the pipe pace pass; a doubled motor in a pipe is caught",
+		function()
+			local seed = 7
+			for _, run in RUNS do
+				for _, sprint in { false, true } do
+					for _, every in { 2, 6, 18 } do
+						seed += 1
+						local honest = overTheLink(run[1], run[2], every, sprint, false, seed)
+						t.truthy(honest.emerged and honest.packets > 5, `{run[1]}: the run ({honest.packets} packets)`)
+						t.eq(honest.violations, 0, `{run[1]} -> {run[2]} sprint {sprint} every {every}: honest`)
+						t.falsy(honest.flagged)
+					end
+				end
+				-- sprinting (a doubled walk is still under the sprint's cap, in a pipe as in the town)
+				local cheat = overTheLink(run[1], run[2], 2, true, true, seed + 100)
+				t.truthy(cheat.violations > 0 and cheat.flagged, `{run[1]}: speed2 in the pipe is flagged`)
+			end
+		end
+	)
 
 	t.test(
 		"nothing through walls: the body's section along every route meets nothing but the grate it slips through",

@@ -32,7 +32,7 @@
 -- WHAT THE COMPILED TABLE HOLDS (types below)
 --   routes     Registry route records 9301-9304 (P1's four arms), 9311 (P2), 9321 (P3): kind "tunnel", origin
 --              "sewer", flags treeTravel false and autoGrabExcluded true, speedMult = Tunables sewer.speedMult (the
---              pipe pace; the motor does not read speedMult yet: see below), and an `enclosure` record: id = the
+--              pipe pace: Motion.routeSpeed in the motor and the server's caps), and an `enclosure` record: id = the
 --              space, a "ground" mouth at each street end (out = the shaft's rung side, level; reach from the data),
 --              P1's arms joined at the crossing by end links (straight on) and forks (A/D: the two side arms), width
 --              and height of the walkway and shaft, upAt (the back faces away from the rungs in a shaft, up along a run).
@@ -68,9 +68,9 @@
 --     it does not (sewers_runthrough pins both).
 --   * The rungs' side is chosen so the body, its back away from the rungs, stays inside the passage's walls below the
 --     street (P1's shafts are square to the streets, its arms diagonal).
---   * Pace: route.speedMult (the pipe pace, Tunables sewer.speedMult) is carried by every record and read by nothing
---     (SquirrelMotor calls Motion.railSpeed without it, N2). P1 and P2 beat their surface ways at the street pace; P3
---     beats its straight walk only at the pipe pace.
+--   * Pace: route.speedMult (the pipe pace, Tunables sewer.speedMult) is read by the motor and the server's caps
+--     (Motion.routeSpeed, SquirrelMotor.routeCap). P1 and P2 would beat their surface ways at the street pace; P3 beats
+--     its straight walk only at the pipe pace.
 --   * A four-way: two forks onto one route in opposite directions cannot be told apart (A/D selects a route id), so
 --     P1 is four arms meeting at the crossing, not two crossing routes.
 

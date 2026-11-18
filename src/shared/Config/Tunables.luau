@@ -127,7 +127,8 @@ Tunables.tree = {
 	interior = { doorHold = { v = 3, unit = "s" }, hideNoSight = { v = 2, unit = "s" }, searchPerSpot = { v = 1.5, unit = "s" } },
 	recovery = { safeHistory = { v = 3, unit = "s" }, riverToQuay = { v = true, src = "worldgen_districts_art §16" } },
 	-- the storm drains (BRIEF_ADDENDUM D8; Shared/World/SewerLayout). speedMult is compiled into every sewer route's
-	-- speedMult (tools/compile lib/Sewers): change it, recompile. The motor does not read route.speedMult yet.
+	-- speedMult (tools/compile lib/Sewers): change it, recompile. The motor and the server's caps read it
+	-- (Motion.routeSpeed, SquirrelMotor.routeCap).
 	sewer = { speedMult = { v = 1.25, src = "D8 survey default: 1.25 x the street pace inside a pipe, so every pipe beats its surface way" },
 	          stakeoutSecs = { v = 15, unit = "s", src = "D8 survey default: an officer stands over the grate the rodent went down" } },
 	policeCoord = { tier2Pair = { v = true }, cutoffLookahead = { v = 30, unit = "u" }, perimeterPoints = { v = 3 } },

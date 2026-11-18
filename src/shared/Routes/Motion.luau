@@ -198,6 +198,13 @@ function Motion.railSpeed(treeTravel: boolean, sprint: boolean, focus: boolean, 
 	return base
 end
 
+-- routeSpeed(route, sprint, focus, boosted): the rail speed on this route, studs/s: railSpeed times the route's own
+-- pace (route.speedMult: 1 on every v5.4 route, so those run exactly as before; the storm drains' pipes are
+-- Tunables sewer.speedMult). The motor and the server's caps (SquirrelMotor.routeCap) both use it.
+function Motion.routeSpeed(route: Route, sprint: boolean, focus: boolean, boosted: boolean): number
+	return Motion.railSpeed(route.flags.treeTravel, sprint, focus, boosted) * route.speedMult
+end
+
 -- Camera basis in XZ (L5796-5801): forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw).
 function Motion.cameraForwardXZ(cameraYaw: number): (number, number)
 	return -math.sin(cameraYaw), -math.cos(cameraYaw)

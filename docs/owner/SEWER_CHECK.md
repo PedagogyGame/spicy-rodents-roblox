@@ -2,7 +2,7 @@
 
 Your words (addendum D8): "a few underground pipes that the squirrel can run through, like a short cut or two through a system under the city, just basic sewers". There are three. A squirrel or the Spicy Rodent goes down a grate, runs the pipe, and climbs out somewhere else. People, the fox and the deer cannot go down. The police lose the rodent at the grate.
 
-Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. Two of your defaults are not met yet: walking onto a grate also takes you down, and drain 3 is not quicker than going over the top. Both are explained under **Known not done**.
+Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. One of your defaults is not met yet: walking onto a grate also takes you down. It is explained under **Known not done**.
 
 ## Before you build
 The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without the bake the game leaves the ground whole, hides nobody, and F9 shows a warning starting `Workspace.Sewers missing` that ends `do not publish this place`. The routes are still there, so a squirrel pressing E at an unmarked corner would go down into the ground. Every bake is optional in the project files, so that a fresh copy builds before it is baked, which means nothing stops a publish without it. Always bake before you publish.
@@ -34,9 +34,11 @@ Measured with W held, on the real squirrel controls, against the way over the to
 
 | Drain | In the pipe (walk / sprint) | Over the top (walk / sprint) | Quicker? |
 |---|---|---|---|
-| 1, corner to corner | 5.1 s / 3.0 s | 6.3 s / 3.5 s round the pavements | yes, a little. A straight dash across the junction through the traffic (about 3.9 s walking) is quicker still |
-| 2, quay to quay | 24.7 s / 19.0 s | 79.4 s / 62.1 s round by the bridge | yes, by far |
-| 3, lawn to verge | 22.2 s / 17.0 s | 20.9 s / 15.2 s straight across | **no**: the pipe is longer than the straight line because of its two ladder shafts. With the 1.25 times pipe pace it would take 17.8 s / 13.6 s and win |
+| 1, corner to corner | 4.1 s / 2.6 s | 6.3 s / 3.5 s round the pavements | yes. A straight dash across the junction through the traffic (about 3.9 s walking) is about as quick |
+| 2, quay to quay | 19.8 s / 15.0 s | 79.4 s / 62.1 s round by the bridge | yes, by far |
+| 3, lawn to verge | 17.8 s / 13.1 s | 20.9 s / 15.2 s straight across | yes, by about 3 s walking and 2 s sprinting |
+
+Inside a pipe the squirrel runs 1.25 times as fast as along a wire (the default I chose for you). The pipe is longer than the straight line over the top because of the two ladder shafts, so drain 3 only wins because of that pace. If it feels too quick, or not quick enough, it is one number.
 
 ## Please check
 | # | What to look at | What you should see |
@@ -53,7 +55,6 @@ Measured with W held, on the real squirrel controls, against the way over the to
 
 ## Known not done
 - **Walking onto a grate takes you down too.** You asked for E only. The run-through mechanic has no "E only" way in, and I may not change the movement code, so it is waiting on the movement lane. Today a squirrel on a grate that walks into the opening goes down, and so does one that turns toward it. The words on screen say exactly that. A squirrel running across a grate, or out of it from the ladder side, does not go down.
-- **Drain 3 is not a short cut yet.** The pipes run at street pace. The 1.25 times pace is stored, but the movement code does not read it yet (the same movement lane). Drains 1 and 2 already beat the way over the top; drain 3 will once the pace is read.
 - **The crossing's A / D works only in the last 6 studs.** The screen says when. A wider window, or keeping a press made earlier, is a change to the movement code.
 - **Your modules have not been seen in Roblox yet.** They are loaded when the server starts and drawn near the squirrel. I have checked the placement only in Blender and in tests without the engine. If Roblox imports one turned or mirrored, the game notices and shows plain parts for that drain, so it never looks broken. The engine check is written (`tests/engine/Sewers.luau`, task `tools/cloud/tasks/sewers_smoke.luau`). It cannot run until the key's Luau Execution permission is restored.
 - **A dead rodent does not come back out of a drain.** The rule (a drain at least 100 studs away with nobody near) is written, but the role ladder that would use it is not running in the game yet. The same goes for the alligator's warning before an idle body is let go.
