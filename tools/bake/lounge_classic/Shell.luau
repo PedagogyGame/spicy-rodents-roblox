@@ -77,6 +77,21 @@ function Shell.build(kit: Kit.Kit, root: any, venue: any): any
 	end
 	kit:box(m, "Landing", -AX, AX, base, 0, Style.LANDING_D, DD, Style.STONE, "Marble")
 
+	-- the pass check: a black podium with a brass top on the landing (the door's prompt stands on it)
+	kit:box(m, "Podium", AX - 1.1, AX, 0, 3.5, Style.LANDING_D + 0.2, Style.LANDING_D + 1.3, Style.BLACK, "Marble")
+	kit:box(
+		m,
+		"PodiumTop",
+		AX - 1.25,
+		AX,
+		3.5,
+		3.7,
+		Style.LANDING_D + 0.05,
+		Style.LANDING_D + 1.45,
+		Style.BRASS,
+		"Metal"
+	)
+
 	-- the front: black marble with brass fins and a brass band, four leaded amber windows set on the wall
 	local face = F - 0.3
 	kit:box(m, "FrontFaceW", -OX, -AX - W, base + 0.5, top, face, F, Style.BLACK, "Marble")

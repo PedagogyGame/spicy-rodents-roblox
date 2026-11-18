@@ -1,0 +1,53 @@
+{
+  "about": "THE GILDED ACORN (f3_lounge_classic) review views. Venue frame: world x = 1487 + X, z = -362 - D, y = 9.5 + Y (X across the frontage, D into the building, Y up from the floor). Make: lune run tools/bake/main.luau (+ editor_ground, attractions, backdrop); lune run tools/bake/lounge_classic.luau; lune run tools/review/export.luau; lune run tools/review/lounge_classic.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/lounge_scene.json --views docs/renders/lounge_classic/views.json --out build/review/lounge --threads 2. The view from above uses the cutaway scene (lune run tools/review/lounge_classic.luau --cutaway --out build/review/lounge_cut.json; render with --set cutaway). Interior views are at a person's eye (floor + 5.2). Cycles bounces light off the walls and Roblox's lighting does not: in the engine the corners and the ceiling will be darker than here.",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {
+      "name": "lc_01_street",
+      "desc": "From Bowl Lane, 40 st in front, at a person's eye: the black-and-gold front, the sign, the crown and acorn.",
+      "pos": [1474, 5.5, -294], "look": [1487, 8.5, -334], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "lc_02_door",
+      "desc": "On the forecourt between the guards' posts (local 0, D -31): the ropes, the steps, the canopy and the double door.",
+      "pos": [1488, 12.3, -329], "look": [1487, 12.5, -341], "fov": 65
+    },
+    {
+      "name": "lc_03_from_door",
+      "desc": "Just inside the door (local 0, 5.2, -19), to the back wall: the rug, the chandeliers, the bar, the stage.",
+      "pos": [1487, 14.7, -343], "look": [1487, 12.5, -386], "fov": 70
+    },
+    {
+      "name": "lc_04_bar",
+      "desc": "At the end of the stools (local 11, 5.2, 12), along the bar to the back bar, the urn, the snow-cone machine.",
+      "pos": [1498, 14.7, -374], "look": [1480, 12.5, -383], "fov": 70
+    },
+    {
+      "name": "lc_05_from_bar",
+      "desc": "From behind the bar, where the bartender stands (local 0, 5.4, 20), back toward the door.",
+      "pos": [1487, 14.9, -382], "look": [1487, 13, -342], "fov": 75
+    },
+    {
+      "name": "lc_06_stage",
+      "desc": "From the rug (local -4, 5.2, 4) toward the stage: the grand piano, the microphone, the drapes, the radio.",
+      "pos": [1483, 14.7, -366], "look": [1468, 11.5, -382], "fov": 65
+    },
+    {
+      "name": "lc_07_booths",
+      "desc": "From the west booths (local -12, 5.2, -14) across to the east booths and the fireplace.",
+      "pos": [1475, 14.7, -348], "look": [1507, 12, -380], "fov": 70
+    },
+    {
+      "name": "lc_08_above",
+      "desc": "From above, the building on its site: the roof behind its parapet, the front, the forecourt.",
+      "pos": [1540, 70, -290], "look": [1487, 12, -360], "fov": 50
+    },
+    {
+      "name": "lc_09_cutaway",
+      "optIn": "cutaway",
+      "desc": "From above with the ceiling and roof left out (the cutaway scene): the whole room's plan.",
+      "pos": [1487, 80, -330], "look": [1487, 9.5, -364], "fov": 55
+    }
+  ]
+}

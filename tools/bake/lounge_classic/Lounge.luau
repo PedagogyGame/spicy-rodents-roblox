@@ -9,9 +9,11 @@
 --   Interior  (Interior) the long polished bar with its brass rail and stools, the back bar (cups, the coffee urn,
 --             the cocoa pot, the snow-cone machine; no bottles anywhere), four leather booths, club chairs round
 --             small tables, the stage with a grand piano and the radio, the fireplace, panelling and the ceiling.
+--   Staff     (Staff) the two guards on the forecourt and the bartender, part-built people the service animates.
 --   Lamps     (Lamps) warm low light: pendants over the bar, booth lamps, sconces, two chandeliers, the stage's
 --             spots, the fire, the back bar's glow, the canopy light: LIGHT_BUDGET lights, SHADOW_BUDGET shadowed.
--- The model carries Venue, Parts, Lights, Shadows, and Door* attributes (the door's world points) for the service.
+-- The model carries Venue, Parts, Lights and Shadows; the door's, the guards' and the bar's rules are
+-- Shared/Attractions/LoungeClassic.
 -- Interface: build(kit, parent, venue) -> Model; dimensions and budgets below.
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
@@ -19,7 +21,7 @@ local Kit = require("../alley/Kit")
 local Shell = require("./Shell")
 local Interior = require("./Interior")
 local Lamps = require("./Lamps")
-local Style = require("./Style")
+local Staff = require("./Staff")
 
 local Lounge = {}
 
@@ -38,11 +40,8 @@ function Lounge.build(kit: Kit.Kit, parent: any, venue: any): any
 	Shell.build(kit, root, venue)
 	Interior.build(kit, root, venue)
 	local lights, shadows = Lamps.build(kit, root, venue)
+	Staff.build(kit, root)
 
-	-- the door's points for the service: outside on the landing, inside past the leaves (world)
-	local D = Style.DOOR_D
-	root:SetAttribute("DoorOutside", kit:cf(0, 0, D - 2).Position)
-	root:SetAttribute("DoorInside", kit:cf(0, 0, D + Style.WALL + 2.5).Position)
 	root:SetAttribute("Parts", kit.count - start)
 	root:SetAttribute("Lights", lights)
 	root:SetAttribute("Shadows", shadows)
