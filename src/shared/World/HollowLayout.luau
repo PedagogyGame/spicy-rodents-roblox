@@ -86,7 +86,7 @@ local C = HollowLayout.C
 -- told the player on stopping at the far end of a dead end inside (the route record's `hint`: Client/Controllers/Squirrel)
 HollowLayout.HINTS = {
 	chamber = "Hidden in the hollow: nobody can see you in here (S runs back out)",
-	hideout = "The hideout: nobody can see you in here (S goes back to the shaft)",
+	hideout = "The hideout: nobody can see you in here (S goes back down the shaft)",
 }
 
 export type Vec3 = { x: number, y: number, z: number }
@@ -741,7 +741,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 			b.routes,
 			record(hideId, `hollow {hl.id} hideout`, hl.id, hide, {
 				id = hl.space,
-				atStart = { route = shaftId, t = r4(hideT), dir = 1 },
+				atStart = { route = shaftId, t = r4(hideT), dir = -1 }, -- (S off the shelf goes on down the shaft)
 				cavity = cavityRecord(shaftCav),
 			})
 		)

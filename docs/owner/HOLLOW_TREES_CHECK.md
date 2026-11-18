@@ -17,7 +17,7 @@ Everything below was tested without a screen, on the real squirrel controls and 
 ## What to press
 1. Play a **Squirrel** (or the Spicy Rodent). Every hollow has a dark knothole at the foot of its trunk. **Run into it**: there is no E to press, as with the ball return's grille, so a squirrel being chased dives straight in.
 2. **One-chamber trees:** you run across the floor to the back. The screen says **Hidden in the hollow: nobody can see you in here (S runs back out)**. Press **S** and you come out of the hole on your feet.
-3. **H2 and H12:** hold **W**. You cross the floor and climb the inside wall. Part-way up, **E** at the knothole takes you out onto that bough (A or D picks it as you climb). In H2, the other A/D side is the **hideout shelf**. At the top, keep holding W and you run out along the top bough.
+3. **H2 and H12:** hold **W**. You cross the floor and climb the inside wall. Part-way up, **E** at the knothole takes you out onto that bough (A or D picks it as you climb). In H2, the other A/D side is the **hideout shelf**; S takes you off it and back down the shaft. At the top, keep holding W and you run out along the top bough.
 4. **H1, the spiral:** hold **W** to climb the ramp, whichever way the camera looks; **S** goes back down. The ramp has three flat landings, and at the top you come out of a knothole onto the outside of the trunk, still climbing. In from the hole to out at the top takes about 6 seconds.
 5. **The log:** run in at one end and out of the other.
 6. Inside, away from a hole, **Space, Q and a click do nothing**: there is no jumping through the bark.

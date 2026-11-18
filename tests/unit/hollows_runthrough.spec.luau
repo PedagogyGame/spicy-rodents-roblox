@@ -280,26 +280,50 @@ return function(t)
 		end
 	end)
 
-	t.test("the shaft's hideout: A or D on the way up picks it, W carries the body onto the shelf", function()
-		local h = layout.hollow("H2") :: HollowLayout.Hollow
-		local shaftId, hideId = h.routes[2], h.routes[3]
-		local fork = ((reg:get(shaftId) :: any).enclosure.forks :: { any })[1]
-		local reached = false
-		for _, side in { -1, 1 } do
-			local c = onRoute(shaftId, math.max(0, fork.t - 0.08), 1)
-			local tr = BakedWorld.drive(w, c, 60 * 4, function(f: number, st: State): SquirrelMotor.Input
-				return BakedWorld.keys(follow(st), { fw = 1, choose = if f == 1 then side else 0 })
-			end, {
-				validator = true,
-				stop = function(st: State)
-					return st.routeId ~= shaftId
-				end,
-			})
-			t.eq(tr.violations, 0)
-			reached = reached or tr.routes[hideId] == true
+	t.test(
+		"the shaft's hideout: A or D on the way up picks it, W carries the body onto the shelf, S back down",
+		function()
+			local h = layout.hollow("H2") :: HollowLayout.Hollow
+			local shaftId, hideId = h.routes[2], h.routes[3]
+			local fork = ((reg:get(shaftId) :: any).enclosure.forks :: { any })[1]
+			local reached = false
+			for _, side in { -1, 1 } do
+				local c = onRoute(shaftId, math.max(0, fork.t - 0.08), 1)
+				local tr = BakedWorld.drive(w, c, 60 * 4, function(f: number, st: State): SquirrelMotor.Input
+					return BakedWorld.keys(follow(st), { fw = 1, choose = if f == 1 then side else 0 })
+				end, {
+					validator = true,
+					stop = function(st: State)
+						return st.routeId ~= shaftId
+					end,
+				})
+				t.eq(tr.violations, 0)
+				reached = reached or tr.routes[hideId] == true
+			end
+			t.truthy(reached, "one of A or D takes the hideout")
+			-- S off the shelf goes back down the shaft and out of the ground hole (never up and out along a bough), held
+			-- through or let go at the shaft and pressed again
+			for _, pause in { false, true } do
+				local s = onRoute(hideId, 0.99, 1)
+				local back = BakedWorld.drive(w, s, 60 * 8, function(f: number, st: State): SquirrelMotor.Input
+					if pause and st.routeId == shaftId and f % 40 < 10 then
+						return BakedWorld.keys(follow(st), {})
+					end
+					return BakedWorld.keys(follow(st), { fw = -1 })
+				end, {
+					validator = true,
+					stop = function(st: State)
+						return st.routeId == nil
+					end,
+				})
+				for rid in back.routes do
+					t.truthy(rid == hideId or rid == shaftId or rid == h.routes[1], `S from the shelf went onto {rid}`)
+				end
+				t.eq(BakedWorld.count(back, "emerge"), 1, "out of the ground hole")
+				t.eq(back.violations, 0)
+			end
 		end
-		t.truthy(reached, "one of A or D takes the hideout")
-	end)
+	)
 
 	t.test("the spiral: W climbs the ramp past its landings and out of the top knothole onto the trunk", function()
 		local h = layout.hollow("H1") :: HollowLayout.Hollow

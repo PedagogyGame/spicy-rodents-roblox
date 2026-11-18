@@ -3765,7 +3765,7 @@ return {
 			kind = "tunnel",
 			enclosure = {
 				id = "hollow.H2",
-				atStart = { dir = 1, route = 9422, t = 0.4119 },
+				atStart = { dir = -1, route = 9422, t = 0.4119 },
 				cavity = {
 					axis = { -92.6134, 72.3547 },
 					bottom = 0.3,
@@ -3780,7 +3780,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
-			hint = "The hideout: nobody can see you in here (S goes back to the shaft)",
+			hint = "The hideout: nobody can see you in here (S goes back down the shaft)",
 			length = 2.6431,
 			origin = "hollow",
 			points = {
