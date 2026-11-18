@@ -5,7 +5,9 @@
 --   the bowling alley (Bellwether Bowl) placed by data/attractions.json (studs). The geometry is
 --     Shared/Attractions/AlleyLayout's; the server finds the lanes, pins, balls, hoods, scoreboards, dartboard,
 --     fortune cabinet, doors and terrain carve boxes by name. The games room's tables and machines are built
---     through the bake registry (tools/bake/GameBakes);
+--     through the bake registry (tools/bake/GameBakes). The building is tools/bake/alley/Alley: Shell (structure
+--     and tunnels), Lanes, Concourse, GamesRoom, BackModule (the interim back of house the owner's backstage
+--     replaces) and Forecourt;
 --   the minigames' places on the expansion venues (generated/Expansion.venues; data/expansion.json): for every
 --     station a game's Spec lists on a venue (src/shared/Minigames/Games.stations) whose game has a builder in
 --     tools/bake/GameBakes, a site Model named after the venue, in the venue's own frame, with that game's
@@ -23,9 +25,8 @@ local Expansion = require("../../generated/Expansion")
 local Games = require("../../src/shared/Minigames/Games")
 local GameBakes = require("./GameBakes")
 local Kit = require("./alley/Kit")
-local Shell = require("./alley/Shell")
-local Lanes = require("./alley/Lanes")
-local Rooms = require("./alley/Rooms")
+local Alley = require("./alley/Alley")
+local Ways = require("./Ways")
 
 local out = "build/Attractions.rbxm"
 local i = 1
@@ -58,11 +59,21 @@ for _, a in doc.attractions do
 	places[a.id] = place
 	local kit = Kit.new(roblox, place)
 	local root = GameBakes.siteModel(roblox, "BowlingAlley", a.id, place)
-	Shell.build(kit, root, a)
-	Lanes.build(kit, root)
-	Rooms.build(kit, root)
+	Alley.build(kit, root, a)
 	root.Parent = folder
 	parts += kit.count
+	-- what each model under the building costs
+	local counts: { string } = {}
+	for _, child in root:GetChildren() do
+		local n = if child:IsA("BasePart") then 1 else 0
+		for _, d in child:GetDescendants() do
+			if d:IsA("BasePart") then
+				n += 1
+			end
+		end
+		table.insert(counts, `{child.Name} {n}`)
+	end
+	print(`attractions: {a.id} {kit.count} parts: {table.concat(counts, ", ")}`)
 end
 
 -- the minigames' places on the expansion venues: a site per venue some game builds on
@@ -74,8 +85,31 @@ for _, v in (Expansion :: any).venues do
 		venues[v.id] = v
 	end
 end
-local onVenues = GameBakes.venueSites(roblox, folder, Games.stations(places), places, venues)
+local stations = Games.stations(places)
+local onVenues = GameBakes.venueSites(roblox, folder, stations, places, venues)
 parts += onVenues.parts
+
+-- the way from the town to each venue built above (tools/bake/Ways): its walk, the new street it meets, a
+-- forecourt, the street's lamps and a fingerpost where the street leaves the town road it continues
+local builtVenues: { [string]: any } = {}
+local labels: { [string]: { string } } = {}
+for _, m in folder:GetChildren() do
+	local id = m:GetAttribute("Site")
+	if type(id) == "string" and venues[id] ~= nil then
+		builtVenues[id] = venues[id]
+		-- (the name without its note: "WBLW CHANNEL 7 (ABANDONED)" reads "WBLW CHANNEL 7")
+		labels[id] = { (string.gsub(venues[id].name, "%s*%b()", "")) }
+	end
+end
+for _, st in stations do
+	local l = labels[st.site]
+	if l ~= nil and st.joins == nil and table.find(l, string.upper(st.game)) == nil then
+		table.insert(l, string.upper(st.game))
+	end
+end
+local ways = Ways.plan(builtVenues, labels)
+local wayParts = Ways.build(roblox, folder, ways)
+parts += wayParts
 
 local bytes = roblox.serializeModel({ folder })
 if not fs.isDir("build") then
@@ -85,4 +119,5 @@ fs.writeFile(out, bytes)
 local built = table.concat(onVenues.built, ", ")
 local took = string.format("%.2f", os.clock() - t0)
 print(`attractions: {#doc.attractions} building(s), {onVenues.sites} venue site(s) [{built}], {parts} parts`)
+print(`attractions: {#ways.ways} way(s) to the venues, {#ways.roads} strips, {wayParts} parts`)
 print(`attractions: -> {out} ({#bytes} bytes) in {took} s`)

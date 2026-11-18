@@ -305,6 +305,27 @@ return function(t)
 		t.eq(BumperPool.script(n), nil)
 	end)
 
+	t.test(
+		"a player who leaves a game against someone forfeits it, in the opening too; practice has nobody to lose to",
+		function()
+			local s = BumperPool.init(2, 4)
+			t.truthy(BumperPool.input(s, 1, "shoot", { 1, 0.4, 0.5 }))
+			BumperPool.gone(s, 2)
+			t.truthy(s.done)
+			t.eq(s.winner, 1)
+			t.eq(s.how, "left")
+			t.eq(BumperPool.HOW_TEXT.left, "left the table")
+			t.eq(BumperPool.turn(s), nil)
+			t.eq((BumperPool.result(s) :: any).winner, 1)
+			local ok, why = BumperPool.input(s, 1, "shoot", { 2, 0, 0.5 })
+			t.falsy(ok)
+			t.eq(why, "game over")
+			local solo = BumperPool.init(1, 4)
+			BumperPool.gone(solo, 1)
+			t.falsy(solo.done)
+		end
+	)
+
 	t.test("practice: one seat, your five alone on the table, every one down in the fewest shots", function()
 		local s = BumperPool.init(1, 3)
 		t.eq(#s.spots, 5)

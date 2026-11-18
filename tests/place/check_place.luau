@@ -6,7 +6,8 @@
 --     LocalScript, Folder, or a named instance for .model.json / .rbxm / .rbxmx);
 --   * no SurfaceAppearance, PartOperation (union) or BaseWrap exists anywhere in the place, so
 --     the place stays publishable through Open Cloud;
---   * ServerStorage.EngineTests exists only when the project maps it (ci.project.json).
+--   * ServerStorage.EngineTests exists only when the project maps it (ci.project.json);
+--   * the owner's place (build.project.json) carries the baked Neighbourhood Shop.
 -- Usage: lune run tests/place/check_place.luau <place.rbxl|rbxlx> <project.json>
 
 local fs = require("@lune/fs")
@@ -223,6 +224,22 @@ check(
 	(engineTests ~= nil) == projectHasEngineTests,
 	`ServerStorage.EngineTests presence ({engineTests ~= nil}) does not match project ({projectHasEngineTests})`
 )
+
+-- The owner's place (build.project.json) carries the Neighbourhood Shop whenever generated/ShopArt names it: its
+-- slot is an optional path, which Rojo leaves out without a word when the shop's bake was not run.
+if string.find(projectPath, "build%.project%.json$") and fs.isFile("generated/ShopArt.luau") then
+	local slot = instanceAt({ "Workspace", "Expansion", "NeighbourhoodShop" })
+	local found = false
+	for _, d in if slot then slot:GetDescendants() else {} do
+		if d:IsA("Model") and d:GetAttribute("ArtShop") ~= nil then
+			found = true
+		end
+	end
+	check(
+		found,
+		"Workspace.Expansion.NeighbourhoodShop has no baked shop: run lune run tools/bake/neighbourhood_shop.luau first"
+	)
+end
 
 print(`place test: {placePath} against {projectPath}: {total} instances, {checks} checks, {#failures} failure(s)`)
 for _, f in failures do

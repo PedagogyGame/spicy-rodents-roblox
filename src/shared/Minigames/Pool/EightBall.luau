@@ -5,8 +5,8 @@
 -- (set the cue ball down when it is in hand, call a pocket for the 8, strike), and "shoot" runs the table
 -- model (Shot) on the spot, judges what happened and keeps the shot's script for every client to play. So
 -- the same pure module is the referee on the server, the game a computer player plays, and a whole game
--- under Lune. It corrects MinigameRules/Pool8Ball (which stays for the old "shot" verb) on the checklist's
--- lines:
+-- under Lune. It replaces the first sketch of these rules (MinigameRules/Pool8Ball, now retired) and keeps
+-- to the checklist's lines:
 --   POOL-R1 any break leaves the table open; the first legal pot after the break gives solids (1-7) or
 --           stripes (9-15); fouls are the cue ball potted ("scratch"), touching no ball ("no_hit"), the
 --           wrong ball first ("wrong_ball") and no cushion and no pot after the contact ("no_rail"); a foul
@@ -28,11 +28,13 @@
 --           and while the table is open, everything that drops) and the winning 8. The other player's balls
 --           going down do not lengthen it.
 --   POOL-R7 an idle turn is a foul (skipTurn): the other player has the ball in hand.
+--   A player who leaves a game against someone else forfeits it (gone): the other wins, "left the table".
 -- Pure and seeded: the same seed and the same inputs give the same game, byte for byte. Lune-tested
 -- (tests/unit/pool_eightball.spec.luau).
 -- Interface: def, verbs; init(seats, seed, breaker?) -> State; input(state, seat, verb, args) with verbs
 --   "place" { x, z }, "call" { pocket 1..6 }, "shoot" { angle, power, tipX?, tipY?, pocket? }; turn(state);
---   skipTurn(state); result(state); view(state); script(state) -> the last shot's Shot.Script?;
+--   skipTurn(state); gone(state, seat) (a forfeit); takenOff(state, seat) (gone for not playing: said so);
+--   result(state); view(state); script(state) -> the last shot's Shot.Script?;
 --   apply(state, outcome, rest?) -> event (the referee alone: "foul" | "continue" | "pass" | "win" |
 --   "lose"); groupOf(ball); onEight(state, seat); legal(state, seat) -> { ball ids the seat may hit first };
 --   left(state, seat) -> balls of its group still up (7 while the table is open); canPlace(state, x, z);
@@ -66,6 +68,8 @@ EightBall.HOW_TEXT = {
 	eight_early = "potted the 8 too early",
 	eight_foul = "fouled on the 8",
 	eight_wrong_pocket = "potted the 8 in the wrong pocket",
+	left = "left the table",
+	removed = "was taken off the table for not playing",
 } :: { [string]: string }
 
 export type PotAt = { ball: number, hole: number }
@@ -491,6 +495,34 @@ function EightBall.skipTurn(state: State)
 	state.lastScript = nil
 	state.seat = other(state, seat)
 	state.inHand = if state.broken then "anywhere" else "kitchen"
+end
+
+-- A seat has left a game against someone else: they forfeit it, and the one still at the table wins.
+function EightBall.gone(state: State, seat: number)
+	if state.done or state.seats < 2 then
+		return
+	end
+	state.done = true
+	state.winner = other(state, seat)
+	state.how = "left"
+	state.called = 0
+	state.last = {
+		seat = seat,
+		event = "lose",
+		pots = {},
+		holes = {},
+		firstHit = 0,
+		breakShot = not state.broken,
+	}
+	state.lastScript = nil
+end
+
+-- A seat that was taken off for not playing (the service's idle clock), not one that walked away: if its going
+-- ended the game (gone), the game says so.
+function EightBall.takenOff(state: State, seat: number)
+	if state.done and state.how == "left" and state.winner ~= seat then
+		state.how = "removed"
+	end
 end
 
 function EightBall.script(state: State): Shot.Script?

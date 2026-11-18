@@ -1,13 +1,17 @@
 --!strict
--- tools/bake/alley/Lanes: six lanes in three pairs (brief v2 §13a): maple and pine boards, the foul line, approach
+-- tools/bake/alley/Lanes: eighteen lanes in nine pairs (brief v2 §13a; addendum D5): maple and pine boards, the foul line, approach
 -- dots, target arrows, gutters, capping, pin decks with spots, ten pins per lane (anchored composite parts the
 -- server moves by script: pinfall is decided by Shared/Minigames/Bowling/PinModel, never by physics, so the
--- pins collide with nothing), pits with cushions, kickbacks, the masking units with lane numbers, the pinsetter
--- machines and sweep bars, a ball per lane, the ball-return hoods and racks between each pair's approaches,
+-- pins collide with nothing), pits with cushions, kickbacks, the masking units with lane numbers, the sweep
+-- bars, a ball per lane, the ball-return hoods and racks between each pair's approaches,
 -- settees and scorer consoles, overhead score monitors (SurfaceGui the server rewrites) and the lights.
 -- Names the server relies on (Server/Minigames/BowlingLane): Lanes.Lane<i>.{Ball, Pins.Pin<n> (PrimaryPart
 -- Body), Sweep}; Scoreboards.Lane<i>.Screen (SurfaceGui "Score").
--- Interface: build(kit, root) -> nothing; PIN_PROFILE; BALL_COLORS
+-- The stand-in pinsetter behind each masking unit is built here (Lanes.machine) but belongs to the back module
+-- (tools/bake/alley/BackModule puts one per lane in its own model): the owner's backstage replaces them.
+-- Part economy (eighteen lanes): a lane's boards are one part per zone with six seam lines (they were 39 strips
+-- and 12 seams), an approach has six seams and two rows of dots, a starburst four bars.
+-- Interface: build(kit, root) -> nothing; machine(kit, parent, lane) -> Model; PIN_PROFILE; BALL_COLORS
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 
@@ -17,7 +21,6 @@ local L = AlleyLayout
 local MAPLE = { 228, 198, 150 }
 local MAPLE2 = { 220, 188, 140 }
 local PINE = { 216, 178, 118 }
-local PINE2 = { 208, 170, 110 }
 local GUTTER = { 46, 48, 54 }
 local CAP = { 26, 26, 30 }
 local DARK = { 36, 30, 26 }
@@ -48,33 +51,29 @@ local function board(kit: any, parent: any, lane: number)
 	local half = L.LANE_W / 2
 	-- collision bed (one smooth surface for the ball), boards drawn just above it
 	kit:box(parent, "Bed", x - half, x + half, L.DUCT_CEIL, -0.01, L.FOUL_D, L.DECK_START, MAPLE, "Wood")
+	-- the boards: one part per zone (maple heads, pine middle, maple at the pins) and a seam every other board
 	local strips = 13
 	local w = L.LANE_W / strips
-	local zones = { { L.FOUL_D, 16, MAPLE, MAPLE2 }, { 16, 40, PINE, PINE2 }, { 40, L.DECK_START, MAPLE, MAPLE2 } }
-	for s = 1, strips do
-		local sx0 = x - half + (s - 1) * w
-		for _, z in zones do
-			local col = if s % 2 == 0 then z[3] else z[4]
-			kit:box(parent, "Boards", sx0 + 0.006, sx0 + w - 0.006, -0.012, 0, z[1], z[2], col, "Wood", {
-				collide = false,
-				query = false,
-				shadow = false,
-			})
-		end
+	local zones = { { L.FOUL_D, 16, MAPLE }, { 16, 40, PINE }, { 40, L.DECK_START, MAPLE2 } }
+	for _, z in zones do
+		kit:box(parent, "Boards", x - half + 0.006, x + half - 0.006, -0.012, 0, z[1], z[2], z[3], "Wood", {
+			collide = false,
+			query = false,
+			shadow = false,
+		})
 	end
-	-- seams between strips (thin dark lines)
-	for s = 1, strips - 1 do
-		local sx = x - half + s * w
+	for sIdx = 2, strips - 1, 2 do
+		local sx = x - half + sIdx * w
 		kit:box(
 			parent,
 			"Seam",
-			sx - 0.006,
-			sx + 0.006,
+			sx - 0.008,
+			sx + 0.008,
 			-0.012,
-			-0.002,
+			0.001,
 			L.FOUL_D,
 			L.DECK_START,
-			{ 150, 112, 70 },
+			{ 176, 140, 96 },
 			"Wood",
 			{
 				collide = false,
@@ -296,10 +295,11 @@ local function pins(kit: any, parent: any, lane: number)
 	end
 end
 
-local function machine(kit: any, parent: any, lane: number)
+function Lanes.machine(kit: any, parent: any, lane: number): any
 	local x = L.laneX(lane)
 	local half = L.LANE_W / 2 + L.GUTTER_W
-	local m = kit:model(parent, "Machine")
+	local m = kit:model(parent, `Machine{lane}`)
+	m:SetAttribute("Lane", lane)
 	-- the pinsetter frame over the deck and pit (seen from the machine room behind)
 	kit:box(
 		m,
@@ -344,7 +344,12 @@ local function machine(kit: any, parent: any, lane: number)
 	)
 	local g = kit:gui(tag, "Front", 60)
 	kit:label(g, { Text = `LANE {lane}  A-2`, TextColor = { 30, 30, 30 }, Font = "Code" })
-	-- the sweep bar (parked up inside the machine; BowlingLane drops and sweeps it)
+	return m
+end
+
+-- the sweep bar (parked up behind the masking unit; BowlingLane drops and sweeps it)
+local function sweepBar(kit: any, parent: any, lane: number)
+	local x = L.laneX(lane)
 	local sweep = kit:box(
 		parent,
 		"Sweep",
@@ -383,11 +388,25 @@ end
 local function kickbacksAndMasking(kit: any, root: any)
 	local m = kit:model(root, "Masking")
 	for k = 0, L.LANES do
-		local kx = -L.LANE_BLOCK_X + k * L.PITCH
+		local kx = L.LANE_BLOCK_X0 + k * L.PITCH
 		local edge = k == 0 or k == L.LANES
 		local w = if edge then 0.6 else 0.4
 		-- capping along the whole lane between gutters, then the tall kickback by the deck
 		kit:box(m, "Capping", kx - w / 2, kx + w / 2, L.DUCT_CEIL, 0.12, L.FOUL_D - 0.3, 50, CAP, "SmoothPlastic")
+		-- (beside the decks it stands on the floor, over the pits it reaches down to the pit floor: it never hangs
+		-- into the ball-return duct beneath)
+		kit:box(
+			m,
+			"Kickback",
+			kx - w / 2,
+			kx + w / 2,
+			L.DUCT_CEIL,
+			L.MASK_BOTTOM,
+			50,
+			L.DECK_END,
+			KICK,
+			"SmoothPlastic"
+		)
 		kit:box(
 			m,
 			"Kickback",
@@ -395,7 +414,7 @@ local function kickbacksAndMasking(kit: any, root: any)
 			kx + w / 2,
 			L.PIT_Y,
 			L.MASK_BOTTOM,
-			50,
+			L.DECK_END,
 			L.PIT_END + 0.3,
 			KICK,
 			"SmoothPlastic"
@@ -428,15 +447,31 @@ local function kickbacksAndMasking(kit: any, root: any)
 				{ 46, 52, 88 },
 				"SmoothPlastic"
 			)
+			-- a person jumps about 7.2 studs, which clears the side wall from the aisle: an invisible guard 9 tall
+			-- along it, from the foul line to the masking units (the LaneGuard group: the ball and the pins pass, and
+			-- a squirrel, which never collides with it, still runs onto the lanes)
+			kit:box(
+				m,
+				"LaneGuardSide",
+				kx - w / 2,
+				kx + w / 2,
+				0,
+				9,
+				L.FOUL_D - 0.3,
+				L.MACHINE_D0,
+				{ 255, 0, 0 },
+				"SmoothPlastic",
+				{ query = false, transparency = 1, shadow = false, group = "LaneGuard" }
+			)
 		end
 	end
-	-- the masking units: one face across all six lanes, art per pair, lane numbers
+	-- the masking units: one face across all the lanes, art per pair, lane numbers
 	local front = L.MACHINE_D0
 	kit:box(
 		m,
 		"MaskFace",
-		-L.LANE_BLOCK_X - 0.3,
-		L.LANE_BLOCK_X + 0.3,
+		L.LANE_BLOCK_X0 - 0.3,
+		L.LANE_BLOCK_X1 + 0.3,
 		L.MASK_BOTTOM,
 		L.CEILING_Y,
 		front - 0.4,
@@ -445,9 +480,9 @@ local function kickbacksAndMasking(kit: any, root: any)
 		"SmoothPlastic"
 	)
 	local pairCols = { { 232, 118, 40 }, { 36, 150, 150 }, { 236, 196, 64 } }
-	for p = 1, 3 do
+	for p = 1, L.PAIRS do
 		local px = L.pairX(p)
-		local col = pairCols[p]
+		local col = pairCols[(p - 1) % #pairCols + 1]
 		-- swooping stripes (three bands) and a starburst per pair
 		for b = 0, 2 do
 			kit:at(
@@ -480,10 +515,10 @@ local function kickbacksAndMasking(kit: any, root: any)
 			"Neon",
 			{ collide = false }
 		)
-		for r = 0, 7 do
+		for r = 0, 3 do
 			kit:at(m, "Ray", px, L.MASK_BOTTOM + 3.9, front - 0.425, 2.4, 0.07, 0.02, { 255, 230, 140 }, "Neon", {
 				collide = false,
-				rot = kit.roblox.CFrame.Angles(0, 0, r * math.pi / 8),
+				rot = kit.roblox.CFrame.Angles(0, 0, r * math.pi / 4),
 			})
 		end
 		-- the down-lights on the pins
@@ -535,15 +570,18 @@ local function hoods(kit: any, root: any)
 	local folder = kit:folder(root, "Returns")
 	local chrome = { 196, 198, 204 }
 	local band = { 36, 150, 150 }
-	for p = 1, 3 do
+	for p = 1, L.PAIRS do
 		local m = kit:model(folder, `Return{p}`)
 		local x = L.pairX(p)
 		local hw = L.HOOD_W / 2
 		local d0, d1 = L.HOOD_D1, L.HOOD_D0 -- -4.2 .. -0.8
-		local mouthHW, mouthY0, mouthY1 = 0.62, 1.35, 2.25
-		-- sides and back
+		local mouthHW, mouthY0, mouthY1 = L.MOUTH_W / 2, L.MOUTH_Y0, L.MOUTH_Y1
+		-- The hood is hollow: the squirrel's run comes up the riser inside it and out of the mouth over the rack
+		-- (data/attractions.json; a crawl from the riser's top). Walls, a back, a crown of a flat top and two
+		-- sloping shoulders, a face round the mouth; nothing inside but a dark lining.
+		local eave = L.HOOD_H - 0.45
 		for side = -1, 1, 2 do
-			kit:box(m, "HoodSide", x + side * hw - 0.08, x + side * hw + 0.08, 0, 1.6, d0, d1, chrome, "Metal")
+			kit:box(m, "HoodSide", x + side * hw - 0.08, x + side * hw + 0.08, 0, eave, d0, d1, chrome, "Metal")
 			kit:box(
 				m,
 				"HoodBand",
@@ -557,34 +595,58 @@ local function hoods(kit: any, root: any)
 				"SmoothPlastic",
 				{ collide = false }
 			)
+			-- the shoulder: from the top's edge (0.5 out) down to the side wall's top
+			local run, drop = hw - 0.5, L.HOOD_H - eave
+			kit:at(
+				m,
+				"BonnetShoulder",
+				x + side * (0.5 + run / 2),
+				(L.HOOD_H + eave) / 2 - 0.05,
+				(d0 + d1) / 2,
+				math.sqrt(run * run + drop * drop) + 0.04,
+				0.1,
+				d1 - d0,
+				chrome,
+				"Metal",
+				{ rot = kit.roblox.CFrame.Angles(0, 0, -side * math.atan2(drop, run)) }
+			)
 		end
-		kit:box(m, "HoodBack", x - hw, x + hw, 0, 1.6, d1 - 0.12, d1, chrome, "Metal")
-		-- the rounded bonnet: a half-buried cylinder along the lane
-		kit:cyl(m, "Bonnet", x, 1.6, (d0 + d1) / 2, d1 - d0, L.HOOD_W, "D", chrome, "Metal")
-		kit:box(m, "BonnetCapBack", x - hw, x + hw, 1.6, 2.4, d1 - 0.06, d1, chrome, "Metal", { collide = false })
+		kit:box(m, "HoodBack", x - hw, x + hw, 0, eave, d1 - 0.12, d1, chrome, "Metal")
+		kit:box(m, "Bonnet", x - 0.5, x + 0.5, L.HOOD_H - 0.1, L.HOOD_H, d0, d1, chrome, "Metal")
+		kit:box(m, "BonnetCapBack", x - hw, x + hw, eave, L.HOOD_H - 0.12, d1 - 0.06, d1, chrome, "Metal", {
+			collide = false,
+		})
 		-- the front face around the mouth
 		kit:box(m, "FaceLow", x - hw, x + hw, 0, mouthY0, d0, d0 + 0.12, chrome, "Metal")
 		for side = -1, 1, 2 do
 			local a = x + side * mouthHW
 			local b = x + side * hw
-			kit:box(m, "FaceSide", math.min(a, b), math.max(a, b), mouthY0, 2.4, d0, d0 + 0.12, chrome, "Metal")
+			kit:box(m, "FaceSide", math.min(a, b), math.max(a, b), mouthY0, eave, d0, d0 + 0.12, chrome, "Metal")
 		end
-		kit:box(m, "FaceTop", x - mouthHW, x + mouthHW, mouthY1, 2.6, d0, d0 + 0.12, chrome, "Metal")
-		kit:box(
-			m,
-			"MouthLiner",
-			x - mouthHW,
-			x + mouthHW,
-			mouthY0,
-			mouthY1,
-			d0 + 0.12,
-			d0 + 0.9,
-			{ 16, 16, 18 },
-			"SmoothPlastic",
-			{
-				collide = false,
-			}
-		)
+		kit:box(m, "FaceTop", x - 0.5, x + 0.5, mouthY1, L.HOOD_H - 0.1, d0, d0 + 0.12, chrome, "Metal")
+		kit:box(m, "FaceTopSide", x - mouthHW, x + mouthHW, mouthY1, mouthY1 + 0.08, d0, d0 + 0.12, chrome, "Metal")
+		-- the mouth's dark lining: a top and two sides, a body's width apart
+		kit:box(m, "MouthLiner", x - mouthHW, x + mouthHW, mouthY1 - 0.04, mouthY1, d0 + 0.12, d0 + 0.9, {
+			16,
+			16,
+			18,
+		}, "SmoothPlastic", { collide = false })
+		for side = -1, 1, 2 do
+			local a = x + side * mouthHW
+			kit:box(
+				m,
+				"MouthLiner",
+				math.min(a, a - side * 0.04),
+				math.max(a, a - side * 0.04),
+				mouthY0,
+				mouthY1,
+				d0 + 0.12,
+				d0 + 0.9,
+				{ 16, 16, 18 },
+				"SmoothPlastic",
+				{ collide = false }
+			)
+		end
 		kit:box(
 			m,
 			"MouthLip",
@@ -592,21 +654,21 @@ local function hoods(kit: any, root: any)
 			x + mouthHW + 0.05,
 			mouthY0 - 0.05,
 			mouthY0,
-			d0 - 0.15,
+			d0 - 0.35,
 			d0 + 0.12,
 			{ 30, 30, 34 },
 			"Rubber" :: any
 		)
-		-- the lift's inner chute walls (dark) from the floor opening to the mouth
+		-- the lift's dark chute: a back panel inside the hood's back, and the shelf the ball rolls out on
 		kit:box(
 			m,
 			"ChuteBack",
-			x - 0.8,
-			x + 0.8,
+			x - hw + 0.1,
+			x + hw - 0.1,
 			0,
-			2.3,
-			L.SHAFT_D1 + 0.1,
-			L.SHAFT_D1 + 0.2,
+			eave,
+			d1 - 0.2,
+			d1 - 0.12,
 			{ 20, 20, 22 },
 			"SmoothPlastic",
 			{ collide = false }
@@ -616,10 +678,10 @@ local function hoods(kit: any, root: any)
 			"ChuteFloor",
 			x - 0.7,
 			x + 0.7,
-			1.25,
-			1.35,
+			mouthY0 - 0.25,
+			mouthY0 - 0.12,
 			d0 + 0.12,
-			L.SHAFT_D0,
+			L.SHAFT_D0 - 0.5,
 			{ 30, 30, 34 },
 			"Metal",
 			{ collide = false }
@@ -681,14 +743,27 @@ local function hoods(kit: any, root: any)
 			"Metal"
 		)
 		-- a hand dryer vent on top (every ball return has one)
-		kit:box(m, "Dryer", x - 0.45, x + 0.45, 2.3, 2.75, -2.8, -1.8, { 60, 62, 66 }, "Metal", { collide = false })
+		local top = L.HOOD_H
+		kit:box(
+			m,
+			"Dryer",
+			x - 0.45,
+			x + 0.45,
+			top,
+			top + 0.4,
+			-2.8,
+			-1.8,
+			{ 60, 62, 66 },
+			"Metal",
+			{ collide = false }
+		)
 		kit:box(
 			m,
 			"DryerGrille",
 			x - 0.35,
 			x + 0.35,
-			2.75,
-			2.78,
+			top + 0.4,
+			top + 0.43,
 			-2.7,
 			-1.9,
 			{ 24, 24, 26 },
@@ -718,23 +793,23 @@ end
 local function approaches(kit: any, root: any)
 	local m = kit:model(root, "Approach")
 	local holes = {}
-	for p = 1, 3 do
+	for p = 1, L.PAIRS do
 		local x = L.pairX(p)
 		table.insert(holes, { x - L.DUCT_W / 2, x + L.DUCT_W / 2, L.SHAFT_D0, L.SHAFT_D1 })
 	end
-	for i, r in kit:holes(-L.LANE_BLOCK_X, L.LANE_BLOCK_X, L.APPROACH_D, L.FOUL_D - 0.06, holes) do
+	for i, r in kit:holes(L.LANE_BLOCK_X0, L.LANE_BLOCK_X1, L.APPROACH_D, L.FOUL_D - 0.06, holes) do
 		kit:box(m, `Approach{i}`, r[1], r[2], L.DUCT_CEIL, 0, r[3], r[4], { 222, 192, 146 }, "Wood")
 	end
 	for lane = 1, L.LANES do
 		local x = L.laneX(lane)
 		-- board seams on the approach and the dots
-		for k = -6, 6 do
-			if k ~= 0 then
+		for k = -5, 5, 2 do
+			do
 				kit:box(
 					m,
 					"ApproachSeam",
-					x + k * 0.31 - 0.006,
-					x + k * 0.31 + 0.006,
+					x + k * 0.31 - 0.008,
+					x + k * 0.31 + 0.008,
 					0,
 					0.002,
 					L.APPROACH_D,
@@ -749,7 +824,7 @@ local function approaches(kit: any, root: any)
 				)
 			end
 		end
-		for _, dd in { -3.4, -7.4, -11.6 } do
+		for _, dd in { -7.4, -11.6 } do
 			for k = -2, 2 do
 				kit:cyl(m, "ApproachDot", x + k * 0.52, 0.003, dd, 0.004, 0.09, "Y", DARK, "SmoothPlastic", {
 					collide = false,
@@ -761,7 +836,7 @@ local function approaches(kit: any, root: any)
 	end
 	-- players stay off the lanes (an invisible guard just past the foul line; the ball and pins pass through
 	-- it: collision group LaneGuard, registered by Server/Attractions/AttractionService)
-	kit:box(m, "LaneGuard", -L.LANE_BLOCK_X, L.LANE_BLOCK_X, 0, 9, 0.6, 0.9, { 255, 0, 0 }, "SmoothPlastic", {
+	kit:box(m, "LaneGuard", L.LANE_BLOCK_X0, L.LANE_BLOCK_X1, 0, 9, 0.6, 0.9, { 255, 0, 0 }, "SmoothPlastic", {
 		query = false,
 		transparency = 1,
 		shadow = false,
@@ -771,8 +846,8 @@ local function approaches(kit: any, root: any)
 	kit:box(
 		m,
 		"SetteeEdge",
-		-L.LANE_BLOCK_X,
-		L.LANE_BLOCK_X,
+		L.LANE_BLOCK_X0,
+		L.LANE_BLOCK_X1,
 		0,
 		0.08,
 		L.APPROACH_D - 0.3,
@@ -788,10 +863,10 @@ end
 local function settees(kit: any, root: any)
 	local folder = kit:folder(root, "Settees")
 	local vinyl = { { 222, 104, 40 }, { 32, 140, 140 }, { 222, 104, 40 } }
-	for p = 1, 3 do
+	for p = 1, L.PAIRS do
 		local m = kit:model(folder, `Settee{p}`)
 		local x = L.pairX(p)
-		local col = vinyl[p]
+		local col = vinyl[(p - 1) % #vinyl + 1]
 		local back = L.SETTEE_D - 2.2
 		-- a U of bench: back row facing the lanes, two short sides
 		kit:box(m, "BenchBase", x - 4.8, x + 4.8, 0, 1.2, back, back + 1.6, { 40, 40, 46 }, "SmoothPlastic")
@@ -939,10 +1014,12 @@ local function scoreboards(kit: any, root: any)
 end
 
 local function ceilingLights(kit: any, root: any)
-	local m = kit:model(root, "LaneLights")
+	-- (the lights in the hall's ceiling are part of HallRoof: AlleyLayout.HALL_ROOF)
+	local hall = root:FindFirstChild(L.HALL_ROOF.model) or kit:model(root, L.HALL_ROOF.model)
+	local m = kit:model(hall, "LaneLights")
 	-- fluorescent troffers over the approaches and settees, a few real lights among them
 	for _, d in { -6, -13, -20 } do
-		for p = 1, 3 do
+		for p = 1, L.PAIRS do
 			local x = L.pairX(p)
 			local f = kit:box(
 				m,
@@ -960,13 +1037,18 @@ local function ceilingLights(kit: any, root: any)
 				}
 			)
 			if d == -13 then
-				kit:light(f, "PointLight", { Range = 22, Brightness = 1.15, Color = { 255, 244, 226 }, Shadows = true })
+				-- (no shadows: there are nine of these now, and the pin lights keep theirs)
+				kit:light(
+					f,
+					"PointLight",
+					{ Range = 22, Brightness = 1.15, Color = { 255, 244, 226 }, Shadows = false }
+				)
 			end
 		end
 	end
 	-- dimmer cans down the lanes (cosmic feel), every 12 studs
 	for d = 8, 44, 12 do
-		for p = 1, 3 do
+		for p = 1, L.PAIRS do
 			kit:cyl(
 				m,
 				"Can",
@@ -983,7 +1065,7 @@ local function ceilingLights(kit: any, root: any)
 		end
 	end
 	-- a soft wash down the lanes (two lights per pair: the heads and the middle)
-	for p = 1, 3 do
+	for p = 1, L.PAIRS do
 		for _, d in { 12, 30 } do
 			local wash = kit:cyl(
 				m,
@@ -1008,8 +1090,8 @@ local function ceilingLights(kit: any, root: any)
 		kit:box(
 			m,
 			"CeilingRib",
-			-L.LANE_BLOCK_X,
-			L.LANE_BLOCK_X,
+			L.LANE_BLOCK_X0,
+			L.LANE_BLOCK_X1,
 			L.CEILING_Y - 0.06,
 			L.CEILING_Y,
 			d - 0.05,
@@ -1031,9 +1113,10 @@ function Lanes.build(kit: any, root: any)
 		m:SetAttribute("Pair", L.pairOf(lane))
 		board(kit, m, lane)
 		pins(kit, m, lane)
-		machine(kit, m, lane)
+		sweepBar(kit, m, lane)
 		local rx, ry, rd = L.rackSlot(lane)
-		kit:ball(m, "Ball", rx, ry, rd, L.BALL_D, Lanes.BALL_COLORS[lane], "SmoothPlastic", {
+		local ballCol = Lanes.BALL_COLORS[(lane - 1) % #Lanes.BALL_COLORS + 1]
+		kit:ball(m, "Ball", rx, ry, rd, L.BALL_D, ballCol, "SmoothPlastic", {
 			reflectance = 0.15,
 			group = "BowlingPhysics",
 		})

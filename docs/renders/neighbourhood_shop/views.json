@@ -1,0 +1,67 @@
+{
+  "about": "THE NEIGHBOURHOOD SHOP (f1_neighbourhood_shop) review views. Venue frame: world x = 686 - X, z = 70.625 + D, y = 2.3 + Y (X across the frontage, D into the building, Y up from the floor). Make: python -I tools/blender/neighbourhood_shop/export_shop.py; lune run tools/bake/main.luau (+ editor_ground, backdrop); lune run tools/bake/neighbourhood_shop.luau; lune run tools/review/export.luau; lune run tools/review/neighbourhood_shop.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/shop_scene.json --views docs/renders/neighbourhood_shop/views.json --out build/review/shop --threads 2. The shell is drawn from the bake; the owner's interior and roof from the very FBX files that were uploaded (tools/review/art_render.py), placed where the engine pivots them. Interior views are at a person's eye (floor + 5.2). Cycles bounces light off the walls and Roblox's lighting does not: in the engine the corners and the ceiling will be darker than here (the shell's soft room fills are there for that).",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {
+      "name": "ns_01_street",
+      "desc": "From Main Street's south sidewalk straight across the boulevard, at a person's eye: the shopfront, the sign, the roof.",
+      "pos": [686, 5.5, -44], "look": [686, 10, 62], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "ns_02_street_side",
+      "desc": "From the boulevard's north sidewalk 50 st along toward the trolley stop (x 735), looking back along the frontage.",
+      "pos": [735, 5.5, 44], "look": [680, 9, 58], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "ns_03_door",
+      "desc": "On the north sidewalk in front of the door (local 11.3, -26), looking in through the open door.",
+      "pos": [674.7, 5.5, 44.5], "look": [674.7, 6.5, 80], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "ns_04_retail",
+      "desc": "Inside the retail room by the door (local 14, 5.2, -13), toward the checkout, the skateboard wall and the racks.",
+      "pos": [672, 7.5, 57.6], "look": [678, 5.5, 82], "fov": 70
+    },
+    {
+      "name": "ns_05_retail_back",
+      "desc": "From behind the checkout (local 5, 5.2, 15), back toward the shopfront, the windows and the street.",
+      "pos": [681, 7.5, 85.6], "look": [672, 5.5, 52], "fov": 70
+    },
+    {
+      "name": "ns_06_cafe",
+      "desc": "The cafe from its window table (local -6, 5.2, -14), toward the counter, the five stools and the menus.",
+      "pos": [692, 7.5, 56.6], "look": [705, 5.3, 72], "fov": 70
+    },
+    {
+      "name": "ns_07_cafe_counter",
+      "desc": "From beyond the last stool (local -13, 5.2, 6.5), back along the stools and the counter to the windows.",
+      "pos": [699, 7.5, 77.1], "look": [697, 5, 52], "fov": 70
+    },
+    {
+      "name": "ns_08_office",
+      "desc": "The back office (local -11, 5.2, 10.5), toward the desk, the cabinet and the plant.",
+      "pos": [697, 7.5, 81.1], "look": [705, 4.5, 87.5], "fov": 70
+    },
+    {
+      "name": "ns_09_curtain",
+      "desc": "From the middle of the cafe (local -15, 5.2, -4) toward the beaded curtain into the office.",
+      "pos": [701, 7.5, 66.6], "look": [701, 5.5, 80], "fov": 65
+    },
+    {
+      "name": "ns_10_aerial",
+      "desc": "From the air south of the boulevard (x 760): the roof, the chimney, the forecourt and the street.",
+      "pos": [760, 80, -30], "look": [686, 8, 68], "fov": 50
+    },
+    {
+      "name": "ns_11_back",
+      "desc": "From behind (north of the shop, x 745): the back wall, a gable end and the chimney.",
+      "pos": [745, 22, 140], "look": [686, 12, 72], "fov": 55
+    },
+    {
+      "name": "ns_12_sign",
+      "desc": "From the north sidewalk 30 st along from the door, at a person's eye: the sign on the window header band, under the eave.",
+      "pos": [702, 5.5, 40], "look": [684, 11, 52], "fov": 60, "aboveGround": true
+    }
+  ]
+}

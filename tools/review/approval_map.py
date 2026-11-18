@@ -25,6 +25,7 @@ FAM = {
 }
 NEW = (255, 214, 64)
 KIND = {
+    "shop_neighbourhood": "the owner's shop: retail, cafe, office",
     "shop_corner": "1970s corner store, 22 items", "shop_barber": "barber shop", "restaurant_bakery": "bakery",
     "restaurant_cafe": "cafe", "shop_music": "music store", "shop_pet": "pet store", "restaurant_pizza": "pizza",
     "restaurant_chinese": "Chinese", "shop_antique": "antique store", "restaurant_diner": "diner", "restaurant_taco": "tacos",
@@ -35,6 +36,12 @@ KIND = {
     "lounge_classic": "lounge one, 1940s", "lounge_scifi": "lounge two, sci-fi", "racquet_club": "racquetball court",
     "mall_small": "new mall, wind tunnel", "tv_station": "5 storeys, paintball", "restaurant_hilltop": "hilltop restaurant",
     "skylift_station": "gondola to the hilltop", "jetski_rental": "marina ride", "parasail_launch": "marina ride",
+}
+# Where the lounges and the racquet club were first drawn (data/expansion.json before 2026-11-13): world x0, x1, z0, z1
+FIRST_DRAWN = {
+    "L1": (1374, 1424, -390, -334),
+    "L2": (1432, 1482, -390, -334),
+    "RC": (1494, 1558, -418, -334),
 }
 INK = (34, 36, 40)
 PAPER = (246, 242, 232)
@@ -380,6 +387,24 @@ def main():
                 tmp = tmp.rotate(90, expand=True)
                 de.layer.paste(tmp, (int(u - 12), int(v - 110)), tmp)
     de.text(1060, 0, "MAIN STREET (COMMERCIAL BOULEVARD)", 14, (20, 20, 20), True)
+    # OWNER QUESTION 1 (alley venue map, question 1): where the two lounges and the racquet club were first drawn,
+    # before the eighteen-lane alley's games room took their ground along Bowl Lane; nothing is built on either
+    q1 = (200, 30, 120, 255)
+    for name, (x0, x1, z0, z1) in FIRST_DRAWN.items():
+        de.dashed_poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], q1, 3, (7, 4))
+        de.text((x0 + x1) / 2, (z0 + z1) / 2, name, 12, q1[:3], True)
+    de.line([(1430, -300), (1560, -300)], q1, 3)
+    de.line([(1560, -300), (1548, -293)], q1, 3)
+    de.line([(1560, -300), (1548, -307)], q1, 3)
+    de.text(1495, -284, "Q1: L1, L2, RC MOVED 88 EAST?", 14, q1[:3], True)
+    # the ground kept for the owner's backstage behind the lanes (the reserve): the park and the steakhouse keep it
+    # until the backstage package arrives
+    alley = data["attractions"][0]
+    pl, kept = alley["place"], alley["reserve"]  # (yaw 0: world x = place.x + X, z = place.z - D)
+    rs = (pl["x"] + kept["x0"], pl["x"] + kept["x1"], pl["z"] - kept["d1"], pl["z"] - kept["d0"])
+    de.dashed_poly([(rs[0], rs[2]), (rs[1], rs[2]), (rs[1], rs[3]), (rs[0], rs[3])], (40, 40, 40, 255), 2, (5, 4))
+    de.text((rs[0] + rs[1]) / 2, rs[2] + 12, "KEPT FOR THE BACKSTAGE (the park keeps it until it arrives)", 11,
+            (40, 40, 40), True)
     for lid, label in [("east_chilis_restaurant", "CHILI'S"), ("east_fuel_market", "FUEL"), ("east_corner_shops", "CORNER SHOPS")]:
         l = next(x for x in data["lots"] if x["id"] == lid)
         de.text(l["x"], l["z"], label, 12, (90, 70, 50), True)
@@ -445,6 +470,11 @@ def main():
         ("  P / S = the 6 pickups and 4 SUVs", False),
         ("  red line = sky lift cable and towers", False),
         ("  dashed yellow = new street / jet-ski water", False),
+        ("QUESTION FOR YOU (nothing built on it yet)", True),
+        ("  Q1 (magenta): the 18-lane alley's games room", False),
+        ("  took the lounges' first spots on Bowl Lane;", False),
+        ("  both lounges and the racquet club moved 88 east.", False),
+        ("  OK? Or: games room behind lounge one, lounges back.", False),
     ]
     for text, bold in extra:
         d.text((xx, yy), text, font=font(14, bold), fill=INK)

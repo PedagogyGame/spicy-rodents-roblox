@@ -8,7 +8,8 @@
 -- they only need their ids filled in in the game's own file. Bowling's cues keep their bare names; a new
 -- game's are "<game>.<cue>" so that two games can never mean different sounds by one name.
 -- Interface: play(cue, volume?) -> bool (true only if a real sound was started); CUES (cue -> asset id, "" =
---   none yet); add(cues) (a game's own); counts() -> { [cue]: times asked } (so a developer can see the cues fire)
+--   none yet); add(cues) (a game's own); counts() -> { [cue]: times asked } (so a developer can see the cues fire);
+--   count(cue) (one more asked, for a game that plays a cue itself)
 
 local MinigameSounds = {}
 
@@ -26,8 +27,14 @@ function MinigameSounds.counts(): { [string]: number }
 	return asked
 end
 
-function MinigameSounds.play(cue: string, volume: number?): boolean
+-- Count a cue as asked for, for a caller that plays it itself (paintball's World plays its cues from a place in
+-- the world, which play() does not)
+function MinigameSounds.count(cue: string)
 	asked[cue] = (asked[cue] or 0) + 1
+end
+
+function MinigameSounds.play(cue: string, volume: number?): boolean
+	MinigameSounds.count(cue)
 	local id = MinigameSounds.CUES[cue]
 	if id == nil or id == "" then
 		return false

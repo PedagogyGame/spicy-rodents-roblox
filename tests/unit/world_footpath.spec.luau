@@ -233,4 +233,45 @@ return function(t)
 			t.truthy(f.opened <= FootPath.MAX_NODES)
 		end
 	)
+	t.test(
+		"the owner's Neighbourhood Shop is a building: a walk from behind it to Main Street goes round it",
+		function()
+			local data = Data.default()
+			local colliders = Colliders.fromData(data)
+			local shop: Colliders.Box? = nil
+			for _, b in colliders.boxes do
+				if b.id == "f1_neighbourhood_shop" then
+					shop = b
+				end
+			end
+			t.truthy(shop, "the built venue is a collider box")
+			local s = shop :: Colliders.Box
+			t.near(s.cx, 686, 0.5)
+			t.near(s.cz, 70.625, 0.5)
+			-- its brick walls stand 22.72 either side and 19.72 behind the floor's centre, its fascia 19.33 in front
+			t.truthy(s.hw >= 22.72 and s.hd >= 19.72, `{s.hw} x {s.hd}`)
+			t.truthy(s.peak > s.eave and s.eave > s.y0)
+			local f = FootPath.new({ colliders = colliders, bounds = Height.worldClamp() })
+			local from = { 686, s.cz + s.hd + 8 } -- the lawn behind it
+			local to = { 686, 44 } -- Main Street's north sidewalk in front of its door
+			t.eq(Colliders.pointIn(colliders, from[1], from[2], Height.at(from[1], from[2]) + 3, 0), nil)
+			local points, len = FootPath.find(f, from[1], from[2], to[1], to[2])
+			t.truthy(points ~= nil, "a way round")
+			t.truthy(len > (from[2] - to[2]) + 10, `a detour, not straight through ({len} studs)`)
+			local px, pz = from[1], from[2]
+			for i, q in points :: { { number } } do
+				local n = math.max(1, math.ceil(math.sqrt((q[1] - px) ^ 2 + (q[2] - pz) ^ 2)))
+				for k = 0, n do
+					local x, z = px + (q[1] - px) * k / n, pz + (q[2] - pz) * k / n
+					local hit = Colliders.pointIn(colliders, x, z, Height.at(x, z) + 3, 1)
+					t.truthy(hit == nil or hit.id ~= "f1_neighbourhood_shop", `leg {i} goes through the shop`)
+				end
+				px, pz = q[1], q[2]
+			end
+			-- only a built venue is a box: the planned ones have nothing standing yet
+			for _, b in colliders.boxes do
+				t.truthy(not string.find(b.id, "^f%d_") or b.id == "f1_neighbourhood_shop", b.id)
+			end
+		end
+	)
 end

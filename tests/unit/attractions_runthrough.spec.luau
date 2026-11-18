@@ -15,49 +15,13 @@ local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local MoveValidator = require("@server/Movement/MoveValidator")
 local BakedWorld = require("@tests/lib/BakedWorld")
 
--- What stands in the animal's way along every pair's run on the building as baked today (paths under the alley's
--- Model; <p> the pair, <a>/<b> its two lanes). Each is a known failure the duct builder clears:
-local KNOWN_BLOCKAGES = {
-	-- the alley opening: 1.55 high for a 1.7-high body, and the ramp behind it baked backwards (Shell.luau rotates
-	-- the wedge by pi, so its tall end faces the alley)
-	"Tunnels.Tunnel<p>.VentFrameTop",
-	"Tunnels.Tunnel<p>.VentLintel",
-	"Tunnels.Tunnel<p>.VentRamp",
-	-- dressing in the duct: wall ribs every 4 studs stand into a 1.6-wide body in the 1.7-wide duct; the spare pin,
-	-- the joists and a lamp under the pits hang in its way
-	"Tunnels.Tunnel<p>.Rib",
-	"Tunnels.Tunnel<p>.SparePin",
-	"Tunnels.Tunnel<p>.Joist",
-	"Tunnels.Tunnel<p>.Lamp",
-	-- under the pits: 1.23 of headroom, below even a crawl (1.3)
-	"Tunnels.Tunnel<p>.Ceiling2",
-	"Lanes.Lane<a>.PitFloor",
-	"Lanes.Lane<b>.PitFloor",
-	-- the kickback board between the pin decks hangs 1.2 into the duct (to Y -1.6) from D 50 to the pits
-	"Masking.Kickback",
-	-- the riser: its walls are narrower than the body, and no hole is cut where it rises through the floor
-	"Tunnels.Tunnel<p>.RiserWall",
-	"Tunnels.Tunnel<p>.Ceiling1",
-	"Masking.Capping",
-	"Approach.Approach<n>",
-	"Lanes.Lane<a>.Gutter",
-	"Lanes.Lane<b>.Gutter",
-	"Lanes.Lane<a>.FoulLine",
-	"Lanes.Lane<b>.FoulLine",
-	-- the hood: a solid bonnet with the lift's chute, the dryer and a liner block in it, and a mouth 1.24 x 0.9
-	"Returns.Return<p>.ChuteBack",
-	"Returns.Return<p>.HoodBack",
-	"Returns.Return<p>.Bonnet",
-	"Returns.Return<p>.BonnetCapBack",
-	"Returns.Return<p>.Dryer",
-	"Returns.Return<p>.DryerGrille",
-	"Returns.Return<p>.MouthLiner",
-	"Returns.Return<p>.FaceTop",
-	"Returns.Return<p>.FaceSide",
-}
--- the approach floor slab the riser comes up through, per pair
-local APPROACH = { 10, 8, 6 }
-
+-- What stands in the animal's way along every pair's run on the building as baked (paths under the alley's Model;
+-- <p> the pair, <a>/<b> its two lanes, <n> the approach floor piece the riser comes up through). Nothing may: the
+-- six-lane house's duct had 28 such parts per pair (a 1.55-high vent for a 1.7-high body, 1.23 of headroom under
+-- the pits, the kickback hanging into the duct, no hole for the riser, a solid hood with a 1.24 x 0.9 mouth); the
+-- eighteen-lane duct is built to the body (AlleyLayout: DUCT_W, DUCT_FLOOR, VENT_H, SHAFT_D0, HOOD_W, MOUTH_*).
+-- A part that must stand in the way one day is listed here by name, with the reason.
+local KNOWN_BLOCKAGES: { string } = {}
 return function(t)
 	local baked, place = BakedWorld.bakeAlley()
 	local data = Data.default()
@@ -104,9 +68,9 @@ return function(t)
 	end
 
 	t.test(
-		"in at the grille, heading in, eased; under the lane; out with its head at the rack (all three pairs)",
+		"in at the grille, heading in, eased; under the lane; out with its head at the rack (all nine pairs)",
 		function()
-			for p = 1, 3 do
+			for p = 1, AlleyLayout.PAIRS do
 				local px = AlleyLayout.pairX(p)
 				local s = standing(px, 92, AlleyLayout.ALLEY_Y + 1, 0, -1)
 				local trace = BakedWorld.drive(w, s, 60 * 10, hold(camAlong(0, -1)), {
@@ -271,7 +235,7 @@ return function(t)
 
 	t.test("the rack: Space or a click hops out onto the rack by the bowler; Q drops onto it; S goes back", function()
 		local camAway = camAlong(1, 0)
-		for p = 1, 3 do
+		for p = 1, AlleyLayout.PAIRS do
 			local px = AlleyLayout.pairX(p)
 			for _, key in { "leap", "pounce" } do
 				-- the mouth's short hop (data: hop 14, hopUp 12), out along the mouth whatever the view
@@ -450,7 +414,7 @@ return function(t)
 	t.test(
 		"where a launch out of each mouth starts, nothing solid stands (the balls resting there are seen)",
 		function()
-			for p = 1, 3 do
+			for p = 1, AlleyLayout.PAIRS do
 				for _, mb in BakedWorld.mouthClearance(baked, reg, runOf(p)) do
 					local names = {}
 					for _, part in mb.parts do
@@ -460,21 +424,23 @@ return function(t)
 					table.sort(names)
 					-- the grille is clear; at the rack the body starts beside the pair's two balls resting at the hood (they do
 					-- not collide; the rack moment's builder decides where they rest when a squirrel comes out)
-					local want = if mb.mouth == "rack" then `Lanes.Lane{2 * p - 1}.Ball,Lanes.Lane{2 * p}.Ball` else ""
-					t.eq(table.concat(names, ","), want, `pair {p} {mb.mouth}`)
+					local want = if mb.mouth == "rack"
+						then { `Lanes.Lane{2 * p - 1}.Ball`, `Lanes.Lane{2 * p}.Ball` }
+						else {}
+					table.sort(want)
+					t.eq(table.concat(names, ","), table.concat(want, ","), `pair {p} {mb.mouth}`)
 				end
 			end
 		end
 	)
 
 	t.test("the duct builder's list: what the building as baked today puts in the animal's way, by name", function()
-		for p = 1, 3 do
+		for p = 1, AlleyLayout.PAIRS do
 			local expected: { [string]: boolean } = {}
 			for _, name in KNOWN_BLOCKAGES do
 				local n = string.gsub(name, "<p>", tostring(p))
 				n = string.gsub(n, "<a>", tostring(2 * p - 1))
 				n = string.gsub(n, "<b>", tostring(2 * p))
-				n = string.gsub(n, "<n>", tostring(APPROACH[p]))
 				expected[n] = true
 			end
 			local found: { [string]: boolean } = {}

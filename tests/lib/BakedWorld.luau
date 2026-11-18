@@ -690,23 +690,19 @@ function BakedWorld.alleyRuntime(part: Part, inst: any)
 	end
 end
 
--- bakeAlley(attraction?): the bowling alley built in memory by the bake's own code (tools/bake/alley: Shell, Lanes,
--- Rooms), from data/attractions.json's first attraction unless one is given; with the server's runtime state.
--- Returns the world, the alley's place and the Model.
+-- bakeAlley(attraction?): the bowling alley built in memory by the bake's own code (tools/bake/alley/Alley: the
+-- shell, the lanes, the rooms, the interim back module, the forecourt), from data/attractions.json's first
+-- attraction unless one is given; with the server's runtime state. Returns the world, the alley's place and the Model.
 function BakedWorld.bakeAlley(attraction: any?): (World, AlleyLayout.Place, any)
 	local serde = require("@lune/serde")
 	local a = attraction or serde.decode("json", fs.readFile("data/attractions.json")).attractions[1]
 	local place: AlleyLayout.Place = { x = a.place.x, z = a.place.z, floorY = a.place.floorY, yaw = a.place.yaw }
 	local Kit = (require :: any)("../../tools/bake/alley/Kit")
-	local Shell = (require :: any)("../../tools/bake/alley/Shell")
-	local Lanes = (require :: any)("../../tools/bake/alley/Lanes")
-	local Rooms = (require :: any)("../../tools/bake/alley/Rooms")
+	local Alley = (require :: any)("../../tools/bake/alley/Alley")
 	local GameBakes = (require :: any)("../../tools/bake/GameBakes")
 	local kit = Kit.new(roblox, place)
 	local root = GameBakes.siteModel(roblox, "BowlingAlley", a.id, place)
-	Shell.build(kit, root, a)
-	Lanes.build(kit, root)
-	Rooms.build(kit, root)
+	Alley.build(kit, root, a)
 	return BakedWorld.fromModel(root, { adjust = BakedWorld.alleyRuntime }), place, root
 end
 

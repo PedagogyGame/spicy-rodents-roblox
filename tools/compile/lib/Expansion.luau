@@ -80,6 +80,8 @@ Expansion.APPROVAL = table.freeze({
 Expansion.FRONTAGE = 16 -- studs from a door to the network for "frontage", "alley" and "forecourt"
 Expansion.PATH_END = 3 -- studs from a path end to its door or to the network
 Expansion.EPS = 0.05
+Expansion.CABLE_CLEAR = 20 -- studs from the sky-lift cable down to the ground...
+Expansion.CABLE_APRON = 30 -- ...farther than this from either station's building
 
 local function r4(n: number): number
 	return math.floor(n * 1e4 + 0.5) / 1e4
@@ -301,7 +303,10 @@ function Expansion.groundStats(v: any): (number, number)
 	return lo, hi
 end
 
-local function attractionPolys(world: World): { { id: string, poly: Poly } }
+-- An attraction's footprint, and the ground it keeps for something not built yet (the bowling alley's backstage).
+-- A reserve's `givesWayOnArrival` names the venues whose sites may overlap it until that thing arrives (the owner's
+-- default: the park and the steakhouse give up that ground only when the backstage package is here): `yields`.
+local function attractionPolys(world: World): { { id: string, poly: Poly, yields: { [string]: boolean }? } }
 	local out = {}
 	for _, a in world.attractions do
 		local p, fp = a.place, a.footprint
@@ -311,6 +316,23 @@ local function attractionPolys(world: World): { { id: string, poly: Poly } }
 			table.insert(poly, { x, z })
 		end
 		table.insert(out, { id = a.id, poly = poly })
+		-- ground an attraction keeps free for something that has not been built yet (the bowling alley's backstage)
+		local rs = a.reserve
+		if rs then
+			local kept = {}
+			for _, c in { { rs.x0, rs.d0 }, { rs.x1, rs.d0 }, { rs.x1, rs.d1 }, { rs.x0, rs.d1 } } do
+				local x, _, z = AlleyLayout.toWorld(p, c[1], 0, c[2])
+				table.insert(kept, { x, z })
+			end
+			local yields: { [string]: boolean } = {}
+			for _, vid in rs.givesWayOnArrival or {} do
+				yields[vid] = true
+			end
+			table.insert(
+				out,
+				{ id = a.id .. " (ground reserved for " .. rs["for"] .. ")", poly = kept, yields = yields }
+			)
+		end
 	end
 	return out
 end
@@ -490,7 +512,7 @@ function Expansion.check(doc: any, world: World): { string }
 			end
 		end
 		for _, a in alleys do
-			if overlaps(site, a.poly) then
+			if overlaps(site, a.poly) and not (a.yields and a.yields[id]) then
 				bad(id .. " overlaps the attraction " .. a.id)
 			end
 		end
@@ -743,6 +765,15 @@ function Expansion.check(doc: any, world: World): { string }
 					bad(ride.id .. ": the cable does not end at " .. vid .. "/" .. (pair[3] :: string))
 				end
 			end
+			-- the cable clears the ground by CABLE_CLEAR outside CABLE_APRON of either station's building (a cabin
+			-- hangs 10.5 below it, so its floor stays ~9 st up); inside the apron it may come down to the platforms
+			local stationFeet = {}
+			for _, ref in { ride.from, ride.to } do
+				local v = venueById[string.sub(ref, 1, (string.find(ref, "/", 1, true) or 1) - 1)]
+				if v ~= nil then
+					table.insert(stationFeet, Expansion.footPoly(v))
+				end
+			end
 			for i = 1, #pts - 1 do
 				local a, b = pts[i], pts[i + 1]
 				local len = math.sqrt((b[1] - a[1]) ^ 2 + (b[3] - a[3]) ^ 2)
@@ -750,9 +781,11 @@ function Expansion.check(doc: any, world: World): { string }
 				for k = 0, n do
 					local t = k / n
 					local x, y, z = a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
-					local dStart = math.sqrt((x - first[1]) ^ 2 + (z - first[3]) ^ 2)
-					local dEnd = math.sqrt((x - last[1]) ^ 2 + (z - last[3]) ^ 2)
-					if dStart > 30 and dEnd > 30 and y < Expansion.ground(x, z) + 6 then
+					local apron = false
+					for _, poly in stationFeet do
+						apron = apron or polyDist(poly, x, z) <= Expansion.CABLE_APRON
+					end
+					if not apron and y < Expansion.ground(x, z) + Expansion.CABLE_CLEAR then
 						bad(
 							string.format(
 								"%s: the cable is %.1f st above the ground at (%.0f, %.0f)",

@@ -3,7 +3,11 @@
 -- parts (the cloud checks cannot be run from here, and they have no clients or physics anyway). Datatypes
 -- (Vector3, CFrame, Color3, Enum) are Lune's real ones; instances are small Luau tables with the handful of
 -- members the glue uses: a tree (Parent, FindFirstChild, GetChildren, GetDescendants, IsA, Destroy, Clone),
--- attributes, properties as plain fields, Position from CFrame, and Model:GetPivot / PivotTo that carry the
+-- attributes (GetAttributeChangedSignal fires when SetAttribute writes a different value: at once, or, after
+-- deferAttributes(true), once per attribute at the next frame() and only if the frame left it different, which
+-- is what a CLIENT sees of a server's writes: the place runs deferred signals and replication carries the last
+-- value of a frame, so three writes in one frame are one change and a write put back is none), properties as plain
+-- fields, Position from CFrame, and Model:GetPivot / PivotTo that carry the
 -- model's parts along; the usual events (Activated, Triggered, OnClientEvent ...) appear as signals the test
 -- fires; RemoteEvent:FireServer records what was sent. No physics, no replication.
 -- The engine globals exist only between install() and uninstall(): use `FakeEngine.with(function() ... end)`.
@@ -17,14 +21,15 @@
 -- Interface: new(className, name?, props?) -> Instance; install(); uninstall(); with(fn); part(name, cframe,
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
---   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
+--   bound; signal() -> { Connect, Once, fire }; a Sound's Play() and Stop() (Playing, played); uis() -> the fake UserInputService; input(kind "began" | "ended" |
 --   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position?, id? };
 --   with an id every event from that id's "began" to its "ended" is handed over as ONE InputObject, as the
 --   engine does for a finger: a controller can follow a touch by the object, which is the only sound way);
 --   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
 --   task.spawn / defer run at once and task.delay waits for runDelayed(which?, limit?) (everything queued, oldest
 --   first; `which(seconds)` picks by the delay asked for, `limit` stops after that many: a test can let one
---   timer fire while later ones are still running); delayedCount(); events(names) and classes({ parts?,
+--   timer fire while later ones are still running); delayedCount(); deferAttributes(on) and frame() (attribute
+--   signals as a client gets them: once per attribute per frame, the last value); events(names) and classes({ parts?,
 --   gui? }) teach it more event members and more BasePart / GuiObject classes (a game's own test asks for what
 --   its glue uses rather than editing the lists here); the fake UserInputService remembers what input() pressed
 --   (IsKeyDown, IsMouseButtonPressed)
@@ -131,6 +136,16 @@ function methods.FindFirstChild(self: any, name: string): any
 	return nil
 end
 
+-- Sound:Play() and Stop(): a fake sound only remembers that it was asked (Playing, and `played` times)
+function methods.Play(self: any)
+	rawset(self, "Playing", true)
+	rawset(self, "played", (rawget(self, "played") or 0) + 1)
+end
+
+function methods.Stop(self: any)
+	rawset(self, "Playing", false)
+end
+
 -- (a fake tree is always complete: waiting is finding)
 function methods.WaitForChild(self: any, name: string, _timeout: number?): any
 	return methods.FindFirstChild(self, name)
@@ -179,8 +194,38 @@ function methods.IsA(self: any, class: string): boolean
 		or (class == "GuiObject" and GUI_OBJECTS[own] == true)
 end
 
+-- deferAttributes(true): attribute writes are gathered and their signals fire at frame()
+local deferAttrs = false
+local pendingAttrs: { { inst: any, name: string, was: any } } = {}
+
 function methods.SetAttribute(self: any, name: string, value: any)
-	rawget(self, "_attrs")[name] = value
+	local attrs = rawget(self, "_attrs")
+	local was = attrs[name]
+	attrs[name] = value
+	if deferAttrs then
+		for _, p in pendingAttrs do
+			if p.inst == self and p.name == name then
+				return -- (already written this frame: the frame's first value is the one to compare with)
+			end
+		end
+		table.insert(pendingAttrs, { inst = self, name = name, was = was })
+		return
+	end
+	-- (as the engine: the changed signal fires only when the value is a different one)
+	local signals = rawget(self, "_attrSignals")
+	if signals and signals[name] and was ~= value then
+		signals[name].fire()
+	end
+end
+
+function methods.GetAttributeChangedSignal(self: any, name: string): any
+	local signals = rawget(self, "_attrSignals")
+	if signals == nil then
+		signals = {}
+		rawset(self, "_attrSignals", signals)
+	end
+	signals[name] = signals[name] or FakeEngine.signal()
+	return signals[name]
 end
 
 function methods.GetAttribute(self: any, name: string): any
@@ -333,6 +378,26 @@ function FakeEngine.runDelayed(which: ((seconds: number) -> boolean)?, limit: nu
 	end
 end
 
+-- Attribute signals as a client gets them: deferAttributes(true) gathers every SetAttribute from then on, and
+-- frame() ends the frame: each attribute written fires its changed signal once, in the order first written,
+-- and only if its value now differs from the value it had when the frame began. deferAttributes(false) goes
+-- back to firing at once (anything gathered is dropped).
+function FakeEngine.deferAttributes(on: boolean)
+	deferAttrs = on
+	pendingAttrs = {}
+end
+
+function FakeEngine.frame()
+	local list = pendingAttrs
+	pendingAttrs = {}
+	for _, p in list do
+		local signals = rawget(p.inst, "_attrSignals")
+		if signals and signals[p.name] and rawget(p.inst, "_attrs")[p.name] ~= p.was then
+			signals[p.name].fire()
+		end
+	end
+end
+
 -- How many task.delay callbacks are waiting.
 function FakeEngine.delayedCount(): number
 	return #delayed
@@ -374,6 +439,15 @@ function FakeEngine.signal(): any
 				end
 			end,
 		}
+	end
+	-- (Once: connected for the next fire only, as the engine's)
+	function sig.Once(self: any, fn: (...any) -> ()): any
+		local conn: any
+		conn = sig.Connect(self, function(...: any)
+			conn.Disconnect()
+			fn(...)
+		end)
+		return conn
 	end
 	function sig.fire(...: any)
 		for _, fn in table.clone(handlers) do
@@ -558,6 +632,8 @@ function FakeEngine.uninstall()
 	renderStepped = nil
 	delayed = {}
 	inputs = {}
+	deferAttrs = false
+	pendingAttrs = {}
 end
 
 -- with: run fn with the engine globals in place; they are always taken away again, even if fn throws.

@@ -49,12 +49,16 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" }, "type": { "enum": ["bowling_alley"] }, "name": { "type": "string" },
-        "district": { "type": "string" }, "lanes": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "district": { "type": "string" }, "lanes": { "type": "integer", "minimum": 1, "maximum": 24 },
         "games": { "type": "array", "items": { "type": "string" } },
         "place": { "type": "object", "required": ["x", "z", "floorY", "yaw"], "additionalProperties": false,
           "properties": { "x": { "type": "number" }, "z": { "type": "number" }, "floorY": { "type": "number" }, "yaw": { "type": "number" } } },
         "footprint": { "type": "object", "required": ["x0", "x1", "d0", "d1"], "additionalProperties": false,
           "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" } } },
+        "reserve": { "type": "object", "required": ["x0", "x1", "d0", "d1", "for"], "additionalProperties": false,
+          "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" }, "for": { "type": "string" },
+            "givesWayOnArrival": { "type": "array", "items": { "type": "string" },
+              "description": "venue ids (data/expansion.json) whose sites overlap the reserve today and give that ground up only when what it is kept for arrives" } } },
         "routes": { "type": "array", "items": {
           "type": "object",
           "required": ["id", "name", "kind", "points", "surfaceRadius"],
