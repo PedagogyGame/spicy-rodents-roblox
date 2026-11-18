@@ -19,7 +19,7 @@
 -- sky lift), handoff (a new body; packets of the old one still arriving are taken for the new, as the game does),
 -- release and possess again (a knock-out and a respawn).
 -- The server pins a new body (engine.pin, as Boot/Game: anchored, its own) until the first packet passes the gate: the
--- client's root updates are not taken while it is pinned.
+-- client's root updates are not taken while it is pinned; it is not handed back while it rides (Movement/BodyPin).
 -- Interface: new(opts) -> Rig; Rig:possess(state, keys); Rig:run(seconds); Rig:at(t, fn); Rig:teleport(x, y, z,
 --   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:unreported(x, y, z);
 --   Rig:result() -> Result;
@@ -295,14 +295,18 @@ function LiveRig.new(opts: Options): Rig
 					end
 				end)
 			end,
-			pin = function(id: any, on: boolean)
+			pin = function(id: any, on: boolean): boolean
 				if id ~= actorKey() then
-					return
+					return true
+				end
+				if not on and server.riding then
+					return false -- (Movement/BodyPin: never handed back while it rides)
 				end
 				server.pinned = on
 				if not on then
 					server.unpinnedAt = rig.t
 				end
+				return true
 			end,
 			hold = function(_id: any, x: number, y: number, z: number, seconds: number)
 				-- (the server takes the body's physics: the client's root updates are not taken until it gives it back)

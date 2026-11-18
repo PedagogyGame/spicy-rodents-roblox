@@ -54,6 +54,7 @@ local PlayerVehicles =
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local SkyLift = Import.shared("Rides/SkyLift") :: typeof(require("../../shared/Rides/SkyLift"))
+local BodyPin = require("../Movement/BodyPin")
 
 local SkyLiftService = {}
 SkyLiftService.__index = SkyLiftService
@@ -1057,9 +1058,8 @@ function SkyLiftService._alight(self: any, ride: Ride)
 			end
 		end
 		ride.body:PivotTo(CFrame.new(x, y + offset, z) * CFrame.Angles(0, yaw, 0))
-		if ride.root then
-			ride.root.Anchored = ride.wasAnchored
-		end
+		-- (a body the squirrel validator keeps stays anchored and the server's: Movement/BodyPin)
+		BodyPin.letGo(ride.root, ride.wasAnchored)
 		local player = ride.player
 		if player ~= nil then
 			if town.giveBack then
@@ -1475,11 +1475,8 @@ function SkyLiftService.lookOff(self: any, player: any)
 		pcall(town.focus :: any, player, nil)
 	end
 	local function release()
-		if l.root then
-			pcall(function()
-				l.root.Anchored = l.wasAnchored
-			end)
-		end
+		-- (a body the squirrel validator keeps stays anchored: Movement/BodyPin)
+		BodyPin.letGo(l.root, l.wasAnchored)
 	end
 	local post = self.telescopePost
 	local at = if post then (post :: any).Position else nil
@@ -1880,7 +1877,8 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 		end,
 		giveBack = function(player: any, body: any)
 			if isInstance(player) and body.PrimaryPart then
-				(body.PrimaryPart :: BasePart):SetNetworkOwner(player :: Player)
+				-- (never a body the squirrel validator keeps: Movement/BodyPin)
+				BodyPin.giveTo(body.PrimaryPart, player)
 			end
 		end,
 		charge = nil, -- the wallet (feat/wallet): Credits' charge(player, cents, why) goes here when it lands

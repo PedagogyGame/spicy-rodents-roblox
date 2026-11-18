@@ -78,6 +78,7 @@ local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require(".
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
+local BodyPin = require("../Movement/BodyPin")
 local MoveValidator = require("../Movement/MoveValidator")
 local ValidatorWorld = require("../Movement/ValidatorWorld")
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
@@ -770,71 +771,28 @@ function Game.start(opts: Opts?): any
 		end
 		return nil
 	end
-	movement.deps.engine = {
-		-- a newly held squirrel is the server's (anchored, its own) until its driver's first packet passes the gate: a
-		-- client that never sends cannot move it, and nothing is judged while its town streams in
-		pin = function(actorId: any, on: boolean)
-			local actor, driver = heldBy(actorId)
-			local body = if actor then actor.body :: Model else nil
-			local root = if body then body.PrimaryPart else nil
-			if body == nil or root == nil then
-				return
-			end
-			pcall(function()
-				if on then
-					if not root.Anchored then
-						root:SetNetworkOwner(nil)
-					end
-					root.Anchored = true
-					root.AssemblyLinearVelocity = Vector3.zero
-				elseif driver and typeof(driver) == "Instance" and body:GetAttribute("Ride") == nil then
-					root.Anchored = false
-					root:SetNetworkOwner(driver :: Player)
-				end
-			end)
+	-- the validator's hands (Movement/BodyPin): a newly held squirrel is the server's (anchored, its own, marked kept)
+	-- until its driver's first packet passes the gate, and only the validator's own unpin hands a kept body back (a
+	-- hold's timer, the sky lift, never do); a client that never sends cannot move it, and nothing is judged while its
+	-- town streams in
+	movement.deps.engine = BodyPin.engine({
+		heldBy = heldBy,
+		isPinned = function(actorId: any): boolean
+			return movement:isPinned(actorId)
 		end,
-		correct = function(actorId: any, msg: any)
-			local actor, driver = heldBy(actorId)
-			if actor == nil then
-				return
-			end
-			if msg.snap then
-				local body = actor.body :: Model
-				pcall(function()
-					body:PivotTo(CFrame.new(msg.x, msg.y + hipOf(body), msg.z) * body:GetPivot().Rotation)
-				end)
-			end
-			if net and driver and typeof(driver) == "Instance" then
+		place = function(body: any, x: number, y: number, z: number)
+			local model = body :: Model
+			model:PivotTo(CFrame.new(x, y + hipOf(model), z) * model:GetPivot().Rotation)
+		end,
+		tell = function(driver: any, msg: any)
+			if net and typeof(driver) == "Instance" then
 				net:fire(driver, "Correction", msg)
 			end
 		end,
-		hold = function(actorId: any, x: number, y: number, z: number, seconds: number)
-			local actor, driver = heldBy(actorId)
-			local body = if actor then actor.body :: Model else nil
-			local root = if body then body.PrimaryPart else nil
-			if body == nil or root == nil or driver == nil or typeof(driver) ~= "Instance" then
-				return
-			end
-			local wasAnchored = root.Anchored
-			pcall(function()
-				root:SetNetworkOwner(nil)
-				root.Anchored = true
-				body:PivotTo(CFrame.new(x, y + hipOf(body), z) * body:GetPivot().Rotation)
-			end)
-			task.delay(seconds, function()
-				if
-					possession:controllerOf(actor) == driver
-					and root.Parent ~= nil
-					and body:GetAttribute("Ride") == nil
-				then
-					pcall(function()
-						root.Anchored = wasAnchored
-						root:SetNetworkOwner(driver :: Player)
-					end)
-				end
-			end)
+		delay = function(seconds: number, fn: () -> ())
+			task.delay(seconds, fn)
 		end,
-	}
+	})
 	if net then
 		net:on("Squirrel.State", function(player: any, rec: any)
 			local actor = possession:actorOf(player)

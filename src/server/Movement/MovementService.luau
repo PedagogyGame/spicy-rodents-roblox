@@ -19,6 +19,9 @@
 -- a whole (MoveValidator.hop: no climb above a leap, no hanging in the air, no wall), or it is snapped to the gate.
 -- A squirrel's new body is the server's (engine.pin: anchored, its own) from the hand-off until its driver's first
 -- packet passes the gate: a client that never sends cannot move it, and nothing is judged while its town streams in.
+-- Only its own unpin hands the body back (Movement/BodyPin keeps every other path off a kept body), and stays pinned
+-- until the engine says it did (not while the body rides); should a pinned body still move off where it is kept, it is
+-- taken again and snapped back (reason "pin").
 -- What packets cannot show, watch() does: the server's own view of the root (a client owns its body's physics), ten
 -- to fifteen times a second:
 --   * drift: the root against the last accepted packet by the packets' own pace (their speed over the packet's age,
@@ -43,7 +46,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
+--   M:epochOf(actorId) -> number; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
 
 local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
@@ -75,9 +78,10 @@ export type Engine = {
 	correct: (actorId: any, msg: Correction) -> (),
 	-- take the body's physics and keep it still at x, y, z (feet) for `seconds`, then give it back
 	hold: ((actorId: any, x: number, y: number, z: number, seconds: number) -> ())?,
-	-- on: the server takes a newly held body's physics and keeps it still where it stands (anchored, its own); off: gives
-	-- it to its driver (the first packet passed the gate)
-	pin: ((actorId: any, on: boolean) -> ())?,
+	-- on: the server takes a newly held body's physics and keeps it still where it stands (anchored, its own, marked kept:
+	-- Movement/BodyPin); off: gives it to its driver (the first packet passed the gate) -> whether it did (false: not
+	-- now, the body rides; nil counts as done)
+	pin: ((actorId: any, on: boolean) -> boolean?)?,
 }
 
 export type Deps = {
@@ -142,6 +146,7 @@ type Squirrel = {
 	toldAt: number?, -- server time the driver was last told again of the move it ignores
 	pinned: boolean, -- a newly held body the server keeps (engine.pin) until its driver's first packet passes the gate
 	pinnedAt: number, -- server time it was first watched pinned (0: not yet)
+	pinAt: Gate?, -- where a pinned body is kept (the hand-off's place, or where the server moved it since)
 }
 
 export type Movement = {
@@ -159,6 +164,7 @@ export type Movement = {
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	epochOf: (self: Movement, actorId: any) -> number,
+	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
 }
@@ -347,6 +353,9 @@ function MovementService.new(deps: Deps): Movement
 		sq.overSince = nil
 		sq.epoch = nextEpoch(self)
 		sq.gate = target
+		if sq.pinned then
+			sq.pinAt = target -- (a pinned body the server moved is kept where it put it)
+		end
 		sq.lastAt = nil
 		sq.since = nil
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
@@ -424,6 +433,11 @@ function MovementService.new(deps: Deps): Movement
 		end
 		self.histories[id] = nil
 		self.last[id] = nil
+		local old = self.squirrels[id]
+		local engine = self.deps.engine
+		if old and old.pinned and engine and engine.pin then
+			engine.pin(id, false) -- (a body still kept goes back to the AI: no longer the validator's)
+		end
 		self.squirrels[id] = nil
 		if kind == "possess" then
 			local sq = squirrel(self, id)
@@ -436,9 +450,9 @@ function MovementService.new(deps: Deps): Movement
 			end
 			sq.possessedAt = 0
 			-- a squirrel's new body is the server's until its driver's first packet passes the gate (pin)
-			local engine = self.deps.engine
 			if RAIL_KINDS[actor.species] and self.deps.validator and engine and engine.pin and enforcing() then
 				sq.pinned = true
+				sq.pinAt = sq.gate
 				self._stats.pins += 1
 				engine.pin(id, true)
 			end
@@ -505,24 +519,36 @@ function MovementService.new(deps: Deps): Movement
 	end
 
 	-- the first packet passed the gate: the body is its driver's
-	local function unpin(self: Movement, id: any, sq: Squirrel, at: Gate?, now: number)
+	-- (the only hand-back of a pinned body; pinned until the engine says it did: not while the body rides, when a later
+	-- packet asks again)
+	local function unpin(self: Movement, id: any, sq: Squirrel, now: number)
 		if not sq.pinned then
 			return
 		end
+		local engine = self.deps.engine
+		if engine and engine.pin and engine.pin(id, false) == false then
+			self.log:every(`unpin:{id}`, 5, "warn", `{id}: past the gate while it rides; kept until it is off`)
+			return
+		end
 		sq.pinned = false
+		local at = sq.pinAt
+		sq.pinAt = nil
 		if at then
 			-- (the root stays where it was pinned until the driver's own updates come, a round trip on)
 			sq.prior = { x = at.x, y = at.y, z = at.z, at = now }
 			sq.priorUntil = math.max(sq.priorUntil, now + ignoredFor(self, id))
 		end
-		local engine = self.deps.engine
-		if engine and engine.pin then
-			engine.pin(id, false)
-		end
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
 		return squirrel(self, actorId).epoch
+	end
+
+	-- isPinned(actorId): the server keeps the body until its driver's first packet passes the gate (nothing else may
+	-- hand it back: Movement/BodyPin)
+	function m.isPinned(self: Movement, actorId: any): boolean
+		local sq = self.squirrels[actorId]
+		return sq ~= nil and sq.pinned
 	end
 
 	function m.teleported(self: Movement, actorId: any, x: number, y: number, z: number, why: string, now: number)
@@ -569,7 +595,25 @@ function MovementService.new(deps: Deps): Movement
 			gate.at = now
 		end
 		if sq.pinned then
-			-- the server's own body (engine.pin): nothing its driver does moves it, nothing to judge
+			-- the server's own body (engine.pin): nothing its driver does moves it, nothing to judge. Should it move off
+			-- where it is kept all the same (a path that let it go), it is taken again and put back
+			local at = sq.pinAt
+			if at == nil then
+				sq.pinAt = { x = x, y = y, z = z, at = now }
+			elseif dist(x, y, z, at.x, at.y, at.z) > C.GATE_SLACK then
+				self.log:every(
+					`pinmoved:{actorId}`,
+					5,
+					"warn",
+					`{actorId} moved while the server keeps it; taken again`
+				)
+				local engine = self.deps.engine
+				if engine and engine.pin then
+					engine.pin(actorId, true)
+				end
+				snap(self, actorId, "pin", now, { x = at.x, y = at.y, z = at.z, at = now })
+				return
+			end
 			if sq.pinnedAt == 0 then
 				sq.pinnedAt = now
 			elseif now - sq.pinnedAt > C.PIN_LOG then
@@ -803,7 +847,7 @@ function MovementService.new(deps: Deps): Movement
 				end
 				sq.gate = nil
 			end
-			unpin(self, actorId, sq, gate, now)
+			unpin(self, actorId, sq, now)
 			local v = validator:accept(actorId, packet, now)
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)

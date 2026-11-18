@@ -63,8 +63,11 @@ return function(t)
 		-- the root is watched fifteen times a second (walls between samples stay inside one chord)
 		t.truthy(string.find(src, "if watchAcc < 1 / 15 then", 1, true), "watched at 15 Hz")
 		-- a new squirrel body is the server's until its driver's first packet passes the gate
-		t.truthy(string.find(src, "pin = function(actorId: any, on: boolean)", 1, true), "engine.pin wired")
-		t.truthy(string.find(src, "root.Anchored = true", 1, true), "pinned: anchored")
+		t.truthy(string.find(src, "movement.deps.engine = BodyPin.engine({", 1, true), "engine.pin wired (BodyPin)")
+		t.truthy(
+			string.find(src, "return movement:isPinned(actorId)", 1, true),
+			"a hold never gives back a pinned body"
+		)
 		-- a body a game moves itself (the paintball arena) is told to the validator
 		t.truthy(
 			string.find(src, "moved = function(body: any, why: string)\n\t\t\t\tmovedBody(body, why)", 1, true),
