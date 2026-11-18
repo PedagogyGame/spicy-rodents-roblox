@@ -1,7 +1,7 @@
 --!strict
 -- tools/bake/alley/Forecourt: the way in from the street (brief addendum D5), outside the main doors of the
 -- eighteen-lane alley: the landing at floor level under the canopy, the ramp down from it to where the walk from
--- Bowl Lane arrives (data/expansion.json xpath_alley_steps ends at the ramp's foot; nothing bakes that walk yet),
+-- Bowl Lane arrives (data/expansion.json xpath_alley_steps ends at the ramp's foot; tools/bake/bowl_lane bakes that walk),
 -- planters at the landing's edges, two lamp posts, and the pylon sign with the giant pin by the road. The
 -- geometry is Shared/Attractions/AlleyLayout's (LANDING, RAMP, ENTRANCE); the ground here is at or just under the
 -- floor, so the terrain is cut out from over the ramp and the landing.
