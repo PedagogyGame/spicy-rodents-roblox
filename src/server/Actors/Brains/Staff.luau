@@ -56,6 +56,46 @@ local PACE = Units.st(1.4)
 local Methods = {}
 Methods.__index = Methods
 
+-- Back to the work loop from where the body stands now (work stops only): still at the stop being worked, the
+-- work goes on (its act and facing); otherwise on to the end of the nearest leg, by the `way` when there is one
+-- and the body is off the loop.
+local function rejoin(self: Brain)
+	local stops = self.stops
+	if stops == nil then
+		return
+	end
+	local actor = self.actor
+	local n = #stops
+	self.back = nil
+	if self.pause > 0 then
+		local s = stops[(self.target - 2) % n + 1] -- the stop being worked (the target is the next one)
+		if s.hold > 0 and Common.dist2d(actor.x, actor.z, s.x, s.z) < REACH then
+			actor.task = s.act
+			actor.intent.heading = if s.yaw and s.yaw ~= 0 then s.yaw else 1e-6
+			return
+		end
+		self.pause = 0
+	end
+	local best, bestD = self.target, math.huge
+	for i = 1, n do
+		local a, b = stops[i], stops[i % n + 1]
+		local ex, ez = b.x - a.x, b.z - a.z
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((actor.x - a.x) * ex + (actor.z - a.z) * ez) / l2, 0, 1) else 0
+		local d = Common.dist2d(actor.x, actor.z, a.x + ex * t, a.z + ez * t)
+		if d < bestD then
+			best, bestD = i % n + 1, d
+		end
+	end
+	self.target = best
+	local way = self.params.way
+	if way and bestD >= REACH then
+		local goal = stops[best]
+		self.back = way(actor.x, actor.z, goal.x, goal.z)
+		self.backAt = 1
+	end
+end
+
 function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local actor = self.actor
 	local intent = actor.intent
@@ -64,7 +104,7 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		return
 	end
 	if Directive.takeReleased(self.directive) then
-		self:rejoin() -- an order ended (a bitten run, the walk back from the hospital): back to the loop
+		rejoin(self) -- an order ended (a bitten run, the walk back from the hospital): back to the loop
 	end
 	local back = self.back
 	if back then
@@ -134,48 +174,10 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.pause = snapshot.pause or 0
 	Directive.restore(self.directive, snapshot.directive)
 	Common.halt(self.actor) -- no walking on the old intent before the next think
-	self:rejoin()
+	rejoin(self)
 end
 
--- Back to the work loop from where the body stands now (work stops only): still at the stop being worked, the
--- work goes on (its act and facing); otherwise on to the end of the nearest leg, by the `way` when there is one
--- and the body is off the loop.
-function Methods.rejoin(self: Brain)
-	local stops = self.stops
-	if stops == nil then
-		return
-	end
-	local actor = self.actor
-	local n = #stops
-	self.back = nil
-	if self.pause > 0 then
-		local s = stops[(self.target - 2) % n + 1] -- the stop being worked (the target is the next one)
-		if s.hold > 0 and Common.dist2d(actor.x, actor.z, s.x, s.z) < REACH then
-			actor.task = s.act
-			actor.intent.heading = if s.yaw and s.yaw ~= 0 then s.yaw else 1e-6
-			return
-		end
-		self.pause = 0
-	end
-	local best, bestD = self.target, math.huge
-	for i = 1, n do
-		local a, b = stops[i], stops[i % n + 1]
-		local ex, ez = b.x - a.x, b.z - a.z
-		local l2 = ex * ex + ez * ez
-		local t = if l2 > 0 then math.clamp(((actor.x - a.x) * ex + (actor.z - a.z) * ez) / l2, 0, 1) else 0
-		local d = Common.dist2d(actor.x, actor.z, a.x + ex * t, a.z + ez * t)
-		if d < bestD then
-			best, bestD = i % n + 1, d
-		end
-	end
-	self.target = best
-	local way = self.params.way
-	if way and bestD >= REACH then
-		local goal = stops[best]
-		self.back = way(actor.x, actor.z, goal.x, goal.z)
-		self.backAt = 1
-	end
-end
+Methods.rejoin = rejoin
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
 	if evt.type == "pause" then

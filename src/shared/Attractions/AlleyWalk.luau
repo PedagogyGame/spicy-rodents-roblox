@@ -133,11 +133,12 @@ end
 
 local function theGraph(): Graph
 	local g = graph
-	if g == nil then
-		g = build()
-		graph = g
+	if g then
+		return g
 	end
-	return g
+	local built = build()
+	graph = built
+	return built
 end
 
 local function dist(ax: number, ad: number, bx: number, bd: number): number
@@ -146,12 +147,14 @@ end
 
 -- the room a point is in (the first zone that holds it; of the outdoor ones only the forecourt), or nil
 local function zoneAt(X: number, D: number): AlleyLayout.Zone?
-	for _, z in L.ZONES do
-		if z.outside and z.id ~= "forecourt" then
+	for _, z: AlleyLayout.Zone in L.ZONES do
+		local id: string = z.id
+		local outdoor = z.outside == true and id ~= "forecourt"
+		if outdoor then
 			continue
 		end
 		if X >= z.x0 and X <= z.x1 and D >= z.d0 and D <= z.d1 then
-			if z.id == "settees" and D < L.SETTEE_D - 2.75 then
+			if id == "settees" and D < L.SETTEE_D - 2.75 then
 				return L.zone("concourse") -- behind the settees' backs: on the concourse's side of them
 			end
 			return z
@@ -203,7 +206,10 @@ end
 local TABLES: { Rect }? = nil
 local function tables(): { Rect }
 	local out = TABLES
-	if out == nil then
+	if out then
+		return out
+	end
+	do
 		local list: { Rect } = {}
 		for _, t in L.POOL_TABLES do
 			table.insert(list, { x0 = t.x - 3.4, x1 = t.x + 3.4, d0 = t.d - 6.1, d1 = t.d + 6.1 })
@@ -217,9 +223,8 @@ local function tables(): { Rect }
 			table.insert(list, { x0 = f.x0, x1 = f.x1, d0 = f.d0, d1 = f.d1 })
 		end
 		TABLES = list
-		out = list
+		return list
 	end
-	return out
 end
 
 local BODY = 0.9 -- studs: half a person's width

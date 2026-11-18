@@ -473,9 +473,9 @@ local function footWay(
 	local back = if in1 then AlleyWalk.way(alley, ox, oz, x1, z1) else {}
 	local inside = (if in0 then FootPath.length(x0, z0, out) else 0)
 		+ (if in1 then FootPath.length(ox, oz, back) else 0)
-	local o = table.clone(opts or {})
-	if o.maxLength then
-		o.maxLength -= inside -- (the limit is on the whole walk)
+	local o: { [string]: any } = table.clone(opts or {})
+	if type(o.maxLength) == "number" then
+		o.maxLength = (o.maxLength :: number) - inside -- (the limit is on the whole walk)
 	end
 	local fx, fz = if in0 then ox else x0, if in0 then oz else z0
 	local tx, tz = if in1 then ox else x1, if in1 then oz else z1
