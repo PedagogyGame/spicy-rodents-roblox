@@ -94,3 +94,33 @@ Every cue below is timed and placed already. Until the owner chooses the set, el
 | `paintball.over` | full time | `volGo` 0.8 | `victory.wav` | a whistle |
 
 Twelve sounds if each is uploaded; the fire and the far fire, and the reload and the ready, could be one recording each at two volumes.
+
+### Corner store (`src/server/Items/ItemWorld.luau`, table `SOUNDS`; branch `feat/corner-store`; nothing uploaded)
+Every cue is a Sound named after it, played at the person using the item (or at the cushion). All of these should be found in Roblox's licensed sound library: no uploads. Fill `"rbxassetid://<n>"` in `SOUNDS`.
+
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `CornerStore.Till` | a sale at the till (`src/server/Items/CornerStore.luau`, table `SOUNDS`) | a cash register's drawer and bell |
+| `Items.WaterGun` | a squirt | a short water squirt |
+| `Items.Harmonica` | the harmonica is played | a two-second harmonica phrase |
+| `Items.BikeHorn` | the bike horn | a rubber-bulb honk |
+| `Items.AirHorn` | the air horn (it also startles people and squirrels within 12 studs) | a loud air-horn blast, about a second |
+| `Items.Bubbles` | blowing bubbles | a soft blow and pops |
+| `Items.CameraClick` | a disposable-camera shot | a shutter click and film wind |
+| `Items.TapeRip` | a strip of duct tape | tape ripping off a roll |
+| `Items.Whoopee` | someone steps on the whoopee cushion | a whoopee cushion (mild: it is a toy) |
+| `Items.SodaFizz` | a soda or an ice cream bar is had | a can opening and fizz |
+| `Items.Wrapper` | (named for the ice cream bar; the soda's fizz plays for both today) | a wrapper crinkle |
+| `Items.PaperRustle` | the newspaper is read | paper rustle |
+| `Items.ChairUnfold` | the lawn chair is set down | an aluminium chair unfolding |
+| `Items.Click` | the flashlight on or off | a small switch click |
+| `Items.UmbrellaOpen` | the umbrella opens or closes | an umbrella whoosh |
+| `Items.Throw` | a frisbee or a football thrown | a soft whoosh |
+| `Items.Chalk` | chalk writing | chalk on pavement |
+| `Items.Scatter` | peanuts or bird seed put down | seeds scattered |
+| `Items.Crunch` | a dog treat given | a crunch |
+| `Items.KiteWind` | the kite goes up | wind and a flapping kite |
+
+The radio's playlist (the same table): `Radio.Oldies1`, `Radio.Oldies2`, `Radio.SoftRock`, `Radio.Country`, `Radio.Jazz`, `Radio.Weather` (a short town weather jingle). Six stock-library music tracks, one after another while the radio is on; any licensed library tracks with a small-town 1970s feel will do.
+
+Twenty effects and six tracks; all from the library, so none counts against the month's uploads.

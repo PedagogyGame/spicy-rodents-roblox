@@ -81,6 +81,11 @@ step "bake the Neighbourhood Shop's shell (tools/bake/neighbourhood_shop.luau ->
 lune run tools/bake/neighbourhood_shop.luau
 done_step
 
+# Pepper's Corner Store (Workspace.Expansion.F1) is its own bake too, for the same reason.
+step "bake Pepper's Corner Store (tools/bake/corner_store.luau -> build/Expansion_F1.rbxm)"
+lune run tools/bake/corner_store.luau
+done_step
+
 # The sky lift and the Lookout (Workspace.Expansion.F4) are their own bake too, for the same reason.
 step "bake the sky lift and the Lookout (tools/bake/skylift.luau -> build/Expansion_F4.rbxm)"
 lune run tools/bake/skylift.luau

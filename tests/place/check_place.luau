@@ -7,7 +7,7 @@
 --   * no SurfaceAppearance, PartOperation (union) or BaseWrap exists anywhere in the place, so
 --     the place stays publishable through Open Cloud;
 --   * ServerStorage.EngineTests exists only when the project maps it (ci.project.json);
---   * the owner's place (build.project.json) carries the baked Neighbourhood Shop.
+--   * the owner's place (build.project.json) carries the baked Neighbourhood Shop and Pepper's Corner Store.
 -- Usage: lune run tests/place/check_place.luau <place.rbxl|rbxlx> <project.json>
 
 local fs = require("@lune/fs")
@@ -238,6 +238,13 @@ if string.find(projectPath, "build%.project%.json$") and fs.isFile("generated/Sh
 	check(
 		found,
 		"Workspace.Expansion.NeighbourhoodShop has no baked shop: run lune run tools/bake/neighbourhood_shop.luau first"
+	)
+	-- and Pepper's Corner Store (Workspace.Expansion.F1), for the same reason
+	local f1 = instanceAt({ "Workspace", "Expansion", "F1" })
+	local store = f1 and f1:FindFirstChild("f1_corner_store")
+	check(
+		store ~= nil and store:FindFirstChild("Zone") ~= nil and store:FindFirstChild("Items") ~= nil,
+		"Workspace.Expansion.F1 has no baked corner store: run lune run tools/bake/corner_store.luau first"
 	)
 end
 

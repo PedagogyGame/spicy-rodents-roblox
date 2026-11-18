@@ -269,8 +269,9 @@ return function(t)
 				px, pz = q[1], q[2]
 			end
 			-- only a built venue is a box: the planned ones have nothing standing yet
+			local built = { f1_neighbourhood_shop = true, f1_corner_store = true }
 			for _, b in colliders.boxes do
-				t.truthy(not string.find(b.id, "^f%d_") or b.id == "f1_neighbourhood_shop", b.id)
+				t.truthy(not string.find(b.id, "^f%d_") or built[b.id], b.id)
 			end
 		end
 	)
