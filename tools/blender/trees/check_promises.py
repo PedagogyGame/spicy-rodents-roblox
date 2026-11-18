@@ -34,7 +34,10 @@ BOUGH (visualPose, kinds branch / bridge / lookout):
   line (t < 0.2, "clr" columns) is reported apart from the rest of the bough; both fail unless
   --clearance-warn. With --clearance-warn the pushed feet only warn (off the bark, or no bark under them)
   and that stretch is measured on the bough's own top line instead (centre line + lift, where the game
-  now draws the squirrel), which fails like the rest of the bough. Samples whose feet are still over the trunk (inside
+  now draws the squirrel), which fails like the rest of the bough. Where two walks of the tree cross (another
+  walk's top line within 0.8 stud of the column and at most 0.8 over the feet, the wood found over them no higher
+  than 0.15 above that line), wood over the feet is that walk's own bough: those samples are counted apart and
+  only warn. Samples whose feet are still over the trunk (inside
   tapered(t) + 0.1 of the trunk centre line) stand on trunk bark and are counted apart.
 TUNNEL (src/worldgen/Builders/Trees.luau header and clear()): no leaf geometry within 1.6 studs of the
   squirrel's body line on a bough (centre line + 2 studs up), nor within 2.2 studs of the trunk's climbing
@@ -78,6 +81,8 @@ CLEARANCE_SAMPLE_T = 0.16
 BOUGH_TUNNEL = 1.6
 BODY_UP = 2.0
 TRUNK_TUNNEL = 2.2
+CROSSING = 0.8  # studs, level: another walk's top line this near the column through the feet ...
+CROSSING_UP = 0.8  # ... and no higher than this over them: the two walks cross there
 
 
 # ---- the game's curve (three.js r160 CatmullRomCurve3, centripetal; Curve.luau) --------------------
@@ -323,7 +328,22 @@ def check_tree(info, parts, routes, clearance_warn=False):
 
     # boughs -----------------------------------------------------------------------------------------
     rep["boughs"] = []
-    all_e, all_c, tot_miss, tot_cmiss = [], [], 0, 0
+    all_e, all_c, all_x, tot_miss, tot_cmiss = [], [], [], 0, 0
+    walk_tops = [(mm["id"], PP + np.array([0.0, bough_lift(mm), 0.0])) for mm, _, _, PP in bough
+                 if mm["kind"] in ("branch", "bridge", "lookout")]
+
+    def crossing(m, f, err):
+        """Wood over the feet where another walk's own top line passes over them (two walks crossing in a fork):
+        the squirrel there is under the other walk's bark whatever the bark is, as long as that line stands
+        within CROSSING_UP of the feet and CROSSING of the column. Such samples are counted apart (warn only)."""
+        for rid, top in walk_tops:
+            if rid == m["id"]:
+                continue
+            dy = top[:, 1] - f[1]
+            near = (np.hypot(top[:, 0] - f[0], top[:, 2] - f[2]) < CROSSING) & (dy > -0.05) & (dy < CROSSING_UP)
+            if near.any() and -err <= dy[near].max() + 0.15:
+                return True
+        return False
     for m, c, ts, P in bough:
         lift = bough_lift(m)
         top_line = P + np.array([0.0, lift, 0.0])
@@ -336,7 +356,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 k = (cl * SPU + CLEARANCE_PAD) * np.clip(1 - ts / CLEARANCE_T, 0, None) ** 2
                 feet[:, 0] += d[0] / l * k
                 feet[:, 2] += d[2] / l * k
-        e, ec, rows, miss, cmiss, over = [], [], [], 0, 0, 0
+        e, ec, rows, miss, cmiss, over, cross = [], [], [], 0, 0, 0, []
         pushed = m["kind"] == "branch" and bool(cl)
 
         def under(f):
@@ -367,6 +387,8 @@ def check_tree(info, parts, routes, clearance_warn=False):
             err = under(f)
             if err == "over":
                 over += 1
+            elif err is not None and err < -TOL and crossing(m, f, err):
+                cross.append(err)
             elif err is None:
                 miss += 1
                 rows.append({"s": float(t * c.length), "err": 9.0})
@@ -375,7 +397,9 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 rows.append({"s": float(t * c.length), "err": err})
         s = stats(e)
         s.update(route=m["id"], name=m["name"], kind=m["kind"], length=round(c.length, 1), lift=round(lift, 3),
-                 samples=len(ts), over_trunk=over, miss=miss, worst=worst(rows, "err"), clearance=dict(stats(ec), miss=cmiss))
+                 samples=len(ts), over_trunk=over, miss=miss, worst=worst(rows, "err"), clearance=dict(stats(ec), miss=cmiss),
+                 crossing=stats(cross))
+        all_x += cross
         rep["boughs"].append(s)
         all_e += e
         all_c += ec
@@ -388,6 +412,10 @@ def check_tree(info, parts, routes, clearance_warn=False):
     if tot["bad"] or tot_miss:
         fail.append(f"bough bark off the feet by > {TOL} st at {tot['bad']} of {tot['n']} samples (min {tot['min']}, max "
                     f"{tot['max']}), {tot_miss} samples with no bark under the feet")
+    xt = rep["crossing_total"] = stats(all_x)
+    if xt["n"]:
+        warn.append(f"crossing walks: {xt['n']} samples where another walk's top line passes just over the feet "
+                    f"(wood over them, min {xt['min']} st)")
     ct = rep["clearance_total"]
     ct["miss"] = tot_cmiss
     if ct["bad"] or tot_cmiss:
