@@ -8,6 +8,7 @@ local Expansion = require("../../generated/Expansion")
 local Kit = require("../../tools/bake/alley/Kit")
 local Lounge = require("../../tools/bake/lounge_classic/Lounge")
 local Style = require("../../tools/bake/lounge_classic/Style")
+local Data = require("@shared/Data")
 
 local Vector3 = roblox.Vector3
 
@@ -259,5 +260,39 @@ return function(t)
 			end
 		end
 		t.eq(Style.MENU, "HOT COCOA  ·  COFFEE  ·  GREEN TEA  ·  SNOW CONES")
+	end)
+
+	t.test("no squirrel route (a bough, a pole, a wire, a pipe) runs into or through the building", function()
+		local v = venue()
+		local registry = Data.default():routes()
+		t.truthy(#registry:all() > 1000, "the town's routes are loaded")
+		local near = 0
+		for _, r in registry:all() do
+			local pts = r.points
+			for i = 1, #pts do
+				local a, b = pts[i], pts[math.min(i + 1, #pts)]
+				-- along each leg, a point every half stud
+				local n = math.max(1, math.ceil(math.sqrt((b.x - a.x) ^ 2 + (b.y - a.y) ^ 2 + (b.z - a.z) ^ 2) * 2))
+				for k = 0, n do
+					local f = k / n
+					local x, y, d = AlleyLayout.toLocal(
+						v.place,
+						a.x + (b.x - a.x) * f,
+						a.y + (b.y - a.y) * f,
+						a.z + (b.z - a.z) * f
+					)
+					if math.abs(x) < Style.OUTER_X + 6 and d > Style.FORECOURT_D - 6 and d < Style.BACK_D + 6 then
+						near += 1
+					end
+					local inBuilding = math.abs(x) < Style.OUTER_X + 0.5
+						and d > Style.FRONT_D - 0.5
+						and d < Style.BACK_D + 0.5
+						and y < Style.CREST + 0.5
+					t.truthy(not inBuilding, `route {r.name} at X {x} Y {y} D {d}`)
+				end
+			end
+		end
+		-- (none comes within 6 studs today: the nearest is the alley yard's downspout, 68 studs off)
+		t.eq(near, 0)
 	end)
 end

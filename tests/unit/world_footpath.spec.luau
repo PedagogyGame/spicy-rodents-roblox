@@ -268,9 +268,20 @@ return function(t)
 				end
 				px, pz = q[1], q[2]
 			end
+			-- THE GILDED ACORN is one too (its footprint, 50 x 56)
+			local lounge: Colliders.Box? = nil
+			for _, b in colliders.boxes do
+				if b.id == "f3_lounge_classic" then
+					lounge = b
+				end
+			end
+			t.truthy(lounge ~= nil and (lounge :: Colliders.Box).hw >= 25 and (lounge :: Colliders.Box).hd >= 28)
 			-- only a built venue is a box: the planned ones have nothing standing yet
 			for _, b in colliders.boxes do
-				t.truthy(not string.find(b.id, "^f%d_") or b.id == "f1_neighbourhood_shop", b.id)
+				t.truthy(
+					not string.find(b.id, "^f%d_") or b.id == "f1_neighbourhood_shop" or b.id == "f3_lounge_classic",
+					b.id
+				)
 			end
 		end
 	)

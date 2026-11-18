@@ -1754,7 +1754,8 @@
         "polish_lighting"
       ],
       "partBudget": 1300,
-      "notes": ""
+      "built": "tools/bake/lounge_classic.luau",
+      "notes": "THE GILDED ACORN (addendum D14: the 1940s lounge only). A sealed brick hall with a black-and-gold front, a recessed entry up four steps to a solid double door and a forecourt to Bowl Lane's planned sidewalk (D -32) where the two guards stand; baked into build/Expansion_LoungeClassic.rbxm (tools/bake/lounge_classic.luau). The door, the pass, first person, the guards and the bar are Server/Attractions/LoungeService on Shared/Attractions/LoungeClassic."
     },
     {
       "id": "f3_lounge_scifi",
