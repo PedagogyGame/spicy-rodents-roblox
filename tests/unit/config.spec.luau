@@ -131,11 +131,11 @@ return function(t)
 	end)
 
 	t.test("Flags: defaults, set/reset, isDev by Studio or dev list", function()
+		t.truthy(Flags.enabled("moveValidatorEnforce"), "on since the live validator")
+		Flags.set("moveValidatorEnforce", false)
 		t.falsy(Flags.enabled("moveValidatorEnforce"))
-		Flags.set("moveValidatorEnforce", true)
-		t.truthy(Flags.enabled("moveValidatorEnforce"))
 		Flags.reset()
-		t.falsy(Flags.enabled("moveValidatorEnforce"))
+		t.truthy(Flags.enabled("moveValidatorEnforce"))
 		Flags.configure({
 			devUserIds = { 42 },
 			isStudio = function()

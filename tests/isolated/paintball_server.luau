@@ -507,8 +507,9 @@ return function(t)
 	)
 
 	t.test(
-		"the audience: whoever is near is shown the match, whoever is found inside the arena unseated is put in the lobby, an empty arena says unwatch and costs nothing",
+		"the audience: whoever is near is shown the match, whoever is found inside the arena unseated is put in the lobby (the town told of every move: a held squirrel's validator), an empty arena says unwatch and costs nothing",
 		function()
+			local told: { [any]: number } = {}
 			Kit.play(function(kit)
 				local w = kit.w
 				local ada = kit.client("Ada")
@@ -535,6 +536,7 @@ return function(t)
 				t.eq(far.streams, nil)
 				-- the intruder is put out, and is shown the match from the lobby
 				t.truthy(intruder.body.teleports >= 1)
+				t.eq(told[intruder.body], intruder.body.teleports, "every move of the intruder told to the town")
 				local _, _, lz = Arena.toLocal(kit.place, intruder.body.x, intruder.body.y, intruder.body.z)
 				t.truthy(lz > Arena.HALF)
 				t.falsy(intruder.body.ghost)
@@ -555,7 +557,15 @@ return function(t)
 				kit.run(1)
 				t.eq(#kit.wires.got["Paintball.Snap"], snaps)
 				t.eq(kit.service:stats().steps, steps, "an idle arena is not stepped")
-			end)
+				t.eq(told[ada.stub.body], ada.stub.body.teleports, "and every placement of a seated one")
+			end, {
+				service = {
+					moved = function(body: any, why: string)
+						t.eq(why, "paintball")
+						told[body] = (told[body] or 0) + 1
+					end,
+				},
+			})
 		end
 	)
 

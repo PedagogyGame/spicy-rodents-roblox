@@ -658,6 +658,12 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 	local function put(body: any, x: number, y: number, z: number, yaw: number)
 		local wx, wy, wz = ArenaModule.toWorld(place, x, y, z)
 		engine.teleport(body, wx, wy, wz, ArenaModule.yawToWorld(place, yaw))
+		-- every move of a body the server makes is told to the town (a held squirrel's validator takes the new place:
+		-- Boot/Game movedBody; untold, it would snap the body back over the move)
+		local moved = ctx.opts.moved
+		if moved ~= nil then
+			moved(body, "paintball")
+		end
 	end
 
 	-- Out of the arena: un-ghosted and stood in the lobby (a few studs apart, so a whole match that ends

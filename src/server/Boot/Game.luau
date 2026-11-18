@@ -78,6 +78,11 @@ local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require(".
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
+local BodyPin = require("../Movement/BodyPin")
+local MoveValidator = require("../Movement/MoveValidator")
+local ValidatorWorld = require("../Movement/ValidatorWorld")
+local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
+local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local SewerService = require("../World/SewerService")
@@ -134,6 +139,25 @@ end
 -- moved back the patient sat alone hundreds of studs from their own scene.
 function Game.putBack(free: boolean, possessable: boolean): boolean
 	return free and possessable
+end
+
+export type MovementDeps = {
+	data: any, -- Shared/Data (its routes: the harvest's, the alley's, the drains', the hollows')
+	swept: any?, -- Traffic/SweptCollision (TrafficService): markTeleported on every hand-off
+	wall: ValidatorWorld.Ray?, -- the wall ray (ValidatorWorld.engineRays in the engine)
+	down: ValidatorWorld.Ray?, -- the floor ray
+	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of a squirrel's chili rush
+}
+
+-- movement(deps): the movement service the game runs, with the squirrel validator switched on (spike S3: every
+-- squirrel packet is judged by Movement/MoveValidator against the town's rails and the baked town's walls and floors,
+-- Movement/ValidatorWorld). start() builds it with the engine's rays; tests/unit/movement_live.spec.luau holds the
+-- wiring to it.
+function Game.movement(deps: MovementDeps): any
+	local rail = RailWorld.get(deps.data, Height.at)
+	local world = ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down })
+	local validator = MoveValidator.new(world, { boostOf = deps.boostOf })
+	return MovementService.new({ swept = deps.swept, validator = validator })
 end
 
 export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
@@ -361,7 +385,32 @@ function Game.start(opts: Opts?): any
 	mark("data", td)
 	stage(0.52, "Putting 25 cars on the roads")
 	local traffic = TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 7 })
-	local movement = MovementService.new({ swept = traffic :: any })
+	-- the walls and floors the validator's rays meet are the baked town's, built once the bodies' folder exists
+	local rays: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }? = nil
+	local function engineRays(): { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+		if rays == nil then
+			local exclude: { Instance } = {}
+			for _, name in { "Bodies", "Vehicles" } do
+				local f = workspace:FindFirstChild(name)
+				if f then
+					table.insert(exclude, f)
+				end
+			end
+			local wall, down = ValidatorWorld.engineRays(exclude)
+			rays = { wall = wall, down = down }
+		end
+		return rays :: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+	end
+	local movement = Game.movement({
+		data = data,
+		swept = traffic :: any,
+		wall = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return engineRays().wall(ox, oy, oz, dx, dy, dz)
+		end,
+		down = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return engineRays().down(ox, oy, oz, dx, dy, dz)
+		end,
+	})
 	local net: any? = nil
 	if o.net ~= false then
 		net = Net.engineServer()
@@ -684,6 +733,126 @@ function Game.start(opts: Opts?): any
 
 	local function isSquirrelFamily(actor: any): boolean
 		return actor.species == "squirrel" or actor.species == "rodent"
+	end
+
+	-- The squirrel validator's hands (Movement/MovementService): the driver's "Correction", the server's own snap of the
+	-- body, the hold; the held squirrel's motor states come up on Net "Squirrel.State". Positions are the feet (the
+	-- root less the body's HipHeight), as the motor's are.
+	local function hipOf(body: Model): number
+		local h = body:GetAttribute("HipHeight")
+		return if type(h) == "number" and h > 0 then h else 0
+	end
+	local function heldBy(actorId: any): (any?, any?)
+		local actor = rt.actors:get(actorId)
+		if actor == nil then
+			return nil, nil
+		end
+		local driver = possession:controllerOf(actor)
+		return actor, if driver ~= "ai" then driver else nil
+	end
+	movement.deps.poseOf = function(actor: any): (number?, number?, number?)
+		local body = actor.body :: Model
+		local root = body and body.PrimaryPart
+		if root == nil then
+			return nil, nil, nil
+		end
+		local p = root.Position
+		return p.X, p.Y - hipOf(body), p.Z
+	end
+	-- the driver's round trip as the engine measures it: a latency that drops lowers the clock's arrival offset by up to
+	-- that much, and the validator's clock check allows it (Movement/MoveValidator, pingOf)
+	movement.deps.validator.pingOf = function(actorId: any): number?
+		local _, driver = heldBy(actorId)
+		if driver and typeof(driver) == "Instance" and driver:IsA("Player") then
+			local ok, ping = pcall(function(): number
+				return (driver :: Player):GetNetworkPing()
+			end)
+			return if ok then ping else nil
+		end
+		return nil
+	end
+	-- the validator's hands (Movement/BodyPin): a newly held squirrel is the server's (anchored, its own, marked kept)
+	-- until its driver's first packet passes the gate, and only the validator's own unpin hands a kept body back (a
+	-- hold's timer, the sky lift, never do); a client that never sends cannot move it, and nothing is judged while its
+	-- town streams in
+	movement.deps.engine = BodyPin.engine({
+		heldBy = heldBy,
+		isPinned = function(actorId: any): boolean
+			return movement:isPinned(actorId)
+		end,
+		place = function(body: any, x: number, y: number, z: number)
+			local model = body :: Model
+			model:PivotTo(CFrame.new(x, y + hipOf(model), z) * model:GetPivot().Rotation)
+		end,
+		tell = function(driver: any, msg: any)
+			if net and typeof(driver) == "Instance" then
+				net:fire(driver, "Correction", msg)
+			end
+		end,
+		delay = function(seconds: number, fn: () -> ())
+			task.delay(seconds, fn)
+		end,
+	})
+	if net then
+		net:on("Squirrel.State", function(player: any, rec: any)
+			local actor = possession:actorOf(player)
+			if actor == nil or not isSquirrelFamily(actor) then
+				return
+			end
+			local seq, epoch, snapshot = SquirrelWire.fromRecord(rec)
+			movement:packet(
+				actor.id,
+				actor.species,
+				{ seq = seq, epoch = epoch, snapshot = snapshot },
+				workspace:GetServerTimeNow()
+			)
+		end)
+	end
+	-- a body the server itself moved (a minigame's knock, the lounge's door): its place is the validator's new
+	-- baseline, under a new motor epoch the driver is told of
+	local function movedBody(body: any, why: string)
+		local id = body and body:GetAttribute(PossessionState.ATTR.ActorId)
+		local actor, driver = heldBy(id)
+		if actor == nil or driver == nil or not isSquirrelFamily(actor) then
+			return
+		end
+		local root = (body :: Model).PrimaryPart
+		if root then
+			local p = root.Position
+			movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, why, workspace:GetServerTimeNow())
+		end
+	end
+	-- fifteen times a second: the server's own view of every held squirrel's root (MovementService.watch), and the sky
+	-- lift's riders (attribute Ride) left alone until the platform puts them down
+	local onLift: { [any]: boolean } = {}
+	local watchAcc = 0
+	local function watchSquirrels(dt: number)
+		watchAcc += dt
+		if watchAcc < 1 / 15 then
+			return
+		end
+		watchAcc = 0
+		local t = workspace:GetServerTimeNow()
+		for _, player in Players:GetPlayers() do
+			local actor = possession:actorOf(player)
+			local body = if actor and isSquirrelFamily(actor) then actor.body :: Model else nil
+			local root = if body then body.PrimaryPart else nil
+			if actor and body and root then
+				local ride = body:GetAttribute("Ride") ~= nil
+				local p = root.Position
+				if ride ~= (onLift[actor.id] == true) then
+					onLift[actor.id] = ride
+					movement:suspend(actor.id, ride)
+					if not ride then
+						-- off the sky lift where the platform put it, under a new epoch
+						movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, "ride", t)
+					end
+				end
+				if not ride then
+					movement:watch(actor.id, p.X, p.Y - hipOf(body), p.Z, t)
+				end
+			end
+		end
 	end
 
 	local function healthOf(actorId: string): number
@@ -1143,6 +1312,12 @@ function Game.start(opts: Opts?): any
 	local biteAcc, fadeAcc = 0, 0
 	local function step(dt: number)
 		now += dt
+		local okSq, errSq = pcall(function()
+			watchSquirrels(dt)
+		end)
+		if not okSq then
+			warn(`[SpicyRodents] squirrel watch failed: {errSq}`)
+		end
 		-- the fleet steps, then an even 15 pose sends a second go out stamped with `now`: one call that
 		-- the headless replay (tools/sim) makes too, so what it measures is what this server does
 		local hits = traffic:frame(dt, now, trafficWorld() :: any, net)
@@ -1353,6 +1528,11 @@ function Game.start(opts: Opts?): any
 					return true, nil
 				end,
 			},
+			-- a body a game moved itself (the paintball arena's sweep and its places): a held squirrel's validator is
+			-- told, as for every server move
+			moved = function(body: any, why: string)
+				movedBody(body, why)
+			end,
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
 				local out = {}
@@ -1385,6 +1565,7 @@ function Game.start(opts: Opts?): any
 					-- a player's body: put it there (its controller restarts where it finds itself) and say why
 					local body = target.body :: Model
 					body:PivotTo(CFrame.new(x, y + 0.6, z) * body:GetPivot().Rotation)
+					movedBody(body, "knocked")
 					fire(driver, { kind = "notice", text = text })
 				else
 					local a = world.actorsById[townId]
@@ -1492,6 +1673,9 @@ function Game.start(opts: Opts?): any
 					return out
 				end,
 				kill = kill,
+				moved = function(body: any)
+					movedBody(body, "lounge")
+				end,
 			}),
 			heartbeat = o.heartbeat ~= false,
 			terrain = o.terrain ~= false,

@@ -870,6 +870,8 @@ export type GameParts = {
 	wallet: any, -- Economy/Credits
 	squirrels: () -> { Squirrel },
 	kill: (actor: any, cause: string) -> (),
+	-- a body the door or the sweep moved (Boot/Game: the squirrel validator takes its new place as its baseline)
+	moved: ((body: any) -> ())?,
 }
 function LoungeService.gameTown(parts: GameParts): Town
 	local possession, wallet = parts.possession, parts.wallet
@@ -889,12 +891,18 @@ function LoungeService.gameTown(parts: GameParts): Town
 			local a = actorOf(player)
 			if a and a.body then
 				(a.body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
+				if parts.moved then
+					parts.moved(a.body)
+				end
 			end
 		end,
 		evict = function(body: any, cf: CFrame)
 			-- the body itself (a player may still hold it: a leaver's body before its release) and, for a
 			-- computer-held body drawn from its world record each frame, the record too (feet = a.y - a.hip)
 			(body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
+			if parts.moved then
+				parts.moved(body)
+			end
 			local rt = parts.runtime
 			if rt then
 				for id, actor in rt.byTownId do

@@ -25,12 +25,15 @@
 -- what a route's own record says to do at its far end (its `hint`: the alley roof's ridge and bough say jump or drop)
 -- or on going on from there by itself (its `onwardHint`: out of the alley's vent into the rafters).
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
+-- The server's validator (ctx.link, Controllers/MotorLink): after each step the motor's state goes up twenty times a
+-- second; a "Correction" the server sent (a snap-back, a move it made) is taken at the top of the next frame, and the
+-- server's own move of the root arriving after it (link:echo) is not taken for a second move.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
 -- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
--- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant?, link? };
 --   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
 --   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
@@ -243,6 +246,10 @@ function Squirrel.start(
 		state.y = feet
 		state.grounded = false
 	end
+	local link = ctx.link
+	if link then
+		state.clock = link:resumeClock() -- (the server's validator reads a clock that never runs back)
+	end
 	-- the drawn pose starts exactly where the body is drawn now and eases onto the motor from there
 	local visual = SquirrelVisual.new()
 	visual.x, visual.y, visual.z = pos.X, feet, pos.Z
@@ -271,8 +278,16 @@ function Squirrel.start(
 				railLive = true
 			end
 		end
+		-- a correction from the server's validator: a snap-back's state restored, or the place it moved the body to
+		if link and link:apply(state, os.clock()) then
+			visual.live = false
+			holding = false
+		end
 		local at = root.Position
-		if Squirrel.movedFromOutside((at - last).Magnitude, lastSpeed, frameDt) then
+		if
+			Squirrel.movedFromOutside((at - last).Magnitude, lastSpeed, frameDt)
+			and not (link and link:echo(at.X, at.Y, at.Z, hip, os.clock()))
+		then
 			-- moved by the server: restart the motor where the body now is, and cut the drawn point to it
 			local g = world.groundAt(at.X, at.Z, at.Y)
 			local soles = at.Y - hip
@@ -330,7 +345,13 @@ function Squirrel.start(
 			if rx and ry and rz then
 				SquirrelMotor.place(state, rx, ry, rz, true)
 				metrics.lastEvent = "riverRecover"
+				if link then
+					link:urgent() -- (the server's validator sees the quay spot itself)
+				end
 			end
+		end
+		if link then
+			link:tick(state)
 		end
 		local say = if ctx.toast
 			then Squirrel.feedback(f :: any, events :: any, wasOnRoute, state.railT, routeOf)

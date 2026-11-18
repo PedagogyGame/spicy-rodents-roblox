@@ -12,6 +12,8 @@
 -- server's recovery through StarterGui:SetCore("ResetButtonCallback", BindableEvent): it never kills
 -- or respawns a body.
 -- No side effects on require.
+-- The server's squirrel validator: one Controllers/MotorLink for the session (Net "Squirrel.State" up, "Correction"
+-- down), its motor epoch set from each Granted's motorEpoch and handed to every squirrel controller.
 -- Robustness (W1 client review): remotes are awaited with timeouts and a missing one is said on
 -- screen; the body is awaited up to 15 s while it streams in (the server also makes it persistent for
 -- its driver); the default character controls are on for a person on foot and off in a vehicle or the
@@ -40,6 +42,7 @@ local Squirrel = require("../Controllers/Squirrel")
 local Quadruped = require("../Controllers/Quadruped")
 local Vehicle = require("../Controllers/Vehicle")
 local Drone = require("../Controllers/Drone")
+local MotorLink = require("../Controllers/MotorLink")
 local SkyLiftView = require("../Rides/SkyLiftView")
 local Telescope = require("../Rides/Telescope")
 
@@ -210,6 +213,21 @@ function PossessionClient.start(opts: Opts): Client
 
 	local world = ClientWorld.get()
 	world.ignore({ opts.bodies })
+	-- the held squirrel's line to the server's validator (Controllers/MotorLink): Net "Squirrel.State" up, "Correction"
+	-- down; one for the session, so the sequence and the motor clock run on from body to body
+	local wire = ReplicatedStorage:WaitForChild("Net", 10)
+	local up = if wire then wire:FindFirstChild("Squirrel.State") else nil
+	local down = if wire then wire:FindFirstChild("Correction") else nil
+	local link = MotorLink.new(function(b: buffer)
+		if up then
+			(up :: any):FireServer(b)
+		end
+	end)
+	if down then
+		(down :: RemoteEvent).OnClientEvent:Connect(function(msg: any)
+			link:offer(msg)
+		end)
+	end
 	local input = InputMap.start()
 	local function toast(text: string, seconds: number?)
 		if hud then
@@ -320,6 +338,7 @@ function PossessionClient.start(opts: Opts): Client
 			variant = payload.variant,
 			toast = toast,
 			meter = if hud then hud.meter else nil,
+			link = link,
 		}
 		-- a key pressed in the menu or in another body is not this body's: without this an N pressed
 		-- minutes ago switched the rodent's night vision on at the handoff (and a Space made it leap)
@@ -371,6 +390,7 @@ function PossessionClient.start(opts: Opts): Client
 		metrics.inputToMoveMs = nil
 		metrics.handoffs += 1
 		fpToggle = false
+		link:setEpoch(tonumber(payload.motorEpoch) or 0)
 		startBodyController(model, payload)
 		applyCamera()
 		-- zone changes (the squirrel entering the bowling alley's tunnel) re-pick the camera

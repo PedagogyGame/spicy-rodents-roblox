@@ -141,6 +141,10 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		engine = opts.engine,
 		onGranted = function(player: any, payload: any)
 			payload.variant = (byTownId[townIdOf[payload.actorId]] or {}).variant
+			-- the motor epoch the driver's packets carry (Movement/MovementService; onHandoff made it just before)
+			if movement and movement.epochOf then
+				payload.motorEpoch = movement:epochOf(payload.actorId)
+			end
 			if typeof(player) == "Instance" then
 				granted:FireClient(player :: Player, payload)
 			end
@@ -153,6 +157,15 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		onHandoff = function(actor: any, player: any?, kind: "possess" | "release")
 			if movement and movement.onHandoff then
 				movement:onHandoff(actor, player, kind)
+			end
+		end,
+		onTeleport = function(actor: any, x: number, y: number, z: number, why: string)
+			if movement and movement.teleported and (actor.species == "squirrel" or actor.species == "rodent") then
+				local okH, hip = pcall(function()
+					return actor.body:GetAttribute("HipHeight")
+				end)
+				local feet = y - (if okH and type(hip) == "number" then hip else 0)
+				movement:teleported(actor.id, x, feet, z, why, workspace:GetServerTimeNow())
 			end
 		end,
 		safePose = function(actor: any): (number, number, number, number)

@@ -13,7 +13,9 @@ local Flags = {}
 Flags.defaults = {
 	roleLab = true, -- the dev-only Role Lab backend exists (still gated by isDev per command)
 	liveTunables = true, -- Tunables mirror to ReplicatedStorage.TunablesLive for devs
-	moveValidatorEnforce = false, -- log-only until W7 (BUILD_PLAN §1.4 MoveValidator)
+	-- squirrels the validator flags are snapped back (Server/Movement/MovementService; on since the live validator,
+	-- 2026-11-18: BUILD_PLAN §1.4 had it log-only until W7)
+	moveValidatorEnforce = true,
 	persistence = false, -- DataStore binding lands in W4 #11; W1 uses the in-memory store
 } :: { [string]: boolean }
 

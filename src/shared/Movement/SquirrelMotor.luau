@@ -62,8 +62,12 @@ export type World = Motion.World & {
 	-- optional world clamp (studs); defaults to the v5.4 rectangle
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
-	-- a wall collider? (Colliders in W1)
-	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number) -> boolean)?,
+	-- a wall collider? (Colliders in W1). yHigh: the higher end's feet; rise: how far over it the arc could reach
+	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number, yHigh: number?, rise: number?) -> boolean)?,
+	-- optional floor test for validators: is there something to stand on under feet at (x, y, z)?
+	floorBelow: ((x: number, y: number, z: number) -> boolean)?,
+	-- optional, for validators: is there ground within `depth` under feet at (x, y, z)? (else groundAt is asked)
+	landable: ((x: number, y: number, z: number, depth: number) -> boolean)?,
 	-- optional trampoline sites (Movement/Trampoline, from the registry's trampoline routes)
 	trampolines: { Trampoline.Site }?,
 }
@@ -1874,10 +1878,36 @@ function SquirrelMotor.envelope(
 		end
 		if launched then
 			launchUsed = true
-			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce
+			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
+			-- the ground within the gap may have landed and leapt again in it (Space held through a landing)
 			local fromGroundOrRail = prev.grounded or plausible()
+			if not fromGroundOrRail then
+				local depth = math.max(0, -prev.vy) * dt + 0.5 * P.gravity * dt * dt + E.posSlack
+				local landable = world.landable
+				fromGroundOrRail = if landable
+					then landable(prev.x, prev.y, prev.z, depth)
+					else prev.y - world.groundAt(prev.x, prev.z, prev.y) <= depth
+			end
 			local capUp = if fromGroundOrRail then launchUp else pounceUp
 			local capXZ = if fromGroundOrRail then launchXZ else pounceXZ
+			-- a trampoline's bed (Movement/Trampoline) bounces a falling body higher than a leap, and pushes it on
+			local tramps = world.trampolines
+			if tramps and #tramps > 0 then
+				local reach = Trampoline.C.radius + hypot2(prev.vx, prev.vz) * dt + E.posSlack
+				for _, site in tramps do
+					if
+						hypot2(prev.x - site.x, prev.z - site.z) <= reach
+						or hypot2(next.x - site.x, next.z - site.z) <= reach
+					then
+						capUp = math.max(
+							capUp,
+							(Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
+						)
+						capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
+						break
+					end
+				end
+			end
 			if next.vy > capUp then
 				add(out, "launch", 1, `vertical launch {next.vy} st/s (cap {capUp})`)
 			end
@@ -1893,7 +1923,16 @@ function SquirrelMotor.envelope(
 			if not prev.grounded and not next.grounded then
 				local expected = prev.vy - P.gravity * dt
 				local eps = P.gravity * E.gravityEps
-				if math.abs(next.vy - expected) > eps then
+				if math.abs(next.vy - expected) <= eps then
+					-- a plain arc: the height follows the vertical speed between the two (a body that claims to fall but
+					-- keeps its height is flying), unless a rail it could have visited in between explains it
+					local hi = math.max(prev.vy, next.vy) * dt + E.posSlack + eps * dt
+					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - eps * dt
+					local dy = next.y - prev.y
+					if (dy > hi or dy < lo) and not plausible() then
+						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
+					end
+				else
 					-- a mid-air pounce REPLACES the velocity (vy 2.37..5.09 u, |v_xz| <= 13.5 u x1.12) at any
 					-- tick inside the gap, so it can lower a rising vy; a rail visit zeroes and relaunches it
 					local pounce = next.vy <= pounceUp
@@ -1930,7 +1969,12 @@ function SquirrelMotor.envelope(
 		end
 		-- walls: the straight move must not cross a collider
 		local crosses = world.crosses
-		if crosses and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y)) then
+		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall)
+		local rise = math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt
+		if
+			crosses
+			and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), rise)
+		then
 			add(out, "wall", 1, "move crosses a wall collider")
 		end
 	end
