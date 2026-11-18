@@ -1,9 +1,8 @@
 --!strict
 -- Server/Movement/MovementService (BUILD_PLAN §4.4 #6; HANDOFF rule 12) and Server/Telemetry: squirrel
--- packets through MoveValidator with corrections withheld (log-only), the generic speed check, the 1 s
+-- packets through MoveValidator (log-only, then snapped back with enforcement), the generic speed check, the 1 s
 -- pose history for every body, the possession handoff seam (markTeleported + reset), and Telemetry's
 -- per-system ms and counts.
-local Flags = require("@shared/Config/Flags")
 local Log = require("@shared/Util/Log")
 local MoveValidator = require("@server/Movement/MoveValidator")
 local MovementService = require("@server/Movement/MovementService")

@@ -70,7 +70,8 @@ function SquirrelWire.encode(seq: number, epoch: number, snapshot: { [string]: n
 		end
 	end
 	rec.flags = flags
-	rec.railDir = if (snapshot.railDir :: number? or 1) < 0 then -1 else 1
+	local dir = snapshot.railDir
+	rec.railDir = if type(dir) == "number" and dir < 0 then -1 else 1
 	for _, k in F64 do
 		rec[k] = snapshot[k] :: number
 	end

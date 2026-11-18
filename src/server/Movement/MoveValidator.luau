@@ -52,6 +52,7 @@ export type Verdict = {
 	correction: Snapshot?, -- the state the client should snap to (flagged packets only)
 	resync: boolean, -- the gap was too long to judge; the packet was taken as the new baseline
 	baseline: boolean, -- the first packet of an unknown actor
+	snapped: boolean?, -- (Movement/MovementService) the body was snapped back for this packet
 }
 
 export type Options = {

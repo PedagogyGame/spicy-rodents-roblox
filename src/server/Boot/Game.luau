@@ -81,6 +81,7 @@ local MovementService = require("../Movement/MovementService")
 local MoveValidator = require("../Movement/MoveValidator")
 local ValidatorWorld = require("../Movement/ValidatorWorld")
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
+local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local SewerService = require("../World/SewerService")
@@ -733,6 +734,135 @@ function Game.start(opts: Opts?): any
 		return actor.species == "squirrel" or actor.species == "rodent"
 	end
 
+	-- The squirrel validator's hands (Movement/MovementService): the driver's "Correction", the server's own snap of the
+	-- body, the hold; the held squirrel's motor states come up on Net "Squirrel.State". Positions are the feet (the
+	-- root less the body's HipHeight), as the motor's are.
+	local function hipOf(body: Model): number
+		local h = body:GetAttribute("HipHeight")
+		return if type(h) == "number" and h > 0 then h else 0
+	end
+	local function heldBy(actorId: any): (any?, any?)
+		local actor = rt.actors:get(actorId)
+		if actor == nil then
+			return nil, nil
+		end
+		local driver = possession:controllerOf(actor)
+		return actor, if driver ~= "ai" then driver else nil
+	end
+	movement.deps.poseOf = function(actor: any): (number?, number?, number?)
+		local body = actor.body :: Model
+		local root = body and body.PrimaryPart
+		if root == nil then
+			return nil, nil, nil
+		end
+		local p = root.Position
+		return p.X, p.Y - hipOf(body), p.Z
+	end
+	movement.deps.engine = {
+		correct = function(actorId: any, msg: any)
+			local actor, driver = heldBy(actorId)
+			if actor == nil then
+				return
+			end
+			if msg.snap then
+				local body = actor.body :: Model
+				pcall(function()
+					body:PivotTo(CFrame.new(msg.x, msg.y + hipOf(body), msg.z) * body:GetPivot().Rotation)
+				end)
+			end
+			if net and driver and typeof(driver) == "Instance" then
+				net:fire(driver, "Correction", msg)
+			end
+		end,
+		hold = function(actorId: any, x: number, y: number, z: number, seconds: number)
+			local actor, driver = heldBy(actorId)
+			local body = if actor then actor.body :: Model else nil
+			local root = if body then body.PrimaryPart else nil
+			if body == nil or root == nil or driver == nil or typeof(driver) ~= "Instance" then
+				return
+			end
+			local wasAnchored = root.Anchored
+			pcall(function()
+				root:SetNetworkOwner(nil)
+				root.Anchored = true
+				body:PivotTo(CFrame.new(x, y + hipOf(body), z) * body:GetPivot().Rotation)
+			end)
+			task.delay(seconds, function()
+				if
+					possession:controllerOf(actor) == driver
+					and root.Parent ~= nil
+					and body:GetAttribute("Ride") == nil
+				then
+					pcall(function()
+						root.Anchored = wasAnchored
+						root:SetNetworkOwner(driver :: Player)
+					end)
+				end
+			end)
+		end,
+	}
+	if net then
+		net:on("Squirrel.State", function(player: any, rec: any)
+			local actor = possession:actorOf(player)
+			if actor == nil or not isSquirrelFamily(actor) then
+				return
+			end
+			local seq, epoch, snapshot = SquirrelWire.fromRecord(rec)
+			movement:packet(
+				actor.id,
+				actor.species,
+				{ seq = seq, epoch = epoch, snapshot = snapshot },
+				workspace:GetServerTimeNow()
+			)
+		end)
+	end
+	-- a body the server itself moved (a minigame's knock, the lounge's door): its place is the validator's new
+	-- baseline, under a new motor epoch the driver is told of
+	local function movedBody(body: any, why: string)
+		local id = body and body:GetAttribute(PossessionState.ATTR.ActorId)
+		local actor, driver = heldBy(id)
+		if actor == nil or driver == nil or not isSquirrelFamily(actor) then
+			return
+		end
+		local root = (body :: Model).PrimaryPart
+		if root then
+			local p = root.Position
+			movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, why, workspace:GetServerTimeNow())
+		end
+	end
+	-- ten times a second: the server's own view of every held squirrel's root (MovementService.watch), and the sky
+	-- lift's riders (attribute Ride) left alone until the platform puts them down
+	local onLift: { [any]: boolean } = {}
+	local watchAcc = 0
+	local function watchSquirrels(dt: number)
+		watchAcc += dt
+		if watchAcc < 0.1 then
+			return
+		end
+		watchAcc = 0
+		local t = workspace:GetServerTimeNow()
+		for _, player in Players:GetPlayers() do
+			local actor = possession:actorOf(player)
+			local body = if actor and isSquirrelFamily(actor) then actor.body :: Model else nil
+			local root = if body then body.PrimaryPart else nil
+			if actor and body and root then
+				local ride = body:GetAttribute("Ride") ~= nil
+				local p = root.Position
+				if ride ~= (onLift[actor.id] == true) then
+					onLift[actor.id] = ride
+					movement:suspend(actor.id, ride)
+					if not ride then
+						-- off the sky lift where the platform put it, under a new epoch
+						movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, "ride", t)
+					end
+				end
+				if not ride then
+					movement:watch(actor.id, p.X, p.Y - hipOf(body), p.Z, t)
+				end
+			end
+		end
+	end
+
 	local function healthOf(actorId: string): number
 		return health[actorId] or PlayRules.HEALTH
 	end
@@ -1190,6 +1320,12 @@ function Game.start(opts: Opts?): any
 	local biteAcc, fadeAcc = 0, 0
 	local function step(dt: number)
 		now += dt
+		local okSq, errSq = pcall(function()
+			watchSquirrels(dt)
+		end)
+		if not okSq then
+			warn(`[SpicyRodents] squirrel watch failed: {errSq}`)
+		end
 		-- the fleet steps, then an even 15 pose sends a second go out stamped with `now`: one call that
 		-- the headless replay (tools/sim) makes too, so what it measures is what this server does
 		local hits = traffic:frame(dt, now, trafficWorld() :: any, net)
@@ -1432,6 +1568,7 @@ function Game.start(opts: Opts?): any
 					-- a player's body: put it there (its controller restarts where it finds itself) and say why
 					local body = target.body :: Model
 					body:PivotTo(CFrame.new(x, y + 0.6, z) * body:GetPivot().Rotation)
+					movedBody(body, "knocked")
 					fire(driver, { kind = "notice", text = text })
 				else
 					local a = world.actorsById[townId]
@@ -1539,6 +1676,9 @@ function Game.start(opts: Opts?): any
 					return out
 				end,
 				kill = kill,
+				moved = function(body: any)
+					movedBody(body, "lounge")
+				end,
 			}),
 			heartbeat = o.heartbeat ~= false,
 			terrain = o.terrain ~= false,

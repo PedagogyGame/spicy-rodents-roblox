@@ -13,7 +13,7 @@
 -- Players are anything with `UserId` (and, in the engine, a real Player): the S2 soak drives the
 -- same code with PlayerLike stubs through an injected `Engine`.
 -- W1 hooks (`onHandoff`): SweptCollision.markTeleported(actor), MoveValidator.reset(actor),
--- AvatarBlendService.apply(actor, player) (§1.5 steps 6-7).
+-- AvatarBlendService.apply(actor, player) (§1.5 steps 6-7); `onTeleport` after recover moved a held body.
 -- No side effects on require.
 -- Interface: new(deps) -> Service; Service:possess, release, swap, recover, actorOf(player),
 -- controllerOf(actor), check() -> (ok, errors), stats
@@ -56,6 +56,9 @@ export type Deps = {
 	onGranted: ((player: any, payload: GrantPayload) -> ())?,
 	onReleased: ((player: any, actorId: string, why: string) -> ())?,
 	onHandoff: ((actor: Actor, player: any?, kind: "possess" | "release") -> ())?,
+	-- After recover moved a held body (x, y, z: the pivot it was put at): Movement/MovementService.teleported, so
+	-- the squirrel validator takes the new place as its baseline instead of snapping the body back from it.
+	onTeleport: ((actor: Actor, x: number, y: number, z: number, why: string) -> ())?,
 	-- Recovery target for a body (default: where it stands, lifted 3 studs).
 	safePose: ((actor: Actor) -> (number, number, number, number))?,
 }
@@ -333,6 +336,9 @@ function Possession.new(deps: Deps): Service
 			y += 3
 		end
 		engine.teleport(actor.body, x, y, z, yaw)
+		if deps.onTeleport then
+			deps.onTeleport(actor, x, y, z, "reset")
+		end
 		self.stats.recovered += 1
 		return true
 	end
