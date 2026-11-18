@@ -17,7 +17,14 @@
 -- it must never stop where the client's body went. So the engine rays look past a tree's invisible bough cylinders
 -- (ClientWorld.isBough), the bodies, the vehicles and the terrain (no wall for the client), and run in the squirrel's
 -- collision group (Shared/World/CollisionGroups.SQUIRREL_PROBE).
--- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray); crosses(wall) ->
+-- The town's cars (owner's playtest 2026-11-18: "I did run right through a car"): they are no parts on the server, and
+-- the client's motor now treats the cars it draws as walls and their roofs as ground (Shared/Traffic/Solid). So the
+-- rays meet the traffic service's car boxes as well (opts.cars, Server/Traffic/TrafficService.solids): the walls only
+-- where a car has stood still long enough for every client to draw it there (a moving car, drawn behind where the
+-- server has it, is never a wall: no honest body is snapped for it), the floors wherever a client may still draw one
+-- (withCars).
+-- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray; opts.cars: { walls, floors },
+--   Traffic/Solid sets); withCars(wall?, down?, cars) -> (wall?, down?); crosses(wall) ->
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; crossesLong(wall) -> the same, chord by chord, for any
 --   length; floor(down) -> (x, y, z) -> boolean; landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
@@ -28,6 +35,7 @@
 local Import = require("../Import")
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
+local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
 
 local ValidatorWorld = {}
 
@@ -147,12 +155,35 @@ function ValidatorWorld.landable(down: Ray): (number, number, number, number) ->
 	end
 end
 
-export type Options = { wall: Ray?, down: Ray? }
+-- The car boxes the rays meet (Traffic/Solid sets; exported types do not cross Import)
+export type Cars = { walls: any, floors: any }
+
+export type Options = { wall: Ray?, down: Ray?, cars: Cars? }
+
+-- withCars(wall?, down?, cars): the two rays, each also stopped by the cars' boxes (the walls set for `wall`, the
+-- floors set for `down`); a ray the world has none of is the cars' alone. The boxes are read at each ray (the sets are
+-- refilled every traffic tick).
+function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars): (Ray, Ray)
+	local walls, floors = cars.walls, cars.floors
+	local function over(set: any, ray: Ray?): Ray
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			if set.n > 0 and Solid.ray(set, ox, oy, oz, dx, dy, dz) then
+				return true
+			end
+			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz)
+		end
+	end
+	return over(walls, wall), over(floors, down)
+end
 
 -- build(rail, opts?): MoveValidator's world over a rail world (Movement/RailWorld: registry, index, graph,
 -- trampolines). A fresh table, so Motion's caches on it are the validator's own.
 function ValidatorWorld.build(rail: any, opts: Options?): any
 	local o: Options = opts or {}
+	local wall, down = o.wall, o.down
+	if o.cars then
+		wall, down = ValidatorWorld.withCars(wall, down, o.cars)
+	end
 	return {
 		registry = rail.registry,
 		index = rail.index,
@@ -161,10 +192,10 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		groundAt = function(_x: number, _z: number, refY: number): number
 			return refY
 		end,
-		crosses = if o.wall then ValidatorWorld.crosses(o.wall) else nil,
-		crossesLong = if o.wall then ValidatorWorld.crossesLong(o.wall) else nil,
-		floorBelow = if o.down then ValidatorWorld.floor(o.down) else nil,
-		landable = if o.down then ValidatorWorld.landable(o.down) else nil,
+		crosses = if wall then ValidatorWorld.crosses(wall) else nil,
+		crossesLong = if wall then ValidatorWorld.crossesLong(wall) else nil,
+		floorBelow = if down then ValidatorWorld.floor(down) else nil,
+		landable = if down then ValidatorWorld.landable(down) else nil,
 	}
 end
 

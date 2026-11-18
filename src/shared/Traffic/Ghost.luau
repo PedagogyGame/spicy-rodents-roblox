@@ -9,7 +9,8 @@
 --            (pure: the root pose a player sees); view(buffer, now, kinds, heightAt, visit) (pure: one
 --            client frame, `visit` called per vehicle with its sampled and seen pose);
 --            rootCFrame(lib, x, y, z, yaw, pitch, visible, roll?) (the CFrame of that pose, lib = PartBuilder.Lib);
---            render(buffer, now, folder, kinds, heightAt, models) (engine: placeholder models, one BulkMoveTo);
+--            render(buffer, now, folder, kinds, heightAt, models, cars?) (engine: placeholder models, one BulkMoveTo;
+--            `cars`, a Traffic/Solid set, is refilled with the boxes of the cars drawn this frame);
 --            solidify(model) (a ghost's collision: only its invisible RootPart, the logical box, is solid).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
@@ -21,6 +22,7 @@
 local Units = require("../Config/Units")
 local PartBuilder = require("../Avatar/PartBuilder")
 local VehiclePuppet = require("./VehiclePuppet")
+local Solid = require("./Solid")
 
 export type Pose = {
 	id: number,
@@ -531,11 +533,19 @@ function Ghost.render(
 	folder: Instance,
 	kinds: Kinds,
 	heightAt: (x: number, z: number) -> number,
-	models: { [number]: Model }
+	models: { [number]: Model },
+	cars: Solid.Set?
 ): number
 	local lib = PartBuilder.engineLib()
 	local parts, cframes = {}, {}
+	if cars then
+		Solid.clear(cars)
+	end
 	Ghost.view(buffer, now, kinds, heightAt, function(id, p, k, x, y, z, yaw, pitch, roll)
+		if cars and p.visible then
+			-- the box as drawn, level (the drawn car pitches and rolls with the road by a few degrees)
+			Solid.add(cars, Solid.hull(k.kind, x, y - VehiclePuppet.baseOffset(k.kind), z, yaw))
+		end
 		local model = models[id]
 		if not model then
 			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}` })

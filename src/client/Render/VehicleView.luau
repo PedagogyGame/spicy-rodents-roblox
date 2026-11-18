@@ -11,8 +11,10 @@
 -- local to this client; each one's invisible RootPart (the logical box) is solid to this client's own body
 -- (Ghost.solidify: a person walks into a car, not through it), the drawn parts never collide. The server's swept test
 -- stays the authority on a run-over.
--- Interface: start() -> stop(); the folder is returned by folder(). start() also starts Render/TownView
--- (street-lamp lights and the Skyline far view).
+-- The boxes of the cars drawn this frame go into `opts.cars` (a Traffic/Solid set: Client/World/ClientWorld's `cars`),
+-- where the squirrel's motor meets them as walls and roofs.
+-- Interface: start(opts?) -> stop() (opts.cars: Traffic/Solid.Set); the folder is returned by folder(). start() also
+-- starts Render/TownView (street-lamp lights and the Skyline far view).
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -31,7 +33,8 @@ function VehicleView.folder(): Folder?
 	return folderRef
 end
 
-function VehicleView.start(): () -> ()
+function VehicleView.start(opts: { cars: any? }?): () -> ()
+	local cars = if opts then opts.cars else nil
 	-- the street lamps and Skyline far view (no remotes needed) start first, whatever happens below
 	TownView.start()
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -83,7 +86,7 @@ function VehicleView.start(): () -> ()
 		RunService.RenderStepped:Connect(function(dt: number)
 			local good, err = pcall(function()
 				local at = receiver:at(workspace:GetServerTimeNow(), dt)
-				Ghost.render(receiver.buffer, at, folder, kinds, ground, models)
+				Ghost.render(receiver.buffer, at, folder, kinds, ground, models, cars)
 			end)
 			if not good and not warned then
 				warned = true
@@ -96,6 +99,9 @@ function VehicleView.start(): () -> ()
 			c:Disconnect()
 		end
 		folder:Destroy()
+		if cars then
+			cars.n = 0
+		end
 	end
 end
 

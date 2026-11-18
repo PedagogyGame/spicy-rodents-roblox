@@ -31,8 +31,14 @@
 --     oaks would stop the body just outside the reach that climbs them.
 --   * The lowest BODY_RISE of the box counts only at the body's core: where the ground rises toward a
 --     kerb, the kerb seen from a half-width out stands taller than a step and would be a wall again.
+-- The town's cars (owner's playtest 2026-11-18: "I did run right through a car"): they are drawn on this client only
+-- (Render/VehicleView) and their parts are not in these queries (Client/Main ignores the ghosts' folder), so the cars
+-- this client draws are kept as numbers in `cars` (a Shared/Traffic/Solid set VehicleView refills every frame), and
+-- groundAt, blocked, blockedCore and blockedHalf meet them too (Solid.squirrelWorld): a car is a wall at the body's
+-- box, its roof ground the same ray finds (v5.4 let a squirrel stand on a car's roof; a moving car slides out from
+-- under it). The server's validator meets the same boxes (Server/Movement/ValidatorWorld).
 -- Interface: get() -> ClientWorld { groundAt, blocked, blockedCore, blockedHalf, blockedRadius, waterAt,
---   clamp, rail() -> RailWorld?, ignore(instances) }; groundLike(name, sizeY, transparency) -> boolean
+--   clamp, rail() -> RailWorld?, ignore(instances), cars }; groundLike(name, sizeY, transparency) -> boolean
 --   (pure); STEP; BODY_HALF; BODY_TOP; BODY_RISE; wallProbe(feetY) -> centreY, radius (pure);
 --   bodyProbe(feetY) -> centreY, sizeX, sizeY, sizeZ (pure); isBough(name, parentName) -> boolean (pure);
 --   isTrunk(name, parentName) -> boolean (pure); trunkClear(axisDistance, trunkRadius) -> boolean (pure)
@@ -44,6 +50,7 @@ local Height = Import.shared("World/Height") :: typeof(require("../../shared/Wor
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
+local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
 
 export type ClientWorld = {
 	groundAt: (x: number, z: number, refY: number) -> number,
@@ -56,6 +63,7 @@ export type ClientWorld = {
 	rail: () -> any?,
 	ignore: (list: { Instance }) -> (),
 	railReady: boolean,
+	cars: Solid.Set, -- the cars this client draws (Render/VehicleView fills it every frame)
 }
 
 local ClientWorld = {}
@@ -233,6 +241,7 @@ function ClientWorld.get(): ClientWorld
 	local self: ClientWorld
 	self = {
 		railReady = false,
+		cars = Solid.newSet(),
 		clamp = { minX = clamp.minX, maxX = clamp.maxX, minZ = clamp.minZ, maxZ = clamp.maxZ },
 		groundAt = function(x: number, z: number, refY: number): number
 			local top = refY + 1.5
@@ -286,6 +295,10 @@ function ClientWorld.get(): ClientWorld
 			walls.FilterDescendantsInstances = ignoreList
 		end,
 	}
+	-- the cars, as walls and roofs, in the motor's own tests
+	local withCars = Solid.squirrelWorld(self, self.cars)
+	self.groundAt, self.blocked, self.blockedCore, self.blockedHalf =
+		withCars.groundAt, withCars.blocked, withCars.blockedCore, withCars.blockedHalf
 	task.spawn(function()
 		local ok, result = pcall(function()
 			return RailWorld.get(Data.default(), Height.at)

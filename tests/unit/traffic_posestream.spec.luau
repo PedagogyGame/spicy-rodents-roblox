@@ -280,7 +280,7 @@ return function(t)
 		t.truthy(string.find(view, "PoseStream.newReceiver()", 1, true))
 		t.truthy(string.find(view, "receiver:packet(b, workspace:GetServerTimeNow())", 1, true))
 		t.truthy(string.find(view, "local at = receiver:at(workspace:GetServerTimeNow(), dt)", 1, true))
-		t.truthy(string.find(view, "Ghost.render(receiver.buffer, at, folder, kinds, ground, models)", 1, true))
+		t.truthy(string.find(view, "Ghost.render(receiver.buffer, at, folder, kinds, ground, models, cars)", 1, true))
 		-- the ghosts stand on the drawn roads, and the headless replay seats them on the same ground
 		local ground = "RoadSurface.ground(RoadSurface.new(Data.default():roads()), Height.at)"
 		t.truthy(string.find(view, ground, 1, true), "VehicleView seats the ghosts on World/RoadSurface")

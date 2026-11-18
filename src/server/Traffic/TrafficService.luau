@@ -7,8 +7,14 @@
 --            step, then the pose stream's send through Traffic/PoseStream);
 --            :dispatchResponder(dest, opts?); :releaseResponder(v); :responderIdle() -> n;
 --            :responderHome() -> {x, z}; :dispatchIncident(scene); :markTeleported(actorId) (HANDOFF
---            rule 12); :stats(); :kinds(); RunOver (Util/Signal); :start(ctx) (engine only: a Heartbeat
---            loop over `frame`; never called on require).
+--            rule 12); :stats(); :kinds(); :solids() -> { walls, floors } (Traffic/Solid sets, below); RunOver
+--            (Util/Signal); :start(ctx) (engine only: a Heartbeat loop over `frame`; never called on require).
+-- Solid cars for the movement validator (owner's playtest 2026-11-18: "I did run right through a car"; Server/Movement/
+-- ValidatorWorld): each client draws the cars a little behind this state (Traffic/Ghost: the playout delay and the
+-- link), and its squirrel's motor treats the boxes it draws as walls and roofs (Traffic/Solid). So the validator's
+-- walls are only the cars that have stood still SETTLE seconds (every client draws them there by then; a car that
+-- moves leaves the set at once), and its floors are every visible car stretched FLOOR_LAG seconds of its speed behind
+-- (where a client may still draw it under a squirrel on its roof). Both sets are refilled at the end of every tick.
 --
 -- Pure and steppable: `step(dt, world)` runs whole 1/tickHz ticks (Tunables traffic.tickHz, default 30)
 -- and carries the remainder. Each tick: (1) every vehicle's AICarMotor steps against the people and the
@@ -31,6 +37,7 @@ local MedicalRoute = Import.shared("Infection/MedicalRoute") :: typeof(require("
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 local Signal = Import.shared("Util/Signal") :: typeof(require("../../shared/Util/Signal"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
 local SweptCollision = require("./SweptCollision")
 
 -- Exported types do not cross Import (W1 Track A note): the shared types are restated loosely here.
@@ -66,6 +73,14 @@ export type Stats = {
 
 local TrafficService = {}
 TrafficService.__index = TrafficService
+
+TrafficService.SETTLE = 1.5 -- seconds a car stands still before the validator takes it for a wall
+TrafficService.STILL_SPEED = 0.05 -- studs/s: slower is standing still (the pose stream's `stopped`)
+TrafficService.FLOOR_LAG = 1.0 -- seconds of its speed a car's floor is stretched behind it
+TrafficService.FLOOR_TRAIL_MAX = 40 -- studs, at most
+
+-- Solid sets for the validator (Traffic/Solid; exported types do not cross Import)
+export type Solids = { walls: any, floors: any }
 
 export type Opts = {
 	lanes: { any }, -- generated/Lanes records
@@ -108,6 +123,8 @@ export type TrafficService = typeof(setmetatable(
 		_stats: Stats,
 		RunOver: Signal,
 		unified: { string },
+		still: { [number]: number }, -- seconds each vehicle has stood still (visible, not moved)
+		_solids: Solids,
 		-- an observer called at the end of every simulation tick (the headless replay records the true
 		-- state from it); nil in the game
 		onTick: ((self: any) -> ())?,
@@ -268,6 +285,8 @@ function TrafficService.new(opts: Opts): TrafficService
 		_stats = { ticks = 0, ms = 0, maxTickMs = 0, hits = 0, stuck = {}, events = {}, violations = {} },
 		RunOver = Signal.new(),
 		unified = unified,
+		still = {},
+		_solids = { walls = Solid.newSet(), floors = Solid.newSet() },
 		onTick = nil :: ((self: any) -> ())?,
 	}, TrafficService)
 	for _, e in self.entries do
@@ -345,6 +364,38 @@ function TrafficService.markTeleported(self: TrafficService, actorId: any)
 	self.prevActors[actorId] = nil
 end
 
+-- The validator's walls and floors after a tick (header): the walls are the cars that stood still SETTLE seconds, the
+-- floors every visible car with its trail.
+local function refreshSolids(self: TrafficService, dt: number)
+	local walls, floors = self._solids.walls, self._solids.floors
+	Solid.clear(walls)
+	Solid.clear(floors)
+	for _, v in self.vehicles do
+		local p = self.prev[v.id]
+		local still = v.visible
+			and not v.teleported
+			and v.speed < TrafficService.STILL_SPEED
+			and p ~= nil
+			and p.visible
+			and math.abs(v.x - p.x) < 0.01
+			and math.abs(v.z - p.z) < 0.01
+		local run = if still then (self.still[v.id] or 0) + dt else 0
+		self.still[v.id] = run
+		if v.visible then
+			if run >= TrafficService.SETTLE then
+				Solid.add(walls, Solid.hull(v.kind, v.x, v.y, v.z, v.yaw))
+			end
+			local trail = math.min(v.speed * TrafficService.FLOOR_LAG, TrafficService.FLOOR_TRAIL_MAX)
+			Solid.add(floors, Solid.hull(v.kind, v.x, v.y, v.z, v.yaw, trail))
+		end
+	end
+end
+
+-- solids() -> { walls, floors }: the validator's car boxes (Traffic/Solid sets, refilled every tick; header).
+function TrafficService.solids(self: TrafficService): Solids
+	return self._solids
+end
+
 local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit }
 	local t0 = os.clock()
 	local dt = self.tick
@@ -379,6 +430,7 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 			self._stuckRun[v.id] = 0
 		end
 	end
+	refreshSolids(self, dt)
 	-- the fatal test
 	local actors: { SweptCollision.ActorPose } = {}
 	for _, s in (world.squirrels or {}) :: { Squirrel } do
