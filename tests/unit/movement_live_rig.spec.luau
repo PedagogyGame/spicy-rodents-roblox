@@ -119,6 +119,7 @@ return function(t)
 			for _, v in r.violations do
 				print(`      VIOLATION {v}`)
 			end
+			print(`      server cost {string.format("%.4f", r.serverMsPerTick)} ms per squirrel per tick`)
 			t.eq(r.snaps, 0, "snaps")
 			t.truthy(r.accepted > 60 * MINUTES * 5, `packets judged ({r.accepted})`)
 		end)

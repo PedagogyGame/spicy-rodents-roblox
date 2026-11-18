@@ -72,7 +72,9 @@ export type Result = {
 	stale: number,
 	violations: { string },
 	sent: number,
+	serverMsPerTick: number, -- the server's cost for this squirrel per 60 Hz tick
 	recoveries: number,
+	visited: { [number]: boolean },
 	frames: number,
 	seconds: number,
 	-- where the server's root is at the end, and the client's motor
@@ -110,6 +112,7 @@ function LiveRig.new(opts: Options): Rig
 	local rig: any = { t = 0, opts = opts }
 	local violations: { string } = {}
 	local accepted, packets, holds = 0, 0, 0
+	local serverSeconds = 0 -- the server's time on the squirrel: decoding, judging, watching
 
 	local function at(t: number, fn: () -> ())
 		n += 1
@@ -178,6 +181,7 @@ function LiveRig.new(opts: Options): Rig
 		lastRoot = -math.huge,
 		clockBase = 0,
 		recoveries = 0, -- river recoveries the client made
+		visited = {} :: { [number]: boolean }, -- routes the client's motor ran
 		lastT = 0,
 	}
 	rig.client = client
@@ -198,10 +202,12 @@ function LiveRig.new(opts: Options): Rig
 			if server.actor == 0 then
 				return
 			end
+			local c0 = os.clock()
 			local seq, epoch, snapshot = SquirrelWire.decode(b)
 			packets += 1
 			local v =
 				rig.movement:packet(actorKey(), "squirrel", { seq = seq, epoch = epoch, snapshot = snapshot }, rig.t)
+			serverSeconds += os.clock() - c0
 			if v.accepted then
 				accepted += 1
 			end
@@ -293,6 +299,9 @@ function LiveRig.new(opts: Options): Rig
 		local step = math.min(dt, SquirrelMotor.params.frameDtCap)
 		local _, events = SquirrelMotor.step(state, inp, step, world)
 		client.events = events
+		if state.routeId then
+			client.visited[state.routeId] = true
+		end
 		if opts.clockRate and opts.clockRate ~= 1 then
 			state.clock += step * (opts.clockRate - 1)
 		end
@@ -337,7 +346,9 @@ function LiveRig.new(opts: Options): Rig
 				end
 			end
 			if not server.riding then
+				local c0 = os.clock()
 				movement:watch(id, server.root.x, server.root.y, server.root.z, rig.t)
+				serverSeconds += os.clock() - c0
 			end
 		end
 	end
@@ -445,7 +456,9 @@ function LiveRig.new(opts: Options): Rig
 			stale = st.stale,
 			violations = violations,
 			sent = client.link.sent,
+			serverMsPerTick = serverSeconds * 1000 / math.max(1, rig.t * 60),
 			recoveries = client.recoveries,
+			visited = client.visited,
 			frames = client.frame,
 			seconds = rig.t,
 			root = table.clone(server.root),
