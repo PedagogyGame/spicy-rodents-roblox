@@ -12,6 +12,8 @@
 -- server's recovery through StarterGui:SetCore("ResetButtonCallback", BindableEvent): it never kills
 -- or respawns a body.
 -- No side effects on require.
+-- The server's squirrel validator: one Controllers/MotorLink for the session (Net "Squirrel.State" up, "Correction"
+-- down), its motor epoch set from each Granted's motorEpoch and handed to every squirrel controller.
 -- Robustness (W1 client review): remotes are awaited with timeouts and a missing one is said on
 -- screen; the body is awaited up to 15 s while it streams in (the server also makes it persistent for
 -- its driver); the default character controls are on for a person on foot and off in a vehicle or the

@@ -427,16 +427,43 @@ return function(t)
 			start = function(): State
 				return SquirrelMotor.new(b.minX - 15, world.groundHeight, cz)
 			end,
-			keys = function(_now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+			keys = function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+				-- (still until the cheat: a wall alone in the first seconds after a hand-off is not snapped)
 				local inp = SquirrelMotor.idleInput(-math.pi / 2)
-				inp.fw = 1
+				inp.fw = if now >= CHEAT_AT then 1 else 0
 				inp.sprint = true
 				return inp
 			end,
 			opts = { world = noWalls },
-			from = 0,
 		})
 	end
+	t.test(
+		"a wall alone in the first seconds after a hand-off is logged, not snapped (the town may still stream in)",
+		function()
+			local b = boxes[1]
+			local rig = LiveRig.new({
+				world = noWalls,
+				vworld = vworld,
+				link = { latency = 0.12, jitter = 0.15, loss = 0.02 },
+				seed = 12,
+			})
+			rig:possess(
+				SquirrelMotor.new(b.minX - 4, world.groundHeight, (b.minZ + b.maxZ) / 2),
+				function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					local inp = SquirrelMotor.idleInput(-math.pi / 2)
+					inp.fw = if now < 1.5 then 1 else 0
+					return inp
+				end
+			)
+			rig:run(2.5)
+			local r = rig:result()
+			print(`      {LiveRig.describe("in through a wall straight after a hand-off", r)}`)
+			t.eq(r.snaps, 0, "snaps")
+			local entered = r.client and r.client.x > b.minX
+			t.truthy(entered, "the body went in")
+		end
+	)
+
 	for _, c in cheats do
 		t.test(`cheat: {c.name}: snapped back within 1 s`, function()
 			local o: any = {

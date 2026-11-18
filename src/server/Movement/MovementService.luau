@@ -23,6 +23,8 @@
 -- correction) is snapped too, and so is one still sending under an old epoch C.IGNORED after the move it was told of. C.HOLD_AFTER snaps inside
 -- C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it still) for
 -- C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
+-- For C.STREAM_GRACE after a hand-off a wall alone does not snap (logged): the town around a new body may still be
+-- streaming in on its client, and a house it has not got yet is no wall to its motor.
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
@@ -91,6 +93,7 @@ type Squirrel = {
 	good: { [string]: number | boolean }?, -- the last clean packet's snapshot
 	lastAt: number?, -- server time of the last accepted packet
 	since: number?, -- server time of this epoch's first accepted packet
+	possessedAt: number?, -- server time of the first packet after the hand-off (0: the hand-off, none yet)
 	lastX: number,
 	lastY: number,
 	lastZ: number,
@@ -132,6 +135,7 @@ MovementService.C = table.freeze({
 	HOLD_AFTER = 3, -- snaps ...
 	HOLD_WINDOW = 10, -- ... inside this many seconds: the body is held
 	HOLD_SECONDS = 2,
+	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped
 })
 local C = MovementService.C
 
@@ -306,6 +310,7 @@ function MovementService.new(deps: Deps): Movement
 					sq.gate = { x = x, y = y, z = z, at = 0 } -- (its time is set by the first packet or watch)
 				end
 			end
+			sq.possessedAt = 0
 		end
 	end
 
@@ -400,6 +405,9 @@ function MovementService.new(deps: Deps): Movement
 				end
 				return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
 			end
+			if sq.possessedAt == 0 then
+				sq.possessedAt = now
+			end
 			local snapshot = packet.snapshot
 			local px, py, pz = snapshot.x :: number, snapshot.y :: number, snapshot.z :: number
 			local gate = sq.gate
@@ -437,11 +445,25 @@ function MovementService.new(deps: Deps): Movement
 			v.correction = nil
 			if enforce and v.flagged and not v.ok then
 				local codes = {}
+				local wallOnly = true
 				for _, x in v.violations do
 					table.insert(codes, x.code)
+					wallOnly = wallOnly and x.code == "wall"
 				end
-				snap(self, actorId, table.concat(codes, "+"), now, nil)
-				v.snapped = true
+				local fresh = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+				if wallOnly and fresh then
+					-- (a house its client may not have streamed in yet: logged, the bucket emptied)
+					validator:clearFlag(actorId)
+					self.log:every(
+						`grace:{actorId}`,
+						5,
+						"warn",
+						`{actorId} through a wall {now - (sq.possessedAt :: number)} s after a hand-off; not snapped`
+					)
+				else
+					snap(self, actorId, table.concat(codes, "+"), now, nil)
+					v.snapped = true
+				end
 			end
 			return v
 		end
