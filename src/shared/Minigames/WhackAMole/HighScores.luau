@@ -7,7 +7,8 @@
 -- is the whole reward (free play). A board is plain data, sent as it is and kept for the life of the server.
 -- Pure; Lune-tested (tests/unit/whack_round.spec.luau).
 -- Interface: SIZE, NAME_MAX, HOUSE; new() -> Board; place(board, score) -> number?; add(board, name, score)
---   -> number? (the place it took); lines(board) -> { string }; types Entry, Board
+--   -> number? (the place it took); lines(board) -> { string }; list(board) -> { { name, score } } (as sent to the
+--   player's end card); types Entry, Board
 
 local HighScores = {}
 
@@ -17,13 +18,17 @@ HighScores.NAME_MAX = 20
 export type Entry = { name: string, score: number, house: boolean }
 export type Board = { entries: { Entry } }
 
--- A good round in his browser game is 200 to 300 (about one mole in two, a few misses); 400 is very good.
+-- What a round scores (his pacing; a hit frees its hole sooner, so a sure hand is sent more moles): striking every
+-- mole about 0.35 s after it starts up makes about 710; a steady hand (0.55 s, now and then the wrong hole) about
+-- 580; a casual one (0.7 s) about 490; a first round (0.9 s, often the wrong hole) about 340
+-- (tests/unit/whack_round.spec.luau plays these hands). So a first round reaches the bottom, a steady one the
+-- middle, and only a quick and sure one tops it.
 HighScores.HOUSE = {
-	{ name = "MIDNIGHT", score = 400 },
-	{ name = "COCOA", score = 300 },
-	{ name = "TAUPE", score = 220 },
-	{ name = "CHARCOAL", score = 150 },
-	{ name = "LITTLE NOSE", score = 80 },
+	{ name = "MIDNIGHT", score = 650 },
+	{ name = "COCOA", score = 560 },
+	{ name = "TAUPE", score = 480 },
+	{ name = "CHARCOAL", score = 400 },
+	{ name = "LITTLE NOSE", score = 300 },
 }
 
 function HighScores.new(): Board
@@ -67,6 +72,14 @@ function HighScores.lines(board: Board): { string }
 	local out: { string } = {}
 	for i, e in board.entries do
 		out[i] = `{i}. {e.name}  {e.score}`
+	end
+	return out
+end
+
+function HighScores.list(board: Board): { { name: string, score: number } }
+	local out = {}
+	for i, e in board.entries do
+		out[i] = { name = e.name, score = e.score }
 	end
 	return out
 end

@@ -19,7 +19,7 @@ This is your whack-a-mole from the 18 November delivery, the tenth game. It stan
 - **The server keeps score.** Your screen sends only which hole you struck and when. The server judges the hole as it was at that moment, so a player on a slow line still scores what they saw.
 - **Free play.** No coins, ever. Your coin slot and coin return are now a **FREE PLAY** plate.
 - **Watching.** Anyone within 40 studs sees the same moles, mallet and score as the player.
-- **Best scores.** The cabinet keeps a board of the best five rounds for as long as the server runs, with each player's name. It starts with five house scores to beat: MIDNIGHT 400, COCOA 300, TAUPE 220, CHARCOAL 150 and LITTLE NOSE 80. Your own best is kept too.
+- **Best scores.** The cabinet keeps a board of the best five rounds for as long as the server runs, with each player's name. It starts with five house scores to beat: MIDNIGHT 650, COCOA 560, TAUPE 480, CHARCOAL 400 and LITTLE NOSE 300. A first round should reach the bottom; only a quick, sure hand tops it (striking every mole makes about 710). The board is on your end card, with your round on it at its place, or just under it when it did not make the board. Your own best is kept too. People watching do not see the board.
 
 ## How to play
 1. Pick **Townsperson** or **Police** (only people can play), walk into the bowling alley and go through to the games room. The cabinet is on the front wall, beside the pinball machines.

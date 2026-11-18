@@ -185,6 +185,14 @@ return function(t: any)
 				t.eq(window(w, N.status), "TIME!")
 				t.truthy(Rig.has(Rig.texts(w.gui), `{r.score} points`), Rig.screen(w))
 				t.truthy(Rig.has(Rig.texts(w.gui), "Play again"))
+				-- the end card is the cabinet's board, this round on it at its place
+				local over = Controller.current.over
+				t.truthy(over and over.place >= 1 and #over.board == 5, "the board came with the end")
+				for i, e in over.board do
+					local name = if i == over.place then "(you)" else e.name
+					t.truthy(Rig.has(Rig.texts(w.gui), name), `{name} on the end card: {Rig.screen(w)}`)
+				end
+				t.truthy(Rig.has(Rig.texts(w.gui), `{over.place}.`))
 				t.truthy((MinigameSounds.counts()["whack_a_mole.bonk"] or 0) >= r.hits, "a bonk for each hit")
 				t.truthy((MinigameSounds.counts()["whack_a_mole.pop"] or 0) > 0)
 				-- every mole is down again

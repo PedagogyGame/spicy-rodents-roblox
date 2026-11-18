@@ -8,8 +8,9 @@
 --     Client/Minigames/WhackAMole/Cabinet (whack_round, whack_rise, whack_hit, whack_over, whack_idle), which
 --     moves the moles and the mallet and writes the SCORE, TIME and status windows on the sign.
 --   The card: how to play in one sentence (for the device in hand), the score and the time left. The end card:
---     the score, hits, misses and how many strikes hit, with the place it took on the cabinet's board or a new
---     personal best (the server's state: place, best, newBest).
+--     the cabinet's board of best rounds (the house's to beat at first) with this round on it, highlighted, at
+--     the place it took, or under it when it did not make the board; this round's hits, misses and how many
+--     strikes hit; and a new personal best (the server's state: place, best, newBest, board).
 --   Sound: named cue points only, no asset ids yet (Cabinet.SOUNDS: "whack_a_mole.<cue>").
 -- The bar is the framework's own (Leave in every phase, Play again at the end).
 -- Interface: a ClientGame.ClientGame
@@ -70,8 +71,9 @@ local function endCard(view: { [string]: any }, _you: number?): { [string]: any 
 	local line = `TIME!  {score} points.`
 	local c = Controller.current
 	local mine = c and c.over
+	local place = 0
 	if mine then
-		local place = tonumber(mine.place) or 0
+		place = tonumber(mine.place) or 0
 		if place == 1 then
 			line ..= "  THE TOP OF THE BOARD!"
 		elseif place > 1 then
@@ -83,23 +85,42 @@ local function endCard(view: { [string]: any }, _you: number?): { [string]: any 
 			line ..= `  Your best: {mine.best}.`
 		end
 	end
+	local you = {
+		seat = 1,
+		name = (seat and seat.name) or "You",
+		gone = seat and seat.gone,
+		rank = "",
+		hits = tostring(hits),
+		misses = tostring(misses),
+		rate = if judged > 0 then `{math.floor(hits / judged * 100 + 0.5)}%` else "-",
+		total = tostring(score),
+	}
+	-- the cabinet's board, this round on it at its place (or under it)
+	local rows = {}
+	local board = if mine and type(mine.board) == "table" then mine.board else {}
+	for i, e in board do
+		if i == place then
+			you.rank = `{i}.`
+			table.insert(rows, you)
+		elseif type(e) == "table" then
+			local name = tostring(e.name or "")
+			local total = tostring(tonumber(e.score) or 0)
+			table.insert(
+				rows,
+				{ seat = 0, name = name, rank = `{i}.`, hits = "", misses = "", rate = "", total = total }
+			)
+		end
+	end
+	if you.rank == "" then
+		table.insert(rows, you)
+	end
 	return {
 		title = "WHACK-A-MOLE",
 		line = line,
-		rows = {
-			{
-				seat = 1,
-				name = (seat and seat.name) or "You",
-				gone = seat and seat.gone,
-				place = 1,
-				hits = tostring(hits),
-				misses = tostring(misses),
-				rate = if judged > 0 then `{math.floor(hits / judged * 100 + 0.5)}%` else "-",
-				total = tostring(score),
-			},
-		},
+		rows = rows,
 		cols = {
-			{ title = "PLAYER", key = "name", x = 0.02, w = 0.36 },
+			{ title = "", key = "rank", x = 0.02, w = 0.06 },
+			{ title = "PLAYER", key = "name", x = 0.08, w = 0.32 },
 			{ title = "HITS", key = "hits", x = 0.4, w = 0.14 },
 			{ title = "MISSES", key = "misses", x = 0.54, w = 0.14 },
 			{ title = "ON TARGET", key = "rate", x = 0.68, w = 0.15 },
@@ -139,7 +160,7 @@ local entry: ClientGame.ClientGame = {
 			Cabinet.over(cab, msg)
 			local c = Controller.current
 			if c and c.cab == cab and type(msg.place) == "number" then
-				c.over = { place = msg.place, best = msg.best, newBest = msg.newBest }
+				c.over = { place = msg.place, best = msg.best, newBest = msg.newBest, board = msg.board }
 			end
 		elseif kind == "whack_idle" then
 			Cabinet.idle(cab, msg)

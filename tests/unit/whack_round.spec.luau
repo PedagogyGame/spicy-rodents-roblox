@@ -7,6 +7,7 @@ local HighScores = require("@shared/Minigames/WhackAMole/HighScores")
 local Minigame = require("@shared/Minigames/Minigame")
 local Round = require("@shared/Minigames/WhackAMole/Round")
 local Rules = require("@shared/Minigames/WhackAMole/Rules")
+local Rng = require("@shared/Util/Rng")
 local Test = require("../lib/Test")
 
 local DT = 1 / 60
@@ -305,12 +306,58 @@ return function(t: Test.T)
 		local b = HighScores.new()
 		t.eq(#b.entries, HighScores.SIZE)
 		t.eq(HighScores.place(b, 0), nil)
-		t.eq(HighScores.place(b, 80), nil, "a tie stands below the house")
-		t.eq(HighScores.add(b, "Ben", 81), 5)
-		t.eq(HighScores.add(b, "A very long name indeed for a board", 500), 1)
+		local low = HighScores.HOUSE[HighScores.SIZE].score
+		t.eq(HighScores.place(b, low), nil, "a tie stands below the house")
+		t.eq(HighScores.add(b, "Ben", low + 1), 5)
+		t.eq(HighScores.add(b, "A very long name indeed for a board", 900), 1)
 		t.eq(#b.entries, HighScores.SIZE)
 		t.eq(b.entries[1].name, string.sub("A very long name indeed for a board", 1, HighScores.NAME_MAX))
 		t.eq(b.entries[5].name, "CHARCOAL", "the lowest falls off")
-		t.eq(HighScores.lines(b)[1], `1. {b.entries[1].name}  500`)
+		t.eq(HighScores.lines(b)[1], `1. {b.entries[1].name}  900`)
+		t.eq(HighScores.list(b)[1].score, 900)
+		t.eq(HighScores.list(b)[5].name, "CHARCOAL")
+	end)
+
+	-- a hand at the cabinet: strikes the first mole it sees `react` seconds after it starts up, needs `move`
+	-- seconds between two strikes, and now and then (`slip`) strikes the next hole instead
+	local function hand(seed: number, react: number, move: number, slip: number): number
+		local s = Round.new(seed)
+		local slips = Rng.new(seed + 1000)
+		local free = 0
+		while not Round.over(s) do
+			Round.advance(s, DT)
+			local now = s.now
+			if now >= free and now < Round.SECONDS then
+				for _, r in s.rises do
+					if now >= r.at + react and Round.hittable(r, now) then
+						local hole = if slips.next() < slip then r.hole % Round.HOLES + 1 else r.hole
+						Round.strike(s, hole, now)
+						free = now + move
+						break
+					end
+				end
+			end
+		end
+		return s.score
+	end
+
+	local function mean(react: number, move: number, slip: number): number
+		local sum = 0
+		for seed = 1, 12 do
+			sum += hand(seed, react, move, slip)
+		end
+		return sum / 12
+	end
+
+	t.test("the house board: a first round reaches the bottom, only a quick and sure hand tops it", function()
+		local H = HighScores.HOUSE
+		local quick = mean(0.35, 0.25, 0)
+		local steady = mean(0.55, 0.45, 0.08)
+		local casual = mean(0.7, 0.55, 0.1)
+		local first = mean(0.9, 0.7, 0.15)
+		t.truthy(quick > H[1].score, `a quick sure hand ({quick}) tops the house ({H[1].score})`)
+		t.truthy(steady > H[3].score and steady < H[1].score, `a steady hand ({steady}) reaches the middle`)
+		t.truthy(casual > H[4].score and casual < H[2].score, `a casual hand ({casual}) gets on the board`)
+		t.truthy(first > H[5].score and first < H[3].score, `a first round ({first}) reaches the bottom`)
 	end)
 end

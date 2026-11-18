@@ -305,7 +305,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				score = score,
 				hits = result.hits or 0,
 				misses = result.misses or 0,
-				board = HighScores.lines(self.board),
+				board = HighScores.list(self.board),
 			}
 			for _, k in followers() do
 				local msg = table.clone(self.over)
@@ -324,7 +324,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				for _, person in ctx.town.people() do
 					local d = Vector3.new(person.x, person.y, person.z) - ctx.anchor
 					if (d.Magnitude <= Game.WATCH or self.told[person.key]) and not isComputer(person.key) then
-						ctx.send(person.key, { kind = "whack_idle", board = HighScores.lines(self.board) })
+						ctx.send(person.key, { kind = "whack_idle", board = HighScores.list(self.board) })
 					end
 				end
 			end
@@ -338,7 +338,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		return {
 			g = self.games,
 			start = self.start,
-			board = if mine then HighScores.lines(self.board) else nil,
+			board = if mine then HighScores.list(self.board) else nil,
 			place = if mine then mine.place else nil,
 			best = if mine then mine.best else nil,
 			newBest = if mine then mine.newBest else nil,

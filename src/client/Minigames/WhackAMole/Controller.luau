@@ -157,7 +157,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		cab = cab,
 		phase = "",
 		camOn = false,
-		over = nil, -- this player's place on the board and best, at the end (the server's state)
+		over = nil, -- this player's place on the board, best and the board, at the end (the server's state)
 		sentAt = -math.huge, -- shared-clock time of the last strike sent
 		sent = 0, -- strikes sent (for the specs)
 		asked = {}, -- verb -> true while a start, an again or a leave is on its way
@@ -266,7 +266,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		local view = msg.view or {}
 		local phase = view.phase or ""
 		if type(msg.place) == "number" then
-			self.over = { place = msg.place, best = msg.best, newBest = msg.newBest }
+			self.over = { place = msg.place, best = msg.best, newBest = msg.newBest, board = msg.board }
 		elseif phase ~= "done" then
 			self.over = nil
 		end
