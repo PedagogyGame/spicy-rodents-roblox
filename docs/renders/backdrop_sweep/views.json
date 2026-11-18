@@ -14,6 +14,8 @@
     {"name": "s09_core_south_edge", "desc": "The old town's south road (z about -880) looking south out of town.", "pos": [100, 5.5, -880], "look": [100, 10, -2400], "fov": 70, "aboveGround": true},
     {"name": "s10_hospital_north", "desc": "Behind the hospital (its back wall at z 1002) looking north to the coast.", "pos": [-890, 13.5, 1060], "look": [-890, 6, 1600], "fov": 70},
     {"name": "s11_quay_west_back", "desc": "Behind the quay's west row looking west (+X) over the off-road back field to the edge.", "pos": [2700, 5.5, -200], "look": [4500, 30, -200], "fov": 70, "aboveGround": true},
+    {"name": "s13_south_edge_out", "desc": "At the south clamp edge (z -2250 is 50 st ahead) looking straight out south: the band, the land mesh, the ranges.", "pos": [1500, 8.7, -2200], "look": [1500, 30, -4500], "fov": 70},
+    {"name": "s14_west_edge_out", "desc": "At the west clamp edge (x 4300) in the off-road back field, looking out west (+X).", "pos": [4250, 10.7, 0], "look": [6500, 40, 0], "fov": 70},
     {"name": "s12_east_of_core", "desc": "East of the old town (x about -1150) looking east toward the radio tower: the gap between town and the edge.", "pos": [-1150, 5.5, 200], "look": [-2900, 60, 600], "fov": 70, "aboveGround": true}
   ]
 }
