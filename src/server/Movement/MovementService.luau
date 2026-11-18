@@ -174,6 +174,10 @@ local MovementService = {}
 MovementService.C = table.freeze({
 	GATE_SLACK = 6, -- studs: the first packet of an epoch this near where the server put the body (root or feet) ...
 	GATE_MOVE = 0.6, -- ... plus the fastest the squirrel goes in at most this many seconds
+	-- a gate high in the air (no floor within a leap under it): the first packet may fall from it, no higher than this
+	-- above it nor rising faster (studs, studs/s) ...
+	GATE_RISE = 1,
+	GATE_AIR = 0.15, -- ... and no further across than GATE_SLACK and the fastest pace for this many seconds
 	DRIFT_BASE = 8, -- studs: the root against the last accepted packet (the drawn pose eases behind the motor)
 	DRIFT_LAG = 0.6, -- seconds: how far the root may lead the packets (their jitter against the root's)
 	DRIFT_FRESH = 0.5, -- seconds: packets older than this are late; the root's height is then judged
@@ -228,6 +232,20 @@ local function finite3(x: any, y: any, z: any): boolean
 		and math.abs(x) < m
 		and math.abs(y) < m
 		and math.abs(z) < m
+end
+
+-- fallsFrom(validator, gate, next, fast): the gate itself is high in the air (a body taken, or put back, mid-leap with no
+-- floor within a leap under it) and the first packet only falls from it: no higher than C.GATE_RISE above it, not
+-- rising, and no further across than C.GATE_SLACK and C.GATE_AIR of the fastest pace (the client's body starts there)
+local function fallsFrom(validator: any, gate: Gate, next: any, fast: number): boolean
+	local landable = validator.world.landable
+	if landable == nil or landable(gate.x, gate.y, gate.z, MoveValidator.apexAllowance()) then
+		return false
+	end
+	local across = math.sqrt((next.x - gate.x) ^ 2 + (next.z - gate.z) ^ 2)
+	return next.y <= gate.y + C.GATE_RISE
+		and (next.vy or 0) <= C.GATE_RISE
+		and across <= C.GATE_SLACK + fast * C.GATE_AIR
 end
 
 function MovementService.new(deps: Deps): Movement
@@ -831,8 +849,9 @@ function MovementService.new(deps: Deps): Movement
 					-- (a wall too: the client's body was put at the gate, and its first packet comes a tick or two later;
 					-- the line is on a rail only with both ends near the route claimed, so a route id buys no way through)
 					local next = SquirrelMotor.deserialize(snapshot)
+					local falling = fallsFrom(validator, gate, next, fastest(self, actorId))
 					for _, v in validator:hop(actorId, from, next, span + 0.1, now, true) do
-						if v.severity >= 1 or v.code == "wall" then
+						if (v.severity >= 1 or v.code == "wall") and not (v.code == "fly" and falling) then
 							table.insert(violations, v)
 						end
 					end

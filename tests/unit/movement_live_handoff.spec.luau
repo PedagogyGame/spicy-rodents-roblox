@@ -370,6 +370,75 @@ return function(t)
 		end
 	)
 
+	-- 3. A BODY TAKEN HIGH IN THE AIR ------------------------------------------------------------------------------------
+	-- (an AI squirrel let go mid-leap keeps its height, and is picked again before it lands)
+	for _, up in { 8, 14, 20, 30, 60 } do
+		for _, load in { 0, 3 } do
+			t.test(
+				`honest: a body taken {up} studs up in the open air, its town streaming {load} s: 0 snaps`,
+				function()
+					local s = SquirrelMotor.clone(town.openStart())
+					s.y += up
+					s.grounded = false
+					local rig = LiveRig.new({
+						world = town.world,
+						vworld = town.vworld,
+						link = { latency = 0.1, jitter = 0.05, loss = 0.02 },
+						seed = 7,
+						loadSeconds = load,
+					})
+					rig:possess(s, town.driven(Rng.new(3)))
+					rig:run(20)
+					local r = rig:result()
+					print(`      {LiveRig.describe(`{up} up, load {load}`, r)}`)
+					t.eq(r.snaps, 0, "no snap")
+					t.eq(rig.server.pinned, false, "handed back")
+					t.truthy(r.accepted > 250, `packets judged ({r.accepted})`)
+				end
+			)
+		end
+	end
+	for _, c in
+		{
+			{
+				name = "hangs where it was taken",
+				cheat = function(s: any, y0: number)
+					s.y, s.vy = y0, 0
+				end,
+			},
+			{
+				name = "rises from where it was taken",
+				cheat = function(s: any, y0: number)
+					s.y, s.vy = math.max(s.y, y0 + 4), 10
+				end,
+			},
+		}
+	do
+		t.test(`cheat: a body taken 30 studs up that {c.name}: snapped, never handed a flight`, function()
+			local s = SquirrelMotor.clone(town.openStart())
+			s.y += 30
+			s.grounded = false
+			local y0 = s.y
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = { latency = 0.1, jitter = 0.05, loss = 0.02 },
+				seed = 7,
+				cheat = function(st: any)
+					c.cheat(st, y0)
+				end,
+			})
+			rig:possess(s, town.driven(Rng.new(3)))
+			rig:run(10)
+			local r = rig:result()
+			print(
+				`      {LiveRig.describe(c.name, r)}; the server's body {math.floor(rig.server.root.y - y0)} from where it was taken`
+			)
+			t.truthy(r.snaps >= 1, "snapped")
+			t.truthy(rig.server.root.y <= y0 + 1, "the server's body never above where it was taken")
+		end)
+	end
+
 	-- 4. THE PLACE BEFORE A MOVE, WHATEVER THE ENGINE SAYS THE ROUND TRIP IS -----------------------------------------------
 	-- After each Reset the root is kept 250 studs off, near nothing, for as long as the round trip read would cover: a
 	-- round trip of 6 s (GetNetworkPing reads up to 10) buys no more room or time than one of 1 s (C.PING_MAX)
