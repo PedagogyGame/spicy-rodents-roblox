@@ -35,7 +35,8 @@
 --              pipe pace: Motion.routeSpeed in the motor and the server's caps), and an `enclosure` record: id = the
 --              space, a "ground" hatch mouth at each street end (E only, from a body standing on the grate, any
 --              facing; out = the shaft's rung side, level: the way it comes out; reach from the data),
---              P1's arms joined at the crossing by end links (straight on) and forks (A/D: the two side arms), width
+--              P1's arms joined at the crossing by end links (straight on) and forks (A/D: the two side arms, picked
+--              anywhere along the arm: each fork's window is the arm's length), width
 --              and height of the walkway and shaft, upAt (the back faces away from the rungs in a shaft, up along a run).
 --   mouths     id, pipe, space, kind ("grate" in a verge or lawn, "cover" on a quay walk), name, the mouth point
 --              (x, y = street level, z: where the squirrel stands to press E and where it stands after coming out),
@@ -780,11 +781,15 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 				upAt = upAt,
 			}
 			if junction then
-				-- the crossing: straight on by the end link (W), the side arms by forks (A/D), all at the arms' t = 1
+				-- the crossing: straight on by the end link (W), the side arms by forks (A/D), all at the arms' t = 1; A/D
+				-- picks a side arm anywhere along the arm (the fork's window is the arm's length) and the pick is kept
 				local forks = {}
 				for _, other in p.routes do
 					if other.id ~= r.id and other.id ~= straightOf[r.id] then
-						table.insert(forks, { t = 1, route = other.id, toT = 1, dir = -1, name = other.from })
+						table.insert(
+							forks,
+							{ t = 1, route = other.id, toT = 1, dir = -1, name = other.from, window = r4(length) }
+						)
 					end
 				end
 				enclosure.atEnd = { route = straightOf[r.id], t = 1, dir = -1 }

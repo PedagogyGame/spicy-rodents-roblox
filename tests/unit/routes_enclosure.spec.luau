@@ -260,6 +260,15 @@ return function(t)
 		)
 		t.eq(spec.mouths[1].hatch, false)
 		t.eq(spec.mouths[2].hatch, true)
+		-- a fork's own A/D window: positive studs; the default is C.forkAhead, a part-way link mouth always has it
+		t.truthy(has(errs({ forks = { { t = 1, route = 2, toT = 1, dir = -1, window = 0 } } }), "window"))
+		local wide = Enclosure.fromRecord(rec({
+			forks = { { t = 1, route = 2, toT = 1, dir = -1, window = 40 }, { t = 1, route = 3, toT = 1, dir = -1 } },
+		}) :: any)
+		t.eq(wide.forks[1].window, 40)
+		t.eq(wide.forks[2].window, Enclosure.C.forkAhead)
+		local exits = Enclosure.exits(wide, 50)
+		t.eq(exits[1].window + exits[2].window, 40 + Enclosure.C.forkAhead)
 	end)
 
 	t.test("upAt: the authored section up, interpolated between keys and held past them; exits in t order", function()

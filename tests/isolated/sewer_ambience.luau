@@ -267,9 +267,9 @@ return function(t)
 				end
 			end
 			local P = SewerAmbience.PROMPT
-			t.truthy((said[P.down] or 0) >= 30, "standing on the grate facing in: E or W: down the drain")
+			t.truthy((said[P.down] or 0) >= 30, "standing on the grate: E: down the drain")
 			t.truthy((said["W: climb out"] or 0) >= 10, "the top of the far shaft: W: climb out")
-			t.truthy((said[P.crossingNow] or 0) >= 1, "the crossing's A / D, where it works")
+			t.truthy((said[P.crossingAhead] or 0) >= 10, "the crossing's A / D, along the arm")
 			t.truthy(
 				(said[string.format(P.armStraight, (layout.mouth("P1.SE") :: Mouth).name)] or 0) >= 30,
 				"past the crossing: straight on, out by the bungalow"

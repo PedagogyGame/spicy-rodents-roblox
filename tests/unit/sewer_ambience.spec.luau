@@ -4,7 +4,8 @@
 --   the words on a grate tell the truth: "E: down the drain" exactly where E takes the body down (every mouth, a
 --   ring of places and facings: any facing on the grate), and there W never goes down (a hatch mouth, Enclosure rule
 --   1); near one, how to get in; never a compass word (the game's map has east at -x)
---   drain 1's crossing: A / D announced running at it and "now" only where the motor takes it; which arm was taken
+--   drain 1's crossing: A / D announced running at it along the arm (the motor keeps a pick made anywhere on it), the
+--   arm picked named; which arm was taken
 --   "W: climb out" shows in the top of a shaft on the way out of every run, never on the way down or in a passage
 --   the controller's refusals inside a drain (Space, Q, a click, E: the motor's hints) read as a drain's
 --   the place names, the cue points inside their pipes, every cue named in docs/AUDIO_BUDGET.md with no id yet
@@ -256,7 +257,7 @@ return function(t)
 		end
 	end)
 
-	t.test("drain 1's crossing: A / D announced running at it, 'now' only where the motor takes it", function()
+	t.test("drain 1's crossing: A / D announced running at it along the arm, and the arm picked named", function()
 		local reg = w.registry
 		local ch = layout.chambers[1]
 		for _, r in layout.routes do
@@ -264,7 +265,16 @@ return function(t)
 			if layout.spaceOf(r.id) ~= "sewer.crossroads" then
 				continue
 			end
-			local nowSeen, aheadSeen = 0, 0
+			local spec = route.enclosure :: Enclosure.Spec
+			local side = spec.forks[1]
+			local sideMouth: Mouth? = nil
+			for _, m in layout.mouths do
+				if m.route == side.route then
+					sideMouth = m
+				end
+			end
+			local pickedText = string.format(P.crossingPicked, (sideMouth :: Mouth).name)
+			local aheadSeen, pickedSeen = 0, 0
 			for i = 0, 400 do
 				local tt = i / 400
 				local q = reg:pointAt(route, tt)
@@ -281,26 +291,25 @@ return function(t)
 				}
 				local text = SewerAmbience.prompt(layout, view)
 				local d = math.sqrt((q.x - ch.crossing.x) ^ 2 + (q.z - ch.crossing.z) ^ 2)
-				if text == P.crossingNow then
-					nowSeen += 1
-					t.truthy(
-						d <= Enclosure.C.forkAhead,
-						`{r.id} t {tt}: "now" {d} studs off (forks within {Enclosure.C.forkAhead})`
-					)
-				elseif text == P.crossingAhead then
+				if text == P.crossingAhead then
 					aheadSeen += 1
-					t.truthy(
-						d > Enclosure.C.forkAhead and d <= SewerAmbience.C.crossingHint,
-						`{r.id} t {tt}: ahead at {d}`
-					)
+					t.truthy(d <= SewerAmbience.C.crossingHint, `{r.id} t {tt}: ahead at {d}`)
+					-- the arm A or D picked (the motor keeps it): named instead
+					local picked: SewerAmbience.View = table.clone(view)
+					picked.picked = side.route
+					t.eq(SewerAmbience.prompt(layout, picked), pickedText, `{r.id} t {tt}: the pick named`)
+					pickedSeen += 1
 				end
 				-- running away from the crossing: nothing about it
 				local back: SewerAmbience.View = table.clone(view)
 				back.mx, back.mz = -view.mx :: number, -view.mz :: number
+				back.picked = side.route
 				local bt = SewerAmbience.prompt(layout, back)
-				t.truthy(bt ~= P.crossingNow and bt ~= P.crossingAhead, `{r.id} t {tt}: not running at it`)
+				t.truthy(bt ~= P.crossingAhead and bt ~= pickedText, `{r.id} t {tt}: not running at it`)
 			end
-			t.truthy(nowSeen > 0 and aheadSeen > 0, `{r.id}: announced ({aheadSeen}) and now ({nowSeen})`)
+			-- along the level run of the arm (the shaft's foot is 2 studs from the end wall, 25 or more from the
+			-- crossing), all of it
+			t.truthy(aheadSeen >= 150 and pickedSeen == aheadSeen, `{r.id}: announced along the arm ({aheadSeen})`)
 		end
 	end)
 

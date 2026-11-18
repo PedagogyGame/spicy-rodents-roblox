@@ -18,9 +18,12 @@
 --   mouths  { Mouth }? where the inside meets the outside (below); a route with none is reached by links only
 --   atStart / atEnd  { route, t, dir }? authored end links to the next INSIDE route of the same enclosure: running
 --           off that end goes on along `route` from `t`, travelling `dir` x sign(W/S) (+1 toward its t = 1)
---   forks   { {t, route, toT, dir, name?} }? authored junctions part-way along the route to another inside route
---           of the same enclosure (a hideout off a shaft, a side passage): A/D picks one ahead (like a junction on
---           a bough), W carries the body onto it as it passes; E takes one within C.linkWindow of the body
+--   forks   { {t, route, toT, dir, name?, window?} }? authored junctions part-way along the route to another inside
+--           route of the same enclosure (a hideout off a shaft, a side passage): A/D picks one ahead (like a junction
+--           on a bough), from up to `window` studs before it (default C.forkAhead; a crossing at the end of a run can
+--           offer it along the whole run), and the pick is kept until it is passed (the same key again, with no other
+--           way on that side, drops it: straight on); W carries the body onto it as it passes; E takes one within
+--           C.linkWindow of the body
 --   Inside one enclosure, ONLY these connect routes (end links, forks, and mouths whose links name an inside route):
 --   a junction inside is never guessed, and nothing reaches across the wood between two passages of one tree.
 --   width, height  the section the enclosure gives the body (studs; defaults 1.7 x 1.8). The body needs
@@ -110,7 +113,7 @@ export type Vec3 = Curve.Vec3
 
 -- As written in a route record (data files and generated modules).
 export type LinkRecord = { route: number, t: number, dir: number }
-export type ForkRecord = { t: number, route: number, toT: number, dir: number, name: string? }
+export type ForkRecord = { t: number, route: number, toT: number, dir: number, name: string?, window: number? }
 export type MouthRecord = {
 	t: number,
 	opens: string,
@@ -144,7 +147,7 @@ export type Record = {
 
 -- As the Registry carries it on a Route.
 export type Link = { route: number, t: number, dir: number }
-export type Fork = { t: number, route: number, toT: number, dir: number, name: string? }
+export type Fork = { t: number, route: number, toT: number, dir: number, name: string?, window: number }
 export type Mouth = {
 	t: number,
 	opens: string,
@@ -182,7 +185,7 @@ export type Spec = {
 export type RouteLike = { id: number, kind: string, length: number, enclosure: Spec? }
 
 -- A way off an enclosed route part-way along it that A/D may pick and E or W may take (Enclosure.exits).
-export type Exit = { t: number, route: number, toT: number, dir: number, mouth: Mouth? }
+export type Exit = { t: number, route: number, toT: number, dir: number, mouth: Mouth?, window: number }
 
 Enclosure.KIND = "tunnel"
 Enclosure.OPENS = { ground = true, ledge = true, air = true, link = true }
@@ -201,7 +204,8 @@ Enclosure.C = {
 	dropPush = 3.0, -- Q at a mouth: this horizontal speed out along `out`, so the drop clears the opening
 	hopUp = 8.6, -- default vertical speed of a mouth's `hop` (a pounce's base lift)
 	linkWindow = 1.2, -- an end link or a fork connects within this many studs of its point on either route
-	forkAhead = 6.0, -- A/D offers the forks and part-way link mouths up to this far ahead along the travel
+	forkAhead = 6.0, -- A/D offers the forks (unless a fork says its own window) and part-way link mouths up to this far
+	-- ahead along the travel
 	minOutLevel = 0.3, -- a mouth's resolved `out` leans out at least this much horizontally
 	steep = 0.97, -- |tangent . world up| above which the default section up carries on from before
 	width = 1.7, -- default section width
@@ -263,7 +267,14 @@ function Enclosure.fromRecord(rec: Record): Spec
 	local forks: { Fork } = {}
 	local forkRecs: { ForkRecord } = rec.forks or {}
 	for _, f in forkRecs do
-		table.insert(forks, { t = f.t, route = f.route, toT = f.toT, dir = if f.dir < 0 then -1 else 1, name = f.name })
+		table.insert(forks, {
+			t = f.t,
+			route = f.route,
+			toT = f.toT,
+			dir = if f.dir < 0 then -1 else 1,
+			name = f.name,
+			window = f.window or Enclosure.C.forkAhead,
+		})
 	end
 	local upAt: { UpKey } = {}
 	local upRecs: { { number } } = rec.upAt or {}
@@ -395,6 +406,9 @@ function Enclosure.validate(rec: any, kind: string): { string }
 		end
 		if not isNumber(f.t) or f.t < 0 or f.t > 1 then
 			table.insert(errs, `{where}.t must be in [0, 1]`)
+		end
+		if f.window ~= nil and (not isNumber(f.window) or f.window <= 0) then
+			table.insert(errs, `{where}.window must be a positive number`)
 		end
 		checkLink(errs, where, { route = f.route, t = f.toT, dir = f.dir })
 	end
@@ -660,16 +674,19 @@ function Enclosure.names(mouth: Mouth, routeId: number): boolean
 end
 
 -- exits(spec, length): the authored ways off the route part-way along it, in t order: its forks and the first link of
--- each part-way link mouth (A/D picks among them; E or passing W takes one).
+-- each part-way link mouth (A/D picks among them, from up to `window` studs before one; E or passing W takes one).
 function Enclosure.exits(spec: Spec, _length: number): { Exit }
 	local out: { Exit } = {}
 	for _, f in spec.forks do
-		table.insert(out, { t = f.t, route = f.route, toT = f.toT, dir = f.dir, mouth = nil })
+		table.insert(out, { t = f.t, route = f.route, toT = f.toT, dir = f.dir, mouth = nil, window = f.window })
 	end
 	for _, m in spec.mouths do
 		if not isEnd(m.t) and #m.links > 0 then
 			local l = m.links[1]
-			table.insert(out, { t = m.t, route = l.route, toT = l.t, dir = l.dir, mouth = m })
+			table.insert(
+				out,
+				{ t = m.t, route = l.route, toT = l.t, dir = l.dir, mouth = m, window = Enclosure.C.forkAhead }
+			)
 		end
 	end
 	table.sort(out, function(a: Exit, b: Exit): boolean

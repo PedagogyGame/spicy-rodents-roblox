@@ -514,4 +514,69 @@ return function(t)
 		end
 		t.truthy(reached["P1.NE"] and reached["P1.SW"], "A and D lead to the two side arms")
 	end)
+
+	-- runs from `fromId` across the crossing with W held and the view along the arm; presses[i] = { studs before the
+	-- crossing, side } is pressed once as the body first comes within that distance of it on its own arm
+	local function acrossWith(fromId: string, toId: string, presses: { { number } }): (Run, Mouth?)
+		local a = mouth(fromId)
+		local arm = reg:get(a.route) :: any
+		local cam = towards(a, mouth(toId))
+		local done: { [number]: boolean } = {}
+		local r = runThrough(fromId, toId, function(_f: number, st: State): SquirrelMotor.Input
+			local fields: { [string]: any } = { fw = 1 }
+			if st.routeId == arm.id and st.bridge == nil then
+				local before = (1 - st.railT) * arm.length
+				for i, p in presses do
+					if not done[i] and before <= p[1] then
+						done[i] = true
+						fields.choose = p[2]
+						break
+					end
+				end
+			end
+			return BakedWorld.keys(cam, fields)
+		end)
+		return r, layout.nearestMouth(r.state.x, r.state.z, 2)
+	end
+
+	t.test("P1's crossing: A or D anywhere along the arm is kept; the same key again goes straight on", function()
+		local opposite = { ["P1.NW"] = "P1.SE", ["P1.SE"] = "P1.NW", ["P1.NE"] = "P1.SW", ["P1.SW"] = "P1.NE" }
+		for fromId, toId in opposite do
+			local armLength = (reg:get(mouth(fromId).route) :: any).length
+			for _, side in { -1, 1 } do
+				-- one press, from just down the shaft to the last stride: always the same side arm
+				local outAt: string? = nil
+				for _, before in { armLength - 3, 30, 15, 5, 1 } do
+					local r, m = acrossWith(fromId, toId, { { before, side } })
+					local where = `{fromId} side {side} pressed {before} studs before`
+					t.truthy(r.emerged, `{where}: out`)
+					t.eq(BakedWorld.count(r.trace, "junctionChosen"), 1, `{where}: picked`)
+					t.eq(BakedWorld.count(r.trace, "forkTaken"), 1, `{where}: taken at the crossing`)
+					t.eq(r.trace.violations, 0, where)
+					t.truthy(m ~= nil and m.id ~= fromId and m.id ~= toId, `{where}: out at a side arm's grate`)
+					if m then
+						outAt = outAt or m.id
+						t.eq(m.id, outAt, `{where}: the same arm wherever it was pressed`)
+					end
+				end
+				-- the same key again: straight on
+				local r2, m2 = acrossWith(fromId, toId, { { 30, side }, { 15, side } })
+				t.eq(BakedWorld.count(r2.trace, "junctionCleared"), 1, `{fromId} side {side} twice: dropped`)
+				t.eq(BakedWorld.count(r2.trace, "forkTaken"), 0, `{fromId} side {side} twice: no fork`)
+				t.truthy(m2 ~= nil and m2.id == toId, `{fromId} side {side} twice: straight on`)
+				-- the other key after it: the other arm
+				local r3, m3 = acrossWith(fromId, toId, { { 30, side }, { 15, -side } })
+				t.eq(BakedWorld.count(r3.trace, "forkTaken"), 1)
+				t.truthy(m3 ~= nil and m3.id ~= outAt and m3.id ~= toId and m3.id ~= fromId, `{fromId}: then the other`)
+				t.eq(r2.trace.violations + r3.trace.violations, 0)
+			end
+		end
+		-- running away from the crossing (out of it straight on, along the far arm), A or D picks nothing
+		local r = runThrough("P1.NW", "P1.SE", function(_f: number, st: State): SquirrelMotor.Input
+			local away = st.routeId == mouth("P1.SE").route and st.railT < 0.8
+			return BakedWorld.keys(towards(mouth("P1.NW"), mouth("P1.SE")), { fw = 1, choose = if away then 1 else 0 })
+		end)
+		t.eq(BakedWorld.count(r.trace, "junctionChosen"), 0, "nothing to pick running away from it")
+		t.truthy(r.emerged)
+	end)
 end

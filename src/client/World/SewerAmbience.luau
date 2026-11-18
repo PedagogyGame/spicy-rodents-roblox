@@ -67,7 +67,8 @@ local SewerAmbience = {}
 SewerAmbience.C = {
 	linger = 0.3, -- s: the inside look and sound hold this long after the body leaves a drain's volume
 	promptHold = 1.0, -- s: no "down the drain" words for this long after the body leaves a drain's volume
-	crossingHint = 14, -- studs (level) from drain 1's crossing, running toward it: the side arms are named
+	crossingHint = 40, -- studs (level) from drain 1's crossing, running toward it: the side arms are named (A or D
+	-- picks one anywhere along an arm: the forks' window is the arm's length, SewerLayout)
 	armFlash = 2.0, -- s: which arm the body took at the crossing stays on screen this long
 	lampRadius = 40, -- studs from the body: the space's lamps on within it, off beyond (moving with the body)
 	maxLit = 8, -- at most this many of the space's lights on at once (the nearest)
@@ -109,8 +110,8 @@ local PROMPT = {
 	down = "E: down the drain",
 	step = "Stand on the %s and press E to go down the drain",
 	climb = "W: climb out",
-	crossingAhead = "The crossing: A or D there turns into a side arm (W: straight on)",
-	crossingNow = "A / D now: a side arm (W: straight on)",
+	crossingAhead = "The crossing ahead: A or D picks a side arm (W: straight on)",
+	crossingPicked = "Side arm picked: out at the %s (the same key again: straight on)",
 	armSide = "Side arm: out at the %s",
 	armStraight = "Straight on: out at the %s",
 }
@@ -156,6 +157,7 @@ export type View = {
 	mx: number?, -- the way the body is moving (level, any length; 0 or nil: still)
 	mz: number?,
 	since: number?, -- s since the body was last in a drain's volume (nil: long ago)
+	picked: number?, -- the route A or D picked (the motor's selection on an enclosed run; the body's ExitPicked)
 }
 
 -- the chamber whose pipe holds `space` (drain 1's crossing), or nil
@@ -201,16 +203,16 @@ function SewerAmbience.armAt(layout: Layout, x: number, z: number): Mouth?
 	return nil
 end
 
--- In drain 1, running toward the crossing: the words for its side arms (nil elsewhere). Within Enclosure.C.forkAhead
--- of it A or D takes a side arm (the motor offers the forks only that far ahead: a press before is not kept), so
--- "now" shows there; from C.crossingHint it is announced.
+-- In drain 1, running toward the crossing (within C.crossingHint): the words for its side arms (nil elsewhere). A or
+-- D picks one anywhere along the arm and the motor keeps the pick until the crossing, so the words say which arm is
+-- picked (view.picked) or that one can be.
 function SewerAmbience.crossing(layout: Layout, view: View): string?
 	if view.space == nil then
 		return nil
 	end
 	local ch = chamberOf(layout, view.space :: string)
-	if ch == nil then
-		return nil
+	if ch == nil or SewerAmbience.shaftAt(layout, view.x, view.y, view.z) ~= nil then
+		return nil -- not drain 1, or still in a shaft (climbing, not running at the crossing)
 	end
 	local dx, dz = ch.crossing.x - view.x, ch.crossing.z - view.z
 	local d = math.sqrt(dx * dx + dz * dz)
@@ -222,7 +224,14 @@ function SewerAmbience.crossing(layout: Layout, view: View): string?
 	if (mx * dx + mz * dz) / (ml * d) < 0.7 then
 		return nil -- not running at it
 	end
-	return if d <= Enclosure.C.forkAhead then PROMPT.crossingNow else PROMPT.crossingAhead
+	if view.picked ~= nil then
+		for _, m in layout.mouths do
+			if m.route == view.picked and m.space == ch.space then
+				return string.format(PROMPT.crossingPicked, m.name)
+			end
+		end
+	end
+	return PROMPT.crossingAhead
 end
 
 -- The lights to have on: the indices of `points` (the lights' places) within `radius` of `at`, the nearest `max`.
@@ -720,6 +729,7 @@ function SewerAmbience.start(ctx: Context): Handle
 			local vy = if lastPos and dt > 0 then (feet - lastPos.Y) / dt else 0
 			local mx = if lastPos then p.X - lastPos.X else 0
 			local mz = if lastPos then p.Z - lastPos.Z else 0
+			local picked = body:GetAttribute("ExitPicked")
 			view = {
 				x = p.X,
 				y = feet,
@@ -729,6 +739,7 @@ function SewerAmbience.start(ctx: Context): Handle
 				space = here,
 				mx = mx,
 				mz = mz,
+				picked = if type(picked) == "number" then picked else nil,
 			}
 		end
 		if here then

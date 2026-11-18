@@ -1112,8 +1112,8 @@ function Motion.transferFilter(world: World, from: Route, fromT: number): ((rout
 end
 
 -- exitsAhead(world, route, t, dir): the authored ways off an enclosed route (Enclosure.exits: forks, part-way link
--- mouths) that A/D may pick from here: within Enclosure.C.forkAhead studs ahead along `dir`, or within
--- Enclosure.C.linkWindow behind. Empty off an enclosed route.
+-- mouths) that A/D may pick from here: within the exit's window (a fork's own, else Enclosure.C.forkAhead) ahead along
+-- `dir`, or within Enclosure.C.linkWindow behind. Empty off an enclosed route.
 function Motion.exitsAhead(_world: World, route: Route, t: number, dir: number): { Enclosure.Exit }
 	local spec = route.enclosure
 	local out: { Enclosure.Exit } = {}
@@ -1122,7 +1122,7 @@ function Motion.exitsAhead(_world: World, route: Route, t: number, dir: number):
 	end
 	for _, e in Enclosure.exits(spec, route.length) do
 		local ahead = (e.t - t) * route.length * (if dir < 0 then -1 else 1)
-		if ahead <= Enclosure.C.forkAhead and ahead >= -Enclosure.C.linkWindow then
+		if ahead <= e.window and ahead >= -Enclosure.C.linkWindow then
 			table.insert(out, e)
 		end
 	end

@@ -1306,8 +1306,8 @@ return {
 				width = 2.1,
 				atEnd = { dir = -1, route = 9303, t = 1 },
 				forks = {
-					{ name = "P1.NE", dir = -1, route = 9302, t = 1, toT = 1 },
-					{ name = "P1.SW", dir = -1, route = 9304, t = 1, toT = 1 },
+					{ name = "P1.NE", dir = -1, route = 9302, t = 1, toT = 1, window = 45.4961 },
+					{ name = "P1.SW", dir = -1, route = 9304, t = 1, toT = 1, window = 45.4961 },
 				},
 				height = 2.95,
 				mouths = {
@@ -1366,8 +1366,8 @@ return {
 				width = 2.1,
 				atEnd = { dir = -1, route = 9304, t = 1 },
 				forks = {
-					{ name = "P1.NW", dir = -1, route = 9301, t = 1, toT = 1 },
-					{ name = "P1.SE", dir = -1, route = 9303, t = 1, toT = 1 },
+					{ name = "P1.NW", dir = -1, route = 9301, t = 1, toT = 1, window = 45.4961 },
+					{ name = "P1.SE", dir = -1, route = 9303, t = 1, toT = 1, window = 45.4961 },
 				},
 				height = 2.95,
 				mouths = {
@@ -1426,8 +1426,8 @@ return {
 				width = 2.1,
 				atEnd = { dir = -1, route = 9301, t = 1 },
 				forks = {
-					{ name = "P1.NE", dir = -1, route = 9302, t = 1, toT = 1 },
-					{ name = "P1.SW", dir = -1, route = 9304, t = 1, toT = 1 },
+					{ name = "P1.NE", dir = -1, route = 9302, t = 1, toT = 1, window = 45.4961 },
+					{ name = "P1.SW", dir = -1, route = 9304, t = 1, toT = 1, window = 45.4961 },
 				},
 				height = 2.95,
 				mouths = {
@@ -1486,8 +1486,8 @@ return {
 				width = 2.1,
 				atEnd = { dir = -1, route = 9302, t = 1 },
 				forks = {
-					{ name = "P1.NW", dir = -1, route = 9301, t = 1, toT = 1 },
-					{ name = "P1.SE", dir = -1, route = 9303, t = 1, toT = 1 },
+					{ name = "P1.NW", dir = -1, route = 9301, t = 1, toT = 1, window = 45.4961 },
+					{ name = "P1.SE", dir = -1, route = 9303, t = 1, toT = 1, window = 45.4961 },
 				},
 				height = 2.95,
 				mouths = {

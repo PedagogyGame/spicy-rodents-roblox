@@ -740,10 +740,16 @@ local function doChoose(state: State, world: World, input: Input, events: { Even
 	local side = input.choose
 	if r.enclosure then
 		-- an enclosed run: only its authored ways off part-way along (forks, part-way link mouths), never a junction
-		-- guessed across the wall; W carries the body onto the chosen one as it passes, E takes it
-		local e = Motion.chooseExit(world, r, state.railT, state.railDir, input.cameraYaw, side, state.selectedJunction)
-		state.selectedJunction = if e then e.route else nil
-		if e then
+		-- guessed across the wall; W carries the body onto the chosen one as it passes, E takes it. The pick is kept
+		-- until it is passed; the same key again with no other way on that side drops it ("junctionCleared": the run
+		-- goes straight on), and a press with nothing in reach leaves the pick as it was
+		local current = state.selectedJunction
+		local e = Motion.chooseExit(world, r, state.railT, state.railDir, input.cameraYaw, side, current)
+		if e and e.route == current then
+			state.selectedJunction = nil
+			push(events, "junctionCleared", e.route, r.id)
+		elseif e then
+			state.selectedJunction = e.route
 			push(events, "junctionChosen", e.route, r.id)
 		end
 		return
