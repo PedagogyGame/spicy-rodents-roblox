@@ -228,6 +228,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.gate = target
 		sq.lastAt = nil
 		sq.since = nil
+		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
 		if self.deps.validator then
 			self.deps.validator:reset(id, nil)
 		end
