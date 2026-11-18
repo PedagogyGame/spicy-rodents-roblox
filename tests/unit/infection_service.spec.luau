@@ -13,6 +13,7 @@ local HospitalLayout = require("@shared/Infection/HospitalLayout")
 local InfectionRules = require("@shared/Infection/InfectionRules")
 local MedicalRoute = require("@shared/Infection/MedicalRoute")
 local FootPath = require("@shared/World/FootPath")
+local AlleyStaff = require("@shared/Attractions/AlleyStaff")
 local Lines = require("@shared/Speech/Lines")
 local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
@@ -44,6 +45,7 @@ return function(t)
 	local rail = nil :: any
 	local colliders = Colliders.fromData(data)
 	local layout = HospitalLayout.fromData(data) :: HospitalLayout.Layout
+	local alleyPlace = AlleyStaff.placeOf(data) :: any
 
 	-- `first` are the first dice (the bite's path and timer); after them a seeded generator
 	local function harness(seed: number, first: { number }?, tune: ((params: any) -> ())?): Harness
@@ -1005,10 +1007,12 @@ return function(t)
 						walkable += 1
 						t.deepEq(route[#route], layout.entrance, "every walk in ends at the door")
 						t.truthy(len <= h.svc.params.walkInMaxDist + 10)
-					elseif a.job ~= nil then
-						-- the bowling alley's employees (Shared/Attractions/AlleyStaff) work 2,450 to 2,660 studs of
-						-- walking from the hospital's door, at the walk-in limit: from the far end of their loop
-						-- the walk is too long, and they collapse instead (the ambulance comes)
+					elseif a.job ~= nil and AlleyStaff.inside(alleyPlace, a.x, a.z) then
+						-- the bowling alley's employees (Shared/Attractions/AlleyStaff) walk out by the alley's
+						-- ways and its main doors (Shared/Attractions/AlleyWalk), then 2,450 studs and more to the
+						-- hospital's door: from most of the building that is over the walk-in limit, and they
+						-- collapse instead (the ambulance comes); tests/unit/infection_alley holds the walks
+						-- they do have to the doors
 						alleyFar += 1
 					end
 				end

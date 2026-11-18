@@ -136,19 +136,6 @@ local function lotPos(data: any, id: string, fallbackU: { number }): (number, nu
 	return st(fallbackU[1]), st(fallbackU[2])
 end
 
--- The bowling alley's placement (generated/Attractions), or nil when the data has none.
-local function alleyPlace(data: any): any?
-	local ok, mod = pcall(function()
-		return data:module("Attractions")
-	end)
-	for _, a in (if ok and mod and mod.attractions then mod.attractions else {}) :: { any } do
-		if a.id == "bowling_alley" and a.place then
-			return a.place
-		end
-	end
-	return nil
-end
-
 -- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant
 local function shopSites(data: any): { { number } }
 	local out = {}
@@ -230,7 +217,7 @@ function TownAI.build(opts: Opts): World
 	-- the built expansion venues' floors (indoors, above the ground) and their counters' staff posts
 	local venues = StaffRounds.venues(data:module("Expansion"))
 	-- the bowling alley (generated/Attractions): its floor inside its walls, and its employees (AlleyStaff)
-	local alley = alleyPlace(data)
+	local alley = AlleyStaff.placeOf(data)
 	local ctx: Common.Ctx = {
 		now = 0,
 		rng = rng,

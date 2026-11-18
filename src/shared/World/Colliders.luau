@@ -7,13 +7,15 @@
 -- walls to the peak at the ridge line (lot params eaveU/peakU/ridge; lot-type heightU otherwise).
 -- These are the pure, server-and-client answers the motors and validators need (wall tests,
 -- roofs to land on); the engine's own baked parts collide for physics bodies.
--- Interface: new(cell?) -> Colliders; add(c, box); fromData(data, seatAt?) -> Colliders (the solid lots and the
---   built expansion venues); addBuiltVenues(c, data) -> n;
+-- Interface: new(cell?) -> Colliders; add(c, box); fromData(data, seatAt?) -> Colliders (the solid lots, the
+--   built expansion venues and the bowling alley); addBuiltVenues(c, data) -> n; addAlley(c, data) -> n;
 --   query(c, minX, minZ, maxX, maxZ) -> { Box }; pointIn(c, x, z, y, pad?) -> Box?;
 --   blocked(c, x0, z0, x1, z1, r, refY) -> boolean (swept circle, studs); roofAt(c, x, z, refY) -> number?
 -- Pure; studs. No side effects on require.
 
 local Height = require("./Height")
+local AlleyLayout = require("../Attractions/AlleyLayout")
+local AlleyStaff = require("../Attractions/AlleyStaff")
 
 export type Box = {
 	id: string,
@@ -99,7 +101,45 @@ function Colliders.fromData(data: any, seatAt: ((x: number, z: number) -> number
 		})
 	end
 	Colliders.addBuiltVenues(c, data)
+	Colliders.addAlley(c, data)
 	return c
+end
+
+-- The bowling alley (generated/Attractions; Shared/Attractions/AlleyLayout) is a building too: its hall (the front
+-- rooms, the lanes, the back corridor) and its games-room wing, each a box over its outer walls from the paving
+-- behind it (the lowest ground on the site) to the roof, both with the id "bowling_alley". So a walk round the
+-- town goes round it, and a run that starts inside stays inside (the infection service's runs and walks in).
+function Colliders.addAlley(c: Colliders, data: any): number
+	local place = AlleyStaff.placeOf(data)
+	if place == nil then
+		return 0
+	end
+	local L = AlleyLayout
+	local t = L.WALL_T
+	local parts = {
+		{ L.X0 - t, L.HALL_X1, L.FRONT_D - t, L.REAR_WALL_D + t },
+		{ L.HALL_X1, L.X1 + t, L.GAME_ROOM_D0 - t, L.GAME_ROOM_D1 + t },
+	}
+	for _, r in parts do
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		for _, corner in { { r[1], r[3] }, { r[2], r[3] }, { r[1], r[4] }, { r[2], r[4] } } do
+			local x, _, z = L.toWorld(place, corner[1], 0, corner[2])
+			minX, maxX = math.min(minX, x), math.max(maxX, x)
+			minZ, maxZ = math.min(minZ, z), math.max(maxZ, z)
+		end
+		Colliders.add(c, {
+			id = "bowling_alley",
+			cx = (minX + maxX) / 2,
+			cz = (minZ + maxZ) / 2,
+			hw = (maxX - minX) / 2,
+			hd = (maxZ - minZ) / 2,
+			y0 = place.floorY + L.ALLEY_Y,
+			eave = place.floorY + L.ROOF_Y,
+			peak = place.floorY + L.ROOF_Y,
+			ridge = nil,
+		})
+	end
+	return #parts
 end
 
 -- The expansion venues that are built (generated/Expansion: a venue with `built`, the bake that makes it, such

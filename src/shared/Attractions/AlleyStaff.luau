@@ -21,7 +21,8 @@
 -- A player may take over any of them like any other person (Server/Actors/Possession): the body is a town person.
 -- Interface: EMPLOYEES; MECHANIC_LANES; APPROACH_MOP; ACTS; employee(id) -> Employee; shift(place, employee) ->
 --   { WorldStop } (world studs, the loop in order); floorAt(place, x, z) -> y? (the floor under a world point inside
---   the building's walls); inside(place, x, z) -> boolean; insideLocal(X, D) -> boolean
+--   the building's walls); inside(place, x, z) -> boolean; insideLocal(X, D) -> boolean; placeOf(data) -> Place?
+--   (the alley's placement in Shared/Data's generated/Attractions, nil when the data has none)
 -- Pure; studs. No side effects on require.
 
 local AlleyLayout = require("./AlleyLayout")
@@ -172,6 +173,19 @@ end
 local function yawOf(place: AlleyLayout.Place, face: { number }): number
 	local dx, dz = L.dirToWorld(place, face[1], face[2])
 	return math.atan2(dx, dz)
+end
+
+-- The bowling alley's placement (generated/Attractions), or nil when the data has none.
+function AlleyStaff.placeOf(data: any): AlleyLayout.Place?
+	local ok, mod = pcall(function()
+		return data:module("Attractions")
+	end)
+	for _, a in (if ok and mod and mod.attractions then mod.attractions else {}) :: { any } do
+		if a.id == "bowling_alley" and a.place then
+			return a.place
+		end
+	end
+	return nil
 end
 
 -- The employee's loop in world studs.

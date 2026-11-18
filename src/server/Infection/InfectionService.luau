@@ -29,7 +29,10 @@
 -- Killing the rodent cures nobody (no call exists for it).
 -- EVERYBODY RUNS, AND NOBODY THROUGH A WALL. A bitten townsperson on a lane runs along it (the brain).
 -- Anyone with no lane under their feet (staff, officers, a bystander in a crowd) gets a short run
--- from `runWay`: indoors it stays inside the building, outdoors it is a clear line or goes round.
+-- from `runWay`: indoors it stays inside the building, outdoors it is a clear line or goes round. The
+-- bowling alley is a building with lanes, machines and counters inside: its employees run along the alley's own
+-- ways (`alleyRun`: Shared/Attractions/AlleyWalk, the routes and their loops), and every walk in or out of it goes
+-- by its main doors and those ways (the hospital's pattern: its lanes inside, `layout.outside` in front).
 -- Staff bitten far from their round (a paramedic at a scene) are not handed back to a brain that
 -- walks home in a straight line: they are walked back by a real way (`wayBack`). People standing
 -- round a patient run when the rodent comes near, and nobody gathers round it. A cyclist or
@@ -76,6 +79,9 @@ local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shar
 local FootPath = Import.shared("World/FootPath") :: typeof(require("../../shared/World/FootPath"))
 local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/World/Ground"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
+local AlleyWalk = Import.shared("Attractions/AlleyWalk") :: typeof(require("../../shared/Attractions/AlleyWalk"))
 local HospitalService = require("../Hospital/HospitalService")
 local Nav = require("../Actors/Nav")
 local TownAI = require("../AI/TownAI")
@@ -181,6 +187,7 @@ export type Service = typeof(setmetatable(
 		world: any,
 		traffic: any,
 		layout: any?,
+		alley: any?, -- the bowling alley's placement (Shared/Attractions/AlleyLayout.Place), when it stands
 		roads: any,
 		colliders: any,
 		foot: any, -- World/FootPath.Finder
@@ -231,6 +238,7 @@ function InfectionService.new(opts: Opts): Service
 		world = world,
 		traffic = opts.traffic,
 		layout = layout,
+		alley = AlleyStaff.placeOf(opts.data),
 		roads = MedicalRoute.build(strips),
 		colliders = colliders,
 		-- nobody walks through the river, or over its bridge (the AI motor does not know the deck)
@@ -435,6 +443,55 @@ local function pushPoint(points: { { number } }, x: number, z: number)
 	table.insert(points, { x, z })
 end
 
+-- the bowling alley: (x, z) is inside its walls
+local function inAlley(self: Service, x: number, z: number): boolean
+	local alley = self.alley
+	return alley ~= nil and AlleyStaff.inside(alley, x, z)
+end
+
+-- FootPath.find, but in and out of the bowling alley by its main doors and its own ways (FootPath leaves a box
+-- straight through its nearest wall): an end inside the alley is joined to the walk in front of its doors
+local function footWay(
+	self: Service,
+	x0: number,
+	z0: number,
+	x1: number,
+	z1: number,
+	opts: { [string]: any }?
+): ({ { number } }?, number)
+	local alley = self.alley
+	local in0, in1 = inAlley(self, x0, z0), inAlley(self, x1, z1)
+	if alley == nil or not (in0 or in1) then
+		return FootPath.find(self.foot, x0, z0, x1, z1, opts)
+	end
+	if in0 and in1 then
+		local inside = AlleyWalk.way(alley, x0, z0, x1, z1)
+		return inside, FootPath.length(x0, z0, inside)
+	end
+	local ox, oz = AlleyWalk.outside(alley)
+	local out = if in0 then AlleyWalk.way(alley, x0, z0, ox, oz) else {}
+	local back = if in1 then AlleyWalk.way(alley, ox, oz, x1, z1) else {}
+	local inside = (if in0 then FootPath.length(x0, z0, out) else 0)
+		+ (if in1 then FootPath.length(ox, oz, back) else 0)
+	local o = table.clone(opts or {})
+	if o.maxLength then
+		o.maxLength -= inside -- (the limit is on the whole walk)
+	end
+	local fx, fz = if in0 then ox else x0, if in0 then oz else z0
+	local tx, tz = if in1 then ox else x1, if in1 then oz else z1
+	local way, len = FootPath.find(self.foot, fx, fz, tx, tz, o)
+	if way == nil then
+		return nil, 0
+	end
+	local points: { { number } } = {}
+	for _, list in { out, way, back } do
+		for _, p in list do
+			pushPoint(points, p[1], p[2])
+		end
+	end
+	return points, len + inside
+end
+
 -- sidewalkRoute(x, z): the way to the hospital door along the pavements, or nil when they do not
 -- lead there from (x, z): along the person's own sidewalk to its nearest junction, the sidewalk graph
 -- to the north end of the westside sidewalk, then MedicalRoute's tail. Every leg but the step through
@@ -444,6 +501,23 @@ function InfectionService.sidewalkRoute(self: Service, x: number, z: number): ({
 	local layout = self.layout
 	if layout == nil then
 		return nil, 0
+	end
+	local alley = self.alley
+	if alley and inAlley(self, x, z) then
+		-- in the bowling alley: out by its ways and its main doors, then from the walk in front of them
+		local ox, oz = AlleyWalk.outside(alley)
+		local rest = self:sidewalkRoute(ox, oz)
+		if rest == nil then
+			return nil, 0
+		end
+		local points: { { number } } = {}
+		for _, p in AlleyWalk.way(alley, x, z, ox, oz) do
+			pushPoint(points, p[1], p[2])
+		end
+		for _, p in rest do
+			pushPoint(points, p[1], p[2])
+		end
+		return points, FootPath.length(x, z, points)
 	end
 	local points: { { number } } = {}
 	if HospitalLayout.contains(layout, x, z, InfectionService.GROUNDS) then
@@ -542,7 +616,7 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 		return points, len
 	end
 	local out, door = layout.outside, layout.entrance
-	local way, wayLen = FootPath.find(self.foot, x, z, out[1], out[2], { maxLength = self.params.walkInMaxDist })
+	local way, wayLen = footWay(self, x, z, out[1], out[2], { maxLength = self.params.walkInMaxDist })
 	if way == nil then
 		return nil, 0
 	end
@@ -660,10 +734,71 @@ local function offRound(points: { { number } }, x: number, z: number): number
 	return best
 end
 
--- A person with no lane under their feet runs from `threat` (runWay). False when there was no room.
+-- The run of a bowling alley employee (a Staff brain on a work loop, inside the alley): RUN studs along the alley's
+-- ways (its routes and the employees' loops: never through a wall, a counter or across a lane) toward the stop of
+-- their own loop that leaves them furthest from the threat; when their loop is too small for a run (the shoe
+-- rental), toward the alley's staff posts in its other rooms. nil when no run is RUN_MIN long.
+local function alleyRun(
+	self: Service,
+	x: number,
+	z: number,
+	fx: number,
+	fz: number,
+	loop: { { number } }
+): { { number } }?
+	local alley = self.alley :: any
+	local function best(spots: { { number } }): { { number } }?
+		local found, foundD = nil, -1
+		for _, spot in spots do
+			local cut: { { number } } = {}
+			local left, px, pz = InfectionService.RUN, x, z
+			for _, p in AlleyWalk.way(alley, x, z, spot[1], spot[2]) do
+				local len = math.sqrt((p[1] - px) ^ 2 + (p[2] - pz) ^ 2)
+				if len >= left then
+					local f = left / len
+					table.insert(cut, { px + (p[1] - px) * f, pz + (p[2] - pz) * f })
+					break
+				end
+				table.insert(cut, p)
+				left -= len
+				px, pz = p[1], p[2]
+			end
+			local e = cut[#cut]
+			if e and FootPath.length(x, z, cut) >= InfectionService.RUN_MIN then
+				local d = (e[1] - fx) ^ 2 + (e[2] - fz) ^ 2
+				if d > foundD then
+					found, foundD = cut, d
+				end
+			end
+		end
+		return found
+	end
+	local run = best(loop)
+	if run == nil then
+		local posts: { { number } } = {}
+		for _, p in AlleyLayout.POSTS do
+			if AlleyStaff.insideLocal(p.x, p.d) then
+				local wx, _, wz = AlleyLayout.toWorld(alley, p.x, 0, p.d)
+				table.insert(posts, { wx, wz })
+			end
+		end
+		run = best(posts)
+	end
+	return run
+end
+
+-- A person with no lane under their feet runs from `threat` (runWay; alleyRun for the bowling alley's
+-- employees). False when there was no room.
 local function runFrom(self: Service, id: number, threat: any, after: string?): boolean
 	local a = actorOf(self, id)
-	local way = if a then runWay(self, a.x, a.z, threat.x, threat.z) else nil
+	local brain = self.world.brains[id] :: any
+	local loop = brain and brain.stops and brain.points
+	local way = nil
+	if a and loop and inAlley(self, a.x, a.z) then
+		way = alleyRun(self, a.x, a.z, threat.x, threat.z, loop)
+	elseif a then
+		way = runWay(self, a.x, a.z, threat.x, threat.z)
+	end
 	if way == nil then
 		return false
 	end
@@ -861,7 +996,7 @@ local function openScene(self: Service, rec: Record)
 			return nil
 		end
 		local direct = math.sqrt((x - p.x) ^ 2 + (z - p.z) ^ 2)
-		return (FootPath.find(self.foot, p.x, p.z, x, z, { maxLength = direct + detour, maxNodes = 400 }))
+		return (footWay(self, p.x, p.z, x, z, { maxLength = direct + detour, maxNodes = 400 }))
 	end, want, self.tun.bystanders[1])
 	for i, p in placed do
 		self.busy[p.id] = rec.id
@@ -1114,7 +1249,7 @@ local function crewTime(self: Service, rec: Record): number
 		return 0
 	end
 	local reach = self.tun.crewRunSpeed * self.params.crewMaxSecs
-	local path, len = FootPath.find(self.foot, fx, fz, a.x, a.z, { maxLength = reach })
+	local path, len = footWay(self, fx, fz, a.x, a.z, { maxLength = reach })
 	if path == nil then
 		return 0
 	end
@@ -1248,7 +1383,7 @@ local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: num
 		end
 		table.insert(points, { hx, hz })
 	else
-		local way = FootPath.find(self.foot, out[1], out[2], hx, hz, { maxLength = self.params.walkInMaxDist })
+		local way = footWay(self, out[1], out[2], hx, hz, { maxLength = self.params.walkInMaxDist })
 		if way == nil then
 			return nil, 0
 		end
@@ -1290,7 +1425,7 @@ local function wayBack(self: Service, x: number, z: number, hx: number, hz: numb
 		pushPoint(way, hx, hz)
 		return way
 	end
-	return (FootPath.find(self.foot, x, z, hx, hz, { maxLength = self.params.walkInMaxDist }))
+	return (footWay(self, x, z, hx, hz, { maxLength = self.params.walkInMaxDist }))
 end
 
 local function apply(self: Service, rec: Record, effect: any)
