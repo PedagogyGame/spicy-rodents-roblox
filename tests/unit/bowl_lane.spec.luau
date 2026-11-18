@@ -180,6 +180,27 @@ return function(t)
 		end
 	)
 
+	t.test("the zebra crossing: bars along the lane, the walk's width long, one after another kerb to kerb", function()
+		local c = plan.crossing
+		local walk = plan.walks[1]
+		t.truthy(#c.bars >= 5, `{#c.bars} bars`)
+		local model = street:FindFirstChild("Crossing") :: any
+		local stripes = model:GetChildren()
+		t.eq(#stripes, #c.bars)
+		for _, s in stripes do
+			-- long the way the traffic runs (x), across the walker's way (z)
+			t.truthy(s.Size.X > s.Size.Z * 3, `a bar {s.Size.X} along the lane by {s.Size.Z} across`)
+			t.near(s.Size.X, walk.width, 1e-6)
+			t.near(s.CFrame.Position.X, walk.coord, 1e-6)
+		end
+		for k = 2, #c.bars do
+			local gap = c.bars[k].z - c.bars[k - 1].z
+			t.near(gap, Street.ZEBRA.width + Street.ZEBRA.gap, 1e-6)
+		end
+		t.truthy(c.bars[1].z - c.bars[1].width / 2 >= c.z0, "inside the south kerb")
+		t.truthy(c.bars[#c.bars].z + c.bars[#c.bars].width / 2 <= c.z1, "inside the north kerb")
+	end)
+
 	t.test("no traffic AI: the lane is in neither the town's roads nor its traffic lanes", function()
 		local townData = Town.fromData(Data.default())
 		for _, s in townData.strips do

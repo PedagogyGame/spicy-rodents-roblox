@@ -15,7 +15,8 @@
 --               kerb strip round its three outer edges;
 --   AlleyWalk   the Alley Walk (xpath_alley_walk) from Main Street's south sidewalk to the north sidewalk, and the
 --               steps walk (xpath_alley_steps) from the south sidewalk to the foot of the alley's entrance ramp;
---   Crossing    a zebra crossing between the two, straight across the lane on the walk's line;
+--   Crossing    a zebra crossing between the two, straight across the lane on the walk's line: its bars lie along
+--               the lane (the way the traffic runs), the walk's width long, one after another across it;
 --   Lamps       LAMPS street lamps in the town's shape (a 15-stud post, the curved arm over the road, a glowing head),
 --               in one row behind the north sidewalk (the south side is the venues' frontage), each its own Persistent
 --               Model (always on every client, a dozen parts); no light of their own: the head carries the tag
@@ -47,7 +48,7 @@ Street.CROSS_ROAD = "rd_022_commercial_cross_x347"
 Street.LAMP_X = { 978, 1104, 1232, 1452, 1566, 1642 } -- behind the north sidewalk (clear of the Alley Walk, x 1318..1326, and the antique store's front, x 1340..1380)
 Street.LAMP_HEIGHT = 15 -- studs: the town's lamp (Kits.lamp heightU 6)
 Street.LAMP_BACK = 1.6 -- studs behind the sidewalk's outer edge (LampPlan: a sidewalk that meets the kerb)
-Street.ZEBRA = { stripes = 7, width = 1.2, gap = 1.2 } -- stripes along the lane on the walk's line
+Street.ZEBRA = { width = 1.2, gap = 1.2, margin = 0.6 } -- bars across the lane, `margin` short of each kerb
 Street.BUDGET = 700 -- parts (Model attribute PartBudget; tests/unit/bowl_lane.spec)
 Street.SIGN_GREEN = { 32, 74, 50 } -- the town's street-name green (tools/bake/Ways)
 Street.METAL = { 44, 48, 50 } -- the town's lamp metal (worldgen LampPlan)
@@ -55,6 +56,7 @@ Street.LAMP_TAG = "StreetLampHead" -- (Client/Render/TownView.TAG: the heads its
 
 export type Strip = Plan.Road
 export type Lamp = { x: number, z: number, ox: number, oz: number }
+export type Bar = { x: number, z: number, length: number, width: number } -- a zebra bar: long along x
 export type StreetPlan = {
 	lane: Strip,
 	sidewalks: { Strip },
@@ -63,7 +65,7 @@ export type StreetPlan = {
 	walks: { Strip },
 	strips: { Strip }, -- every paved strip above, the lane first
 	lamps: { Lamp },
-	crossing: { x: number, z0: number, z1: number },
+	crossing: { x: number, z0: number, z1: number, bars: { Bar } },
 	sign: { x: number, z: number },
 }
 
@@ -178,7 +180,17 @@ function Street.plan(): StreetPlan
 	end
 	-- the crossing on the Alley Walk's line, kerb to kerb
 	local walk = walks[1]
-	local crossing = { x = walk.coord, z0 = lane.coord - lane.width / 2, z1 = lane.coord + lane.width / 2 }
+	local z0, z1 = lane.coord - lane.width / 2, lane.coord + lane.width / 2
+	local zb = Street.ZEBRA
+	local room = z1 - z0 - 2 * zb.margin
+	local n = math.floor((room + zb.gap) / (zb.width + zb.gap))
+	local span = n * zb.width + (n - 1) * zb.gap
+	local bars: { Bar } = {}
+	for k = 0, n - 1 do
+		local bz = lane.coord - span / 2 + zb.width / 2 + k * (zb.width + zb.gap)
+		table.insert(bars, { x = walk.coord, z = bz, length = walk.width, width = zb.width })
+	end
+	local crossing = { x = walk.coord, z0 = z0, z1 = z1, bars = bars }
 	-- the name sign at the north-west corner of the junction, behind the sidewalk
 	local sign = { x = crossEdge + 3, z = lz }
 	return {
@@ -335,16 +347,11 @@ function Street.build(roblox: any, parent: any): any
 	end
 	-- the zebra crossing on the Alley Walk's line
 	do
-		local c = p.crossing
 		local m = kit:model(root, "Crossing")
-		local z = Street.ZEBRA
-		local span = z.stripes * z.width + (z.stripes - 1) * z.gap
 		local laneModel = models[p.lane.id]
-		for k = 0, z.stripes - 1 do
-			local sx = c.x - span / 2 + z.width / 2 + k * (z.width + z.gap)
-			local cz = (c.z0 + c.z1) / 2
-			local y = (topAt(roblox, laneModel, sx, cz) or Height.at(sx, cz)) + 0.03
-			kit:at(m, "Stripe", sx, y, -cz, z.width, 0.05, c.z1 - c.z0 - 1.2, Palette.ROAD.paint, "SmoothPlastic", {
+		for _, b in p.crossing.bars do
+			local y = (topAt(roblox, laneModel, b.x, b.z) or Height.at(b.x, b.z)) + 0.03
+			kit:at(m, "Stripe", b.x, y, -b.z, b.length, 0.05, b.width, Palette.ROAD.paint, "SmoothPlastic", {
 				collide = false,
 				query = false,
 				shadow = false,
