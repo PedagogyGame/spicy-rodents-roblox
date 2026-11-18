@@ -518,4 +518,55 @@ return function(t)
 		ItemWorld.stunBody(body, 500.5, 0.2) -- (a shorter, later stun never cuts one short)
 		t.eq(body:GetAttribute(PossessionState.ATTR.StunnedUntil), 501.3)
 	end)
+	t.test(
+		"the air horn's startle is a timed flee: a sprint for 3 to 6 s, then the squirrel's ordinary life",
+		function()
+			local route = { id = 1, kind = "ground", length = 40, points = { { 0, 0, 0 }, { 40, 0, 0 } }, links = {} }
+			local routes = {
+				routes = { route },
+				byId = function(_id: number): any
+					return route
+				end,
+			}
+			local actor = Common.newActor(1, "squirrel", "normal", "Squirrel", 5, 0, 0.9)
+			local rng = function(): number
+				return 0.5
+			end
+			local brain = Squirrel.new(actor, { routes = routes :: any, rng = rng, startRoute = 1 })
+			local c: any = {
+				now = 0,
+				rng = rng,
+				groundAt = function(): number
+					return 0
+				end,
+			}
+			local function live(from: number, to: number): (number, number, number?)
+				local idle, sprinting, lastSprint = 0, 0, nil
+				for i = from, to do
+					c.now = i * 0.1
+					brain:think(0.1, c)
+					if actor.intent.speed == 0 then
+						idle += 1
+					elseif (brain :: any).sprint then
+						sprinting += 1
+						lastSprint = c.now
+					end
+				end
+				return idle, sprinting, lastSprint
+			end
+			local idleBefore = live(1, 6000)
+			t.truthy(idleBefore > 0, "an ordinary squirrel pauses now and then")
+			brain:onEvent({ type = "startle" })
+			t.truthy((brain :: any).sprint and actor.intent.speed > 0, "off at a sprint at once")
+			local _, sprinting, lastSprint = live(6001, 6100)
+			t.truthy(sprinting >= 30, "sprints at least 3 s")
+			t.truthy(lastSprint ~= nil and (lastSprint :: number) <= 600 + 6.1, "and no longer than 6 s")
+			local idleAfter = live(6101, 12000)
+			t.truthy(
+				idleAfter > idleBefore / 2,
+				`back to its ordinary pauses ({idleAfter} idle ticks against {idleBefore})`
+			)
+			t.truthy((brain :: any).runUntil < math.huge, "never a flee for ever")
+		end
+	)
 end

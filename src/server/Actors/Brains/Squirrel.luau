@@ -6,7 +6,7 @@
 -- x0.6 on wood kinds (trunk, branch, bridge, lookout) [routes_movement §10]. The motor
 -- (Server/AI/Kinematics) advances `s` every frame; the brain only sets routeId, dir, speed.
 -- W1 replaces the polyline data with Shared/Routes (Curve, Registry, Graph, Motion).
--- Events: "startle" (a full-sprint flee), "bait" { x, z, untilTime } (a pile of peanuts or bird seed near its
+-- Events: "startle" (a full-sprint flee for 3-6 s), "bait" { x, z, untilTime } (a pile of peanuts or bird seed near its
 -- route: it goes to the route's nearest point and stays there until untilTime or a startle).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
@@ -37,6 +37,7 @@ type Brain = Common.Brain & {
 	sprint: boolean,
 	lastLinkS: number,
 	bait: { s: number, untilTime: number }?, -- a pile of peanuts near the route: go to its nearest point and stay
+	startled: boolean, -- a startle not yet timed (onEvent has no clock: the next think gives the flee its end)
 }
 
 local Squirrel = {}
@@ -50,6 +51,7 @@ local TRANSFER_CHANCE = 0.35
 
 local BAIT_REACH = 16 -- studs: a pile further than this from the route is not worth leaving it for
 local BAIT_AT = 1.0 -- studs: close enough to nibble
+local FLEE_SECS = { 3, 6 } -- a startle's sprint, then the usual pause and an ordinary run
 
 -- The distance along a route of its point nearest to (x, z), and how far that point is.
 local function nearestS(route: RouteLike, x: number, z: number): (number, number)
@@ -96,6 +98,10 @@ end
 function Methods.think(self: Brain, _dt: number, ctx: Common.Ctx)
 	local intent = self.actor.intent
 	local rng = self.params.rng
+	if self.startled then
+		self.startled = false
+		self.runUntil = ctx.now + Common.range(rng, FLEE_SECS[1], FLEE_SECS[2])
+	end
 	-- bait: along the route to the point nearest the pile, then nibbling there until it is gone
 	local bait = self.bait
 	if bait then
@@ -206,10 +212,11 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 		end
 	elseif evt.type == "startle" then
 		self.bait = nil
-		-- full-sprint flee on rails when chased (BUILD_PLAN §1.4 Squirrel brain)
+		-- full-sprint flee on rails when chased (BUILD_PLAN §1.4 Squirrel brain), for FLEE_SECS (timed by the next
+		-- think); then it pauses and its next run rolls its pace afresh (startRun)
 		self.sprint = true
 		self.idleUntil = 0
-		self.runUntil = math.huge
+		self.startled = true
 		self.actor.intent.speed = railSpeed(self.route, true)
 	end
 end
@@ -227,6 +234,7 @@ function Squirrel.new(actor: Common.Actor, params: Params): Common.Brain
 		runUntil = 0,
 		sprint = false,
 		lastLinkS = -math.huge,
+		startled = false,
 	}, Methods)
 	local intent = actor.intent
 	intent.mode = "rail"
