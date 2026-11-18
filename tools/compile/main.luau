@@ -18,6 +18,7 @@ local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
 local TreeArt = require("./lib/TreeArt")
+local TreeArtNext = require("./lib/TreeArtNext")
 local PinballArt = require("./lib/PinballArt")
 local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
@@ -512,6 +513,11 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local treeArtModule = TreeArt.compile({ repo = repo, invariant = invariant, compare = compare })
 	if treeArtModule then
 		table.insert(w1.modules, treeArtModule)
+	end
+	-- data/art/trees_v2.json: the new generator's trees, swapped in by Server/Assets/TreeArt once uploaded
+	local treeArtNextModule = TreeArtNext.compile({ repo = repo, invariant = invariant, compare = compare })
+	if treeArtNextModule then
+		table.insert(w1.modules, treeArtNextModule)
 	end
 	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
 	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })

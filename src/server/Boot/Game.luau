@@ -1733,13 +1733,14 @@ function Game.start(opts: Opts?): any
 	ReplicatedStorage:SetAttribute("BootReady", true)
 
 	-- The trees' normal and roughness maps arrive after the town is playable (each tree already shows
-	-- its colour texture): Assets/TreeArt loads the uploaded models one by one, off the boot path.
+	-- its colour texture): Assets/TreeArt loads the uploaded models one by one, off the boot path, and swaps in
+	-- the new generator's tree for every trunk whose v2 Model has an id (Generated/TreeArtNext).
 	if town and o.heartbeat ~= false then
 		task.spawn(function()
 			local okT, report = pcall(TreeArt.run, town)
 			if okT then
 				print(
-					`[SpicyRodents] tree art: {report.upgraded}/{report.trees} trees with full maps, {report.failed} failed, {math.floor(
+					`[SpicyRodents] tree art: {report.swapped}/{report.trees} trees swapped for the new models, {report.upgraded} with full maps, {report.failed} failed, {math.floor(
 						report.seconds
 					)} s`
 				)
