@@ -26,7 +26,9 @@ Gameplay contract (src/shared/Routes/Motion.luau visualPose; tools/blender/trees
 measures it on the exported meshes, to 0.1 stud):
   * trunk bark radius at route parameter t equals the squirrel's tapered radius
       r(1 - 0.48 t) (min 0.8 st), giants r/0.95 - 2.625 t (min 1.125 st); r = surfaceRadius x 2.5,
-    all the way round, from the top of the root flare to the top of the route. The only wood outside
+    all the way round, from the route's first point to its top (in the lowest max(2.5, 1.2 r) studs, where the
+    root flare was, within FLARE_ROOM: the buttress lobes and the roots stay under the climb's start, and a root
+    rises above it only where it is clear of the trunk). The only wood outside
     it is the boughs themselves: a bough with its collar stays within 2 studs of its route, so
     collars add no wood to the trunk and a steep bough (which hangs to one side of its route) is thin.
   * branch / bridge / lookout bark: the bough's top edge is the squirrel's feet line, rail + lift
@@ -45,9 +47,17 @@ SPU = 2.5
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 Y = np.array([0.0, 1.0, 0.0])
 
-BARK_BUDGET = 12000
-LEAF_BUDGET = 14000
+# Triangle budgets (phones: the town's trees together about 1.3x the live ones). The named trees and the giants
+# carry many walks, whose skin alone is up to 9,700 triangles; every other tree has 8,000 of bark.
+BARK_BUDGET = 8000
+BARK_BUDGET_BIG = 12000
+BIG_CATEGORIES = ("named", "giant")
+LEAF_BUDGET = 6000
+# A spray card's length and width against the species' card: fewer, larger sprays keep the crown as full under the
+# smaller leaf budget (the spray atlas paints proportionally smaller leaves, textures.SPRAY_LEAF)
+SPRAY_SCALE = 1.3
 COLLAR = 0.14  # how much a bough swells where it leaves the trunk
+FLARE_ROOM = 0.22  # studs the bark may stand outside the climbing radius at the climb's start, fading by the flare's top
 
 
 # ---- data ---------------------------------------------------------------------------------------
@@ -891,10 +901,14 @@ class TreeBuilder:
         flute_ph = rng.random() * 6.28
         start_normal = np.array([1.0, 0.0, 0.0])
 
+        y_climb = float(P[0][1])  # the climb's first point (route t = 0): from here up the bark is the climbing radius
+
         def radius(i, ang):
             y = C[i][1]
-            fall = math.exp(-(max(0.0, y) / (0.5 * R0)) ** 2)  # gone by the height the climb starts at
-            fall *= float(np.clip((P[0][1] + self.flare_end - 0.02 - y) / 0.4, 0.0, 1.0))
+            fall = math.exp(-(max(0.0, y) / (0.5 * R0)) ** 2)
+            fall *= float(np.clip((y_climb + self.flare_end - 0.02 - y) / 0.4, 0.0, 1.0))
+            # (and ramped in under the climb's start: no steep shoulder for the skin to round off above it)
+            fall *= float(np.clip((y_climb - 0.05 - y) / 1.4, 0.0, 1.0)) ** 0.7
             lob = np.zeros_like(ang)
             # the ring's angle 0 is +X (start_normal) and grows toward T x N = Y x X = -Z
             for a0, amp in zip(self.root_ang, lobe_amp):
@@ -904,6 +918,11 @@ class TreeBuilder:
             # shallow, and the ring's corners stand as far outside that radius as its flats lie inside)
             flute = 0.014 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.008 * np.sin(ang * 3 - y * 0.31)
             r = base[i] * (1 + 0.5 * facet) * (1 + 0.55 * fall * lob) + flute * min(1.0, base[i] / 2.0)
+            if y >= y_climb - 0.05:
+                # the squirrel climbs from the route's first point: the buttresses swell under it (the rings in the
+                # ground carry them up to the ground line) and above it stand no more than FLARE_ROOM proud
+                room = FLARE_ROOM * float(np.clip((y_climb + self.flare_end - y) / self.flare_end, 0.0, 1.0))
+                r = np.minimum(r, base[i] * (1 + 0.5 * facet) + room)
             for k in self.knots:
                 # under a knothole the bark stands no further out than the climbing radius (the oval sits 0.03
                 # stud outside it), corners included
@@ -1294,10 +1313,11 @@ class TreeBuilder:
     def plan_roots(self):
         rng = self.rng
         R0 = float(self.Rt(0.0))
+        y_climb = float(self.trunkP[0][1])
         for k, a in enumerate(self.root_ang):
             d = np.array([math.cos(a), 0.0, math.sin(a)])
             Lr = R0 * (1.7 + 1.2 * rng.random())
-            m = 6
+            m = 11  # (close enough that the tube between two points stays under where it may rise)
             pts = []
             for j in range(m):
                 f = j / (m - 1)
@@ -1309,7 +1329,13 @@ class TreeBuilder:
             r0 = R0 * (0.40 + 0.12 * rng.random())
             f = np.linspace(0, 1, m)
             radii = np.maximum(0.12, r0 * (1 - f) ** 1.1 + 0.1)
-            self.limbs.append(Limb(f"root{k}", "root", pts, radii, 5, float(np.clip(0.75 * r0, 0.4, 1.2)), None, None, 1, 3.0))
+            kb = float(np.clip(0.75 * r0, 0.4, 1.2))
+            # the root runs in under the climb's first point (its top and the blend's swell under it), and comes up
+            # out of the ground only where it is clear of the trunk: no root wood on the climbing radius
+            rad = np.hypot(pts[:, 0], pts[:, 2])
+            gap = np.maximum(rad - R0 - radii - 1.5 * kb - 0.3, 0.0)
+            pts[:, 1] = np.minimum(pts[:, 1], y_climb - 0.1 - kb - radii + gap)
+            self.limbs.append(Limb(f"root{k}", "root", pts, radii, 5, kb, None, None, 1, 3.0))
 
     # .. the skin: union the tubes, then pull the junctions onto the smooth blend ..
     def build_skin(self):
@@ -1803,10 +1829,13 @@ class TreeBuilder:
             return 6 if r0 > 0.8 else (5 if r0 > 0.5 else 4)
         return 3
 
+    def bark_budget(self):
+        return BARK_BUDGET_BIG if self.cat in BIG_CATEGORIES else BARK_BUDGET
+
     def fit_bark_budget(self):
         """Keep the bark under its triangle budget: the thinnest, farthest twigs become paint on the
         spray cards (their leaves stay)."""
-        budget = self.opts.get("bark_budget", BARK_BUDGET) - 250
+        budget = self.opts.get("bark_budget", self.bark_budget()) - 250
         used = self.bark.tris
         cost = [(self.branch_tris(b), b) for b in self.branches]
         total = used + sum(c for c, _ in cost)
@@ -1920,7 +1949,7 @@ class TreeBuilder:
         par, rng = self.par, self.rng
         sc = self.scale
         cl, cw = par["card"]
-        cl, cw = cl * sc, cw * sc
+        cl, cw = cl * sc * SPRAY_SCALE, cw * sc * SPRAY_SCALE
         willow = self.sp == "willow"
         cards = []
         c, rh, ylo, yhi = self.crown

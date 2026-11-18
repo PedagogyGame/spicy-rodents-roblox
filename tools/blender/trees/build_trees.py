@@ -12,7 +12,7 @@ OAK, a park maple, a QUAY WILLOW, APPLE 3) or "all". Writes per tree into --out:
   tree_NNN.json                pivot, part bounds (Roblox axes, relative to the pivot), tris, checks
   renders/tree_NNN_<view>.png  Cycles (views.py cameras: street, crown, fork, collar, junction, junction2,
                                bough; debug = bark see-through + red rails + yellow feet lines)
-  tex/*.png                    procedural maps: tileable bark (512), leaf-spray atlases with alpha (1024)
+  tex/*.png                    procedural maps: tileable bark (512), leaf-spray atlases with alpha (512, painted at 1024)
 Leaves are alpha cards: in the engine the Leaves* parts need DoubleSided = true and their
 SurfaceAppearance AlphaMode = Transparency (tree_NNN.json says so per part).
 Threads: Cycles uses --threads (default 2); run under taskset to pin the process.
@@ -78,10 +78,10 @@ class TexCache:
         rpath = self.path(f"spray_{shape}_roughness.png")
         if not (os.path.exists(npath) and os.path.exists(rpath)):
             n, r = tx.spray_normal_rough(self.layout(shape))
-            tx.write_png(npath, n)
-            tx.write_png(rpath, r)
+            tx.write_png(npath, tx.down(n, normal=True))
+            tx.write_png(rpath, tx.down(r))
         if not os.path.exists(cpath):
-            tx.write_png(cpath, tx.spray_colour(self.layout(shape), palette, layer))
+            tx.write_png(cpath, tx.down(tx.spray_colour(self.layout(shape), palette, layer)))
         return [cpath, npath, rpath]
 
     def apple(self):
@@ -311,8 +311,8 @@ def alignment_checks(tb):
     tr = tb.tri_counts()
     leaves = tr["leaves_shade"] + tr["leaves_mid"] + tr["leaves_sun"]
     out["leaves"] = {"cards": len(tb.cards), "min_tunnel_margin_st": round(float(tb.clearance(np.concatenate(lv)).min()), 3) if lv else None}
-    out["budget"] = {"bark": tr["bark"], "bark_max": tg.BARK_BUDGET, "leaves": leaves, "leaves_max": tg.LEAF_BUDGET,
-                     "ok": bool(tr["bark"] <= tg.BARK_BUDGET and leaves <= tg.LEAF_BUDGET)}
+    out["budget"] = {"bark": tr["bark"], "bark_max": tb.bark_budget(), "leaves": leaves, "leaves_max": tg.LEAF_BUDGET,
+                     "ok": bool(tr["bark"] <= tb.bark_budget() and leaves <= tg.LEAF_BUDGET)}
     return out
 
 
@@ -619,6 +619,49 @@ def clear_walks(tb, obj, step=0.25, tol=0.06, reach=0.6):
     return len(moved)
 
 
+def open_knots(tb, obj, pad=0.15, inset=0.04, guard=0.1):
+    """A hollow's knothole where a bough leaves the trunk (a shaft's top, onto that bough) lies inside the bough's
+    collar: the bough's route runs out through it. Here the mouth is opened: every bark vertex in front of the oval
+    (within its width and height + pad, outside the climbing radius, on its side of the axis) is drawn in level onto
+    the climbing radius less `inset`, so the dark oval (0.03 outside that radius) shows. The walks' feet lines stand
+    over the oval and keep their vertices (those within `guard` of a feet line, or above the oval's top + pad).
+    Ground knotholes need nothing here: the trunk's rings hold the bark to the climbing radius round them.
+    Returns how many vertices moved."""
+    if not tb.knots:
+        return 0
+    me = obj.data
+    V = np.array([v.co[:] for v in me.vertices], float)
+    R = np.stack([-V[:, 0], V[:, 2], V[:, 1]], axis=1)  # Roblox axes, tree-local
+    P = tb.trunkP
+    cx, cz = np.interp(R[:, 1], P[:, 1], P[:, 0]), np.interp(R[:, 1], P[:, 1], P[:, 2])
+    rt = tb.Rt(np.interp(R[:, 1], P[:, 1], tb.trunk_s / max(tb.trunkL, 1e-9)))
+    rel = np.stack([R[:, 0] - cx, R[:, 2] - cz], axis=1)
+    dist = np.hypot(rel[:, 0], rel[:, 1])
+    keep = np.zeros(len(R), bool)
+    for b in tb.boughs:
+        feet = getattr(b.get("limb"), "feet", None)
+        if feet is not None:
+            m = np.nonzero(np.all((R >= feet.min(0) - 0.5) & (R <= feet.max(0) + 0.5), axis=1))[0]
+            if len(m):
+                keep[m[tg.seg_dist(R[m], feet[:-1], feet[1:]).min(1) < guard]] = True
+    moved = np.zeros(len(R), bool)
+    for k in tb.knots:
+        out = np.array([math.cos(k["dir"]), math.sin(k["dir"])])
+        side = np.array([-out[1], out[0]])
+        fwd, lat = rel @ out, rel @ side
+        sel = ((np.abs(R[:, 1] - k["p"][1]) < k["h"] / 2 + pad) & (np.abs(lat) < k["w"] / 2 + pad) & (fwd > 0)
+               & (dist > rt - inset) & (dist < rt + 6.0) & ~keep)
+        moved |= sel
+    if moved.any():
+        f = (rt[moved] - inset) / dist[moved]
+        R[moved, 0] = cx[moved] + rel[moved, 0] * f
+        R[moved, 2] = cz[moved] + rel[moved, 1] * f
+        Vb = np.stack([-R[:, 0], R[:, 2], R[:, 1]], axis=1)
+        me.vertices.foreach_set("co", Vb.astype(np.float32).ravel())
+        me.update()
+    return int(moved.sum())
+
+
 def promise_check(rec, objs, routes):
     """check_promises.py's verdict (--clearance-warn) on the objects as built: the independent check, in process."""
     parts = {}
@@ -689,6 +732,7 @@ def main(argv):
             rec = dict(recs[i], seed=recs[i]["seed"] + 7919 * attempt)
             reset_scene()
             tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
+            tb.log["knot_mouth_verts"] = open_knots(tb, objs["Bark"])
             tb.log["feet_cleared_verts"] = clear_walks(tb, objs["Bark"])
             if not args.retries:
                 break

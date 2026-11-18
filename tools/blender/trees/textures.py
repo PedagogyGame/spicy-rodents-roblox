@@ -402,7 +402,11 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
 # ---- leaf sprays (alpha cards) --------------------------------------------------------------------
 
 SPRAY_SHAPES = ("oak", "elm", "palmate", "maple", "willow", "apple")
-SPRAY_N = 1024
+SPRAY_PAINT = 1024  # the atlas is painted at this size (the px in SPRAY_PLAN) ...
+SPRAY_N = 512  # ... and written at this one (spray_maps: a quarter of the GPU memory of 1024)
+# leaves in the atlas against SPRAY_PLAN: smaller and more of them, as the cards are larger (treegen SPRAY_SCALE),
+# so a leaf on the tree stays its size
+SPRAY_LEAF = 0.77
 
 # leaf length px, width / length, leaves on the main twig, side twigs, leaves per side twig, angle off the twig
 SPRAY_PLAN = {
@@ -603,12 +607,35 @@ def _twig_leaves(cv, shape, plan, rng, box, start, heading, length, n, w0, scale
     return pts
 
 
-def spray_layout(shape, seed=1, n=SPRAY_N):
+def spray_plan(shape):
+    """SPRAY_PLAN[shape] with the leaves SPRAY_LEAF the size and as many more on each twig."""
+    plan = dict(SPRAY_PLAN[shape])
+    for k in ("L", "petiole", "step"):
+        plan[k] = plan[k] * SPRAY_LEAF
+    for k in ("main", "per"):
+        plan[k] = int(round(plan[k] / SPRAY_LEAF))
+    return plan
+
+
+def down(a, normal=False):
+    """Halve a map (2 x 2 means) until it is SPRAY_N across; a normal map is renormalised."""
+    a = np.asarray(a, float)
+    while a.shape[0] > SPRAY_N:
+        h, w = a.shape[0] // 2, a.shape[1] // 2
+        a = a[: 2 * h, : 2 * w].reshape(h, 2, w, 2, *a.shape[2:]).mean(axis=(1, 3))
+    if normal:
+        v = a * 2.0 - 1.0
+        v /= np.maximum(np.linalg.norm(v, axis=-1, keepdims=True), 1e-6)
+        a = v * 0.5 + 0.5
+    return a
+
+
+def spray_layout(shape, seed=1, n=SPRAY_PAINT):
     """Paint the four sprays of a species into an atlas. Broad leaves: 2 x 2 cells, each a twig rising
     from the middle of the cell's lower edge. Willow: 4 columns, each a strand hanging from the top."""
     rng = np.random.default_rng(seed)
     cv = _Canvas(n)
-    plan = SPRAY_PLAN[shape]
+    plan = spray_plan(shape)
     if shape == "willow":
         cw = n // 4
         for c in range(4):
@@ -635,8 +662,9 @@ def spray_layout(shape, seed=1, n=SPRAY_N):
             sd = 1 if (t + c) % 2 == 0 else -1
             st = np.array([bx, by]) + np.array([math.cos(heading), math.sin(heading)]) * length * f
             hd = heading - sd * math.radians(rng.uniform(50, 68) - 6 * t)
-            _twig_leaves(cv, shape, plan, rng, box, st, hd, ch * rng.uniform(0.30, 0.37) * (1 - 0.1 * t), plan["per"], 4.0, scale=0.92)
-        _twig_leaves(cv, shape, plan, rng, box, (bx, by), heading, length, nmain, 6.5)
+            _twig_leaves(cv, shape, plan, rng, box, st, hd, ch * rng.uniform(0.30, 0.37) * (1 - 0.1 * t), plan["per"],
+                         4.0 * SPRAY_LEAF ** 0.5, scale=0.92)
+        _twig_leaves(cv, shape, plan, rng, box, (bx, by), heading, length, nmain, 6.5 * SPRAY_LEAF ** 0.5)
     return _finish_layout(cv, shape, seed)
 
 

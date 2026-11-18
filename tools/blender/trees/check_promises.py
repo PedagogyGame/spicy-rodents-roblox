@@ -321,7 +321,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
     # trunk ------------------------------------------------------------------------------------------
     flare_top = TP[0][1] + max(2.5, 1.2 * TR[0])
     allB = np.concatenate([b[3] for b in bough]) if bough else np.zeros((0, 3))
-    errs, flare, rows, miss, junction = [], [], [], 0, 0
+    errs, flare, rows, frows, miss, junction = [], [], [], [], 0, 0
     for p, t, want in zip(TP, tts, TR):
         hits = []
         for k in range(RAYS):
@@ -352,6 +352,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 junction += 1
             elif p[1] < flare_top:
                 flare.append(e)
+                frows.append({"y": float(p[1] - TP[0][1]), "ray": k, "err": e})
             else:
                 errs.append(e)
                 rows.append({"y": float(p[1]), "t": float(t), "ray": k, "err": e, "want": float(want)})
@@ -365,6 +366,7 @@ def check_tree(info, parts, routes, clearance_warn=False):
     fl = st["flare"]
     fl["deep"] = int((np.abs(np.asarray(flare, float)) > FLARE_FAIL).sum()) if flare else 0
     fl["top"] = round(float(flare_top - TP[0][1]), 2)
+    fl["worst"] = worst(frows, "err")
     if fl["deep"]:
         fail.append(f"root flare: {fl['deep']} rays off the climbing radius by > {FLARE_FAIL} st in the lowest "
                     f"{fl['top']} st of the climb (min {fl['min']}, max {fl['max']})")
