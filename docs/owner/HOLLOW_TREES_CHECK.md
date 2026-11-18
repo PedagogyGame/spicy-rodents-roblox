@@ -2,7 +2,7 @@
 
 Your brief (section 3) asks for twelve hollow trees a squirrel can claim, and a fallen hollow log to hide in. Addendum D6 says they run "on the same mechanics" as the ball return. They do: every hollow's inside is an enclosed squirrel run, exactly like the ball return and the storm drains.
 
-Everything below was tested without a screen, on the real squirrel controls and the real server checks. A test cannot tell me how it looks and feels, so this list is the part only you can judge. The pictures are offline renders in `docs/renders/hollows/` (remake them with `lune run tools/review/hollows.luau` and `tools/review/render.py`). The bark in them is a plain stand-in, because the Blender trees cannot be drawn offline. `h1_cutaway` shows the spiral with its walls left out.
+Everything below was tested without a screen, on the real squirrel controls and the real server checks. A test cannot tell me how it looks and feels, so this list is the part only you can judge. The pictures are offline renders in `docs/renders/hollows/` (remake them with `lune run tools/review/hollows.luau` and `tools/review/render.py`). The bark in them is a plain stand-in, because the Blender trees cannot be drawn offline. The `_cutaway` pictures cut the bark and the boards away on the camera's side, so you see the inside against the far wall: `h1_cutaway` the whole spiral, `h2_cutaway` and `h12_cutaway` the two climbing trees, each with a `_low` and `_top` close-up, and `log_cutaway` the log.
 
 ## Where they are
 
@@ -35,18 +35,19 @@ Everything below was tested without a screen, on the real squirrel controls and 
 ## What only you can judge
 - **H1 is in the HIGHLAND ELM giant, not the park tree by the Tabasco garden.** The park tree's trunk is 4 studs across and the squirrel is 1.6 wide, so no ramp fits inside it. The giant is 9.4 across. H1's premium garden and bird feeder are listed beside the giant but are not built, the same as H2's. *Default: the giant, as built.*
 - **The ground holes are big** (1.9 by 2 studs), because the squirrel's body has to fit through them. Do they look right on the bark?
-- **Inside, the walls are plain wooden boards** (rings of planks, a floor and a roof, with one dim warm light per chamber). The Blender bark is not drawn from inside, so these boards are what you see. Offline, the spiral reads very dark between its landings (`h1_ramp` views). Only the engine can say how dark it really is. Are the boards good enough, or should the insides get art of their own?
+- **Inside, the walls are plain wooden boards** (rings of planks, a floor and a roof, with one dim warm light per chamber; each light only reaches as far as the bark, so it never lights the lawn outside at night).
+- **The log has an invisible stop just inside each end.** A squirrel that walks at the end from the side stays outside; one that runs straight in is taken through as before. The Blender bark is not drawn from inside, so these boards are what you see. Offline, the spiral reads very dark between its landings (`h1_ramp` views). Only the engine can say how dark it really is. Are the boards good enough, or should the insides get art of their own?
 - **Moved trees:** H4 is now the Pump Elm and H9 Estate Oak South 2. In the baked town, Estate Oak South 1 stands inside the estate mansion's walls, and both Shop Oaks stand in the sidewalk curbs.
 - **The log** is the north park's hollow log from v5.4, now real: about 3.6 studs across and 23 long. The old grey box at that spot is now invisible.
 - **How fast should a tree's meter empty?** It loses 3 % of its capacity each game day, and a game day is 12 real minutes. So a full tree that nobody feeds falls below the 60 % keep line after about 13 game days (2 hours 40 minutes), and an owner who claimed at 75 % must bring nuts within 5 game days (1 hour). Is that the pace you want? *Default: 3 % a game day.*
 
 ## Costs (for phones)
-- **377 plain parts in all**, about 7,000 triangles, no shadows, and 17 dim point lights (no shadows): one on each floor, and one at each landing or store above it:
-  - H1: 147 parts;
-  - H2: 58;
+- **372 plain parts in all**, about 7,000 triangles, no shadows, and 17 dim point lights (no shadows): one on each floor, and one at each landing or store above it. Each light reaches 1.5 to 4.9 studs, no further than the bark round it:
+  - H1: 143 parts;
+  - H2: 57;
   - H12: 50;
-  - each one-chamber tree: 9 to 15;
-  - the log: 11;
+  - each one-chamber tree: 9 to 14;
+  - the log: 13 (its boards, its floor and its two invisible end stops);
   - one pennant per claimable tree.
 - **The trees themselves are unchanged.** No mesh was re-uploaded.
 - **Per frame:** the hiding check is one cylinder test per hollow for each squirrel. The meters update once a second.

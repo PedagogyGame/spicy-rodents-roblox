@@ -7,7 +7,8 @@
 --   then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/hollows_scene.json
 --     --views build/review/hollows_views.json --out build/review/hollows
 -- Writes hollows_scene.json (render.py's format: parts, attractions.lights) and hollows_views.json (views worked
--- out from the layout: from outside at a person's eye, cut away without the bark, and inside at a squirrel's eye).
+-- out from the layout: from outside at a person's eye, cut away (the bark and the liner on the camera's side left
+-- out, the far half kept as the backdrop: groups "bark_cut" and "liner_cut"), and inside at a squirrel's eye).
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
@@ -39,8 +40,33 @@ local root = HollowShell.build(roblox, layout)
 local parts = {}
 local lights = {}
 
+-- each cut-away's camera, level from its hollow's middle (unit): the half of the wall towards it is left out
+local cutDir: { [string]: { number } } = {}
+for _, h in layout.hollows do
+	local hole = h.mouths[1]
+	local ol = math.sqrt(hole.out[1] ^ 2 + hole.out[3] ^ 2)
+	local ox, oz = hole.out[1] / ol, hole.out[3] / ol
+	local dx, dz = ox * 16 - oz * 10, oz * 16 + ox * 10
+	local dl = math.sqrt(dx * dx + dz * dz)
+	cutDir[h.id] = { dx / dl, dz / dl }
+end
+-- on the far side of hollow `id` from its cut-away camera (or no hollow: false)
+local function far(id: string, x: number, z: number): boolean
+	local h = layout.hollow(id)
+	local d = cutDir[id]
+	if h == nil or d == nil then
+		return false
+	end
+	local c = h.cavities[#h.cavities]
+	return (x - c.x) * d[1] + (z - c.z) * d[2] < 0
+end
+
 local function emit(group: string, p: any)
 	local cf = p.CFrame
+	local model = p.Parent
+	if group == "liner" and model and far(model.Name, cf.Position.X, cf.Position.Z) then
+		emit("liner_cut", p) -- (and the whole wall for the views from inside)
+	end
 	local x, y, z = cf.XVector, cf.YVector, cf.ZVector
 	table.insert(parts, {
 		g = group,
@@ -56,11 +82,12 @@ local function emit(group: string, p: any)
 end
 
 for _, d in root:GetDescendants() do
-	if d:IsA("BasePart") then
-		-- the cavity's wall (liner rings and roof) on its own: a cut-away view leaves it out to show what is inside
-		local wall = string.match(d.Name, "^liner") ~= nil or string.match(d.Name, "^roof") ~= nil
+	if d:IsA("BasePart") and d.Transparency < 1 then
+		-- the cavity's wall (liner rings and roof, the log's boards) on its own: a cut-away view keeps its far half
+		local wall = string.match(d.Name, "^liner") ~= nil
+			or string.match(d.Name, "^roof") ~= nil
+			or string.match(d.Name, "^log%d") ~= nil
 		emit(if wall then "liner" else "hollows", d)
-		local l = d:FindFirstChildOfClass("PointLight")
 		for _, a in d:GetChildren() do
 			local al = if a:IsA("Attachment") then a:FindFirstChildOfClass("PointLight") else nil
 			if al then
@@ -70,22 +97,14 @@ for _, d in root:GetDescendants() do
 					kind = "point",
 					pos = { r4(wp.Position.X), r4(wp.Position.Y), r4(wp.Position.Z) },
 					dir = { 0, 1, 0 },
-					brightness = al.Brightness,
-					range = al.Range,
+					-- (Blender's lights have no range, and render.py makes a light's power from its range: a hollow's
+					-- light goes to the renderer as HollowShell.LIGHT's, which its shorter range and brighter
+					-- brightness are meant to look like inside the chamber)
+					brightness = HollowShell.LIGHT.brightness,
+					range = HollowShell.LIGHT.range,
 					color = { c.R * 255, c.G * 255, c.B * 255 },
 				})
 			end
-		end
-		if l then
-			local c = l.Color
-			table.insert(lights, {
-				kind = "point",
-				pos = { r4(d.CFrame.Position.X), r4(d.CFrame.Position.Y + 1.2), r4(d.CFrame.Position.Z) },
-				dir = { 0, 1, 0 },
-				brightness = l.Brightness,
-				range = l.Range,
-				color = { c.R * 255, c.G * 255, c.B * 255 },
-			})
 		end
 	end
 end
@@ -114,6 +133,26 @@ for _, h in layout.hollows do
 			local x, y, z = tr.axisAt(h0 + 1.5)
 			local r = tr.bark(h0 + 1.5)
 			block("bark", `{h.id}.bark{k}`, { r4(x), r4(y), r4(z) }, { 3, 2 * r, 2 * r }, { 92, 70, 52 }, "Cylinder")
+			-- the cut-away's bark: the far half of the slice as 7 of its 14 flats, 0.3 thick
+			local w = 2 * r * math.tan(math.pi / 14)
+			for f = 0, 13 do
+				local a = (f + 0.5) * math.pi / 7
+				local sx, sz = math.sin(a), math.cos(a)
+				local px, pz = x + sx * (r - 0.15), z + sz * (r - 0.15)
+				if far(h.id, px, pz) then
+					table.insert(parts, {
+						g = "bark_cut",
+						p = `{h.id}.bark{k}.flat{f}`,
+						s = "Block",
+						size = { r4(w), 3, 0.3 },
+						pos = { r4(px), r4(y), r4(pz) },
+						rot = { r4(sz), 0, r4(sx), 0, 1, 0, r4(-sx), 0, r4(sz) },
+						c = { 92, 70, 52 },
+						t = 0,
+						m = "Wood",
+					})
+				end
+			end
 		end
 	end
 end
@@ -131,7 +170,7 @@ local function add(name: string, desc: string, pos: { number }, look: { number }
 	})
 end
 local OUTSIDE = { "ground", "bark", "hollows", "liner", "attractions" }
-local CUT = { "ground", "hollows", "attractions" }
+local CUT = { "ground", "hollows", "liner_cut", "bark_cut", "attractions" }
 local INSIDE = { "ground", "hollows", "liner", "attractions" }
 for _, h in layout.hollows do
 	local hole = h.mouths[1]
@@ -148,16 +187,33 @@ for _, h in layout.hollows do
 		)
 	end
 	if h.variant ~= "knothole" then
+		-- far enough back to take in the whole height (a shaft is 35 studs tall)
 		local cav = h.cavities[#h.cavities]
 		local mid = (cav.bottom + cav.top) / 2
+		local d = cutDir[h.id]
+		local back = math.max(18.9, (cav.top - cav.bottom) * 0.95)
 		add(
 			id .. "_cutaway",
-			`{h.id} ({h.variant}) cut away: the bark left out to show the inside`,
-			{ cav.x + ox * 16 - oz * 10, mid + 6, cav.z + oz * 16 + ox * 10 },
+			`{h.id} ({h.variant}) cut away: the bark and the boards on this side left out to show the inside`,
+			{ cav.x + d[1] * back, mid + 3, cav.z + d[2] * back },
 			{ cav.x, mid, cav.z },
 			CUT,
 			if h.variant == "spiral" then 75 else 60
 		)
+		-- and close up, the foot and the top of a tall one (a whole shaft is a thin stripe in a wide picture)
+		if cav.top - cav.bottom > 12 then
+			for _, part in { { "low", cav.bottom + 5 }, { "top", cav.top - 5 } } do
+				local at = part[2] :: number
+				add(
+					`{id}_cutaway_{part[1]}`,
+					`{h.id} ({h.variant}) cut away, close up at its {part[1]}`,
+					{ cav.x + d[1] * 11, at + 2, cav.z + d[2] * 11 },
+					{ cav.x, at, cav.z },
+					CUT,
+					70
+				)
+			end
+		end
 	end
 end
 -- inside, at a squirrel's eye: the single chamber from just inside its hole; up the shaft; along the spiral

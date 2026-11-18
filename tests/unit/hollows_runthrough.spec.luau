@@ -134,6 +134,39 @@ return function(t)
 		end
 	end)
 
+	t.test("the lights inside reach nothing outside the bark (no lawn or wall lit through it at night)", function()
+		local n = 0
+		for _, l in model:GetDescendants() do
+			if not l:IsA("PointLight") then
+				continue
+			end
+			n += 1
+			local a = l.Parent
+			local at = (a.Parent.CFrame * a.CFrame).Position
+			local h = layout.hollow(a.Parent.Parent.Name) :: HollowLayout.Hollow
+			local tr = HollowLayout.trunk(reg, h.trunk :: number)
+			t.truthy(l.Range >= 1.3, `{h.id}: a light of range {l.Range} lights its chamber`)
+			-- its sphere, sampled every 30 degrees: every point inside the bark at its own height
+			for i = -2, 2 do
+				local el = i * math.pi / 6
+				for k = 0, 11 do
+					local az = k * math.pi / 6
+					local x = at.X + l.Range * math.cos(el) * math.sin(az)
+					local y = at.Y + l.Range * math.sin(el)
+					local z = at.Z + l.Range * math.cos(el) * math.cos(az)
+					local hh = math.max(0, y - tr.foot.y)
+					local ax, _, azz = tr.axisAt(hh)
+					local d = math.sqrt((x - ax) ^ 2 + (z - azz) ^ 2)
+					t.truthy(
+						d <= tr.bark(hh),
+						`{h.id}: a light reaches {string.format("%.2f", d - tr.bark(hh))} past the bark`
+					)
+				end
+			end
+		end
+		t.eq(n, 17, "a light on each floor and at each chamber above it")
+	end)
+
 	t.test("nothing through walls: the body's section along every route meets no part of the shell", function()
 		for _, r in layout.routes do
 			local route = reg:get(r.id) :: any

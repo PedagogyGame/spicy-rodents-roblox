@@ -9,7 +9,10 @@
 -- Nothing in a tree collides or casts a shadow (the squirrel runs these on its rails; the bark collides already);
 -- the log's boards collide (they are the log), and so does an invisible threshold disc just inside each of its ends
 -- (a body walking in off the run is stopped there; the run itself rides past it); a knothole is not queried (sight
--- and the camera look through it). A dim warm light on each floor and at each chamber above it.
+-- and the camera look through it). A dim warm light in each floor's chamber and at each chamber above it, its range
+-- no more than the bark's radius round it (rangeIn), so it lights the inside and never the lawn or a wall outside
+-- (no shadows: the bark would not stop it).
+--   rangeIn(hollow, x, y, z) -> studs (pure)
 -- Interface: build(env, layout, parent?) -> (Folder, Report). `env` is anything with Instance, CFrame, Vector3,
 --   Color3 and Enum as the engine has them (the engine's globals, or @lune/roblox in the specs).
 --   Report = { parts, lights, per = { [hollowId]: parts } }.
@@ -28,8 +31,37 @@ HollowShell.LOOK = {
 	log = { color = { 104, 80, 58 }, material = "Wood" },
 	threshold = { color = { 104, 80, 58 }, material = "SmoothPlastic" }, -- (never drawn)
 }
-HollowShell.LIGHT = { range = 9, brightness = 0.45, color = { 255, 196, 140 } }
-local C = { room = 2.8 } -- (Shared/World/HollowLayout.C.room: a chamber higher than this over the floor gets a light)
+-- (range: the most a light reaches; brightness: at that range. A light held to a shorter range is brighter in
+-- proportion, up to maxBrightness, so its chamber's walls read about as lit: the engine's falloff ends at the range)
+HollowShell.LIGHT = { range = 9, brightness = 0.45, maxBrightness = 2, color = { 255, 196, 140 } }
+-- (Shared/World/HollowLayout.C: room, a chamber higher than this over the floor gets a light; wall, the bark kept
+-- round a cavity)
+local C = { room = 2.8, wall = 0.45 }
+
+-- rangeIn: a light's range at (x, y, z) in a hollow: HollowShell.LIGHT.range, but no further than the bark round
+-- the widest of its cavities there (a cavity is the bark less C.wall at its narrowest), less 0.3 for the lean
+function HollowShell.rangeIn(h: any, x: number, y: number, z: number): number
+	local r = 0
+	for _, c in h.cavities do
+		if c.a == nil and y >= c.bottom - 0.5 and y <= c.top + 0.5 then
+			local d = math.sqrt((x - c.x) ^ 2 + (z - c.z) ^ 2)
+			if d < c.radius then
+				r = math.max(r, c.radius + C.wall - d - 0.3)
+			end
+		end
+	end
+	return math.min(HollowShell.LIGHT.range, r)
+end
+
+local function light(env: any, parent: any, range: number)
+	local l = env.Instance.new("PointLight")
+	local L = HollowShell.LIGHT
+	l.Range = range
+	l.Brightness = math.min(L.maxBrightness, L.brightness * L.range / math.max(range, 0.5))
+	l.Color = env.Color3.fromRGB(HollowShell.LIGHT.color[1], HollowShell.LIGHT.color[2], HollowShell.LIGHT.color[3])
+	l.Shadows = false
+	l.Parent = parent
+end
 
 export type Report = { parts: number, lights: number, per: { [string]: number } }
 
@@ -66,38 +98,46 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 			p.TopSurface = Enum.SurfaceType.Smooth
 			p.BottomSurface = Enum.SurfaceType.Smooth
 			if pc.role == "floor" and h.variant ~= "log" then
-				local l = Instance.new("PointLight")
-				l.Range = HollowShell.LIGHT.range
-				l.Brightness = HollowShell.LIGHT.brightness
-				l.Color =
-					Color3.fromRGB(HollowShell.LIGHT.color[1], HollowShell.LIGHT.color[2], HollowShell.LIGHT.color[3])
-				l.Shadows = false
-				l.Parent = p
+				-- half way up the floor's chamber, over its middle
+				local c = h.cavities[1]
+				local at = Vector3.new(c.x, pc.p[2] + C.room / 2, c.z)
+				local a = Instance.new("Attachment")
+				a.Name = "floor_light"
+				a.CFrame = p.CFrame:Inverse() * CFrame.new(at)
+				a.Parent = p
+				light(env, a, HollowShell.rangeIn(h, at.X, at.Y, at.Z))
 				report.lights += 1
 			end
 			p.Parent = model
 			n += 1
 		end
 		-- a light at each chamber up off the floor (the spiral's landings, the shaft's store and hideout): the
-		-- floor's light does not reach them; an attachment on the first piece, at the chamber
+		-- floor's light does not reach them; an attachment on the first piece, on the cavity's middle line at the
+		-- chamber's height (the bark is as far as it can be all round: the widest range)
 		local anchor = model:FindFirstChildWhichIsA("BasePart")
 		local floorY = math.huge
+		local mid = h.cavities[#h.cavities]
 		for _, c in h.cavities do
 			floorY = math.min(floorY, c.bottom)
 		end
+		-- (round the spiral's heartwood post: just off it, towards the landing)
+		local post = 0
+		for _, pc in h.parts do
+			if pc.role == "post" then
+				post = math.max(post, pc.size[2] / 2 + 0.4)
+			end
+		end
 		for _, c in h.chambers do
 			if anchor and h.variant ~= "log" and c.y > floorY + C.room then
+				local dx, dz = c.x - mid.x, c.z - mid.z
+				local dl = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+				local off = math.min(post, dl)
+				local at = Vector3.new(mid.x + dx / dl * off, c.y + 1.4, mid.z + dz / dl * off)
 				local a = Instance.new("Attachment")
 				a.Name = `chamber_{c.id}`
-				a.CFrame = anchor.CFrame:Inverse() * CFrame.new(c.x, c.y + 1.4, c.z)
+				a.CFrame = anchor.CFrame:Inverse() * CFrame.new(at)
 				a.Parent = anchor
-				local l = Instance.new("PointLight")
-				l.Range = HollowShell.LIGHT.range
-				l.Brightness = HollowShell.LIGHT.brightness
-				l.Color =
-					Color3.fromRGB(HollowShell.LIGHT.color[1], HollowShell.LIGHT.color[2], HollowShell.LIGHT.color[3])
-				l.Shadows = false
-				l.Parent = a
+				light(env, a, HollowShell.rangeIn(h, at.X, at.Y, at.Z))
 				report.lights += 1
 			end
 		end
