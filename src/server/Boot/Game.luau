@@ -1362,6 +1362,7 @@ function Game.start(opts: Opts?): any
 		lounge = LoungeService.start({
 			town = LoungeService.gameTown({
 				possession = possession,
+				runtime = rt,
 				wallet = wallet,
 				squirrels = function(): { LoungeService.Squirrel }
 					local out = {}

@@ -51,6 +51,9 @@ local function stubTown(log: { any }): any
 		moveTo = function(p: any, cf: any)
 			p.body:PivotTo(cf)
 		end,
+		evict = function(body: any, cf: any)
+			body:PivotTo(cf)
+		end,
 		pass = {
 			has = function(p: any): boolean
 				return p.pass == true
@@ -188,7 +191,10 @@ return function(t)
 					end,
 					tell = function() end,
 				}
+				local held = makeModel("Held", roblox.CFrame.new(0, 0, 0), nil)
+				local record = { x = 0, y = 0, z = 0, hip = 2 }
 				local town = LoungeService.gameTown({
+					runtime = { byTownId = { [7] = { body = held } }, world = { actorsById = { [7] = record } } },
 					possession = {
 						actorOf = function(_self: any, p: any): any
 							return if p == "P" then actor else nil
@@ -222,6 +228,14 @@ return function(t)
 				t.eq(killed[1][1], "s")
 				t.eq(killed[1][2], "guard")
 				t.eq(#town.squirrels(), 1)
+				-- a body its player let go of is moved through its world record (feet = y - hip)
+				town.evict(held, roblox.CFrame.new(5, 6, 7))
+				t.eq(record.x, 5)
+				t.eq(record.y, 8)
+				t.eq(record.z, 7)
+				-- one with no record is moved itself, standing
+				town.evict(body, roblox.CFrame.new(1, 2, 3))
+				t.near(body:GetPivot().Position.Y, 2 + LoungeService.STAND, 1e-6)
 			end)
 		end
 	)

@@ -10,7 +10,9 @@
 --     the guards; a fox or a deer is turned away. Inside, E at the door puts the person back on the landing.
 --   * First person: a body the service lets in carries CameraZone = "lockFirstPerson" (Client/Camera/CameraPolicy
 --     locks the camera) and Lounge = the venue id (Client/World/LoungeMusic plays the jazz); both are cleared at
---     the door, and whenever the body is found outside the room (a new body picked, a knock-out elsewhere).
+--     the door, and whenever the body is found outside the room (a knock-out elsewhere). A body its player lets go
+--     of inside (a new body picked, the player gone) is put out on the landing, so no computer brain is ever shut
+--     in the sealed room.
 --   * The guards (the bake's Staff.Guard1, Guard2): every TICK seconds any squirrel-family body, a player's or a
 --     computer's, on the forecourt, in the entry or (should one ever be) in the room is knocked out by the nearest
 --     guard: town.knockOut(actor), Boot/Game's kill with cause "guard" (its player back to the menu with "THE
@@ -28,7 +30,7 @@
 -- Interface: start(opts) -> Service; new(opts) -> Service; gameTown(parts) -> Town; carve(root) -> count;
 --   Service:enter(player) -> (ok, why?); Service:buyPass(player) -> (ok, words); Service:leave(player) -> ok;
 --   Service:order(player, id) -> (ok, words); Service:step(); Service:gone(player); Service:isInside(player) ->
---   boolean; Service:counts() -> { inside, drinks, knockedOut, strikes }; Service:stop(); constants TICK, STRIKE,
+--   boolean; Service:inRoom(body) -> boolean; Service:counts() -> { inside, drinks, knockedOut, strikes }; Service:stop(); constants TICK, STRIKE,
 --   SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, STAND, CUES, FOLDER
 
 local Import = require("../Import")
@@ -76,6 +78,7 @@ export type Town = {
 	speciesOf: (player: any) -> string?,
 	bodyOf: (player: any) -> any?, -- the Model the player holds
 	moveTo: (player: any, cf: CFrame) -> (), -- put the held body's feet at cf (the body faces cf's look)
+	evict: (body: any, cf: CFrame) -> (), -- put a body nobody holds any more (its computer brain's) at cf
 	pass: Pass, -- the wallet's one pass
 	buy: (player: any, id: string, deliver: () -> (boolean?, string?)) -> (boolean, string), -- wallet.buy
 	tell: (player: any, text: string) -> (), -- the notice toast
@@ -572,16 +575,14 @@ function LoungeService.step(self: any, _dt: number?)
 			self.struck[actor] = nil
 		end
 	end
-	-- the room: a body let in that is no longer there (a new body, a knock-out elsewhere) is let go
+	-- the room: a body let in that is no longer there (a knock-out elsewhere) is let go; one its player has let
+	-- go of (a new body picked) is let go and, if it is still in the room, put out at the door, or its computer
+	-- brain would be shut in a sealed building
 	for player, body in self.inside do
-		local p = pivotOf(body)
-		local current = self.town.bodyOf(player)
-		local here = false
-		if p and current == body then
-			local x, y, d = AlleyLayout.toLocal(self.place, p.X, p.Y - LoungeService.STAND, p.Z)
-			here = LoungeClassic.inside(x, y, d)
-		end
-		if not here then
+		local here = self:inRoom(body)
+		if self.town.bodyOf(player) ~= body then
+			self:_release(player, body, here)
+		elseif not here then
 			self.inside[player] = nil
 			setZone(body, false)
 			dropDrink(self, player)
@@ -589,12 +590,31 @@ function LoungeService.step(self: any, _dt: number?)
 	end
 end
 
+-- Is this body's pivot (standing) in the room?
+function LoungeService.inRoom(self: any, body: any): boolean
+	local p = pivotOf(body)
+	if p == nil then
+		return false
+	end
+	local x, y, d = AlleyLayout.toLocal(self.place, p.X, p.Y - LoungeService.STAND, p.Z)
+	return LoungeClassic.inside(x, y, d)
+end
+
+-- Let a body go that its player no longer holds: first person off, the drink gone, out at the door if inside.
+function LoungeService._release(self: any, player: any, body: any, here: boolean)
+	self.inside[player] = nil
+	setZone(body, false)
+	dropDrink(self, player)
+	if here then
+		self.town.evict(body, self:spot(LoungeClassic.DOOR_OUTSIDE))
+	end
+end
+
 -- A player left the game.
 function LoungeService.gone(self: any, player: any)
 	local body = self.inside[player]
-	self.inside[player] = nil
 	if body then
-		setZone(body, false)
+		self:_release(player, body, self:inRoom(body))
 	end
 	dropDrink(self, player)
 end
@@ -654,6 +674,7 @@ end
 -- Boot/Game's objects -> Town. `squirrels` and `kill` are Game's own (its isSquirrelFamily and kill).
 export type GameParts = {
 	possession: any,
+	runtime: any?, -- Actors/ActorsRuntime (world, byTownId): a body's computer brain is moved through it
 	wallet: any, -- Economy/Credits
 	squirrels: () -> { Squirrel },
 	kill: (actor: any, cause: string) -> (),
@@ -677,6 +698,24 @@ function LoungeService.gameTown(parts: GameParts): Town
 			if a and a.body then
 				(a.body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
 			end
+		end,
+		evict = function(body: any, cf: CFrame)
+			-- a computer-held body is drawn from its world record (ActorsRuntime: feet = a.y - a.hip)
+			local rt = parts.runtime
+			if rt then
+				for id, actor in rt.byTownId do
+					if actor.body == body then
+						local a = rt.world.actorsById[id]
+						if a then
+							local p = cf.Position
+							a.x, a.z = p.X, p.Z
+							a.y = p.Y + a.hip
+							return
+						end
+					end
+				end
+			end
+			(body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
 		end,
 		pass = wallet.pass,
 		buy = function(player: any, id: string, deliver: () -> (boolean?, string?)): (boolean, string)

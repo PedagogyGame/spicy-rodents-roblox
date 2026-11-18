@@ -15,8 +15,8 @@
 --             (the cup up at the face and back down), then "All gone."; a second order while holding one, and an
 --             order from outside, are refused with words and take nothing
 --   leave     the door from inside: back on the landing facing the street, first person released, the drink gone
---   swap      a body let in that is somewhere else at the next look (a new body picked) loses first person
---   leaver    a player who leaves the game while inside with a drink: nothing left behind
+--   swap      a body let in whose player picks a new one loses first person and is put out on the landing
+--   leaver    a player who leaves the game while inside with a drink: nothing left behind, the body put out
 -- play() takes its parts as arguments, so the Lune suite runs this same flow on the fake engine
 -- (tests/isolated/lounge_service.luau): the check is itself checked before a cloud run is spent on it.
 -- Interface: run() -> Result (engine only); play(deps) -> Result { ok, failures, numbers }
@@ -68,6 +68,9 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 		end,
 		moveTo = function(p: any, cf: CFrame)
 			p.body:PivotTo(cf + Vector3.new(0, Service.STAND, 0))
+		end,
+		evict = function(body: any, cf: CFrame)
+			body:PivotTo(cf + Vector3.new(0, Service.STAND, 0))
 		end,
 		pass = {
 			has = function(p: any): boolean
@@ -309,6 +312,9 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	e.body = deps.makeBody("Swapper2", street)
 	step(0.5)
 	check(old:GetAttribute("CameraZone") == nil and not svc:isInside(e), "swap: the old body keeps first person")
+	check(not svc:inRoom(old), "swap: the old body is shut in the room")
+	x, _, d = localOf(old)
+	check(math.abs(d - LC.DOOR_OUTSIDE.d) < 0.01, `swap: the old body put at {x}, {d}`)
 
 	-- leaver
 	local f = newPlayer("Leaver", "human", 30, true, street)
@@ -320,6 +326,7 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	local counts = svc:counts()
 	numbers.counts = counts
 	check(not svc:isInside(f), "leaver: still inside")
+	check(not svc:inRoom(f.body), "leaver: the body is shut in the room")
 	check(f.body:GetAttribute("CameraZone") == nil, "leaver: the body keeps first person")
 	check(f.body:FindFirstChild("LoungeDrink") == nil, "leaver: the drink is left behind")
 	check(counts.drinks == 0, `leaver: {counts.drinks} drinks left`)
