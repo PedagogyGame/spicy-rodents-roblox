@@ -61,7 +61,8 @@ local function uploaded(): any
 end
 
 -- a stand-in for InsertService:LoadAsset: the Model's MeshParts by name and size, somewhere off to the side
-local function loader(data: any, drop: string?): ((number) -> any, { number })
+-- drop: a mesh the Model leaves out; bare: a textured mesh that came without its picture
+local function loader(data: any, drop: string?, bare: string?): ((number) -> any, { number })
 	local calls = {}
 	return function(id: number): any
 		table.insert(calls, id)
@@ -76,6 +77,10 @@ local function loader(data: any, drop: string?): ((number) -> any, { number })
 				p.Name = rec.name
 				p.Size = Vector3.new(rec.size[1], rec.size[2], rec.size[3])
 				p.CFrame = CFrame.new(500 + rec.at[1], 7 + rec.at[2], rec.at[3])
+				if rec.textured and `{tag}.{rec.name}` ~= bare then
+					-- the importer brings a textured mesh's picture along (a Lune MeshPart has no TextureID)
+					Instance.new("SurfaceAppearance").Parent = p
+				end
 				p.Parent = m
 			end
 		end
@@ -335,6 +340,41 @@ return function(t)
 				t.falsy(m:GetAttribute("ArtLoaded"))
 			else
 				t.eq(r.reports[i].failed, nil)
+			end
+		end
+	end)
+
+	t.test("a Board that came without its picture leaves the painted board as baked (review)", function()
+		local root4, machines4 = baked()
+		local r = PinballArt.run(root4, { load = loader(data, nil, "rodent.Board"), data = data, env = ENV })
+		for i, m in machines4 do
+			t.eq(r.reports[i].failed, nil)
+			local painted = m:FindFirstChild("Playfield")
+			local group = m:FindFirstChild(PinballArt.GROUP)
+			if m:GetAttribute("Theme") == "rodent" then
+				t.truthy(painted.Transparency < 1, "the baked board still shows")
+				t.truthy(painted:FindFirstChild("Art") ~= nil, "its painted words stay")
+				t.eq(group:FindFirstChild("Board"), nil)
+			else
+				t.eq(painted.Transparency, 1)
+				t.truthy(group:FindFirstChild("Board") ~= nil)
+			end
+		end
+	end)
+
+	t.test("the ramps' entrance flaps sit a hair above the board, never on its face (review: flicker)", function()
+		for index, m in machines do
+			local pf = pfOf(index)
+			local n = 0
+			for _, d in m:FindFirstChild(PinballArt.GROUP):GetChildren() do
+				if d:IsA("BasePart") and d.Name == "Deco_EntranceFlaps" then
+					local bottom = pf:PointToObjectSpace(d.CFrame.Position).Y - d.Size.Y / 2
+					t.truthy(bottom > 0.0005, `{d.Name} of {index}: bottom {bottom}`)
+					n += 1
+				end
+			end
+			if m:GetAttribute("Theme") ~= "acorn" then
+				t.truthy(n > 0, `machine {index} has its entrance flaps`)
 			end
 		end
 	end)

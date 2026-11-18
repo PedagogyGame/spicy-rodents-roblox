@@ -65,6 +65,9 @@ PinballArt.HIDDEN = {
 }
 -- meshes that are the client's parts: children of the machine itself, by their own names
 PinballArt.MOVED = { "^Drop%d+$", "^Standup%d+$", "^Spinner%d+$", "^Sling%d+$", "^Glass$" }
+-- meshes whose bottom faces lie on the board's top (y = 0): lifted a hair so the two never flicker
+PinballArt.LIFTED = { "^Deco_EntranceFlaps$", "^Ramp_" }
+PinballArt.LIFT = 0.004
 
 type Place = { x: number, z: number, floorY: number, yaw: number }
 export type Env = { CFrame: any, Color3: any, Enum: any, Instance: any, Vector3: any }
@@ -174,8 +177,9 @@ local function meshOf(template: Instance, name: string): BasePart?
 	return if d and d:IsA("BasePart") then d else nil
 end
 
--- One mesh, cloned from its Model and dressed: placed, coloured, visual only.
-local function dress(src: BasePart, rec: any, at: any, theme: { [string]: { number } }, e: Env): BasePart
+-- One mesh, cloned from its Model and dressed: placed, coloured, visual only. Also says whether a textured
+-- mesh really came with its picture (a TextureID or a SurfaceAppearance).
+local function dress(src: BasePart, rec: any, at: any, theme: { [string]: { number } }, e: Env): (BasePart, boolean)
 	local p = src:Clone()
 	p.Name = rec.name
 	p.CFrame = at
@@ -188,7 +192,8 @@ local function dress(src: BasePart, rec: any, at: any, theme: { [string]: { numb
 	local okT, texture = pcall(function(): any
 		return (p :: any).TextureID
 	end)
-	local textured = rec.textured and okT and texture ~= nil and texture ~= ""
+	local textured = rec.textured
+		and ((okT and texture ~= nil and texture ~= "") or p:FindFirstChildOfClass("SurfaceAppearance") ~= nil)
 	if rec.textured and not textured then
 		c = rec.fallback or c
 	end
@@ -208,7 +213,7 @@ local function dress(src: BasePart, rec: any, at: any, theme: { [string]: { numb
 	if rec.pivot then
 		p.PivotOffset = e.CFrame.new(rec.pivot[1] - rec.at[1], rec.pivot[2] - rec.at[2], rec.pivot[3] - rec.at[3])
 	end
-	return p
+	return p, textured == true
 end
 
 -- Puts the art on one machine. All or nothing: every mesh is made before any baked part goes.
@@ -227,6 +232,9 @@ function PinballArt.install(m: Machine, templates: { [string]: Instance }, data:
 	local group = e.Instance.new("Model")
 	group.Name = PinballArt.GROUP
 	local missing: { string } = {}
+	-- the painted board stays the bake's when the Board mesh came without its picture: a plain-coloured
+	-- board would lose every painted word
+	local boardPainted = false
 	local function put(tag: string, rec: any, frame: any, into: Instance, name: string?, scale: number?)
 		local src = meshOf(templates[tag], rec.name)
 		if src == nil then
@@ -234,7 +242,16 @@ function PinballArt.install(m: Machine, templates: { [string]: Instance }, data:
 			return
 		end
 		local k = scale or 1
-		local p = dress(src, rec, frame * e.CFrame.new(rec.at[1] * k, rec.at[2], rec.at[3] * k), theme, e)
+		local lift = if matches(rec.name, PinballArt.LIFTED) then PinballArt.LIFT else 0
+		local p, textured =
+			dress(src, rec, frame * e.CFrame.new(rec.at[1] * k, rec.at[2] + lift, rec.at[3] * k), theme, e)
+		if rec.name == "Board" then
+			if not textured then
+				p:Destroy()
+				return
+			end
+			boardPainted = true
+		end
 		if scale then
 			p.Size = e.Vector3.new(rec.size[1] * k, rec.size[2], rec.size[3] * k)
 		end
@@ -310,6 +327,8 @@ function PinballArt.install(m: Machine, templates: { [string]: Instance }, data:
 		if d:IsA("BasePart") and matches(d.Name, PinballArt.REPLACED) then
 			d:Destroy()
 			report.removed += 1
+		elseif d:IsA("BasePart") and d.Name == "Playfield" and not boardPainted then
+			continue -- no Board picture: the baked board and its painting stay as they are
 		elseif d:IsA("BasePart") and PinballArt.HIDDEN[d.Name] then
 			d.Transparency = 1
 			d.CastShadow = false
