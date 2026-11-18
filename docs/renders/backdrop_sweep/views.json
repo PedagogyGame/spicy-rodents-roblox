@@ -1,0 +1,19 @@
+{
+  "about": "The backdrop sweep (owner D10, light work): the town's edges and feel from a player's eye (5.5 st over the ground unless said). Make: lune run tools/bake/main.luau; lune run tools/bake/editor_ground.luau; lune run tools/bake/attractions.luau; lune run tools/bake/backdrop.luau; then each tools/bake/<venue>.luau (skylift, sewers, neighbourhood_shop, bowl_lane, corner_store, lounge_classic); lune run tools/review/export.luau --out build/review/scene.json; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/scene.json --views docs/renders/backdrop_sweep/views.json --out build/review/backdrop_sweep --threads 2. The offline renderer draws the town's 95 trees as nothing (uploaded meshes) and does not light the lamps by day. Roblox axes: +X is game-west, +Z north.",
+  "defaults": {"res": "960x540", "samples": 16, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {"name": "s01_south_field", "desc": "The empty south field below the town, looking south to the clamp edge, the band terrain and the ranges.", "pos": [600, 5.5, -1300], "look": [600, 40, -4000], "fov": 70, "aboveGround": true},
+    {"name": "s02_south_edge_back", "desc": "From the south clamp edge looking back north at the town across the field.", "pos": [400, 5.5, -2150], "look": [400, 10, 0], "fov": 70, "aboveGround": true},
+    {"name": "s03_se_corner", "desc": "The south-east corner of the world clamp (x -2250, z -2250), looking out diagonally.", "pos": [-2150, 5.5, -2150], "look": [-3200, 30, -3200], "fov": 70, "aboveGround": true},
+    {"name": "s04_sw_corner", "desc": "The south-west corner of the world clamp (x 4300, z -2250), looking out diagonally.", "pos": [4200, 5.5, -2150], "look": [5300, 30, -3200], "fov": 70, "aboveGround": true},
+    {"name": "s05_ne_coast_corner", "desc": "Where the east clamp edge (x -2250) meets the north coast: does the band, the coast and the sea join?", "pos": [-2100, 5.5, 1250], "look": [-3200, 0, 2200], "fov": 70, "aboveGround": true},
+    {"name": "s06_nw_coast_corner", "desc": "Where the west clamp edge (x 4300) meets the north coast.", "pos": [4150, 5.5, 1250], "look": [5200, 0, 2200], "fov": 70, "aboveGround": true},
+    {"name": "s07_east_edge", "desc": "The east clamp edge (x -2250) at mid-town, looking out east (-X).", "pos": [-2150, 5.5, -400], "look": [-4500, 40, -400], "fov": 70, "aboveGround": true},
+    {"name": "s08_beach_east_end", "desc": "Along the long beach looking east (-X) to where the sand stops at about x -740.", "pos": [-300, 5.5, 1360], "look": [-1500, 3, 1320], "fov": 70, "aboveGround": true},
+    {"name": "s09_core_south_edge", "desc": "The old town's south road (z about -880) looking south out of town.", "pos": [100, 5.5, -880], "look": [100, 10, -2400], "fov": 70, "aboveGround": true},
+    {"name": "s10_hospital_north", "desc": "Behind the hospital (x -890) looking north to the coast.", "pos": [-890, 5.5, 1000], "look": [-890, 4, 1600], "fov": 70, "aboveGround": true},
+    {"name": "s11_quay_west_back", "desc": "Behind the quay's west row looking west (+X) over the off-road back field to the edge.", "pos": [2700, 5.5, -200], "look": [4500, 30, -200], "fov": 70, "aboveGround": true},
+    {"name": "s12_east_of_core", "desc": "East of the old town (x about -1300) looking east toward the radio tower: the gap between town and the edge.", "pos": [-1150, 5.5, 200], "look": [-2900, 60, 600], "fov": 70, "aboveGround": true}
+  ]
+}
