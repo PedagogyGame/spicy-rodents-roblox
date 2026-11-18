@@ -14,6 +14,7 @@
 --   * Nothing leaves unpaid: a shopper whose body is outside the store (the baked Zone box), or who has no body,
 --     has the basket put back, with words. A player who leaves the game has it put back; one who leaves while
 --     being served is refunded by the wallet (the handing-over fails: nobody to hand it to).
+-- What is bought is used from the hotbar: each Tool's Activated goes to Items/ItemWorld (Items/ItemService's rules).
 -- The player attribute StoreBasket holds the basket as "id,id,..." ("" when empty) for a screen to show.
 -- Sounds: cue names only (no uploads; docs/AUDIO_BUDGET.md): CUES.
 -- Interface: new(deps) -> Store { take(player, id) -> (ok, words), pay(player) -> (ok, words),
@@ -27,6 +28,7 @@ local Import = require("../Import")
 local Basket = Import.shared("Items/Basket") :: typeof(require("../../shared/Items/Basket"))
 local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local Inventory = require("./Inventory")
+local ItemWorld = require("./ItemWorld")
 
 local CornerStore = {}
 
@@ -35,6 +37,7 @@ export type Zone = { cx: number, cy: number, cz: number, yaw: number, hx: number
 type Baskets = { byKey: { [any]: { string } } }
 
 CornerStore.STORE = "f1_corner_store"
+CornerStore.REMOTE = "CornerStoreItemText" -- ReplicatedStorage: the client's words for the chalk
 
 CornerStore.WORDS = table.freeze({
 	animal = "Only people shop here.",
@@ -301,6 +304,28 @@ function CornerStore.makeTool(sample: Model, itemId: string, name: string): Tool
 			w.Parent = c
 		end
 	end
+	-- the umbrella opens: a canopy over its top, hidden until it is used (Items/ItemWorld "open")
+	if itemId == "umbrella" and handle then
+		local top = sample:GetBoundingBox().Position + Vector3.new(0, 1.3, 0)
+		local canopy = Instance.new("Part")
+		canopy.Name = "OpenCanopy"
+		canopy.Shape = Enum.PartType.Cylinder
+		canopy.Size = Vector3.new(0.4, 4.2, 4.2)
+		canopy.CFrame = CFrame.new(top) * CFrame.Angles(0, 0, math.pi / 2)
+		canopy.Color = Color3.fromRGB(30, 70, 160)
+		canopy.Material = Enum.Material.Fabric
+		canopy.Transparency = 1
+		canopy.CanCollide = false
+		canopy.CanQuery = false
+		canopy.CanTouch = false
+		canopy.Massless = true
+		canopy.Anchored = false
+		canopy.Parent = tool
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = handle :: BasePart
+		w.Part1 = canopy
+		w.Parent = canopy
+	end
 	-- the grip at the model's centre, so it sits in the hand however its parts were laid out
 	if handle then
 		tool.Grip = (handle :: BasePart).CFrame:ToObjectSpace(CFrame.new(centre.Position)):Inverse()
@@ -310,6 +335,8 @@ end
 
 export type StartOpts = {
 	expansion: Instance?, -- Workspace.Expansion
+	runtime: any?, -- Actors/ActorsRuntime (the town's brains, for the items' effects)
+	zones: { any }?, -- generated/Expansion.zones (where a kite flies)
 	wallet: any, -- Economy/Credits.Wallet (Game.start's)
 	possession: any, -- Actors/Possession (actorOf(player) -> actor { species, body })
 	fire: (player: any, payload: { [string]: any }) -> (), -- Game's notice/refused channel
@@ -325,8 +352,8 @@ function CornerStore.start(opts: StartOpts): Store?
 		return nil
 	end
 	local zonePart = root:FindFirstChild("Zone")
-	local items = root:FindFirstChild("Items")
-	if zonePart == nil or items == nil then
+	local shelves = root:FindFirstChild("Items")
+	if zonePart == nil or shelves == nil then
 		warn("[CornerStore] the store's bake has no Zone or Items")
 		return nil
 	end
@@ -341,7 +368,7 @@ function CornerStore.start(opts: StartOpts): Store?
 	end
 	local Players = game:GetService("Players")
 	local samples: { [string]: Model } = {}
-	for _, m in items:GetChildren() do
+	for _, m in shelves:GetChildren() do
 		local id = m:GetAttribute("ItemId")
 		local sample = m:FindFirstChild("Sample")
 		if type(id) == "string" and sample and sample:IsA("Model") then
@@ -353,7 +380,9 @@ function CornerStore.start(opts: StartOpts): Store?
 		n = string.gsub(n, "^an? ", "")
 		return string.upper(string.sub(n, 1, 1)) .. string.sub(n, 2)
 	end
-	local inventory = Inventory.new({
+	local items: ItemWorld.World? = nil -- (started below, once the inventory exists)
+	local inventory: Inventory.Inventory
+	inventory = Inventory.new({
 		makeTool = function(player: any, itemId: string): any?
 			local sample = samples[itemId]
 			local backpack: Instance? = nil
@@ -364,6 +393,12 @@ function CornerStore.start(opts: StartOpts): Store?
 				return nil
 			end
 			local tool = CornerStore.makeTool(sample, itemId, displayName(itemId))
+			-- using it (a click, a tap, the gamepad's trigger): Items/ItemService decides, Items/ItemWorld does
+			tool.Activated:Connect(function()
+				if items then
+					items.use(player, itemId)
+				end
+			end)
 			tool.Parent = backpack
 			return tool
 		end,
@@ -420,6 +455,27 @@ function CornerStore.start(opts: StartOpts): Store?
 		end,
 	})
 	local conns: { RBXScriptConnection } = {}
+	items = ItemWorld.start({
+		inventory = inventory,
+		possession = opts.possession,
+		runtime = opts.runtime,
+		fire = opts.fire,
+		zones = opts.zones,
+		heartbeat = opts.heartbeat,
+	})
+	-- the chalk's words come back from the owner's client (Client/Items/ItemClient): text only, checked and
+	-- filtered by ItemService before anything is written
+	local net = Instance.new("RemoteEvent")
+	net.Name = CornerStore.REMOTE
+	net.Parent = game:GetService("ReplicatedStorage")
+	table.insert(
+		conns,
+		net.OnServerEvent:Connect(function(player: Player, itemId: any, text: any)
+			if items and type(itemId) == "string" and type(text) == "string" and #text <= 200 then
+				items.use(player, itemId, { text = text })
+			end
+		end)
+	)
 	for _, d in root:GetDescendants() do
 		if d:IsA("ProximityPrompt") then
 			local itemId = d:GetAttribute("StoreItem")
@@ -484,6 +540,10 @@ function CornerStore.start(opts: StartOpts): Store?
 		for _, c in conns do
 			c:Disconnect()
 		end
+		if items then
+			items.stop()
+		end
+		net:Destroy()
 	end
 	return store
 end

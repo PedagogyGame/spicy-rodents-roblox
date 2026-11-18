@@ -1357,8 +1357,11 @@ function Game.start(opts: Opts?): any
 	-- town's wallet, nothing out unpaid (Items/CornerStore)
 	local cornerStore: any = nil
 	local okC, errC = pcall(function()
+		local expansionData = data:module("Expansion") :: any
 		cornerStore = CornerStore.start({
 			expansion = workspace:FindFirstChild("Expansion"),
+			runtime = rt,
+			zones = if expansionData then expansionData.zones else nil,
 			wallet = wallet,
 			possession = possession,
 			fire = fire,

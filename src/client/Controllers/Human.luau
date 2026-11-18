@@ -12,7 +12,10 @@
 -- those attributes are the only way to change it; MinigameClient sets them (ClientGame.Ctx.pace) and clears
 -- them when the game closes.
 -- No side effects on require.
+-- A soda or an ice cream bar from the corner store (Server/Items/ItemWorld "treat") sets the body attributes TreatUntil
+-- (server time) and TreatScale: until then the pace is that much faster (treat()).
 -- Interface: start(body, payload, metrics) -> stop(); speed(sprint, scale?, noSprint?) -> studs per second;
+--   treat(untilTime?, scale?, now) -> multiplier;
 --   WALK; SPRINT; MAX_SCALE
 
 export type Metrics = { [string]: any }
@@ -24,6 +27,14 @@ local Human = {}
 Human.WALK = 17
 Human.SPRINT = 28
 Human.MAX_SCALE = 2
+
+-- The corner store's sugar rush: TreatScale (at most 1.25) until TreatUntil, else 1.
+function Human.treat(untilTime: any, scale: any, now: number): number
+	if type(untilTime) ~= "number" or type(scale) ~= "number" or now >= untilTime then
+		return 1
+	end
+	return math.clamp(scale, 1, 1.25)
+end
 
 -- The walking speed this frame: Shift sprints unless the game on screen has switched it off, and the game's
 -- scale multiplies whichever it is (anything that is not a number between 0 and MAX_SCALE counts as 1 or is
@@ -110,6 +121,11 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 			local sprint = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 				or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 			hum.WalkSpeed = Human.speed(sprint, body:GetAttribute("MoveScale"), body:GetAttribute("NoSprint"))
+				* Human.treat(
+					body:GetAttribute("TreatUntil"),
+					body:GetAttribute("TreatScale"),
+					workspace:GetServerTimeNow()
+				)
 			if hold then
 				if os.clock() >= holdUntil then
 					endHold()

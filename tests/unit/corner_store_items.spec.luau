@@ -5,6 +5,9 @@
 local ItemRules = require("@shared/Items/ItemRules")
 local ItemService = require("@server/Items/ItemService")
 local Inventory = require("@server/Items/Inventory")
+local Common = require("@server/Actors/Brains/Common")
+local Squirrel = require("@server/Actors/Brains/Squirrel")
+local Human = require("@client/Controllers/Human")
 
 type Rig = {
 	svc: ItemService.Service,
@@ -341,6 +344,77 @@ return function(t)
 		r2.about = r.about
 		t.truthy(use(r2, "water_gun"))
 		t.truthy(table.find(kinds(r2), "stun") ~= nil)
+	end)
+
+	t.test(
+		"a squirrel baited: along its route to the point nearest the pile, waits there, and a startle ends it",
+		function()
+			local route = {
+				id = 1,
+				kind = "ground",
+				length = 40,
+				points = { { 0, 0, 0 }, { 40, 0, 0 } },
+				links = {},
+			}
+			local routes = {
+				routes = { route },
+				byId = function(_id: number): any
+					return route
+				end,
+			}
+			local actor = Common.newActor(1, "squirrel", "normal", "Squirrel", 5, 0, 0.9)
+			local brain = Squirrel.new(actor, {
+				routes = routes :: any,
+				rng = function(): number
+					return 0.5
+				end,
+				startRoute = 1,
+			})
+			local c: any = {
+				now = 0,
+				rng = function(): number
+					return 0.5
+				end,
+				groundAt = function(): number
+					return 0
+				end,
+			}
+			actor.intent.s = 5
+			-- a pile 30 studs off the route: not worth leaving it for
+			brain:onEvent({ type = "bait", x = 20, z = 30, untilTime = 60 })
+			brain:think(0.1, c)
+			t.eq((brain :: any).bait, nil, "not taken")
+			-- a pile 3 studs off the route at x 25: it heads for s 25 and stops there
+			brain:onEvent({ type = "bait", x = 25, z = 3, untilTime = 60 })
+			c.now = 1
+			brain:think(0.1, c)
+			t.eq(actor.intent.dir, 1)
+			t.truthy(actor.intent.speed > 0)
+			actor.intent.s = 25.2
+			brain:think(0.1, c)
+			t.eq(actor.intent.speed, 0, "nibbling")
+			actor.intent.s = 30
+			brain:think(0.1, c)
+			t.eq(actor.intent.dir, -1, "back to it")
+			-- a startle ends it; so does time
+			brain:onEvent({ type = "startle" })
+			actor.intent.s = 25
+			c.now = 2
+			brain:think(0.1, c)
+			t.truthy(actor.intent.speed > 0, "off it runs")
+			brain:onEvent({ type = "bait", x = 25, z = 3, untilTime = 3 })
+			c.now = 4
+			brain:think(0.1, c)
+			t.eq((brain :: any).bait, nil, "its time is up")
+		end
+	)
+
+	t.test("the sugar rush on a person's pace: the scale until the time, at most 1.25, then nothing", function()
+		t.eq(Human.treat(nil, nil, 10), 1)
+		t.eq(Human.treat(20, 1.15, 10), 1.15)
+		t.eq(Human.treat(20, 1.15, 20), 1)
+		t.eq(Human.treat(20, 3, 10), 1.25)
+		t.eq(Human.treat(20, 0.5, 10), 1)
 	end)
 
 	t.test("kite: flies in the park and on the beach only, and comes back down", function()

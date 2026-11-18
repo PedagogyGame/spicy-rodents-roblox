@@ -38,6 +38,7 @@ local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local SpeechBubbles = require("./UI/SpeechBubbles")
 local WalletHud = require("./UI/WalletHud")
+local ItemClient = require("./UI/ItemClient")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
@@ -292,6 +293,9 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		if scope == nil or not Telescope.enter(scope, prompt) then
 			menu.toast(tostring(msg.text or "The telescope has not loaded yet"), 3)
 		end
+	elseif kind == "item" then
+		-- a corner-store item that needs this screen (the chalk's words, the camera's shot): UI/ItemClient
+		ItemClient.handle(msg, menu.toast)
 	elseif kind == "notice" then
 		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
 		menu.toast(tostring(msg.text), 4)
