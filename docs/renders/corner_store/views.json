@@ -30,8 +30,8 @@
     },
     {
       "name": "cs_06_back",
-      "desc": "From the back by the freezer (local -2, 5.2, 16), back toward the front windows and the street.",
-      "pos": [959, 19.3, 100], "look": [962, 17, 62], "fov": 70
+      "desc": "From the back between gondolas 2 and 3 (local 0, 5.2, 16.5), back toward the front windows and the street.",
+      "pos": [957, 19.3, 100.5], "look": [960, 17, 62], "fov": 70
     },
     {
       "name": "cs_07_above",
