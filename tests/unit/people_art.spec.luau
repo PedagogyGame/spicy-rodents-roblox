@@ -723,7 +723,14 @@ return function(t: any)
 					local acc = Instance.new("Accessory")
 					local handle = Instance.new("Part")
 					handle.Name = "Handle"
+					handle.Size = R.Vector3.new(1.2, 0.8, 1.2)
 					handle.Parent = acc
+					local mesh = Instance.new("SpecialMesh")
+					mesh.Parent = handle
+					local att = Instance.new("Attachment")
+					att.Name = "HairAttachment"
+					att.CFrame = R.CFrame.new(0, -0.3, 0.1)
+					att.Parent = handle
 					return acc
 				end,
 			})
@@ -738,12 +745,30 @@ return function(t: any)
 			t.truthy(isTone(model.VNeck), "the V of the scrubs")
 			t.eq(model.Head:FindFirstChild("FaceDecal"), nil, "no decal over the painted face")
 			t.eq(model.Hair.Transparency, 1, "the art's hair under the player's")
+			-- the player's hair grows with the art's larger head (from the stock head's size)
+			local stock = model.Head:GetAttribute("StockSize")
+			t.truthy(typeof(stock) == "Vector3", "the stock head's size is kept")
+			local ratio = model.Head.Size / stock
+			t.truthy((ratio - R.Vector3.new(1, 1, 1)).Magnitude > 0.05, `the art head is another size {ratio}`)
+			local acc = model:FindFirstChildOfClass("Accessory")
+			near3(t, acc.Handle.Size, R.Vector3.new(1.2, 0.8, 1.2) * ratio, 1e-4, "hair size")
+			near3(t, acc.Handle:FindFirstChildOfClass("SpecialMesh").Scale, ratio, 1e-4, "hair mesh scale")
+			near3(t, acc.Handle.HairAttachment.CFrame.Position, R.Vector3.new(0, -0.3, 0.1) * ratio, 1e-4, "hair seat")
 			service:revert(model)
 			t.eq(model.Hair.Transparency, 0)
 			t.falsy(isTone(model.Head), "reverted")
 			service:apply(jacket, "human", look)
 			t.eq(jacket.LeftLowerArm.Color, sleeve, "a long sleeve stays a sleeve")
 			t.truthy(isTone(jacket.LeftHand), "the jacket's hand")
+			-- an officer's cap is the uniform's: it stays, and the player's hair is not put on through it
+			local officer = stockR15()
+			PeopleArt.dress(officer, PeopleLooks.dress("officer", 1), { lib = LIB, library = library })
+			t.truthy(officer:FindFirstChild("Hat") ~= nil, "the officer wears the cap")
+			service:apply(officer, "human", look)
+			t.eq(officer:FindFirstChildOfClass("Accessory"), nil, "no player hair under the cap")
+			t.eq(officer.Hat.Transparency, 0)
+			t.truthy(isTone(officer.Head), "the skin tone still goes on")
+			service:revert(officer)
 		end
 	)
 end
