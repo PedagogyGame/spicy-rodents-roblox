@@ -1,13 +1,14 @@
 --!strict
 -- Buying in Pepper's Corner Store (Server/Items/CornerStore over the town's real wallet, Economy/Credits, and the
 -- record of what a player owns, Server/Items/Inventory): pick up, pay once at the till, short of money, a
--- double press, walking out unpaid, an animal at the shelf, a leaver mid-purchase; and the pure basket
--- (Shared/Items/Basket).
+-- double press, walking out unpaid, an animal at the shelf, a leaver mid-purchase; a body change (the Tool in hand
+-- goes back to the Backpack, a Tool left in a body is nobody's to use); and the pure basket (Shared/Items/Basket).
 local Basket = require("@shared/Items/Basket")
 local ItemRules = require("@shared/Items/ItemRules")
 local Credits = require("@server/Economy/Credits")
 local Inventory = require("@server/Items/Inventory")
 local CornerStore = require("@server/Items/CornerStore")
+local FakeEngine = require("@tests/lib/FakeEngine")
 
 type Rig = {
 	store: CornerStore.Store,
@@ -263,4 +264,55 @@ return function(t)
 			t.truthy(def.price <= 15 or def.id == "bird_seed" or def.id == "kite", def.id)
 		end
 	end)
+	t.test(
+		"a body change: the Tool in hand goes back to the Backpack, none is made twice, none is left behind",
+		function()
+			local player = FakeEngine.new("Player", "A", { UserId = 11 })
+			local backpack = FakeEngine.new("Backpack", "Backpack")
+			backpack.Parent = player
+			local bodyX = FakeEngine.new("Model", "PersonX")
+			local bodyY = FakeEngine.new("Model", "PersonY")
+			player.Character = bodyX
+			local made = 0
+			local inv = Inventory.new({
+				makeTool = function(_p: any, id: string): any?
+					made += 1
+					local tool = FakeEngine.new("Tool", id)
+					tool:SetAttribute("ItemId", id)
+					tool.Parent = backpack
+					return tool
+				end,
+				toolsOf = function(p: any, id: string): { any }
+					local out = {}
+					for _, holder in { backpack, p.Character } do
+						for _, tl in holder:GetChildren() do
+							if tl:GetAttribute("ItemId") == id then
+								table.insert(out, tl)
+							end
+						end
+					end
+					return out
+				end,
+			})
+			inv.add(player, "water_gun")
+			local gun = backpack:GetChildren()[1]
+			gun.Parent = bodyX -- equipped: in the hand of body X
+			local other = FakeEngine.new("Tool", "Sword")
+			other.Parent = bodyX -- (not the store's: left alone)
+			t.truthy(CornerStore.heldBy(gun, player), "in the hand of the body A drives: A's to use")
+			-- A possesses body Y (Possession sets Character); CornerStore's body watch stows, then refreshes
+			player.Character = bodyY
+			t.eq(CornerStore.stow(bodyX, backpack), 1)
+			inv.refresh(player)
+			t.eq(made, 1, "no second Tool made")
+			t.eq(gun.Parent, backpack, "the water gun is back in A's Backpack")
+			t.eq(#bodyX:GetChildren(), 1, "body X keeps only what was never the store's")
+			-- a Tool somehow still in body X (B now drives X) is not A's to use
+			gun.Parent = bodyX
+			t.falsy(CornerStore.heldBy(gun, player), "a Tool left in a body A no longer drives does nothing for A")
+			-- a leaver: whatever body they held keeps none of their things
+			t.eq(CornerStore.stow(bodyX, nil), 1)
+			t.eq(gun.Parent, nil, "destroyed")
+		end
+	)
 end

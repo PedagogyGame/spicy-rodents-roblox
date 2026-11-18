@@ -481,4 +481,22 @@ return function(t)
 		t.eq(ItemService.kiteZoneAt(Expansion.zones, 500, 1300), "beach")
 		t.eq(ItemService.kiteZoneAt(Expansion.zones, 957, 84), nil, "not in the store")
 	end)
+	t.test("a body change puts the toggles away: what was on is off, and the next use switches it on", function()
+		local r = rig()
+		for _, id in { "flashlight", "radio", "umbrella", "soda" } do
+			r.inv.add(r.player, id)
+		end
+		use(r, "flashlight")
+		use(r, "radio")
+		t.truthy(r.svc:state(r.player, "flashlight").on and r.svc:state(r.player, "radio").on)
+		t.eq(table.concat(r.svc:putAway(r.player), ","), "flashlight,radio")
+		t.falsy(r.svc:state(r.player, "flashlight").on)
+		t.falsy(r.svc:state(r.player, "radio").on)
+		r.acts = {}
+		use(r, "flashlight")
+		t.eq(r.acts[1].kind, "light")
+		t.eq(r.acts[1].on, true, "one press after the change switches it on")
+		t.eq(#r.svc:putAway(r.player), 1)
+		t.eq(#r.svc:putAway(r.player), 0, "nothing left on")
+	end)
 end

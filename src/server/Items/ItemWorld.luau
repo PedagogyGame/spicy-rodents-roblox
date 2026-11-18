@@ -23,7 +23,8 @@
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
 --   read, askText, screenshot   a message to the owner's client (Client/Items/ItemClient)
 --   kite       up on its string downwind of its flier, swaying; reeled in on the next use or out of the zone
--- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), stop() }; SOUNDS;
+-- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
+--   body change: toggles off, kite reeled in), stop() }; SOUNDS;
 --   KITE (the flight's numbers)
 -- Engine only inside the functions; no side effects on require.
 
@@ -89,6 +90,7 @@ export type World = {
 	service: any,
 	use: (player: any, itemId: string, payload: { [string]: any }?) -> (boolean, string?),
 	step: () -> (),
+	putAway: (player: any) -> (),
 	stop: () -> (),
 }
 
@@ -865,6 +867,33 @@ function ItemWorld.start(opts: StartOpts): World
 		act = act,
 	})
 
+	-- a body change put the player's things back in the Backpack: whatever was on goes off (the flashlight's beam,
+	-- the radio, the umbrella's canopy) and a kite in the air is reeled in, so the next use starts afresh
+	local function putAway(player: any)
+		service:putAway(player)
+		local torch = handleOf(player, "flashlight")
+		local beam = torch and torch:FindFirstChild("Beam")
+		if beam and beam:IsA("SpotLight") then
+			beam.Enabled = false
+		end
+		local radio = handleOf(player, "radio")
+		local snd = radio and radio:FindFirstChild("RadioSound")
+		if snd and snd:IsA("Sound") then
+			snd:SetAttribute("On", false)
+			snd:Stop()
+		end
+		local umbrella = toolOf(player, "umbrella")
+		local canopy = umbrella and umbrella:FindFirstChild("OpenCanopy")
+		if canopy and canopy:IsA("BasePart") then
+			canopy.Transparency = 1
+		end
+		for _, k in kites do
+			if k.player == player then
+				kiteDown(k)
+			end
+		end
+	end
+
 	local function step()
 		-- kites: up on the string, swaying downwind; reeled in on a second use, out of the zone or without a flier
 		local K = ItemWorld.KITE
@@ -979,6 +1008,7 @@ function ItemWorld.start(opts: StartOpts): World
 			return service:use(player, itemId, payload)
 		end,
 		step = step,
+		putAway = putAway,
 		stop = function()
 			for _, c in conns do
 				c:Disconnect()

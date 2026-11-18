@@ -9,7 +9,8 @@
 -- The water gun's rodent stun is once per player for as long as this server runs (Q11), by UserId.
 -- Words: a refusal is always said (deps.refuse); what an item does is said where it helps (deps.notify).
 -- Interface: new(deps) -> Service { use(player, itemId, payload?) -> (ok, why?), state(player, itemId) -> State,
---   forget(player) }; kiteZoneAt(zones, x, z) -> "park" | "beach" | nil; WORDS
+--   forget(player), putAway(player) -> { itemId } (the toggles that were on, now off) };
+--   kiteZoneAt(zones, x, z) -> "park" | "beach" | nil; WORDS
 -- Pure over deps; no side effects on require. The engine half is Items/ItemWorld.
 
 local Import = require("../Import")
@@ -58,6 +59,7 @@ export type Service = {
 	use: (self: Service, player: any, itemId: string, payload: { [string]: any }?) -> (boolean, string?),
 	state: (self: Service, player: any, itemId: string) -> State,
 	forget: (self: Service, player: any) -> (),
+	putAway: (self: Service, player: any) -> { string },
 	deps: Deps,
 	states: { [any]: { [string]: State } },
 	stunUsed: { [any]: boolean },
@@ -104,6 +106,20 @@ end
 
 function Methods.forget(self: Service, player: any)
 	self.states[keyOf(player)] = nil
+end
+
+-- The player's things went back in the Backpack (a body change): every toggle that was on is off, so the next use
+-- switches it on. Returns the item ids that were on (Items/ItemWorld puts their lights, sounds and kites away).
+function Methods.putAway(self: Service, player: any): { string }
+	local was = {}
+	for itemId, s in self.states[keyOf(player)] or {} do
+		if s.on then
+			s.on = false
+			table.insert(was, itemId)
+		end
+	end
+	table.sort(was)
+	return was
 end
 
 -- the first target ahead of the holder within range, in a narrow cone (the water gun's squirt)

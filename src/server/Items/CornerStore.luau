@@ -270,6 +270,30 @@ function CornerStore.zoneOf(part: any): Zone
 	}
 end
 
+-- A body the player no longer drives gives back every corner-store Tool in its hand (an equipped Tool lives in
+-- the body, and bodies change hands): into the player's Backpack, or destroyed when there is none (a leaver).
+-- Returns how many were moved.
+function CornerStore.stow(body: Instance?, backpack: Instance?): number
+	local n = 0
+	for _, t in (if body then body:GetChildren() else {}) :: { Instance } do
+		if t:IsA("Tool") and t:GetAttribute("ItemId") ~= nil then
+			n += 1
+			if backpack then
+				t.Parent = backpack
+			else
+				t:Destroy()
+			end
+		end
+	end
+	return n
+end
+
+-- A Tool's use counts only for the player whose body holds it now (never for a Tool left behind in a body).
+function CornerStore.heldBy(tool: Instance, player: any): boolean
+	local parent = tool.Parent
+	return parent ~= nil and parent == player.Character
+end
+
 -- A Tool made from a shelf's Sample model: its first part the Handle, the rest welded to it, all light and loose.
 function CornerStore.makeTool(sample: Model, itemId: string, name: string): Tool
 	local tool = Instance.new("Tool")
@@ -396,7 +420,7 @@ function CornerStore.start(opts: StartOpts): Store?
 			local tool = CornerStore.makeTool(sample, itemId, displayName(itemId))
 			-- using it (a click, a tap, the gamepad's trigger): Items/ItemService decides, Items/ItemWorld does
 			tool.Activated:Connect(function()
-				if items then
+				if items and CornerStore.heldBy(tool, player) then
 					items.use(player, itemId)
 				end
 			end)
@@ -519,18 +543,39 @@ function CornerStore.start(opts: StartOpts): Store?
 			end
 		end
 	end
+	-- a body change (possess, release, swap: Possession sets Character): the old body gives back the Tools in its
+	-- hand, whatever was switched on goes off, and the new body (if any) has every owned thing in the Backpack
+	local bodyOf: { [Player]: Instance? } = {}
+	local function bodyChanged(player: Player)
+		local old = bodyOf[player]
+		local now = player.Character
+		bodyOf[player] = now
+		if old and old ~= now then
+			CornerStore.stow(old, player:FindFirstChildOfClass("Backpack"))
+			if items then
+				items.putAway(player)
+			end
+		end
+		if now then
+			task.defer(inventory.refresh, player)
+		end
+	end
 	table.insert(
 		conns,
 		Players.PlayerRemoving:Connect(function(player: Player)
 			store:gone(player)
+			-- (whatever body it held keeps none of the leaver's things)
+			CornerStore.stow(bodyOf[player], nil)
+			CornerStore.stow(player.Character, nil)
+			bodyOf[player] = nil
 		end)
 	)
-	-- a new body (a new Character) gets its Tools back
 	local function watch(player: Player)
+		bodyOf[player] = player.Character
 		table.insert(
 			conns,
-			player.CharacterAdded:Connect(function()
-				task.defer(inventory.refresh, player)
+			player:GetPropertyChangedSignal("Character"):Connect(function()
+				bodyChanged(player)
 			end)
 		)
 	end
