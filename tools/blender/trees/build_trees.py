@@ -553,6 +553,67 @@ def export_fbx(path, objs):
     )
 
 
+def clear_walks(tb, obj, step=0.25, tol=0.06, reach=0.6):
+    """Where two walks pass within a stud of each other (a crossing in a fork), the other bough's wood can still
+    stand over a walk's feet line after the waist (relieve_crossings). Here the finished bark is measured as
+    check_promises.py does (the upward-facing surface nearest the feet, in the vertical column through them) and
+    any wood standing over the feet is pressed down under them: the vertices of the face found there that stand
+    above the feet, within `reach` of the column. Returns how many vertices moved."""
+    me = obj.data
+    V = np.array([v.co[:] for v in me.vertices], float)
+    R = np.stack([-V[:, 0], V[:, 2], V[:, 1]], axis=1)  # Roblox axes, tree-local
+    tris = [tuple(p.vertices) for p in me.polygons]
+    moved = set()
+    # (the vertices on a walk's own feet line never move)
+    keep = np.zeros(len(R), bool)
+    for b in tb.boughs:
+        feet = getattr(b.get("limb"), "feet", None)
+        if feet is not None:
+            m = np.nonzero(np.all((R >= feet.min(0) - 0.1) & (R <= feet.max(0) + 0.1), axis=1))[0]
+            if len(m):
+                keep[m[tg.seg_dist(R[m], feet[:-1], feet[1:]).min(1) < 0.03]] = True
+
+    def column(tree, q):
+        hits = cp.crossings(tree, tuple(to_b(q + tg.Y * 6.0)), (0.0, 0.0, -1.0), 12.0)
+        best = None
+        for d, nd in hits:
+            if nd < 0:  # a face looking up (against the downward ray)
+                y = q[1] + 6.0 - d
+                if best is None or abs(y - q[1]) < abs(best - q[1]):
+                    best = y
+        return best
+
+    def bvh_now():
+        Vb = np.stack([-R[:, 0], R[:, 2], R[:, 1]], axis=1)
+        return BVHTree.FromPolygons([Vector(v) for v in Vb], tris)
+
+    tree = bvh_now()
+    for b in tb.boughs:
+        if b["kind"] not in ("branch", "bridge", "lookout") or b["route"]["name"].endswith("OPEN SKY LOOKOUT"):
+            continue
+        P, sP, lift = b["P"], b["sP"], b["lift"]
+        for s in np.arange(0.0, sP[-1] + 1e-6, step):
+            q = tg.at_s(P, sP, np.array([s]))[0] + tg.Y * lift
+            if tb.over_trunk(q)[0]:
+                continue
+            for _ in range(8):
+                y = column(tree, q)
+                if y is None or y - q[1] <= tol:
+                    break
+                near = np.nonzero((np.hypot(R[:, 0] - q[0], R[:, 2] - q[2]) < reach) & (R[:, 1] > q[1] + 0.005)
+                                  & (R[:, 1] < y + 0.05) & ~keep)[0]
+                if not len(near):
+                    break
+                R[near, 1] = q[1] - 0.03
+                moved.update(int(k) for k in near)
+                tree = bvh_now()
+    if moved:
+        Vb = np.stack([-R[:, 0], R[:, 2], R[:, 1]], axis=1)
+        me.vertices.foreach_set("co", Vb.astype(np.float32).ravel())
+        me.update()
+    return len(moved)
+
+
 def promise_check(rec, objs, routes):
     """check_promises.py's verdict (--clearance-warn) on the objects as built: the independent check, in process."""
     parts = {}
@@ -623,6 +684,7 @@ def main(argv):
             rec = dict(recs[i], seed=recs[i]["seed"] + 7919 * attempt)
             reset_scene()
             tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
+            tb.log["feet_cleared_verts"] = clear_walks(tb, objs["Bark"])
             if not args.retries:
                 break
             rep = promise_check(rec, objs, data["routes"])
