@@ -100,6 +100,9 @@ function PlayRules.deathMessage(cause: string): (string, string)
 		return "RUN OVER!", "A car got you. Pick a new body from the menu."
 	elseif cause == "kick" then
 		return "KICKED OUT!", "Two good kicks and you are out. Pick a new body from the menu."
+	elseif cause == "guard" then
+		-- THE GILDED ACORN's guards (Server/Attractions/LoungeService): no squirrel gets into the lounge
+		return "THE GUARDS!", "The lounge's guards do not let squirrels in. Pick a new body from the menu."
 	end
 	return "KNOCKED OUT!", "Pick a new body from the menu."
 end

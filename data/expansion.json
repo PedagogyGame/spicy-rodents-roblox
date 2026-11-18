@@ -1729,7 +1729,7 @@
           "owner": "F3",
           "note": "paintball pass check; offers the pass if missing"
         },
-        { "id": "bartender", "kind": "staff_post", "at": [0, 0, 20], "yaw": 180, "owner": "F3", "serves": "hot_cocoa,coffee,green_tea,snow_cone" },
+        { "id": "bartender", "kind": "venue_staff_post", "at": [0, 0, 20], "yaw": 180, "owner": "F3", "serves": "hot_cocoa,coffee,green_tea,snow_cone" },
         { "id": "bar", "kind": "counter", "at": [0, 0, 16], "yaw": 0, "owner": "F3" },
         { "id": "music", "kind": "radio", "at": [-20, 6, 20], "yaw": 0, "owner": "F3", "note": "library jazz, 1920s feel" },
         { "id": "booth_1", "kind": "seat", "at": [-18, 0, -10], "yaw": 0, "owner": "F3" },
@@ -1748,7 +1748,8 @@
         "polish_lighting"
       ],
       "partBudget": 1300,
-      "notes": ""
+      "built": "tools/bake/lounge_classic.luau",
+      "notes": "THE GILDED ACORN (addendum D14: the 1940s lounge only). A sealed brick hall with a black-and-gold front, a recessed entry up four steps to a solid double door and a forecourt to Bowl Lane's planned sidewalk (D -32) where the two guards stand; baked into build/Expansion_LoungeClassic.rbxm (tools/bake/lounge_classic.luau). The door, the pass, first person, the guards and the bar are Server/Attractions/LoungeService on Shared/Attractions/LoungeClassic."
     },
     {
       "id": "f3_lounge_scifi",

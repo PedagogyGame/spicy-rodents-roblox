@@ -52,7 +52,8 @@
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
 --   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
---   nil without its bake), townIdOf(actorId), stop() };
+--   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
+--   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
 --   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
@@ -81,6 +82,7 @@ local InfectionService = require("../Infection/InfectionService")
 local SewerService = require("../World/SewerService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
+local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
@@ -90,6 +92,7 @@ local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
 local CornerStore = require("../Items/CornerStore")
 local WhackArt = require("../Assets/WhackArt")
+local LoungeArt = require("../Assets/LoungeArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -408,6 +411,7 @@ function Game.start(opts: Opts?): any
 	local devices = rt.devices
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
+	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
 		for _, model in devices.models do
@@ -1378,6 +1382,35 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the corner store failed to open: {errC}`)
 	end
 
+	-- 6d. THE GILDED ACORN, the 1940s lounge (Workspace.Expansion.LoungeClassic; addendum D14): the door lets a
+	-- person with the wallet's one pass in (first person inside), the guards knock out any squirrel at the door
+	-- (kill, cause "guard"), the bar sells its four drinks (Attractions/LoungeService)
+	local okLo, errLo = pcall(function()
+		lounge = LoungeService.start({
+			town = LoungeService.gameTown({
+				possession = possession,
+				runtime = rt,
+				wallet = wallet,
+				squirrels = function(): { LoungeService.Squirrel }
+					local out = {}
+					for _, a in world.actors do
+						local actor = rt.byTownId[a.id]
+						if actor and isSquirrelFamily(actor) then
+							table.insert(out, { actor = actor, x = a.x, y = a.y - a.hip, z = a.z })
+						end
+					end
+					return out
+				end,
+				kill = kill,
+			}),
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okLo then
+		warn(`[SpicyRodents] the lounge failed to open: {errLo}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1412,6 +1445,10 @@ function Game.start(opts: Opts?): any
 	PinballArt.start(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
 	-- and the owner's whack-a-mole cabinet in the same games room (Assets/WhackArt; nothing while it has no id)
 	WhackArt.startIn(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
+	-- and THE GILDED ACORN's Blender pieces (Assets/LoungeArt; nothing while Shared/Attractions/LoungeArt has no id)
+	if o.heartbeat ~= false then
+		LoungeArt.start()
+	end
 
 	return {
 		runtime = rt,
@@ -1432,6 +1469,9 @@ function Game.start(opts: Opts?): any
 			if skylift and o.heartbeat == false then
 				skylift:step(dt)
 			end
+			if lounge and o.heartbeat == false then
+				lounge:step(dt)
+			end
 			if cornerStore and o.heartbeat == false then
 				cornerStore:step()
 			end
@@ -1444,6 +1484,7 @@ function Game.start(opts: Opts?): any
 		sewers = sewers,
 		skylift = skylift,
 		rafters = rafters,
+		lounge = lounge,
 		cornerStore = cornerStore,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
@@ -1461,6 +1502,9 @@ function Game.start(opts: Opts?): any
 			end
 			if rafters then
 				rafters:stop()
+			end
+			if lounge then
+				lounge:stop()
 			end
 			if cornerStore and cornerStore.stop then
 				cornerStore.stop()

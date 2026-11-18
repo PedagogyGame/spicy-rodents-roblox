@@ -248,6 +248,21 @@ if string.find(projectPath, "build%.project%.json$") and fs.isFile("generated/Sh
 	)
 end
 
+-- ... and THE GILDED ACORN, the 1940s lounge (its own optional slot too).
+if string.find(projectPath, "build%.project%.json$") then
+	local slot = instanceAt({ "Workspace", "Expansion", "LoungeClassic" })
+	local found = false
+	for _, d in if slot then slot:GetChildren() else {} do
+		if d:IsA("Model") and d:GetAttribute("Venue") == "f3_lounge_classic" then
+			found = true
+		end
+	end
+	check(
+		found,
+		"Workspace.Expansion.LoungeClassic has no baked lounge: run lune run tools/bake/lounge_classic.luau first"
+	)
+end
+
 print(`place test: {placePath} against {projectPath}: {total} instances, {checks} checks, {#failures} failure(s)`)
 for _, f in failures do
 	print("  FAIL " .. f)
