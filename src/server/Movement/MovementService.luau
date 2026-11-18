@@ -17,8 +17,10 @@
 -- server put the body (the gate: C.GATE_SLACK and the fastest the squirrel goes since then), or it is snapped again.
 -- What packets cannot show, watch() does: the server's own view of the root (a client owns its body's physics). While
 -- packets come in, the root may not stray from the last accepted one by more than C.DRIFT_BASE and the fastest the
--- squirrel goes in the time since (plus C.DRIFT_LAG); a body that moves C.SILENT_MOVE with no packet accepted for
--- C.SILENT seconds (a client that stopped sending, or ignores its correction) is snapped too. C.HOLD_AFTER snaps inside
+-- squirrel goes in the time since (plus C.DRIFT_LAG), once an epoch has settled (C.SETTLE after its first packet:
+-- the root's own updates sent before the client took a move may still be on their way); a body that moves
+-- C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped sending, or ignores its
+-- correction) is snapped too, and so is one still sending under an old epoch C.IGNORED after the move it was told of. C.HOLD_AFTER snaps inside
 -- C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it still) for
 -- C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
 -- Pure over injected collaborators; no side effects on require.
@@ -88,6 +90,7 @@ type Squirrel = {
 	gate: Gate?,
 	good: { [string]: number | boolean }?, -- the last clean packet's snapshot
 	lastAt: number?, -- server time of the last accepted packet
+	since: number?, -- server time of this epoch's first accepted packet
 	lastX: number,
 	lastY: number,
 	lastZ: number,
@@ -122,7 +125,9 @@ MovementService.C = table.freeze({
 	DRIFT_BASE = 8, -- studs: the root against the last accepted packet (the drawn pose eases behind the motor)
 	DRIFT_LAG = 0.6, -- seconds: how far the root may lead the packets (their jitter against the root's)
 	DRIFT_FRESH = 0.5, -- seconds: packets older than this are late; the drift is then left to SILENT
-	SILENT = 3, -- seconds with no accepted packet ...
+	SETTLE = 1, -- seconds after an epoch's first packet before the root's drift is judged
+	IGNORED = 2, -- seconds after a move the server made: packets still under the old epoch mean the client ignores it
+	SILENT = 5, -- seconds with no accepted packet ...
 	SILENT_MOVE = 6, -- ... while the root moved this far from the last known place: snapped
 	HOLD_AFTER = 3, -- snaps ...
 	HOLD_WINDOW = 10, -- ... inside this many seconds: the body is held
@@ -198,6 +203,7 @@ function MovementService.new(deps: Deps): Movement
 				gate = nil,
 				good = nil,
 				lastAt = nil,
+				since = nil,
 				lastX = 0,
 				lastY = 0,
 				lastZ = 0,
@@ -221,6 +227,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.epoch = nextEpoch(self)
 		sq.gate = target
 		sq.lastAt = nil
+		sq.since = nil
 		if self.deps.validator then
 			self.deps.validator:reset(id, nil)
 		end
@@ -360,7 +367,8 @@ function MovementService.new(deps: Deps): Movement
 		local away = dist(x, y, z, refX, refY, refZ)
 		local age = now - refAt
 		if age <= C.DRIFT_FRESH then
-			if away > C.DRIFT_BASE + fastest(self, actorId) * (age + C.DRIFT_LAG) then
+			local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
+			if settled and away > C.DRIFT_BASE + fastest(self, actorId) * (age + C.DRIFT_LAG) then
 				snap(self, actorId, "drift", now, nil)
 			end
 		elseif age > C.SILENT and away > C.SILENT_MOVE then
@@ -377,6 +385,18 @@ function MovementService.new(deps: Deps): Movement
 			if sq.suspended or sq.heldUntil ~= nil or (packet.epoch ~= nil and packet.epoch ~= sq.epoch) then
 				-- riding, held, or sent before the client knew of the last move the server made
 				self._stats.stale += 1
+				local gate = sq.gate
+				if
+					enforce
+					and not sq.suspended
+					and sq.heldUntil == nil
+					and gate
+					and gate.at > 0
+					and now - gate.at > C.IGNORED
+				then
+					-- long after the move it was told of: the client ignores it (told again; a run of these holds it)
+					snap(self, actorId, "ignored", now, gate)
+				end
 				return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
 			end
 			local snapshot = packet.snapshot
@@ -400,6 +420,9 @@ function MovementService.new(deps: Deps): Movement
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
+				if sq.since == nil then
+					sq.since = now
+				end
 				if v.ok then
 					sq.good = snapshot
 				end
