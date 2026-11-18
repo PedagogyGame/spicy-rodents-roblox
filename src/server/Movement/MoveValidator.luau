@@ -149,6 +149,9 @@ MoveValidator.C = table.freeze({
 	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
 	-- leaving the tallest trunk is within this of it
 	RAIL_REACH_MAX = 90,
+	-- studs: a packet that claims a route is on it only this near its samples (a rail's grab; the feet drawn on a big
+	-- trunk's bark are up to 5.95 off them): a route id made up, or far from where the packet is, is no rail
+	ROUTE_NEAR = Motion.C.airGrab,
 	CLOCK_PING_SHARE = 0.6, -- of the median round trip: what a one-way latency that drops can lower the offset by
 	CLOCK_RUN_BUCKET = 5, -- seconds of server time per long-run clock bucket ...
 	CLOCK_RUN_KEEP = 120, -- ... kept this long ...
@@ -594,7 +597,30 @@ local function railAbove(index: any, x: number, y: number, z: number, r: number,
 	return found
 end
 
--- hop(actorId, from, next, dt, serverTime) -> violations: a move judged as a whole, not tick by tick, over `dt` (the
+-- nearRoute(index, id, x, y, z): route `id` runs within C.ROUTE_NEAR of the point (a route id a packet claims is a rail
+-- only there)
+local function nearRoute(index: any, id: any, x: number, y: number, z: number): boolean
+	return type(id) == "number"
+		and index ~= nil
+		and index:nearestOnRoute(id, x, y, z, MoveValidator.C.ROUTE_NEAR) ~= nil
+end
+
+-- onRails(index, from, next, along): the straight line from `from` to `next` is on the rails (hop): an end near the
+-- route it claims, or with `along`, both ends near the route one of them claims
+local function onRails(index: any, from: any, next: any, along: boolean): boolean
+	if not along then
+		return nearRoute(index, next.routeId, next.x, next.y, next.z)
+			or nearRoute(index, from.routeId, from.x, from.y, from.z)
+	end
+	for _, id in { from.routeId or false, next.routeId or false } do
+		if id and nearRoute(index, id, from.x, from.y, from.z) and nearRoute(index, id, next.x, next.y, next.z) then
+			return true
+		end
+	end
+	return false
+end
+
+-- hop(actorId, from, next, dt, serverTime, along?) -> violations: a move judged as a whole, not tick by tick, over `dt` (the
 -- time it can stand for): a gap too long for the envelope (gap()), and the first packet after a move the server
 -- made, from where it put the body (MovementService's gate). `from` holds x, y, z and routeId (nil: off the rails).
 --   * reach: no further than the fastest the squirrel goes in that time (arithmetic only: a long gap costs nothing);
@@ -604,7 +630,9 @@ end
 --   * the air (and a body on a rail): no higher above a floor than a leap, unless such a rail or a trampoline explains it;
 --   * walls: the straight line, chord by chord (world.crossesLong, its chords bounded), only when within reach (a
 --     longer one is a teleport already); an honest body may have gone round a corner, so one is a third of a flag and
---     a second inside C.WALL_GAP_WINDOW a whole one.
+--     a second inside C.WALL_GAP_WINDOW a whole one. A line on the rails is not judged for walls, and a route id is
+--     only a rail where that route runs (within C.ROUTE_NEAR: a made-up or far one is no rail): for a gap, an end on
+--     the rail it claims; for a gate (`along`), both ends near one rail (the body put there got on it or ran along it).
 -- Its cost is bounded whatever dt and the packet hold: the rail scans by C.RAIL_REACH_MAX, the walls by the chords.
 function MoveValidator.hop(
 	self: MoveValidator,
@@ -612,7 +640,8 @@ function MoveValidator.hop(
 	from: { x: number, y: number, z: number, routeId: number? },
 	next: State,
 	dt: number,
-	serverTime: number
+	serverTime: number,
+	along: boolean?
 ): { Violation }
 	local violations: { Violation } = {}
 	local E = SquirrelMotor.envelopeParams
@@ -675,8 +704,7 @@ function MoveValidator.hop(
 	if
 		crossesLong
 		and moved <= reach
-		and not next.routeId
-		and not from.routeId
+		and not onRails(world.index, from, next, along == true)
 		and crossesLong(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex)
 	then
 		local n = self:wallGap(actorId, serverTime)

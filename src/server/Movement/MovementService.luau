@@ -828,8 +828,10 @@ function MovementService.new(deps: Deps): Movement
 					if gate.snapshot then
 						from.routeId = SquirrelMotor.deserialize(gate.snapshot).routeId
 					end
-					-- (a wall too: the client's body was put at the gate, and its first packet comes a tick or two later)
-					for _, v in validator:hop(actorId, from, SquirrelMotor.deserialize(snapshot), span + 0.1, now) do
+					-- (a wall too: the client's body was put at the gate, and its first packet comes a tick or two later;
+					-- the line is on a rail only with both ends near the route claimed, so a route id buys no way through)
+					local next = SquirrelMotor.deserialize(snapshot)
+					for _, v in validator:hop(actorId, from, next, span + 0.1, now, true) do
 						if v.severity >= 1 or v.code == "wall" then
 							table.insert(violations, v)
 						end

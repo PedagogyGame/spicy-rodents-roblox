@@ -4,7 +4,10 @@
 -- and a pin dropped while the body rides. Each cheat must be snapped; each honest case must not.
 local fs = require("@lune/fs")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local SquirrelWire = require("@shared/Movement/SquirrelWire")
 local BodyPin = require("@server/Movement/BodyPin")
+local MoveValidator = require("@server/Movement/MoveValidator")
+local MovementService = require("@server/Movement/MovementService")
 local LiveRig = require("@tests/lib/LiveRig")
 local Rng = require("@tests/cheat/Rng")
 
@@ -250,6 +253,80 @@ return function(t)
 			t.eq(rig.server.pinned, true, "taken again")
 			t.truthy(out <= 1, `the server's body stays where it is kept ({out} samples away)`)
 			t.eq(high, 0, "never up in the air")
+		end
+	)
+
+	-- 2. A CLAIMED RAIL AT A GATE ------------------------------------------------------------------------------------------
+	-- A body taken just west of a house; its first packet lands beyond the house, 22 studs east (inside the gate's reach),
+	-- claiming no rail, a made-up one, or the real route nearest the gate: each is judged for the wall and snapped
+	local b = town.boxes[1]
+	local gx, gy, gz = b.minX - 2, town.world.groundHeight, (b.minZ + b.maxZ) / 2
+	local nearest = town.world.index:nearest(gx, gy, gz, 90)
+	local claims: { { name: string, id: number? } } = {
+		{ name = "no rail", id = nil },
+		{ name = "a made-up route 7", id = 7 },
+		{ name = `the real route nearest the gate ({nearest and nearest.routeId})`, id = nearest and nearest.routeId },
+	}
+	for _, c in claims do
+		t.test(
+			`cheat: the first packet of a hand-off lands beyond a house claiming {c.name}: snapped at the gate`,
+			function()
+				local corrections = {}
+				local ms = MovementService.new({
+					validator = MoveValidator.new(town.vworld),
+					enforce = true,
+					poseOf = function(_actor: any): (number, number, number)
+						return gx, gy, gz
+					end,
+					engine = {
+						correct = function(_id: any, msg: any)
+							table.insert(corrections, msg)
+						end,
+						pin = function(_id: any, _on: boolean): boolean
+							return true
+						end,
+						hold = function() end,
+					},
+				})
+				ms:onHandoff({ id = "a", species = "squirrel" }, nil, "possess")
+				ms:watch("a", gx, gy, gz, 100)
+				local s = SquirrelMotor.new(b.maxX + 2, gy, gz)
+				s.clock = 5
+				local snap = SquirrelMotor.serialize(s)
+				if c.id then
+					snap.routeId = c.id
+					snap.railT = 0.5
+				end
+				local _, e, dec = SquirrelWire.decode(SquirrelWire.encode(1, ms:epochOf("a"), snap))
+				local r = ms:packet("a", "squirrel", { seq = 1, epoch = e, snapshot = dec }, 100.6)
+				t.eq(r.accepted, false, "not taken")
+				t.eq(ms:isPinned("a"), true, "still the server's")
+				t.eq(ms:stats().reasons["gate:wall"], 1, "snapped at the gate for the wall")
+				t.eq(#corrections, 1)
+			end
+		)
+	end
+
+	t.test(
+		"MoveValidator.hop: a gap's line through a house is judged unless an end is on the rail it claims",
+		function()
+			local v = MoveValidator.new(town.vworld)
+			local function across(id: number?, fromId: number?): { string }
+				local from = { x = gx, y = gy, z = gz, routeId = fromId }
+				local s = SquirrelMotor.new(b.maxX + 2, gy, gz)
+				s.routeId = id
+				s.grounded = true
+				local codes = {}
+				for _, x in v:hop("a", from, s, 0.6, 100) do
+					table.insert(codes, x.code)
+				end
+				return codes
+			end
+			t.eq(table.concat(across(nil, nil), "+"), "wall", "no rail")
+			t.eq(table.concat(across(7, 7), "+"), "wall", "a made-up route at both ends")
+			local id = nearest and nearest.routeId
+			t.eq(table.concat(across(id, id), "+"), "wall", "a real route far from both ends")
+			-- (a line on the rail it claims is the rail's: every honest suite runs over the town's rails, 0 snaps)
 		end
 	)
 
