@@ -67,13 +67,29 @@ LoungeClassic.DRINKS = table.freeze({
 LoungeClassic.SIPS = 4
 LoungeClassic.SIP_EVERY = 5 -- seconds
 
--- The jazz: stock Roblox library tracks (licensed), named here and filled in by the lead (never uploaded). Each is
--- a 1920s-feel instrumental: hot jazz, stride piano, a small band. Empty: silent.
+-- The jazz: stock Roblox library tracks (licensed music from Roblox's verified partner APM, never uploaded), chosen
+-- 18 November for the owner: a 1920s-feel set of hot jazz, stride piano, a slow number and swing. Empty: silent.
 LoungeClassic.JAZZ = table.freeze({
-	table.freeze({ cue = "Lounge.Jazz1", id = "", want = "1920s hot jazz, small band, instrumental" }),
-	table.freeze({ cue = "Lounge.Jazz2", id = "", want = "stride piano, solo, 1920s" }),
-	table.freeze({ cue = "Lounge.Jazz3", id = "", want = "slow jazz ballad, clarinet or muted trumpet, 1920s" }),
-	table.freeze({ cue = "Lounge.Jazz4", id = "", want = "swing, light and bright, instrumental" }),
+	table.freeze({
+		cue = "Lounge.Jazz1",
+		id = "rbxassetid://104391003816309",
+		want = "Charleston Time (Harry Gold), hot jazz",
+	}),
+	table.freeze({
+		cue = "Lounge.Jazz2",
+		id = "rbxassetid://1847365925",
+		want = "Strolling Along (Paul Lenart), stride piano",
+	}),
+	table.freeze({
+		cue = "Lounge.Jazz3",
+		id = "rbxassetid://112961391906009",
+		want = "White Gardenia (Harry Gold), slow jazz",
+	}),
+	table.freeze({
+		cue = "Lounge.Jazz4",
+		id = "rbxassetid://112031221369583",
+		want = "Dixie Doodle (Harry Gold), swing",
+	}),
 })
 LoungeClassic.JAZZ_VOLUME = 0.35
 

@@ -139,17 +139,22 @@ return function(t)
 		t.truthy(LoungeClassic.SIPS * LoungeClassic.SIP_EVERY <= 30)
 	end)
 
-	t.test("the jazz: four cue names with empty ids (never uploaded); a filled id is the next track", function()
-		t.eq(#LoungeClassic.JAZZ, 4)
-		for i, j in LoungeClassic.JAZZ do
-			t.eq(j.cue, `Lounge.Jazz{i}`)
-			t.eq(j.id, "")
+	t.test(
+		"the jazz: four library tracks by cue name (chosen 18 November, never uploaded); the next filled one plays",
+		function()
+			t.eq(#LoungeClassic.JAZZ, 4)
+			for i, j in LoungeClassic.JAZZ do
+				t.eq(j.cue, `Lounge.Jazz{i}`)
+				t.truthy(string.match(j.id, "^rbxassetid://%d+$") ~= nil, `{j.cue}: a library asset id`)
+			end
+			t.eq(LoungeClassic.nextTrack(LoungeClassic.JAZZ, 0), 1)
+			t.eq(LoungeClassic.nextTrack(LoungeClassic.JAZZ, 4), 1)
+			t.eq(LoungeClassic.nextTrack({ { cue = "a", id = "" } }, 0), nil)
+			local list =
+				{ { cue = "a", id = "" }, { cue = "b", id = "rbxassetid://1" }, { cue = "c", id = "rbxassetid://2" } }
+			t.eq(LoungeClassic.nextTrack(list, 0), 2)
+			t.eq(LoungeClassic.nextTrack(list, 2), 3)
+			t.eq(LoungeClassic.nextTrack(list, 3), 2)
 		end
-		t.eq(LoungeClassic.nextTrack(LoungeClassic.JAZZ, 0), nil)
-		local list =
-			{ { cue = "a", id = "" }, { cue = "b", id = "rbxassetid://1" }, { cue = "c", id = "rbxassetid://2" } }
-		t.eq(LoungeClassic.nextTrack(list, 0), 2)
-		t.eq(LoungeClassic.nextTrack(list, 2), 3)
-		t.eq(LoungeClassic.nextTrack(list, 3), 2)
-	end)
+	)
 end

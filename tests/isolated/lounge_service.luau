@@ -347,7 +347,7 @@ return function(t)
 	)
 
 	t.test(
-		"the jazz (client): heard only while the body carries Lounge, faded in and out; silent with empty ids",
+		"the jazz (client): heard only while the body carries Lounge, faded in and out; the playlist from its first track",
 		function()
 			FakeEngine.with(function()
 				local body = makeModel("Me", roblox.CFrame.new(0, 0, 0), nil)
@@ -371,8 +371,8 @@ return function(t)
 				t.eq(h.inside(), true)
 				t.eq(h.level(), 1)
 				t.near(sound.Volume, LoungeClassic.JAZZ_VOLUME, 1e-9)
-				t.eq(h.track(), nil) -- every id is empty: nothing is asked to play
-				t.truthy(not sound.Playing)
+				t.eq(h.track(), "Lounge.Jazz1") -- the playlist starts at its first track
+				t.eq(sound.SoundId, LoungeClassic.JAZZ[1].id)
 				body:SetAttribute(LoungeClassic.ATTRIBUTE, nil)
 				for _ = 1, 20 do
 					h.step(0.1)

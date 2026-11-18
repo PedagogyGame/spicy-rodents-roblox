@@ -64,12 +64,12 @@ local SOUNDS: { [string]: string } = {
 	["Items.Scatter"] = "",
 	["Items.Crunch"] = "",
 	["Items.KiteWind"] = "",
-	["Radio.Oldies1"] = "",
-	["Radio.Oldies2"] = "",
-	["Radio.SoftRock"] = "",
-	["Radio.Country"] = "",
-	["Radio.Jazz"] = "",
-	["Radio.Weather"] = "",
+	["Radio.Oldies1"] = "rbxassetid://1837066444", -- Sunny Side Up (Alan Hawkshaw), 70's Easy FM
+	["Radio.Oldies2"] = "rbxassetid://1837066718", -- Songbird (Brian Bennett), 70's Easy FM
+	["Radio.SoftRock"] = "rbxassetid://1847299654", -- Out Of Sight (David Hamer), AOR of the 70s
+	["Radio.Country"] = "rbxassetid://1840347412", -- Way Out West (Richard Warren Gilks)
+	["Radio.Jazz"] = "rbxassetid://1845444990", -- Coffee Break (Manfred Paulsen), big band
+	["Radio.Weather"] = "rbxassetid://9042143607", -- A Million Stars, 15 s sting (Vintage Radio: 1970s)
 }
 ItemWorld.SOUNDS = SOUNDS
 

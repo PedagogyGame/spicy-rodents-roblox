@@ -94,6 +94,8 @@ The server makes these as Sound instances with empty ids (`src/server/Attraction
 
 No uploads: all eight can come from the library.
 
+**The jazz, chosen 18 November** (licensed music from Roblox's verified partner APM, found through the Creator Store search; picked by title, album, genre and length, not yet heard in the game): `Lounge.Jazz1` Charleston Time, Harry Gold (104391003816309, 1:58); `Lounge.Jazz2` Strolling Along, Paul Lenart, Harlem Stride Piano (1847365925, 2:37); `Lounge.Jazz3` White Gardenia, Harry Gold (112961391906009, 2:39); `Lounge.Jazz4` Dixie Doodle, Harry Gold (112031221369583, 2:33). Any of them is one line to swap in `src/shared/Attractions/LoungeClassic.luau`. The four cues above are still empty.
+
 ### Paintball (`src/client/Minigames/Games/Paintball.luau`, table `sounds`)
 Every cue below is timed and placed already. Until the owner chooses the set, eleven of them play a PLACEHOLDER that ships with every Roblox client (`rbxasset://sounds/...`, nothing uploaded, no licence needed), so the fire, the hits and the dry click can be judged at the playtest; `paintball.step` is empty (no single footstep ships with the client: the body's own stock footsteps are heard meanwhile). A placeholder that does not exist in the client is silent and the Output says it failed to load. Volumes are in `src/client/Minigames/Paintball/Tuning.luau`. Another player's cues are played from where they happened and dulled by each floor between (`World.luau`).
 
@@ -142,4 +144,6 @@ Every cue is a Sound named after it, played at the person using the item (or at 
 
 The radio's playlist (the same table): `Radio.Oldies1`, `Radio.Oldies2`, `Radio.SoftRock`, `Radio.Country`, `Radio.Jazz`, `Radio.Weather` (a short town weather jingle). Six stock-library music tracks, one after another while the radio is on; any licensed library tracks with a small-town 1970s feel will do.
 
-Twenty effects and six tracks; all from the library, so none counts against the month's uploads.
+**The radio, chosen 18 November** (the same licensed library, not yet heard in the game): `Radio.Oldies1` Sunny Side Up, Alan Hawkshaw, 70's Easy FM (1837066444); `Radio.Oldies2` Songbird, Brian Bennett, 70's Easy FM (1837066718); `Radio.SoftRock` Out Of Sight, David Hamer, AOR of the 70s (1847299654); `Radio.Country` Way Out West, Richard Warren Gilks (1840347412); `Radio.Jazz` Coffee Break, Manfred Paulsen (1845444990); `Radio.Weather` A Million Stars, a 15-second sting from Vintage Radio: 1970s (9042143607). One line each in `src/server/Items/ItemWorld.luau`.
+
+Twenty effects and six tracks; all from the library, so none counts against the month's uploads. The six tracks are filled; the twenty effects are still empty.
