@@ -359,6 +359,98 @@ return function(t)
 		end
 	)
 
+	-- 4. THE SERVER'S SPRINT METER -----------------------------------------------------------------------------------------
+	-- a client that keeps its own meter full and runs faster than a walk on the ground, hiding it three ways
+	local function speedTo(target: number): (s: State, _inp: SquirrelMotor.Input, now: number, _w: any) -> ()
+		return function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+			if now < 2 then
+				return
+			end
+			s.stamina, s.winded = 1, false
+			local v = math.sqrt(s.vx ^ 2 + s.vz ^ 2)
+			if v > 1 and s.grounded and s.routeId == nil then
+				local k = target / v
+				s.x += s.vx * (k - 1) / 60
+				s.z += s.vz * (k - 1) / 60
+			end
+		end
+	end
+	local function backAndForth(sprint: boolean): LiveRig.Keys
+		return function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+			local inp = SquirrelMotor.idleInput(if math.floor(now / 3) % 2 == 0 then -math.pi / 2 else math.pi / 2)
+			inp.fw = 1
+			inp.sprint = sprint
+			return inp
+		end
+	end
+	for _, c in
+		{
+			{
+				name = "every other packet says it is in the air (vy 0, at the same height), 44 st/s",
+				speed = 44,
+				flip = 2,
+			},
+			{ name = "every third packet says it is in the air, 44 st/s", speed = 44, flip = 3 },
+			{ name = "one packet every 2.6 s (four gaps in ten seconds), 46 st/s", speed = 46, sparse = 2.6 },
+			{ name = "a walk 1.19 x the walk's pace, for ever", speed = 21.4, walk = true },
+		}
+	do
+		t.test(`cheat: an endless sprint, {c.name}: snapped for the sprint meter`, function()
+			local n = 0
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = { latency = 0.12, jitter = 0.1, loss = 0.02 },
+				seed = 14,
+				cheat = speedTo(c.speed),
+				packetCheat = if c.flip
+					then function(snap: { [string]: any }, now: number): boolean?
+						n += 1
+						if now > 2 and n % c.flip == 0 and snap.grounded and snap.routeId == -1 then
+							snap.grounded = false
+							snap.vy = 0
+						end
+						return true
+					end
+					else nil,
+				silent = if c.sparse
+					then function(now: number): boolean
+						return now > 3 and (now % c.sparse) >= 0.04
+					end
+					else nil,
+			})
+			rig:possess(town.openStart(), backAndForth(not c.walk))
+			rig:run(40)
+			local r = rig:result()
+			print(`      {LiveRig.describe(c.name, r)}`)
+			t.truthy((r.reasons.stamina or 0) >= 1, `snapped for the meter ({r.reasons.stamina or 0})`)
+		end)
+	end
+
+	-- 6. A SLOW LINK AND A SERVER MOVE -------------------------------------------------------------------------------------
+	for _, c in { { 1.0, 0.2 }, { 1.0, 0.5 }, { 0.8, 0.3 } } do
+		t.test(`honest: {c[1]} s one way + {c[2]} s jitter, the Reset button at 10 s, played on: 0 snaps`, function()
+			local Rng = require("@tests/cheat/Rng")
+			local rng = Rng.new(31)
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = { latency = c[1], jitter = c[2], loss = 0.02 },
+				seed = 31,
+			})
+			local s0 = town.startAt(rng)
+			rig:possess(s0, town.driven(rng))
+			rig:at(10, function()
+				rig:teleport(s0.x, s0.y, s0.z, "reset")
+			end)
+			rig:run(50)
+			local r = rig:result()
+			print(`      {LiveRig.describe(`{c[1]} + {c[2]}`, r)}; holds {r.holds}`)
+			t.eq(r.snaps, 0, "no snap")
+			t.truthy(r.accepted > 300, `packets judged ({r.accepted})`)
+		end)
+	end
+
 	-- 5. JOINING ON A BIG TRUNK WHILE THE TOWN STREAMS IN ----------------------------------------------------------------
 	t.test(
 		"honest: a body taken high on any big trunk, 8 s of streaming, then on the bark: 0 snaps on every trunk",

@@ -137,7 +137,9 @@ export type MoveValidator = typeof(setmetatable(
 
 MoveValidator.C = table.freeze({
 	WALL_GAP_WINDOW = 20, -- seconds: a second gap through a wall inside this is a whole flag
-	STAMINA_WALK = 1.2, -- faster than this times the walk on the ground drains the server's sprint meter
+	STAMINA_WALK = 1.08, -- faster than this times the walk on the ground drains the server's sprint meter
+	STAMINA_GROUND = 0.6, -- studs: a packet "in the air" this near a floor ...
+	STAMINA_AIR_VY = 3, -- ... with less vertical speed than this (studs/s) is on the ground for the meter
 	STAMINA_SLACK = 0.5, -- how far below empty it may go (two seconds of sprint: landings' carry, rounding)
 	-- studs: the widest any rail query of the validator looks (its world's index is bounded to it: a packet's numbers,
 	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
@@ -441,9 +443,10 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		prev,
 		next,
 		dt,
+		dtEff,
 		serverTime,
 		resync or dt > SquirrelMotor.envelopeParams.maxDt,
-		boosted,
+		boosted or riverLanding,
 		violations
 	)
 
@@ -645,48 +648,61 @@ function MoveValidator.hop(
 end
 
 -- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full). Faster
--- on the ground than a walk can explain (MoveValidator.C.STAMINA_WALK times the walk), between two packets judged move
--- by move, off the rails and grounded at both ends, drains it as the motor's sprint does (a full meter is
--- sprintSeconds); anything else refills it by the server's own time at the motor's rate (sprintRefill), so a ride, a
--- stall or a respawn never leaves it short. The server's meter never drains where the client's does not: a sprint in
--- the air, a leap's cost and a sprint on a rail are left out, so it stays at or above the client's, but for a landing's
--- carry (a leap or a pounce lands at more than a walk for a moment), which the slack covers. Below -C.STAMINA_SLACK
--- the client is sprinting on credit: half a flag a packet, and the meter held there. The chili rush (boostOf) runs
--- faster than a sprint and is left out.
+-- on the ground than a walk can explain (MoveValidator.C.STAMINA_WALK times the walk) between two packets off the
+-- rails drains it as the motor's sprint does (a full meter is sprintSeconds). On the ground: grounded, or a packet
+-- that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
+-- flipping its grounded flag to hide a sprint); a leap or a pounce in the air is not. A gap too long to judge move by
+-- move drains by its own distance over the time it stands for, and never refills. Anything else refills it by the
+-- server's own time at the motor's rate (sprintRefill), so a ride, a stall or a respawn never leaves it short. The
+-- server's meter never drains where the client's does not, but for a landing's carry and a sprint's slowing down
+-- (a moment faster than a walk with the key let go), which C.STAMINA_SLACK covers. Below -C.STAMINA_SLACK the client
+-- is sprinting on credit: half a flag a packet (a gap's span, a whole one), and the meter held there. The chili rush (boostOf) runs faster than a
+-- sprint and is left out, and so is the client's own river recovery.
 function MoveValidator._stamina(
-	_self: MoveValidator,
+	self: MoveValidator,
 	actor: Actor,
 	prev: State,
 	next: State,
 	dt: number,
+	dtEff: number,
 	serverTime: number,
 	unjudged: boolean,
-	boosted: boolean,
+	exempt: boolean,
 	violations: { Violation }
 )
 	local marks = actor.marks
 	local elapsed = math.max(0, serverTime - marks.staminaAt)
 	marks.staminaAt = serverTime
 	local P = SquirrelMotor.params
-	local running = not unjudged
-		and not boosted
+	local C = MoveValidator.C
+	local landable = self.world.landable
+	local function onGround(s: State): boolean
+		return s.grounded
+			or (math.abs(s.vy) < C.STAMINA_AIR_VY and landable ~= nil and landable(s.x, s.y, s.z, C.STAMINA_GROUND))
+	end
+	local span = if unjudged then dtEff else dt
+	local running = not exempt
 		and dt > 0
+		and span > 1e-3
 		and prev.routeId == nil
 		and next.routeId == nil
-		and prev.grounded
-		and next.grounded
-		and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) / dt > P.walk * MoveValidator.C.STAMINA_WALK
+		and onGround(prev)
+		and onGround(next)
+		and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) / span > P.walk * C.STAMINA_WALK
 	if not running then
-		marks.stamina = math.min(1, marks.stamina + elapsed / P.sprintRefill)
+		if not unjudged then
+			marks.stamina = math.min(1, marks.stamina + elapsed / P.sprintRefill)
+		end
 		return
 	end
-	marks.stamina -= dt / P.sprintSeconds
-	if marks.stamina < -MoveValidator.C.STAMINA_SLACK then
-		marks.stamina = -MoveValidator.C.STAMINA_SLACK
+	marks.stamina -= span / P.sprintSeconds
+	if marks.stamina < -C.STAMINA_SLACK then
+		marks.stamina = -C.STAMINA_SLACK
 		table.insert(violations, {
 			code = "stamina",
-			severity = 0.5,
-			detail = `faster than a walk on the ground for longer than the sprint meter lasts`,
+			-- (half a flag a packet's worth of sprint on credit: a gap's whole span is a whole flag)
+			severity = math.min(1, 0.5 * span / SquirrelWire.SEND_EVERY),
+			detail = "faster than a walk on the ground for longer than the sprint meter lasts",
 		})
 	end
 end
