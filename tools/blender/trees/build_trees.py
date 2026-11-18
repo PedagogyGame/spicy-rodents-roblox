@@ -33,6 +33,7 @@ from mathutils.bvhtree import BVHTree  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import check_promises as cp  # noqa: E402
 import textures as tx  # noqa: E402
 import treegen as tg  # noqa: E402
 import views as vw  # noqa: E402
@@ -552,6 +553,22 @@ def export_fbx(path, objs):
     )
 
 
+def promise_check(rec, objs, routes):
+    """check_promises.py's verdict (--clearance-warn) on the objects as built: the independent check, in process."""
+    parts = {}
+    for name, o in objs.items():
+        me = o.data
+        me.calc_loop_triangles()
+        M = np.array(o.matrix_world)
+        V = np.array([v.co[:] for v in me.vertices], float) @ M[:3, :3].T + M[:3, 3]
+        R = np.stack([-V[:, 0], V[:, 2], V[:, 1]], axis=1) + np.asarray(rec["root"], float)
+        parts[name] = (R, np.array([t.vertices[:] for t in me.loop_triangles], np.int64).reshape(-1, 3))
+    info = {"index": rec["index"], "label": rec["label"], "trunkRoute": rec["trunk"]["id"],
+            "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]], "pivot": list(rec["root"]),
+            "parts": {k: bounds_roblox(o) for k, o in objs.items()}}
+    return cp.check_tree(info, parts, routes, clearance_warn=True)
+
+
 def hollow_knots(path):
     """{trunk route: [knothole]} from dump_hollows.luau's JSON (the hollow trees, Shared/World/HollowLayout): each
     the oval's centre (world studs), the way it faces (level) and its width and height."""
@@ -580,6 +597,8 @@ def main(argv):
     ap.add_argument("--no-checks", action="store_true")
     ap.add_argument("--no-leaves", action="store_true", help="render the bark alone (junction close-ups)")
     ap.add_argument("--clay", action="store_true", help="render the bark untextured (to judge the forms)")
+    ap.add_argument("--retries", type=int, default=0,
+                    help="grow a tree that breaks a promise (check_promises.py --clearance-warn) again from up to N other seeds")
     ap.add_argument("--hollows", default="", help="dump_hollows.luau's JSON: the hollow trees keep their knotholes clear")
     args = ap.parse_args(argv)
     out = os.path.abspath(args.out)
@@ -597,10 +616,19 @@ def main(argv):
     views = [v for v in args.render.split(",") if v]
     summary = []
     for i in ids:
-        rec = recs[i]
-        reset_scene()
-        tk = [dict(k, p=list(np.asarray(k["p"]) - rec["root"])) for k in knots.get(rec["trunk"]["id"], [])]
-        tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
+        tk = [dict(k, p=list(np.asarray(k["p"]) - recs[i]["root"])) for k in knots.get(recs[i]["trunk"]["id"], [])]
+        for attempt in range(args.retries + 1):
+            # (a tree that breaks a promise is grown again from another seed: its routes and trunk stay, the
+            # side branches, the bark's unevenness and the leaves change)
+            rec = dict(recs[i], seed=recs[i]["seed"] + 7919 * attempt)
+            reset_scene()
+            tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
+            if not args.retries:
+                break
+            rep = promise_check(rec, objs, data["routes"])
+            print(f"tree {i:03d} try {attempt}: {'; '.join(rep['fail']) or 'every promise kept'}", flush=True)
+            if not rep["fail"]:
+                break
         parts = {k: bounds_roblox(o) for k, o in objs.items()}
         for k in parts:
             leaf = k.startswith("Leaves")
@@ -615,6 +643,7 @@ def main(argv):
             "trunkRoute": rec["trunk"]["id"], "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]],
             "pivot": [round(float(x), 3) for x in rec["root"]], "heightStuds": round(rec["H"], 2),
             "tris": tb.tri_counts(), "parts": parts, "log": tb.log, "sha": mesh_digest(objs, mats),
+            "seed": rec["seed"],
         }
         info["tris"]["total"] = sum(info["tris"].values())
         if not args.no_checks:

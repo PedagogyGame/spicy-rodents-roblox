@@ -1028,6 +1028,10 @@ class TreeBuilder:
         for s in ss[1:]:
             if s - keep[-1] > 0.3:
                 keep.append(s)
+        # (the route's end gets a ring of its own: moved onto the end, the last kept ring's chord would cut
+        # under a bough that curls at its tip)
+        if L - keep[-1] > 0.05:
+            keep.append(L)
         keep[-1] = L
         s = np.array(keep)
         Q = at_s(P, sP, s)
@@ -1073,7 +1077,7 @@ class TreeBuilder:
         # one more ring before the rail's start and one past its end, so the walk's first and last
         # steps still have bark under them
         t0, tend = norm(Q[1] - Q[0]), norm(Q[-1] - Q[-2])
-        feet = np.concatenate([Q[:1] - t0 * 0.45, Q, Q[-1:] + tend * 0.45]) + Y[None] * lift
+        feet = np.concatenate([Q[:1] - t0 * 0.45, Q, Q[-1:] + tend * 1.0]) + Y[None] * lift
         R = np.concatenate([radii[:1], radii, radii[-1:]])
         # ring planes square to the feet line, except through a tight bend (a willow bough arching
         # over): there they turn no faster than the tube's far side can follow without folding
@@ -1121,7 +1125,7 @@ class TreeBuilder:
         another walk passes close under that line the tube would swallow it: there the bough is waisted
         (down to a radius of 0.42 studs), and the other walk passes under clear wood."""
         walk = [b for b in self.boughs if b["kind"] in ("branch", "bridge")]
-        marg, floor = 0.12, 0.42
+        marg, floor = 0.2, 0.15  # (marg: room for the bark's unevenness and the blend at a junction)
         n = 0
         for b in walk:
             limb, s, R0 = b["limb"], b["s"], b["radii"]
