@@ -5387,7 +5387,7 @@ return {
 				},
 				{
 					id = "bartender",
-					kind = "staff_post",
+					kind = "venue_staff_post",
 					yaw = 180,
 					at = { 0, 0, 20 },
 					owner = "F3",

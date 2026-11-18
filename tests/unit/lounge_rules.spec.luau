@@ -7,6 +7,10 @@ local EconomyRules = require("@shared/Economy/EconomyRules")
 local Expansion = require("../../generated/Expansion")
 local Style = require("../../tools/bake/lounge_classic/Style")
 local Staff = require("../../tools/bake/lounge_classic/Staff")
+local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local StaffRounds = require("@shared/Actors/StaffRounds")
+local Data = require("@shared/Data")
+local TownAI = require("@server/AI/TownAI")
 
 local function venue(): any
 	for _, v in (Expansion :: any).venues do
@@ -69,6 +73,29 @@ return function(t)
 		local bt = anchor("bartender")
 		t.eq(Style.BARTENDER[1], bt[1])
 		t.eq(Style.BARTENDER[2], bt[3])
+	end)
+
+	t.test("the bartender is the lounge's own: the town staffs no counter here and puts nobody in the room", function()
+		local v = venue()
+		local posts: { [string]: boolean } = {}
+		for _, sv in StaffRounds.venues(Expansion) do
+			posts[sv.id] = sv.post ~= nil
+		end
+		t.eq(posts[LoungeClassic.VENUE], false) -- (the bake's Staff.Bartender stands there)
+		t.eq(posts.f1_corner_store, true) -- the corner store keeps its shop worker
+		local world = TownAI.build({ data = Data.default(), seed = 3 })
+		for frame = 0, 30 * 10 do
+			if frame > 0 then
+				TownAI.stepFrame(world, 1 / 30)
+			end
+			if frame % 30 == 0 then
+				for _, a in world.actors do
+					local x, _, d = AlleyLayout.toLocal(v.place, a.x, a.y, a.z)
+					local inBuilding = math.abs(x) < v.footprint.w / 2 and math.abs(d) < v.footprint.d / 2
+					t.truthy(not inBuilding, `{a.post} {a.id} in the lounge at {x}, {d}`)
+				end
+			end
+		end
 	end)
 
 	t.test(

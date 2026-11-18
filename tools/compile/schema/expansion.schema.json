@@ -59,7 +59,7 @@
           "counter", "curio", "deck", "display", "dock", "dumpster", "exhibit", "garden_bed", "gig_post", "guard_post", "instrument",
           "interact", "item_shelf", "landmark", "minigame", "parking", "pet_home", "picture_book", "playground", "prop", "radio",
           "readable", "ride", "ride_cable", "ride_end", "ride_start", "room", "sand", "seat", "shed", "sign", "squirrel_block",
-          "staff_post", "table", "vehicle_spot", "vending", "yard", "zone"] },
+          "staff_post", "table", "vehicle_spot", "vending", "venue_staff_post", "yard", "zone"] },
         "at": { "$ref": "#/$defs/xyz" }, "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
         "owner": { "$ref": "#/$defs/family" },
         "note": { "type": "string" }, "forage": { "enum": ["dumpster", "garden", "bird_feeder", "compost"] },

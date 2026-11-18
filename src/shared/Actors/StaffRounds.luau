@@ -14,7 +14,8 @@
 --   * VENUES: the built expansion venues (generated/Expansion: a venue with `built`) are indoor floors above the
 --     ground, and one with a "staff_post" anchor has a member of staff behind its counter (Pepper's Corner
 --     Store: the first shop worker, AI/TownAI): venues(expansion) lists them, with the post's short round along
---     the counter (POST_ROUND, local X and D about the post), and floorAt says which floor a point is on.
+--     the counter (POST_ROUND, local X and D about the post), and floorAt says which floor a point is on. A
+--     "venue_staff_post" is a post the venue staffs itself (THE GILDED ACORN's baked bartender): no town worker.
 -- Interface: CIRCUIT; POLICE { x, z }; points(stationX, stationZ, index) -> { {x, z} } (studs);
 --   bounds(stationX, stationZ) -> cx, cz, r (a disc that holds the round for every index);
 --   POST_ROUND; venues(expansion?) -> { Venue { id, place, hw, hd, floorY, post: { x, z, round } ? } };

@@ -1729,7 +1729,7 @@
           "owner": "F3",
           "note": "paintball pass check; offers the pass if missing"
         },
-        { "id": "bartender", "kind": "staff_post", "at": [0, 0, 20], "yaw": 180, "owner": "F3", "serves": "hot_cocoa,coffee,green_tea,snow_cone" },
+        { "id": "bartender", "kind": "venue_staff_post", "at": [0, 0, 20], "yaw": 180, "owner": "F3", "serves": "hot_cocoa,coffee,green_tea,snow_cone" },
         { "id": "bar", "kind": "counter", "at": [0, 0, 16], "yaw": 0, "owner": "F3" },
         { "id": "music", "kind": "radio", "at": [-20, 6, 20], "yaw": 0, "owner": "F3", "note": "library jazz, 1920s feel" },
         { "id": "booth_1", "kind": "seat", "at": [-18, 0, -10], "yaw": 0, "owner": "F3" },
