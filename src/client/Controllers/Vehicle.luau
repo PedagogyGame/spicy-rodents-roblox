@@ -7,16 +7,48 @@
 -- human stays welded to the DriverSeat by the server; the camera goes first person at EyeSocket.
 -- The town's cars this client draws are solid (Render/VehicleView: their RootPart collides with the bodies this client
 -- simulates, a driven vehicle among them): the motor stops at their boxes (ClientWorld.cars, Traffic/Solid) as at a wall,
--- so the physics never has to push a driven vehicle back out of one every frame.
--- Interface: start(vehicle, kind, metrics, ctx) -> stop(); ctx = { world, input }
+-- so the physics never has to push a driven vehicle back out of one every frame. The test is the vehicle's own turned
+-- footprint (its logical box, CarMotor.corners), not a square at its centre, so its nose stops at a car's side; and a
+-- move that does not take it deeper into a car it already overlaps is free (Solid.pushes: a town car drawn over it, a
+-- car that pulled up against it, never locks it in; review 2026-11-18).
+-- Interface: start(vehicle, kind, metrics, ctx) -> stop(); ctx = { world, input }; blocked(state, cars, walls) (the motor's
+-- wall test)
 -- No side effects on require.
 
 local Import = require("../Import")
 local CarMotor = Import.shared("Movement/CarMotor") :: typeof(require("../../shared/Movement/CarMotor"))
+local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
 local BodyDriver = require("./BodyDriver")
 
 local Vehicle = {}
+
+-- blocked(state, cars, walls) -> CarMotor.World.blocked: the motor's wall test for the vehicle `state` drives (asked
+-- with where it would move to, before the move; the state still holds where it is, at the new heading): the town's
+-- cars (a Traffic/Solid set) meet its turned footprint, a slab a stud deep at its centre's height (as before), and the
+-- world's own walls `walls` (ClientWorld.blockedRadius) the square of half its width. Pure but for `walls`.
+function Vehicle.blocked(
+	state: { kind: string, x: number, z: number, yaw: number }, -- a CarMotor.State (types do not cross Import)
+	cars: any,
+	walls: (x: number, z: number, y: number, r: number) -> boolean
+): (x: number, z: number, y: number, r: number) -> boolean
+	local size = VehicleKinds.kind(state.kind).size
+	-- the heading the vehicle had where it stands (the motor turns it before it asks; asked once a step)
+	local was = state.yaw
+	return function(x: number, z: number, y: number, r: number): boolean
+		local yaw = state.yaw
+		local stood = was
+		was = yaw
+		if cars and cars.n > 0 then
+			local from = Solid.box(size[1], size[3], 1, state.x, y - 0.5, state.z, stood)
+			local to = Solid.box(size[1], size[3], 1, x, y - 0.5, z, yaw)
+			if Solid.pushes(cars, from, to) then
+				return true
+			end
+		end
+		return walls(x, z, y, r)
+	end
+end
 
 function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
 	local root = vehicle.PrimaryPart
@@ -30,13 +62,7 @@ function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any },
 	local motorWorld = {
 		groundAt = world.groundAt,
 		waterAt = world.waterAt,
-		blocked = function(x: number, z: number, y: number, r: number): boolean
-			local cars = world.cars
-			if cars and cars.n > 0 and Solid.blocked(cars, x, z, r, y - 0.5, y + 0.5) then
-				return true
-			end
-			return world.blockedRadius(x, z, y, r)
-		end,
+		blocked = Vehicle.blocked(state, world.cars, world.blockedRadius),
 		clamp = world.clamp,
 	}
 	metrics.vehicleKind = kind

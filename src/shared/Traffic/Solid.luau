@@ -19,7 +19,8 @@
 --   inside(h, x, z); overlaps(h, x, z, half, y0, y1); enters(h, ox, oy, oz, dx, dy, dz) -> t?;
 --   newSet() -> Set; clear(set); add(set, h); blocked(set, x, z, half, y0, y1, skip?); roof(set, x, z, from) -> top?;
 --   ray(set, ox, oy, oz, dx, dy, dz) -> boolean; body(set, x, z, y, half, skip?); core(set, x, z, y, skip?);
---   caught(set, x, z, y, into) (the cars the body's core is already inside);
+--   caught(set, x, z, y, into) (the cars the body's core is already inside); depth(a, b) (plan overlap of two boxes);
+--   pushes(set, from, to) (a driven vehicle's footprint moving into, or deeper into, a car);
 --   squirrelWorld(world, set) -> world (a copy whose groundAt, blocked, blockedCore and blockedHalf meet the set, and
 --   whose wallsFrom(x, z, y) lets a body out of a car it is already inside);
 --   BODY (the squirrel motor's body: Client/World/ClientWorld's numbers)
@@ -152,6 +153,53 @@ function Solid.enters(h: Hull, ox: number, oy: number, oz: number, dx: number, d
 		return nil -- starts inside (or the box is behind or beyond the segment)
 	end
 	return enter
+end
+
+-- depth(a, b): how far two boxes overlap in plan, along the axis they overlap least (separating axes: the two boxes'
+-- four), or 0 when they are apart or apart in height. Studs.
+function Solid.depth(a: Hull, b: Hull): number
+	if a.top <= b.base or a.base >= b.top then
+		return 0
+	end
+	local dx, dz = b.x - a.x, b.z - a.z
+	local least = math.huge
+	-- each box's across (c, -s) and along (s, c) unit vectors in (x, z)
+	for axis = 1, 4 do
+		local h = if axis <= 2 then a else b
+		local ux, uz
+		if axis % 2 == 1 then
+			ux, uz = h.c, -h.s
+		else
+			ux, uz = h.s, h.c
+		end
+		local ra = a.hw * math.abs(ux * a.c - uz * a.s) + a.hl * math.abs(ux * a.s + uz * a.c)
+		local rb = b.hw * math.abs(ux * b.c - uz * b.s) + b.hl * math.abs(ux * b.s + uz * b.c)
+		local o = ra + rb - math.abs(ux * dx + uz * dz)
+		if o <= 0 then
+			return 0
+		end
+		least = math.min(least, o)
+	end
+	return least
+end
+
+-- pushes(set, from, to): does a box moving from `from` to `to` (a driven vehicle's footprint) run into a box of the set,
+-- or deeper into one it already overlaps? (A town car drawn over a stopped player's car never locks it in: any move
+-- that does not deepen the overlap is free, so it drives out; Client/Controllers/Vehicle.)
+function Solid.pushes(set: Set, from: Hull, to: Hull): boolean
+	local hulls = set.hulls
+	for i = 1, set.n do
+		local h = hulls[i]
+		local r = h.reach + to.reach
+		local dx, dz = to.x - h.x, to.z - h.z
+		if dx * dx + dz * dz < r * r then
+			local now = Solid.depth(to, h)
+			if now > 0 and now > Solid.depth(from, h) + 1e-4 then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 function Solid.newSet(): Set
