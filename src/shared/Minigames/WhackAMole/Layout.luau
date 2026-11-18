@@ -153,14 +153,86 @@ Layout.MALLET = {
 	headAt = m(0.60), -- the head's middle, along the handle from the pivot
 	headLen = m(0.285),
 	headR = m(0.098),
-	-- above a hole, the striking face comes down to the deck: the pivot is held this far toward the player
-	-- (-w) and this high while the head swings down onto the hole
-	reachW = m(-0.634),
+	-- his demonstration's swing: over a hole the pivot is held this far toward the player (-w) and this high,
+	-- the handle tipped back RAISED (radians about the cabinet's across axis) and brought down to STRUCK, where
+	-- the head is over the hole's middle just above a raised mole's head
+	reachW = m(-0.564),
 	strikeV = m(1.63),
+	raised = math.rad(-50),
+	struck = math.rad(-110),
+	-- at rest in its bracket: turned about the vertical, then tipped sideways (his rotation (0, -16, -12) deg)
+	restYaw = math.rad(-12),
+	restTip = math.rad(16),
 }
 
 -- The FREE PLAY plate, where the owner's coin door was (no coins, ever: brief v2 §13a, D13 rating).
 Layout.PLATE = { v = m(0.55), w = m(-0.539), width = m(0.295), height = m(0.27) }
+
+-- The names the bake gives the parts the client moves and writes on (and the art loader keeps).
+Layout.NAMES = {
+	model = "WhackAMole", -- under the games room
+	mole = "Mole", -- Mole1 .. Mole5: a Model each, its pivot at the mole's rest
+	mallet = "Mallet", -- a Model, its pivot at the bottom of the handle
+	score = "ScoreWindow", -- parts with a SurfaceGui "Display" holding a TextLabel "Value"
+	time = "TimeWindow",
+	status = "StatusLine",
+	display = "Display",
+	value = "Value",
+}
+
+-- The camera: from above and behind the player's head, looking down at the deck with the sign's windows in
+-- view. camera(aspect) -> eye, target (cabinet frame) and the vertical field of view (degrees) that keeps the
+-- whole deck, the five holes and both windows on a screen of that shape (width / height), with a margin.
+Layout.EYE = { 0, 9.4, -6.6 }
+Layout.LOOK = { 0, 4.9, 0.3 }
+Layout.FOV_MIN = 40
+Layout.FOV_MAX = 80
+Layout.FRAME_MARGIN = 1.1
+
+-- the points the camera must show (cabinet frame): the deck's four corners, the windows' corners
+function Layout.framePoints(): { { number } }
+	local d = Layout.DECK
+	local out = {
+		{ -d.halfU, d.railTop, d.w0 },
+		{ d.halfU, d.railTop, d.w0 },
+		{ -d.halfU, d.railTop, d.w1 },
+		{ d.halfU, d.railTop, d.w1 },
+	}
+	for _, win in { Layout.WINDOWS.score, Layout.WINDOWS.time } do
+		for _, su in { -1, 1 } do
+			for _, sv in { -1, 1 } do
+				table.insert(out, { win.u + su * win.frameW / 2, win.v + sv * win.frameH / 2, win.glassFront })
+			end
+		end
+	end
+	return out
+end
+
+-- a point (cabinet frame) in the camera's own frame: across (right), up, and how far ahead
+function Layout.inCamera(p: { number }): (number, number, number)
+	local e, t = Layout.EYE, Layout.LOOK
+	local fx, fy, fz = t[1] - e[1], t[2] - e[2], t[3] - e[3]
+	local fl = math.sqrt(fx * fx + fy * fy + fz * fz)
+	fx, fy, fz = fx / fl, fy / fl, fz / fl
+	-- right = forward x up (the cabinet frame is u right, v up, w ahead: a player facing +w has +u on the right)
+	local rx, ry, rz = fz, 0, -fx
+	local rl = math.sqrt(rx * rx + rz * rz)
+	rx, rz = rx / rl, rz / rl
+	-- up = forward x right (written out for this frame, whose axes u, v, w are left-handed)
+	local ux, uy, uz = fy * rz - fz * ry, fz * rx - fx * rz, fx * ry - fy * rx
+	local px, py, pz = p[1] - e[1], p[2] - e[2], p[3] - e[3]
+	return px * rx + py * ry + pz * rz, px * ux + py * uy + pz * uz, px * fx + py * fy + pz * fz
+end
+
+function Layout.camera(aspect: number): ({ number }, { number }, number)
+	local need = 0
+	for _, p in Layout.framePoints() do
+		local x, y, z = Layout.inCamera(p)
+		need = math.max(need, math.abs(y) / z, math.abs(x) / (z * aspect))
+	end
+	local fov = math.deg(2 * math.atan(need * Layout.FRAME_MARGIN))
+	return Layout.EYE, Layout.LOOK, math.clamp(fov, Layout.FOV_MIN, Layout.FOV_MAX)
+end
 
 -- Where the player stands (a little in front of the deck, in the middle), and the prompt.
 Layout.STAND = { u = 0, w = m(-0.565) - 2.4 }

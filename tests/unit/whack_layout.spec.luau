@@ -115,4 +115,24 @@ return function(t: Test.T)
 		local a = Layout.STANDING
 		t.truthy(st.x > a.x0 and st.x < a.x1 and st.d > a.d0 and st.d < a.d1)
 	end)
+
+	t.test("the camera: the deck, the five holes and both windows on screens from 4:3 to a wide phone", function()
+		for _, aspect in { 4 / 3, 16 / 10, 16 / 9, 19.5 / 9, 21 / 9 } do
+			local eye, look, fov = Layout.camera(aspect)
+			t.truthy(fov > Layout.FOV_MIN - 1e-9 and fov < Layout.FOV_MAX, `fov {fov} at {aspect}`)
+			t.truthy(eye[2] > Layout.SIGN.v1 and eye[3] < Layout.DECK.w0, "from above and behind the player's head")
+			t.truthy(look[2] > Layout.DECK.top)
+			local half = math.tan(math.rad(fov) / 2)
+			local points = Layout.framePoints()
+			for i = 1, 5 do
+				local u, v, w = Layout.hole(i)
+				table.insert(points, { u, v + Layout.MOLE.pop, w })
+			end
+			for _, p in points do
+				local x, y, z = Layout.inCamera(p)
+				t.truthy(z > 0, "ahead of the eye")
+				t.truthy(math.abs(y) / z < half and math.abs(x) / z < half * aspect, `({p[1]}, {p[2]}, {p[3]}) in view`)
+			end
+		end
+	end)
 end
