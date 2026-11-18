@@ -18,7 +18,9 @@
 --              minutes it goes back to the thrower. The newspaper is litter: gone after 20 s.
 --   write      the chalk's filtered words on the ground in front (5 minutes; 30 in the town at most)
 --   tape       a strip of duct tape on what is ahead (5 minutes; 40 at most)
---   place      a lawn chair (sat in at once; E folds it back up, its owner's) or a whoopee cushion (the next person
+--   place      a lawn chair (sat in at once; E folds it back up, its owner's; one each: a second folds the first; left
+--              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
+--              whoopee cushion (the next person
 --              to come within a stud and a half sets it off; E picks it up)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
@@ -114,6 +116,62 @@ local function newPart(name: string, size: Vector3, cf: CFrame, color: Color3, p
 	return p
 end
 
+ItemWorld.CHAIR = table.freeze({
+	emptySecs = 180, -- a lawn chair left empty this long folds itself back into its owner's things
+	promptClear = 6, -- studs: never set down this close to a prompt (a shelf, the till, a door, a game)
+})
+
+export type ChairLedger = {
+	-- this owner's chair now; returns the one it replaces (to be folded), if any
+	place: (owner: any, chair: any, now: number) -> any?,
+	remove: (owner: any, chair: any?) -> (), -- (only that chair, when given)
+	chairOf: (owner: any) -> any?,
+	-- whether the owner's chair should fold now: empty for CHAIR.emptySecs (`occupied` says if anyone sits in it)
+	tick: (owner: any, occupied: boolean, now: number) -> boolean,
+	owners: () -> { any },
+}
+
+-- The lawn chairs out in the town, by owner (pure: ItemWorld.start does the folding).
+function ItemWorld.chairs(): ChairLedger
+	local byOwner: { [any]: { chair: any, emptySince: number? } } = {}
+	return {
+		place = function(owner: any, chair: any, now: number): any?
+			local prev = byOwner[owner]
+			byOwner[owner] = { chair = chair, emptySince = now }
+			return if prev and prev.chair ~= chair then prev.chair else nil
+		end,
+		remove = function(owner: any, chair: any?)
+			local r = byOwner[owner]
+			if r and (chair == nil or r.chair == chair) then
+				byOwner[owner] = nil
+			end
+		end,
+		chairOf = function(owner: any): any?
+			local r = byOwner[owner]
+			return r and r.chair
+		end,
+		tick = function(owner: any, occupied: boolean, now: number): boolean
+			local r = byOwner[owner]
+			if r == nil then
+				return false
+			end
+			if occupied then
+				r.emptySince = nil
+				return false
+			end
+			r.emptySince = r.emptySince or now
+			return now - (r.emptySince :: number) >= ItemWorld.CHAIR.emptySecs
+		end,
+		owners = function(): { any }
+			local out = {}
+			for o in byOwner do
+				table.insert(out, o)
+			end
+			return out
+		end,
+	}
+end
+
 -- A rodent's body stunned: only the deadline (server time) on it. A driving client gives its motor no input until
 -- then (Controllers/Squirrel), so nothing here anchors the body, owns it or runs a timer: a release or a new driver
 -- in the meantime changes nothing, and a later stun only ever lengthens it.
@@ -186,6 +244,9 @@ function ItemWorld.start(opts: StartOpts): World
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Exclude
 		local ex: { Instance } = { folder }
+		if rt and rt.bodies then
+			table.insert(ex, rt.bodies) -- every body, the computer's people and squirrels too
+		end
 		for _, p in Players:GetPlayers() do
 			if p.Character then
 				table.insert(ex, p.Character)
@@ -221,6 +282,35 @@ function ItemWorld.start(opts: StartOpts): World
 	end
 	local writings: { Instance } = {}
 	local tapes: { Instance } = {}
+	local chairs = ItemWorld.chairs()
+	-- a lawn chair folded back up: its sitter stands, and it is back in its owner's things (unless they left)
+	local function foldChair(owner: any, m: Instance, back: boolean)
+		chairs.remove(owner, m)
+		local seat = m:FindFirstChild("Seat")
+		local sitter = if seat and seat:IsA("Seat") then seat.Occupant else nil
+		if sitter then
+			sitter.Sit = false
+		end
+		if m.Parent == nil then
+			return
+		end
+		m:Destroy()
+		if back and owner.Parent == Players then
+			opts.inventory.add(owner, "lawn_chair")
+		end
+	end
+	-- whether a point is within CHAIR.promptClear of something with a prompt (a shelf, the till, a door, a game)
+	local function nearPrompt(at: Vector3): boolean
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = if rt and rt.bodies then { folder, rt.bodies } else { folder }
+		for _, part in workspace:GetPartBoundsInRadius(at, ItemWorld.CHAIR.promptClear, params) do
+			if part:FindFirstChildWhichIsA("ProximityPrompt", true) then
+				return true
+			end
+		end
+		return false
+	end
 
 	-- the town's brains, for a computer-run person, squirrel or the rodent
 	local function brainOf(id: any): any?
@@ -632,6 +722,10 @@ function ItemWorld.start(opts: StartOpts): World
 			end
 			local look = root.CFrame.LookVector
 			local yaw = math.atan2(look.X, look.Z)
+			if e.prop == "lawn_chair" and nearPrompt(g) then
+				notify(player, "Not here: you would be in everyone's way.")
+				return false
+			end
 			if e.prop == "lawn_chair" then
 				local m = Instance.new("Model")
 				m.Name = "LawnChair"
@@ -642,16 +736,16 @@ function ItemWorld.start(opts: StartOpts): World
 				seat.CFrame = base * CFrame.new(0, 1.0, 0)
 				seat.Color = Color3.fromRGB(60, 150, 90)
 				seat.Anchored = true
+				seat.CanCollide = false -- (sat in by Seat:Sit; never a wall)
 				seat.Material = Enum.Material.Fabric
 				seat.Parent = m
-				local back = newPart(
+				newPart(
 					"Back",
 					Vector3.new(2, 2, 0.15),
 					base * CFrame.new(0, 2.0, 0.9),
 					Color3.fromRGB(250, 200, 60),
 					m
 				)
-				back.CanCollide = true
 				newPart(
 					"Frame",
 					Vector3.new(2.1, 0.12, 2),
@@ -673,13 +767,13 @@ function ItemWorld.start(opts: StartOpts): World
 						notify(who, "That is somebody's chair.")
 						return
 					end
-					local sitter = seat.Occupant
-					if sitter then
-						sitter.Sit = false
-					end
-					m:Destroy()
-					opts.inventory.add(owner, "lawn_chair")
+					foldChair(owner, m, true)
 				end)
+				-- one each: a chair already out folds back up
+				local prev = chairs.place(owner, m, os.clock())
+				if prev then
+					foldChair(owner, prev, true)
+				end
 				-- its owner sits down in it at once
 				local holder = actorOf(player)
 				local body = if holder then holder.body else nil
@@ -689,15 +783,6 @@ function ItemWorld.start(opts: StartOpts): World
 						seat:Sit(hum)
 					end)
 				end
-				-- an owner who leaves the game takes the chair along
-				task.spawn(function()
-					while m.Parent do
-						if owner.Parent ~= Players then
-							m:Destroy()
-						end
-						task.wait(5)
-					end
-				end)
 			else
 				local p = newPart(
 					"WhoopeeCushion",
@@ -940,6 +1025,23 @@ function ItemWorld.start(opts: StartOpts): World
 					end
 				end
 				table.remove(kites, i)
+			end
+		end
+		-- lawn chairs: an owner who left takes theirs along; one left empty long enough folds itself up
+		for _, owner in chairs.owners() do
+			local m = chairs.chairOf(owner)
+			if m == nil or m.Parent == nil or owner.Parent ~= Players then
+				chairs.remove(owner)
+				if m then
+					m:Destroy()
+				end
+				continue
+			end
+			local seat = m:FindFirstChild("Seat")
+			local occupied = seat ~= nil and seat:IsA("Seat") and seat.Occupant ~= nil
+			if chairs.tick(owner, occupied, os.clock()) then
+				foldChair(owner, m, true)
+				notify(owner, "Your lawn chair folded itself up: it is back in your things.")
 			end
 		end
 		-- whoopee cushions: the next person within a stud and a half (not the one who put it down) sets it off

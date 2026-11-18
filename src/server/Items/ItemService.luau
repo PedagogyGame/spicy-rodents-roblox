@@ -114,7 +114,8 @@ end
 -- switches it on. Returns the item ids that were on (Items/ItemWorld puts their lights, sounds and kites away).
 function Methods.putAway(self: Service, player: any): { string }
 	local was = {}
-	for itemId, s in self.states[keyOf(player)] or {} do
+	local mine: { [string]: State } = self.states[keyOf(player)] or {}
+	for itemId, s in mine do
 		if s.on then
 			s.on = false
 			table.insert(was, itemId)

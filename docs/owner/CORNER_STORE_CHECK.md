@@ -43,7 +43,7 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 | Dog treats | Calms a dog. **There are no dogs in the town yet**, so it says "No dog near enough" |
 | Duct tape | A strip of tape on whatever is in front of you (10 strips) |
 | Whoopee cushion | Put down in front of you; the next person who steps on it sets it off. E picks it back up |
-| Lawn chair | Set down in front of you and you sit in it, anywhere. E (held) folds it back up |
+| Lawn chair | Set down in front of you and you sit in it, anywhere but right by a shelf, the till or a door. E (held) folds it back up; one each (a second folds the first); left empty for 3 minutes it folds itself; nobody bumps into it |
 | Radio | On and off; it plays a playlist of library music (silent until the lead picks the tracks) |
 | Chalk | A box asks what to write (up to 20 letters); it appears on the ground in front of you, checked by Roblox's filter like any chat |
 | Disposable camera | Takes a screenshot: the white flash, then Roblox's own "save to captures" offer (24 shots) |
