@@ -18,7 +18,8 @@
 -- (ClientWorld.isBough), the bodies, the vehicles and the terrain (no wall for the client), and run in the squirrel's
 -- collision group (Shared/World/CollisionGroups.SQUIRREL_PROBE).
 -- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray); crosses(wall) ->
---   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; floor(down) -> (x, y, z) -> boolean; landable(down) ->
+--   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; crossesLong(wall) -> the same, chord by chord, for any
+--   length; floor(down) -> (x, y, z) -> boolean; landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
 -- Ray: (ox, oy, oz, dx, dy, dz) -> boolean, true when the segment origin -> origin + d meets a solid.
@@ -85,6 +86,37 @@ function ValidatorWorld.crosses(wall: Ray): (number, number, number, number, num
 	end
 end
 
+-- crossesLong(wall)(x0, z0, x1, z1, yLow, yHigh?, rise?): the straight line of a gap too long for crosses, judged
+-- chord by chord (each at most C.MAX_CHORD, each by the six rays): did any chord go through a wall? (An honest body may
+-- have gone round a corner in the gap: the caller weighs it as such.)
+function ValidatorWorld.crossesLong(wall: Ray): (number, number, number, number, number, number?, number?) -> boolean
+	local one = ValidatorWorld.crosses(wall)
+	return function(
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		yLow: number,
+		yHigh: number?,
+		rise: number?
+	): boolean
+		local len = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
+		if len < C.MIN_CHORD then
+			return false
+		end
+		local n = math.ceil(len / C.MAX_CHORD)
+		for i = 1, n do
+			local a, b = (i - 1) / n, i / n
+			if
+				one(x0 + (x1 - x0) * a, z0 + (z1 - z0) * a, x0 + (x1 - x0) * b, z0 + (z1 - z0) * b, yLow, yHigh, rise)
+			then
+				return true
+			end
+		end
+		return false
+	end
+end
+
 -- floor(down)(x, y, z): is there something to stand on under feet at y (or the river's water)?
 function ValidatorWorld.floor(down: Ray): (number, number, number) -> boolean
 	return function(x: number, y: number, z: number): boolean
@@ -117,6 +149,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 			return refY
 		end,
 		crosses = if o.wall then ValidatorWorld.crosses(o.wall) else nil,
+		crossesLong = if o.wall then ValidatorWorld.crossesLong(o.wall) else nil,
 		floorBelow = if o.down then ValidatorWorld.floor(o.down) else nil,
 		landable = if o.down then ValidatorWorld.landable(o.down) else nil,
 	}

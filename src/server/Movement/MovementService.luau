@@ -307,7 +307,7 @@ function MovementService.new(deps: Deps): Movement
 			self.deps.swept:markTeleported(id)
 		end
 		if self.deps.validator then
-			self.deps.validator:reset(id, nil) -- forget: the next packet is the new baseline
+			self.deps.validator:forget(id) -- a new start: the next packet is the new baseline
 		end
 		self.histories[id] = nil
 		self.last[id] = nil
@@ -452,7 +452,8 @@ function MovementService.new(deps: Deps): Movement
 				if sq.since == nil then
 					sq.since = now
 				end
-				if v.ok then
+				if v.ok and not v.resync then
+					-- (a packet after a gap too long to judge move by move is never a snap target)
 					sq.good = snapshot
 				end
 			end

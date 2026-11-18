@@ -9,7 +9,9 @@ local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local MoveValidator = require("@server/Movement/MoveValidator")
 local MovementService = require("@server/Movement/MovementService")
 local Harness = require("@tests/cheat/Harness")
+local Rng = require("@tests/cheat/Rng")
 local TestWorld = require("@tests/cheat/TestWorld")
+local LiveRig = require("@tests/lib/LiveRig")
 
 type State = SquirrelMotor.State
 
@@ -114,4 +116,238 @@ return function(t)
 		t.eq(again.flagged, true)
 		t.eq((v:last("b") :: any).x, s.x, "the baseline is still the honest state")
 	end)
+
+	-- THE RIG: cheats from CHEAT_AT on ------------------------------------------------------------------------------
+	local town = LiveRig.town()
+	local CHEAT_AT = 5
+	local fastest = MoveValidator.new(town.vworld):fastest("x")
+	local function still(_now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+		return SquirrelMotor.idleInput(0)
+	end
+	local function sprintEast(_now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+		local inp = SquirrelMotor.idleInput(-math.pi / 2)
+		inp.fw = 1
+		inp.sprint = true
+		return inp
+	end
+	local function show(name: string, r: LiveRig.Result)
+		print(`      {LiveRig.describe(name, r)}; first snap at {r.firstSnap}`)
+		for i, v in r.violations do
+			if i <= 4 then
+				print(`        {v}`)
+			end
+		end
+	end
+	local quiet: LiveRig.Link = { latency = 0.12, jitter = 0.05, loss = 0 }
+
+	-- 2. GAPS TOO LONG TO JUDGE MOVE BY MOVE -------------------------------------------------------------------------
+	t.test(
+		"cheat: one packet every 0.6 s, flying 12 studs up and climbing, at 40 st/s through houses: snapped",
+		function()
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = quiet,
+				seed = 3,
+				silent = function(now: number): boolean
+					return now >= CHEAT_AT and (now % 0.6) >= 0.05
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					if now >= CHEAT_AT then
+						s.y = town.world.groundHeight + 12 + (now - CHEAT_AT) * 2
+						s.vy, s.grounded = 0, false
+						s.x += 40 / 60
+					end
+				end,
+			})
+			rig:possess(town.openStart(), sprintEast)
+			rig:run(25)
+			local r = rig:result()
+			show("sparse fly", r)
+			t.truthy(r.firstSnap and r.firstSnap <= CHEAT_AT + 2, "snapped within 2 s")
+			t.truthy(r.snaps >= 5, `snapped again and again ({r.snaps})`)
+		end
+	)
+
+	t.test(
+		"cheat: silent 2.9 s, then a hop of 0.9 x the fastest for that time, 20 studs up, every 4 s: snapped",
+		function()
+			local hops = 0
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = quiet,
+				seed = 6,
+				silent = function(now: number): boolean
+					return (now % 4) >= 1 and (now % 4) < 3.98
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					local ph = now % 4
+					if now > CHEAT_AT and ph >= 3.98 and ph < 3.98 + 1 / 60 then
+						hops += 1
+						s.x += fastest * 2.9 * 0.9
+						s.y += 20
+						s.grounded = false
+						s.vx, s.vy, s.vz = 0, 0, 0
+					end
+				end,
+			})
+			rig:possess(town.openStart(), still)
+			rig:run(40)
+			local r = rig:result()
+			show("stall hops up", r)
+			t.truthy(r.snaps >= hops - 1, `each hop snapped ({r.snaps} snaps, {hops} hops)`)
+		end
+	)
+
+	t.test(
+		"cheat: silent 2.9 s, then a hop through a house at ground level, back and forth: snapped by the second",
+		function()
+			local b = town.boxes[1]
+			local cz = (b.minZ + b.maxZ) / 2
+			local span = (b.maxX - b.minX) + 20
+			local hops = 0
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = quiet,
+				seed = 7,
+				silent = function(now: number): boolean
+					return (now % 4) >= 1 and (now % 4) < 3.98
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					local ph = now % 4
+					if now > CHEAT_AT and ph >= 3.98 and ph < 3.98 + 1 / 60 then
+						hops += 1
+						s.x += if s.x < b.minX then span else -span
+						s.vx, s.vz = 0, 0
+					end
+				end,
+			})
+			rig:possess(SquirrelMotor.new(b.minX - 10, town.world.groundHeight, cz), still)
+			rig:run(30)
+			local r = rig:result()
+			show("stall hops through a house", r)
+			t.truthy(hops >= 4, `hopped ({hops})`)
+			t.truthy(r.snaps >= 1 and (r.firstSnap :: number) <= 12.5, "snapped by the second hop")
+			t.truthy(r.snaps >= hops - 2, `and from then on ({r.snaps} snaps, {hops} hops)`)
+		end
+	)
+
+	t.test("cheat: the clock jumped 100 s ahead and the body 1,500 studs on: snapped at once", function()
+		local done = false
+		local rig = LiveRig.new({
+			world = town.noWalls,
+			vworld = town.vworld,
+			link = quiet,
+			seed = 5,
+			cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+				if now >= CHEAT_AT and not done then
+					done = true
+					s.clock += 100
+					s.x += 1500
+				end
+			end,
+		})
+		rig:possess(town.openStart(), still)
+		rig:run(10)
+		local r = rig:result()
+		show("clock jump", r)
+		t.truthy(r.firstSnap and r.firstSnap <= CHEAT_AT + 0.5, "snapped")
+	end)
+
+	t.test("cheat: a client that sends one packet in 0.6 s (hiding its moves), on the ground: snapped", function()
+		local rig = LiveRig.new({
+			world = town.world,
+			vworld = town.vworld,
+			link = quiet,
+			seed = 8,
+			silent = function(now: number): boolean
+				return now >= CHEAT_AT and (now % 0.6) >= 0.05
+			end,
+		})
+		rig:possess(town.openStart(), sprintEast)
+		rig:run(15)
+		local r = rig:result()
+		show("sparse sender", r)
+		t.truthy(r.firstSnap and r.firstSnap <= CHEAT_AT + 4, "snapped within 4 s")
+		t.truthy((r.reasons.gaps or 0) >= 1, "for its gaps")
+	end)
+
+	-- 5. THE CLOCK: A LATENCY THAT DROPS IS NO TIME HACK; A SLOW TIME HACK STILL SHOWS -------------------------------
+	local function honest(name: string, link: LiveRig.Link, seconds: number, seed: number, fps: any?)
+		t.test(`honest: {name}: 0 snaps`, function()
+			local rng = Rng.new(seed)
+			local rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = link, seed = seed, fps = fps })
+			rig:possess(town.startAt(rng), town.driven(rng))
+			rig:run(seconds)
+			local r = rig:result()
+			show(name, r)
+			t.eq(r.snaps, 0, "snaps")
+			t.truthy(r.accepted > seconds * 5, `packets judged ({r.accepted})`)
+		end)
+	end
+	for _, c in { { a = 0.75, b = 0.15 }, { a = 0.45, b = 0.05 }, { a = 0.6, b = 0.2 }, { a = 0.8, b = 0.05 } } do
+		honest(`the latency drops from {c.a} s to {c.b} s after 20 s (a congested link clearing, a handover)`, {
+			jitter = 0.1,
+			loss = 0.02,
+			latencyAt = function(now: number): number
+				return if now < 20 then c.a else c.b
+			end,
+		}, 40, 21)
+	end
+	honest("the latency rises and drops by 0.5 s every 12 s", {
+		jitter = 0.1,
+		loss = 0.02,
+		latencyAt = function(now: number): number
+			return if now % 12 < 6 then 0.6 else 0.1
+		end,
+	}, 60, 22)
+	-- the reviewer's links: 500 to 800 ms one way, jitter that reorders packets
+	local SLOW = 90
+	honest("500 ms one way and 300 ms jitter", { latency = 0.5, jitter = 0.3, loss = 0.02 }, SLOW, 31)
+	honest("650 ms one way and 150 ms jitter", { latency = 0.65, jitter = 0.15, loss = 0.02 }, SLOW, 32)
+	honest("400 ms one way and 400 ms jitter (reordered)", { latency = 0.4, jitter = 0.4, loss = 0.02 }, SLOW, 33)
+	honest(
+		"the app frozen for 10 s and then 25 s (backgrounded), 200 ms",
+		{ latency = 0.2, jitter = 0.1, loss = 0.02 },
+		90,
+		41,
+		function(frame: number, _now: number): number
+			if frame == 1200 then
+				return 10
+			elseif frame == 3000 then
+				return 25
+			end
+			return 1 / 60
+		end
+	)
+
+	for _, c in
+		{
+			{ name = "80 ms", link = { latency = 0.08, jitter = 0.15, loss = 0.02 }, within = 4 },
+			{
+				name = "500 ms and 300 ms jitter",
+				link = { latency = 0.5, jitter = 0.3, loss = 0.02 },
+				within = 10, -- (eight seconds to add up to the cap, and the link's own 0.8 s)
+			},
+		}
+	do
+		t.test(`cheat: a 1.12 x clock ({c.name}): snapped within {c.within} s`, function()
+			local rng = Rng.new(61)
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = c.link,
+				seed = 61,
+				clockRate = 1.12,
+			})
+			rig:possess(town.startAt(rng), town.driven(rng))
+			rig:run(20)
+			local r = rig:result()
+			show(`1.12 x clock, {c.name}`, r)
+			t.truthy(r.firstSnap and r.firstSnap <= c.within, `snapped within {c.within} s`)
+			t.truthy((r.reasons.clock or 0) >= 1, "for its clock")
+		end)
+	end
 end

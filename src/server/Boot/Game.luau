@@ -758,6 +758,18 @@ function Game.start(opts: Opts?): any
 		local p = root.Position
 		return p.X, p.Y - hipOf(body), p.Z
 	end
+	-- the driver's round trip as the engine measures it: a latency that drops lowers the clock's arrival offset by up to
+	-- that much, and the validator's clock check allows it (Movement/MoveValidator, pingOf)
+	movement.deps.validator.pingOf = function(actorId: any): number?
+		local _, driver = heldBy(actorId)
+		if driver and typeof(driver) == "Instance" and driver:IsA("Player") then
+			local ok, ping = pcall(function(): number
+				return (driver :: Player):GetNetworkPing()
+			end)
+			return if ok then ping else nil
+		end
+		return nil
+	end
 	movement.deps.engine = {
 		correct = function(actorId: any, msg: any)
 			local actor, driver = heldBy(actorId)

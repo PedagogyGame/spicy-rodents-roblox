@@ -19,7 +19,8 @@
 -- sky lift), handoff (a new body; packets of the old one still arriving are taken for the new, as the game does),
 -- release and possess again (a knock-out and a respawn).
 -- Interface: new(opts) -> Rig; Rig:possess(state, keys); Rig:run(seconds); Rig:at(t, fn); Rig:teleport(x, y, z,
---   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:result() -> Result
+--   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:result() -> Result;
+--   town() -> Town (the rig's town: the S3 world with houses, its validator world, honest drivers); describe(name, r)
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SquirrelWire = require("@shared/Movement/SquirrelWire")
 local Recovery = require("@shared/Movement/Recovery")
@@ -27,6 +28,11 @@ local MoveValidator = require("@server/Movement/MoveValidator")
 local MovementService = require("@server/Movement/MovementService")
 local MotorLink = require("@client/Controllers/MotorLink")
 local Rng = require("@tests/cheat/Rng")
+local Units = require("@shared/Config/Units")
+local ValidatorWorld = require("@server/Movement/ValidatorWorld")
+local Driver = require("@tests/cheat/Driver")
+local Harness = require("@tests/cheat/Harness")
+local TestWorld = require("@tests/cheat/TestWorld")
 
 local LiveRig = {}
 
@@ -36,6 +42,7 @@ type Event = SquirrelMotor.Event
 
 export type Link = {
 	latency: number?, -- one way, seconds (default 0.08)
+	latencyAt: ((t: number) -> number)?, -- one way at time t, in place of `latency` (a link whose latency changes)
 	jitter: number?, -- uniform on top (default 0.15)
 	loss: number?, -- up, per packet (default 0.02)
 	holdEvery: number?, -- seconds between holds (nil: none)
@@ -128,7 +135,8 @@ function LiveRig.new(opts: Options): Rig
 	end
 
 	local function oneWay(): number
-		return latency + rng.next() * jitter
+		local base = if link.latencyAt then link.latencyAt(rig.t) else latency
+		return base + rng.next() * jitter
 	end
 	-- the reliable stream down keeps its order; so does the stream of the server's root writes
 	local lastReliable, lastWrite = 0, 0
@@ -227,6 +235,11 @@ function LiveRig.new(opts: Options): Rig
 	local validator = MoveValidator.new(vworld, {
 		boostOf = function(_id: any): boolean
 			return boosted
+		end,
+		-- the engine's round trip (Player:GetNetworkPing): twice the one-way latency now, and the jitter's mean
+		pingOf = function(_id: any): number?
+			local base = if link.latencyAt then link.latencyAt(rig.t) else latency
+			return 2 * base + jitter
 		end,
 	})
 	local movement = MovementService.new({
@@ -467,6 +480,91 @@ function LiveRig.new(opts: Options): Rig
 	end
 
 	return rig :: Rig
+end
+
+export type Town = {
+	world: any, -- the client's motor world: the S3 town with the houses
+	noWalls: any, -- the same with no walls (a client that walks through them)
+	vworld: any, -- the validator's world over it (the live wall and floor rays over the houses)
+	boxes: { TestWorld.Box },
+	wall: ValidatorWorld.Ray,
+	down: ValidatorWorld.Ray,
+	startAt: (rng: Rng.Rng) -> State, -- on the ground near a random trunk of the centre
+	driven: (rng: Rng.Rng, boosted: boolean?) -> Keys, -- the S3 driver: leaps, pounces, sprints and transfers
+	openStart: () -> State, -- the S3 harness's open ground (no route, no house)
+}
+
+-- town(): the town every rig spec plays in: the S3 world (tests/cheat/TestWorld: the harvest's 1,332 routes on v5.4's
+-- flat core) with houses among the trees for walls (boxes clear of every route by 4 studs), judged by the live wall
+-- and floor rays (Server/Movement/ValidatorWorld) over the boxes.
+function LiveRig.town(): Town
+	local base = TestWorld.build()
+	local boxes: { TestWorld.Box } = {}
+	local rng = Rng.new(99)
+	local tries = 0
+	while #boxes < 14 and tries < 400 do
+		tries += 1
+		local cx, cz = (rng.next() * 2 - 1) * Units.st(80), (rng.next() * 2 - 1) * Units.st(80)
+		local hw, hd = 6 + rng.next() * 6, 6 + rng.next() * 6
+		if base.index:nearest(cx, base.groundHeight + 3, cz, math.max(hw, hd) + 6) == nil then
+			table.insert(boxes, { minX = cx - hw, maxX = cx + hw, minZ = cz - hd, maxZ = cz + hd, top = 14 })
+		end
+	end
+	local world = TestWorld.build({ boxes = boxes })
+	local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
+		return TestWorld.segmentCrossesBox(boxes, ox, oz, ox + dx, oz + dz, oy)
+	end
+	local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
+		local lo = oy + dy
+		if lo <= 0 and oy >= 0 then
+			return true
+		end
+		for _, b in boxes do
+			if ox > b.minX and ox < b.maxX and oz > b.minZ and oz < b.maxZ and b.top >= lo and b.top <= oy then
+				return true
+			end
+		end
+		return false
+	end
+	local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
+	local targets = Driver.targetsAround(world, 0, 0, Units.st(95))
+	local noWalls: any = table.clone(world)
+	noWalls.blocked, noWalls.blockedCore, noWalls.blockedHalf = nil, nil, nil
+	return {
+		world = world,
+		noWalls = noWalls,
+		vworld = vworld,
+		boxes = boxes,
+		wall = wall,
+		down = down,
+		startAt = function(r: Rng.Rng): State
+			local trunk = targets[math.floor(r.next() * #targets) + 1]
+			local foot = world.registry:foot(trunk)
+			local angle = r.next() * math.pi * 2
+			return SquirrelMotor.new(
+				foot.x + math.sin(angle) * Units.st(6),
+				world.groundHeight,
+				foot.z + math.cos(angle) * Units.st(6)
+			)
+		end,
+		driven = function(r: Rng.Rng, boosted: boolean?): Keys
+			local d = Driver.new(world, r, targets)
+			return function(_t: number, state: State, events: { Event }): Input
+				if boosted then
+					state.boostRemaining = 30
+				end
+				return d:input(state, events, 1 / 60)
+			end
+		end,
+		openStart = function(): State
+			local g = Harness.OPEN_GROUND
+			return SquirrelMotor.new(
+				Units.st((g.minX + g.maxX) / 2),
+				world.groundHeight,
+				Units.st((g.minZ + g.maxZ) / 2)
+			)
+		end,
+	}
 end
 
 -- A one-line account of a result for the spec's output.

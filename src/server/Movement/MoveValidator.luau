@@ -31,6 +31,7 @@ local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Ro
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Trampoline = Import.shared("Movement/Trampoline") :: typeof(require("../../shared/Movement/Trampoline"))
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 
 local MoveValidator = {}
@@ -60,15 +61,30 @@ export type Options = {
 	flagThreshold: number?, -- bucket level that flags (default 1.0)
 	leakPerSecond: number?, -- bucket drain per server second (default 0.5)
 	historySeconds: number?, -- pose ring length (default 1.0)
-	clockSeconds: number?, -- seconds of server time the clock check keeps offsets for (default 8)
+	clockSeconds: number?, -- seconds of server time the clock check keeps offsets for (default 10)
 	clockLag: number?, -- the mark is the lowest offset at least this old (default 3: a 1.12 x hack still shows)
 	clockSlack: number?, -- how far (s) the offset may fall below that lowest (default 0.35: 80 to 300 ms and jitter)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of the chili boost (default: never)
+	gapMax: number?, -- gaps too long to judge move by move allowed inside gapWindow (default 4)
+	gapWindow: number?, -- seconds of server time (default 10)
+	clockStepMax: number?, -- the most (s) the offset may ever fall below a mark, whatever the ping (default 0.9)
+	-- the link's round trip in seconds as the engine measures it (Player:GetNetworkPing): a latency that drops can lower
+	-- the offset by as much as it was. Default: none (the slack alone)
+	pingOf: ((actorId: any) -> number?)?,
 }
 
 type History = { clock: { number }, x: { number }, y: { number }, z: { number }, head: number, count: number }
 
-type ClockSample = { server: number, offset: number }
+type ClockSample = { server: number, offset: number, ping: number }
+
+-- What the validator remembers of an actor across a reset that keeps it (a snap-back, a move the server made): the
+-- client's clock runs on through them, and so does a client hiding its moves.
+type Marks = {
+	-- the lowest offset in each CLOCK_BUCKET of server time (`server` is the bucket) and the highest ping in it
+	offsets: { ClockSample },
+	gaps: { number }, -- server times of the recent gaps too long to judge move by move
+	wallGaps: { number }, -- server times of the recent gaps whose straight line went through a wall
+}
 
 type Actor = {
 	last: State,
@@ -77,13 +93,15 @@ type Actor = {
 	bucket: number,
 	flagged: boolean,
 	flaggedAt: number?,
-	offsets: { ClockSample }, -- the lowest offset in each CLOCK_BUCKET of server time (`server` is the bucket)
+	marks: Marks,
 	history: History,
 	packets: number,
 	violations: number,
 	lastLaunch: number?, -- client clock of the last launch seen in the air (pounce rate)
 	drops: number,
 	resyncs: number,
+	lastAcceptedAt: number, -- server time of the last accepted packet
+	lastOffset: number, -- its arrival offset (server time - client clock)
 }
 
 export type MoveValidator = typeof(setmetatable(
@@ -96,11 +114,20 @@ export type MoveValidator = typeof(setmetatable(
 		clockLag: number,
 		clockSlack: number,
 		boostOf: (actorId: any) -> boolean,
+		gapMax: number,
+		gapWindow: number,
+		clockStepMax: number,
+		pingOf: (actorId: any) -> number?,
 		_actors: { [any]: Actor },
+		_marks: { [any]: Marks },
 		_fastest: { [boolean]: number },
 	},
 	MoveValidator
 ))
+
+MoveValidator.C = table.freeze({
+	WALL_GAP_WINDOW = 20, -- seconds: a second gap through a wall inside this is a whole flag
+})
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
 local HISTORY_SLOTS = 64 -- 1 s at 60 Hz, with room for bursts
@@ -134,20 +161,28 @@ function MoveValidator.new(world: World, opts: Options?): MoveValidator
 		flagThreshold = o.flagThreshold or 1.0,
 		leakPerSecond = o.leakPerSecond or 0.5,
 		historySeconds = o.historySeconds or 1.0,
-		clockSeconds = o.clockSeconds or 8,
+		clockSeconds = o.clockSeconds or 10,
 		clockLag = o.clockLag or 3,
 		clockSlack = o.clockSlack or 0.35,
 		boostOf = o.boostOf or function(_actorId: any): boolean
 			return false
 		end,
+		gapMax = o.gapMax or 4,
+		gapWindow = o.gapWindow or 10,
+		clockStepMax = o.clockStepMax or 0.9,
+		pingOf = o.pingOf or function(_actorId: any): number?
+			return nil
+		end,
 		_actors = {} :: { [any]: Actor },
+		_marks = {} :: { [any]: Marks },
 		_fastest = {},
 	}, MoveValidator)
 	return self
 end
 
 -- reset(actorId, snapshot, serverTime, seq?): take the given state as the baseline with a clean bucket
--- (possession, teleport, respawn, accepted correction). `snapshot` nil forgets the actor.
+-- (possession, teleport, respawn, accepted correction). `snapshot` nil: the next packet is the baseline. Either way the
+-- actor's marks (its clock's history, its recent gaps) are kept: forget() drops them (a new body).
 function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapshot?, serverTime: number?, seq: number?)
 	if not snapshot or not SquirrelWire.sane(snapshot) then
 		self._actors[actorId] = nil
@@ -155,6 +190,19 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 	end
 	local state = SquirrelMotor.deserialize(snapshot)
 	local now = serverTime or 0
+	local marks = self._marks[actorId]
+	if marks == nil then
+		marks = { offsets = {}, gaps = {}, wallGaps = {} }
+		self._marks[actorId] = marks
+	end
+	local m = marks :: Marks
+	local key = math.floor(now / CLOCK_BUCKET)
+	local newest = m.offsets[#m.offsets]
+	if newest and newest.server == key then
+		newest.offset = math.min(newest.offset, now - state.clock)
+	else
+		table.insert(m.offsets, { server = key, offset = now - state.clock, ping = 0 })
+	end
 	local actor: Actor = {
 		last = state,
 		lastSeq = seq or -math.huge,
@@ -162,16 +210,24 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 		bucket = 0,
 		flagged = false,
 		flaggedAt = nil,
-		offsets = { { server = math.floor(now / CLOCK_BUCKET), offset = now - state.clock } },
+		marks = m,
 		history = newHistory(),
 		packets = 0,
 		violations = 0,
 		lastLaunch = nil,
 		drops = 0,
 		resyncs = 0,
+		lastAcceptedAt = now,
+		lastOffset = now - state.clock,
 	}
 	record(actor.history, state.clock, state.x, state.y, state.z)
 	self._actors[actorId] = actor
+end
+
+-- forget(actorId): drop the actor and its marks (a hand-off: a new body, a new start).
+function MoveValidator.forget(self: MoveValidator, actorId: any)
+	self._actors[actorId] = nil
+	self._marks[actorId] = nil
 end
 
 local function verdict(
@@ -236,40 +292,63 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local dt = next.clock - prev.clock
 	local violations: { Violation } = {}
 
-	-- clock: the arrival offset may not fall more than the link's swing below its lowest of a while ago (a time hack
-	-- runs the client clock ahead, and the offset falls a second per second at double speed); the lowest is taken
-	-- over buckets at least clockLag old, so a hack's own packets never lower the mark they are held to
+	-- clock: the arrival offset (server time - client clock: the one-way latency and a constant) may not fall more
+	-- than the link can swing below its lowest of a while ago. A time hack runs the client clock ahead, and the offset
+	-- falls without end (a second per second at double speed); a latency that drops (a congested link clearing, a
+	-- handover from cellular to wifi) lowers it once, by at most the latency it had. Two marks: the lowest offset of
+	-- the buckets at least clockLag old (a fast hack shows within a second; a hack's own packets never lower the mark
+	-- they are held to) and of those at least clockSeconds - 2 old (a slow one adds up: a 1.12 x clock shows within
+	-- three seconds on a quick link, eight on the slowest). The swing allowed: the slack, or the highest round trip the engine measured in the window
+	-- when larger (the latency that dropped was at most that), never more than clockStepMax.
 	local offset = serverTime - next.clock
-	local buckets = actor.offsets
+	local marks = actor.marks
+	local buckets = marks.offsets
 	local key = math.floor(serverTime / CLOCK_BUCKET)
+	local ping = self.pingOf(actorId)
+	ping = if type(ping) == "number" and ping >= 0 and ping < 10 then ping else 0
 	local newest = buckets[#buckets]
 	if newest and newest.server == key then
 		newest.offset = math.min(newest.offset, offset)
+		newest.ping = math.max(newest.ping, ping :: number)
 	else
-		table.insert(buckets, { server = key, offset = offset })
+		table.insert(buckets, { server = key, offset = offset, ping = ping :: number })
 	end
 	while #buckets > 1 and (key - buckets[1].server) * CLOCK_BUCKET > self.clockSeconds do
 		table.remove(buckets, 1)
 	end
-	local mark = math.huge
+	local mark, longMark, pingMax = math.huge, math.huge, 0
 	for _, b in buckets do
-		if (key - b.server) * CLOCK_BUCKET >= self.clockLag then
+		local age = (key - b.server) * CLOCK_BUCKET
+		if age >= self.clockLag then
 			mark = math.min(mark, b.offset)
 		end
+		if age >= self.clockSeconds - 2 then
+			longMark = math.min(longMark, b.offset)
+		end
+		pingMax = math.max(pingMax, b.ping)
 	end
 	if mark == math.huge then
 		mark = buckets[1].offset -- (newer than the lag: the first bucket since the baseline)
 	end
-	if offset < mark - self.clockSlack then
+	local swing = math.min(math.max(self.clockSlack, pingMax), self.clockStepMax)
+	local ahead = math.max(mark - offset, if longMark < math.huge then longMark - offset else 0)
+	if ahead > swing then
 		table.insert(violations, {
 			code = "clock",
-			severity = 0.5,
-			detail = `client clock {mark - offset} s ahead of its arrivals`,
+			severity = if ahead > self.clockStepMax then 1 else 0.5,
+			detail = `client clock {ahead} s ahead of its arrivals (swing {swing} s)`,
 		})
 	end
 
+	-- the time the gap can stand for: the client's clock gap, but never more than the server's own gap between the two
+	-- arrivals and what the clock check lets the arrival offset fall (an honest dt is the server gap plus the fall of
+	-- the offset, and the check above holds that fall to the mark less the swing): a clock jumped ahead buys no reach
+	local serverGap = math.max(0, serverTime - actor.lastAcceptedAt)
+	local dtEff = math.min(dt, serverGap + math.max(0, actor.lastOffset - mark) + swing)
+
 	local resync = false
 	local boosted = self.boostOf(actorId)
+	local fastest = self:fastest(actorId)
 	local riverLanding = not next.routeId
 		and next.grounded
 		and Recovery.riverLanding(
@@ -278,29 +357,18 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			next.x,
 			next.y,
 			next.z,
-			Motion.C.airGrab + self:fastest(actorId) * math.max(dt, 0) + 1,
-			self:fastest(actorId) * math.clamp(dt, 0, SquirrelMotor.envelopeParams.maxDt) + 1
+			Motion.C.airGrab + fastest * math.max(dtEff, 0) + 1,
+			fastest * math.clamp(dtEff, 0, SquirrelMotor.envelopeParams.maxDt) + 1
 		)
 	if riverLanding then
 		-- the client's own river recovery (Movement/Recovery.riverFall): the quay spot is the new baseline
 		resync = true
 		actor.resyncs += 1
 	elseif dt > SquirrelMotor.envelopeParams.maxDt then
-		-- too long to judge move by move (a stall, a long loss burst): the new baseline, but no further than the
-		-- fastest the squirrel goes in that time (a stall is no way to teleport)
+		-- too long to judge move by move (a stall, a long loss burst): the new baseline, judged as a whole (gap())
 		resync = true
 		actor.resyncs += 1
-		local reach = self:fastest(actorId) * dt + Motion.C.airGrab + 2
-		local moved = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
-		local rise = next.y - prev.y
-		local climb = self:fastest(actorId) * dt + SquirrelMotor.leapApex() + 2
-		if moved > reach or rise > climb then
-			table.insert(violations, {
-				code = "teleport",
-				severity = 1,
-				detail = `moved {moved} st (up {rise}) in a {dt} s gap (reach {reach}, climb {climb})`,
-			})
-		end
+		self:_gap(actor, prev, next, dtEff, serverTime, fastest, violations)
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
@@ -356,8 +424,121 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		correction = SquirrelMotor.serialize(prev)
 	end
 	actor.last = next
+	actor.lastAcceptedAt = serverTime
+	actor.lastOffset = offset
 	record(actor.history, next.clock, next.x, next.y, next.z)
 	return verdict(ok, true, violations, flagged, actor.bucket, correction, resync, false)
+end
+
+local function prune(times: { number }, now: number, window: number)
+	while #times > 0 and now - times[1] > window do
+		table.remove(times, 1)
+	end
+end
+
+-- _gap: a gap too long to judge move by move (a stall, a loss burst, a client that sends sparsely on purpose) is
+-- still judged as a whole, over `dt` (the time the gap can stand for, held to the server's own arrival gap):
+--   * reach: no further than the fastest the squirrel goes in that time;
+--   * climb: no higher than a leap (and a landing's step) above where it was, unless a rail within reach could have
+--     carried it up (the climb then at the fastest pace) or a trampoline bounced it;
+--   * the air: off the rails and off the ground, no higher above a floor than a leap, unless a rail within reach (it
+--     fell or leapt from one) or a trampoline explains it;
+--   * walls: the straight line, chord by chord (world.crossesLong); an honest body may have gone round a corner in
+--     the gap, so one is a third of a flag and a second inside C.WALL_GAP_WINDOW a whole one;
+--   * how often: more than gapMax gaps inside gapWindow is a client that hides its moves (an honest link loses a burst
+--     now and then).
+function MoveValidator._gap(
+	self: MoveValidator,
+	actor: Actor,
+	prev: State,
+	next: State,
+	dt: number,
+	serverTime: number,
+	fastest: number,
+	violations: { Violation }
+)
+	local E = SquirrelMotor.envelopeParams
+	local world = self.world
+	local marks = actor.marks
+	table.insert(marks.gaps, serverTime)
+	prune(marks.gaps, serverTime, self.gapWindow)
+	if #marks.gaps > self.gapMax then
+		table.insert(violations, {
+			code = "gaps",
+			severity = 1,
+			detail = `{#marks.gaps} gaps too long to judge in {self.gapWindow} s`,
+		})
+	end
+	local airGrab = Motion.C.airGrab
+	local reach = fastest * dt + airGrab + 2
+	local moved = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+	if moved > reach then
+		table.insert(violations, {
+			code = "teleport",
+			severity = 1,
+			detail = `moved {moved} st in a {dt} s gap (reach {reach})`,
+		})
+	end
+	local index = world.index
+	local railNear = next.routeId ~= nil
+		or prev.routeId ~= nil
+		or (
+			index ~= nil
+			and (
+				index:nearest(prev.x, prev.y, prev.z, reach) ~= nil
+				or index:nearest(next.x, next.y, next.z, reach) ~= nil
+			)
+		)
+	local apex = SquirrelMotor.leapApex() * E.launchTol * E.launchTol
+	local bounce = 0
+	local tramps = world.trampolines
+	if tramps then
+		for _, site in tramps do
+			local r = Trampoline.C.radius + reach
+			if
+				math.sqrt((prev.x - site.x) ^ 2 + (prev.z - site.z) ^ 2) <= r
+				or math.sqrt((next.x - site.x) ^ 2 + (next.z - site.z) ^ 2) <= r
+			then
+				local vy = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
+				bounce = vy * vy / (2 * SquirrelMotor.params.gravity)
+				break
+			end
+		end
+	end
+	local climb = math.max(apex, bounce) + Units.st(1.4) + 2 + (if railNear then fastest * dt + airGrab else 0)
+	local rise = next.y - prev.y
+	if rise > climb then
+		table.insert(violations, {
+			code = "climb",
+			severity = 1,
+			detail = `rose {rise} st in a {dt} s gap (climb {climb}{if railNear then ", a rail near" else ""})`,
+		})
+	end
+	local landable = world.landable
+	if landable and not next.grounded and not next.routeId and not railNear and bounce == 0 then
+		if not landable(next.x, next.y, next.z, apex + Units.st(1.4) + 2) then
+			table.insert(violations, {
+				code = "fly",
+				severity = 1,
+				detail = `in the air higher than a leap over any floor after a {dt} s gap, no rail near`,
+			})
+		end
+	end
+	local crossesLong = world.crossesLong
+	if
+		crossesLong
+		and not next.routeId
+		and not prev.routeId
+		and crossesLong(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), apex)
+	then
+		table.insert(marks.wallGaps, serverTime)
+		prune(marks.wallGaps, serverTime, MoveValidator.C.WALL_GAP_WINDOW)
+		table.insert(violations, {
+			code = "wall",
+			severity = if #marks.wallGaps >= 2 then 1 else 0.34,
+			detail = `the straight line of a {dt} s gap goes through a wall ({#marks.wallGaps} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
+		})
+	end
 end
 
 -- pose(actorId, clock) -> x, y, z at a client clock within the last second (linear interpolation; the

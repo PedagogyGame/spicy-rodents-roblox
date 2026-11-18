@@ -12,7 +12,6 @@ local Height = require("@shared/World/Height")
 local Trampoline = require("@shared/Movement/Trampoline")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
-local Driver = require("@tests/cheat/Driver")
 local Harness = require("@tests/cheat/Harness")
 local Rng = require("@tests/cheat/Rng")
 local TestWorld = require("@tests/cheat/TestWorld")
@@ -23,59 +22,10 @@ local FAST = process.env.SPICY_FAST ~= nil
 type State = SquirrelMotor.State
 
 return function(t)
-	-- houses among the trees of the town's centre: boxes clear of every route by 4 studs
-	local base = TestWorld.build()
-	local boxes: { TestWorld.Box } = {}
-	do
-		local rng = Rng.new(99)
-		local tries = 0
-		while #boxes < 14 and tries < 400 do
-			tries += 1
-			local cx, cz = (rng.next() * 2 - 1) * Units.st(80), (rng.next() * 2 - 1) * Units.st(80)
-			local hw, hd = 6 + rng.next() * 6, 6 + rng.next() * 6
-			if base.index:nearest(cx, base.groundHeight + 3, cz, math.max(hw, hd) + 6) == nil then
-				table.insert(boxes, { minX = cx - hw, maxX = cx + hw, minZ = cz - hd, maxZ = cz + hd, top = 14 })
-			end
-		end
-	end
-	local world = TestWorld.build({ boxes = boxes })
-	local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
-		return TestWorld.segmentCrossesBox(boxes, ox, oz, ox + dx, oz + dz, oy)
-	end
-	local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
-		local lo = oy + dy
-		if lo <= 0 and oy >= 0 then
-			return true
-		end
-		for _, b in boxes do
-			if ox > b.minX and ox < b.maxX and oz > b.minZ and oz < b.maxZ and b.top >= lo and b.top <= oy then
-				return true
-			end
-		end
-		return false
-	end
-	local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
-	local targets = Driver.targetsAround(world, 0, 0, Units.st(95))
-
-	local function startAt(rng: Rng.Rng): State
-		local trunk = targets[math.floor(rng.next() * #targets) + 1]
-		local foot = world.registry:foot(trunk)
-		local angle = rng.next() * math.pi * 2
-		return SquirrelMotor.new(
-			foot.x + math.sin(angle) * Units.st(6),
-			world.groundHeight,
-			foot.z + math.cos(angle) * Units.st(6)
-		)
-	end
-	local function driven(rng: Rng.Rng, boosted: boolean?): LiveRig.Keys
-		local d = Driver.new(world, rng, targets)
-		return function(_t: number, state: State, events: { SquirrelMotor.Event }): SquirrelMotor.Input
-			if boosted then
-				state.boostRemaining = 30
-			end
-			return d:input(state, events, 1 / 60)
-		end
-	end
+	local town = LiveRig.town()
+	local world, vworld, boxes = town.world, town.vworld, town.boxes
+	local wall, down = town.wall, town.down
+	local startAt, driven = town.startAt, town.driven
 
 	local MINUTES = if FAST then 0.5 else 2
 	local towns: { { name: string, link: LiveRig.Link, fps: any?, boosted: boolean?, seed: number } } = {
@@ -315,12 +265,8 @@ return function(t)
 		end
 	end
 	-- the S3 harness's open ground (no route, no house), in the town's south-west corner
-	local function openStart(): State
-		local g = Harness.OPEN_GROUND
-		return SquirrelMotor.new(Units.st((g.minX + g.maxX) / 2), world.groundHeight, Units.st((g.minZ + g.maxZ) / 2))
-	end
-	local noWalls: any = table.clone(world)
-	noWalls.blocked, noWalls.blockedCore, noWalls.blockedHalf = nil, nil, nil
+	local openStart = town.openStart
+	local noWalls = town.noWalls
 	local function cheating(now: number): boolean
 		return now >= CHEAT_AT
 	end
