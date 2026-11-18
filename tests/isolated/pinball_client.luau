@@ -894,6 +894,57 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"the art arriving mid-game (review): a flipper this screen had turned takes its new bat about the hub, and a part streamed in late is found",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(2)
+				local bob = person("Bob", 9)
+				t.truthy(w.svc:join(bob.stub, ID))
+				Rig.run(w, 0.2)
+				t.truthy(Rig.input(w, bob.stub, ID, "start"))
+				local X, D = CabinetLayout.stance(2)
+				Rig.walkTo(w, SITE, X + 2, 3, D + 3)
+				playFor(w, 1.5, nil, nil, { bob }, ID)
+				local cab = Cabinet.get(ID)
+				t.truthy(cab.awake and cab.parts ~= nil)
+				local model = w.roots[SITE]:FindFirstChild("GamesRoom"):FindFirstChild("Pinball2")
+				local c = cab.tbl.c
+				-- this screen has the left flipper up
+				local f = model:FindFirstChild(`{CabinetLayout.NAMES.flipper}1`)
+				local hub = f.PrimaryPart
+				hub.CFrame = hub.CFrame * roblox.CFrame.Angles(0, 0.8, 0)
+				-- the server swaps the art: the bat placed about the hub at rest; a lamp not streamed in yet
+				local place = w.places[SITE]
+				local OX, OY, OD = CabinetLayout.origin(2)
+				local ox, oy, oz = AlleyLayout.toWorld(place, OX, OY, OD)
+				local pf = roblox.CFrame.new(ox, oy, oz)
+					* roblox.CFrame.Angles(0, place.yaw, 0)
+					* roblox.CFrame.Angles(0, math.pi, 0)
+					* roblox.CFrame.Angles(CabinetLayout.TILT, 0, 0)
+				local a = c.frest[1]
+				local rest = pf
+					* roblox.CFrame.new(c.fpx[1], CabinetLayout.FLIPPER_H / 2, -c.fpy[1])
+					* roblox.CFrame.Angles(0, CabinetLayout.turnOf(c.fmir[1] * math.cos(a), math.sin(a)), 0)
+				local bat = FakeEngine.part("Bat", rest * roblox.CFrame.new(0.16, 0, 0), f)
+				local lamp = model:FindFirstChild(`{CabinetLayout.NAMES.lamp}1`)
+				lamp.Parent = nil
+				model:SetAttribute("ArtLoaded", true)
+				playFor(w, 0.5, nil, nil, { bob }, ID)
+				local off = hub.CFrame:PointToObjectSpace(bat.CFrame.Position)
+				t.truthy(
+					math.abs(off.X - 0.16) < 1e-3 and math.abs(off.Z) < 1e-3,
+					`the bat lies along the hub ({off.X}, {off.Z})`
+				)
+				t.eq(cab.parts.complete, false, "the lamp is not here yet")
+				lamp.Parent = model
+				playFor(w, 1, nil, nil, { bob }, ID)
+				t.truthy(cab.parts.complete, "found once it streams in")
+				t.eq(cab.parts.lamps[1], lamp)
+			end, opts(2))
+		end
+	)
+
 	t.test("a player who leaves the ball on the plunger for a minute is taken off and the machine reset", function()
 		Rig.play(function(w)
 			local ID = stationOf(1)
