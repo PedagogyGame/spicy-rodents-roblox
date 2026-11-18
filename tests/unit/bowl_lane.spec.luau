@@ -4,6 +4,7 @@
 -- bake lays them), the bowling alley (BakedWorld.bakeAlley) and THE GILDED ACORN (its own bake's code) round it:
 --   * the plan: the lane continues the cross street's asphalt end to end, its sidewalks start at the cross street's
 --     east sidewalk and stop at the turning bay, nothing paved overlaps at one height, and no traffic AI knows it;
+--   * no grass comes up through the paving: every strip's top, the turning bay's strips too, is on the ground;
 --   * a person walks on paving with no step a body cannot take from Main Street's south sidewalk down the Alley Walk,
 --     over the crossing and up the steps walk to the foot of the alley's ramp, along both sidewalks end to end, and
 --     from the south sidewalk onto the lounge's forecourt;
@@ -220,6 +221,49 @@ return function(t)
 		end
 		t.truthy(n > 1000, `the traffic lanes were read ({n} points)`)
 		t.eq(street:GetAttribute("TrafficAI"), false)
+	end)
+
+	t.test("no grass through the paving: every strip's whole top stands on the ground, the turning bay too", function()
+		-- (a strip stands flat across its width, rolled to the crossfall: the turning bay, 48 wide, is laid in
+		-- TURN_STRIPS narrow strips, as one it was under the ground over half its area)
+		local paved = street:FindFirstChild("Paving")
+		t.eq(#plan.turns, Street.TURN_STRIPS)
+		for _, s in plan.strips do
+			local m = paved:FindFirstChild(s.id)
+			t.truthy(m ~= nil, `{s.id} is laid`)
+			local x0, x1, z0, z1 = Street.box(s)
+			local n, under, worst = 0, 0, -math.huge
+			for x = x0 + 0.3, x1 - 0.3, 1 do
+				for z = z0 + 0.3, z1 - 0.3, 1 do
+					local top = Street.topAt(roblox, m, x, z)
+					if top then
+						n += 1
+						local d = Height.at(x, z) - top
+						worst = math.max(worst, d)
+						if d > 0.06 then
+							under += 1
+						end
+					end
+				end
+			end
+			t.truthy(n > 0, `{s.id}: sampled`)
+			t.eq(under, 0, `{s.id}: the ground above the paving at {under} of {n} spots (worst {worst})`)
+		end
+		-- and across the bay, strip to strip, a person and the squirrel walk it with no step (where the ground is a
+		-- hair above the paving, the foot is on the ground: the paving's top is within 0.06 of it)
+		local x0, x1, z0, z1 = Street.box(plan.turn)
+		for _, x in { x0 + 2, (x0 + x1) / 2, x1 - 2 } do
+			local prev: number? = nil
+			local worst = 0
+			for z = z0 + 0.5, z1 - 0.5, SAMPLE do
+				local y = paving(x, z, if prev then prev + 1.5 else nil)
+				if prev then
+					worst = math.max(worst, math.abs(y - prev))
+				end
+				prev = y
+			end
+			t.truthy(worst <= 0.3, `across the turning bay at x {x}: a step of {worst}`)
+		end
 	end)
 
 	t.test(

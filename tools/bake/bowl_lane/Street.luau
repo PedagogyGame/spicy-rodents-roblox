@@ -9,8 +9,10 @@
 --   Lane        the asphalt from the cross street's kerb (x 903.75, end to end with rd_022) to the turning bay;
 --   Sidewalks   both, from the cross street's east sidewalk (rd_024 ends at x 915.5: nothing overlaps it) to the
 --               turning bay, each with its kerb on the street edge (Plan.road's curb);
---   Turn        the turning bay (xp_bowl_lane_turn), asphalt the width of the pad, with a kerb strip round its three
---               outer edges;
+--   Turn        the turning bay (xp_bowl_lane_turn), asphalt over the pad in TURN_STRIPS strips side by side along
+--               the lane (each follows the ground along x and is rolled to its own crossfall: one strip the pad's
+--               48 wide stood flat across a ground that is not, and the grass came up through half of it), with a
+--               kerb strip round its three outer edges;
 --   AlleyWalk   the Alley Walk (xpath_alley_walk) from Main Street's south sidewalk to the north sidewalk, and the
 --               steps walk (xpath_alley_steps) from the south sidewalk to the foot of the alley's entrance ramp;
 --   Crossing    a zebra crossing between the two, straight across the lane on the walk's line;
@@ -36,6 +38,7 @@ local Street = {}
 
 Street.ID = "xs_bowl_lane"
 Street.TURN = "xp_bowl_lane_turn"
+Street.TURN_STRIPS = 7 -- the bay's asphalt in this many strips across (6.9 wide each: under a road's 10, no centre line)
 Street.WALKS = { "xpath_alley_walk", "xpath_alley_steps" }
 Street.CROSS_SIDEWALK = "rd_024_commercial_sidewalk_x364.5" -- the cross street's east sidewalk, which the lane meets
 Street.CROSS_ROAD = "rd_022_commercial_cross_x347"
@@ -52,7 +55,8 @@ export type Lamp = { x: number, z: number, ox: number, oz: number }
 export type StreetPlan = {
 	lane: Strip,
 	sidewalks: { Strip },
-	turn: Strip,
+	turn: Strip, -- the whole bay (its rectangle)
+	turns: { Strip }, -- the bay as laid: TURN_STRIPS strips along x, side by side across it
 	walks: { Strip },
 	strips: { Strip }, -- every paved strip above, the lane first
 	lamps: { Lamp },
@@ -134,6 +138,22 @@ function Street.plan(): StreetPlan
 		["end"] = turnRect.x1,
 		width = turnRect.z1 - turnRect.z0,
 	} :: any
+	local turns: { Strip } = {}
+	local w = turn.width / Street.TURN_STRIPS
+	for k = 1, Street.TURN_STRIPS do
+		table.insert(
+			turns,
+			{
+				id = `{Street.TURN}_{k}`,
+				kind = "asphalt",
+				axis = "x",
+				coord = turnRect.z0 + w * (k - 0.5),
+				start = turnRect.x0,
+				["end"] = turnRect.x1,
+				width = w,
+			} :: any
+		)
+	end
 	local walks: { Strip } = {}
 	for _, id in Street.WALKS do
 		for _, leg in legs(record(exp.paths, id)) do
@@ -141,7 +161,7 @@ function Street.plan(): StreetPlan
 		end
 	end
 	local strips: { Strip } = { lane }
-	for _, list in { sidewalks, { turn }, walks } do
+	for _, list in { sidewalks, turns, walks } do
 		for _, s in list do
 			table.insert(strips, s)
 		end
@@ -162,6 +182,7 @@ function Street.plan(): StreetPlan
 		lane = lane,
 		sidewalks = sidewalks,
 		turn = turn,
+		turns = turns,
 		walks = walks,
 		strips = strips,
 		lamps = lamps,
@@ -277,10 +298,11 @@ function Street.build(roblox: any, parent: any): any
 	do
 		local t = p.turn
 		local x0, x1, z0, z1 = box(t)
-		local m = models[t.id]
 		local KERB = Palette.ROAD.curb
 		local function kerb(name: string, ax: number, az: number, bx: number, bz: number)
 			local cx, cz = (ax + bx) / 2, (az + bz) / 2
+			local under = Street.on(p, cx, cz) :: Strip -- the bay's strip the kerb stands on
+			local m = models[under.id]
 			local y = (topAt(roblox, m, cx, cz) or Height.at(cx, cz)) + 0.12
 			local len = math.max(math.abs(bx - ax), math.abs(bz - az))
 			local alongX = math.abs(bx - ax) > math.abs(bz - az)
