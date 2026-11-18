@@ -1026,7 +1026,7 @@ class TreeBuilder:
         ss = sorted(ss)
         keep = [ss[0]]
         for s in ss[1:]:
-            if s - keep[-1] > 0.12:  # (close where the route bends hard: the chords stay on its feet line)
+            if s - keep[-1] > (0.12 if s > zone + 1.0 else 0.3):  # (close where the route bends hard, past the junction)
                 keep.append(s)
         # (the route's end gets a ring of its own: moved onto the end, the last kept ring's chord would cut
         # under a bough that curls at its tip)

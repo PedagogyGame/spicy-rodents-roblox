@@ -572,6 +572,11 @@ def clear_walks(tb, obj, step=0.25, tol=0.06, reach=0.6):
             m = np.nonzero(np.all((R >= feet.min(0) - 0.1) & (R <= feet.max(0) + 0.1), axis=1))[0]
             if len(m):
                 keep[m[tg.seg_dist(R[m], feet[:-1], feet[1:]).min(1) < 0.03]] = True
+    # (nor does the trunk: its climbing radius is a promise of its own)
+    P = tb.trunkP
+    cx, cz = np.interp(R[:, 1], P[:, 1], P[:, 0]), np.interp(R[:, 1], P[:, 1], P[:, 2])
+    rt = tb.Rt(np.interp(R[:, 1], P[:, 1], tb.trunk_s / max(tb.trunkL, 1e-9)))
+    keep |= (R[:, 1] <= P[-1, 1] + 1.0) & (np.hypot(R[:, 0] - cx, R[:, 2] - cz) < rt + 0.35)
 
     def column(tree, q):
         hits = cp.crossings(tree, tuple(to_b(q + tg.Y * 6.0)), (0.0, 0.0, -1.0), 12.0)
