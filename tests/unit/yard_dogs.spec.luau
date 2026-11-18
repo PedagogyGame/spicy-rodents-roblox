@@ -208,8 +208,15 @@ return function(t)
 		run(d, 0, 2, sense({ squirrel("s", y.x1 + YardDogs.SENSE + 1, (y.z0 + y.z1) / 2) }, false, barks))
 		t.eq(d.mode, "wander")
 		t.eq(#barks, 0)
-		run(d, 2, 1, sense({ squirrel("s", y.x1 + YardDogs.SENSE - 1, (y.z0 + y.z1) / 2) }, false, barks))
-		t.eq(d.mode, "chase", "coming in over the edge")
+		local sq = squirrel("s", y.x1 + YardDogs.SENSE - 1, (y.z0 + y.z1) / 2)
+		local now = run(d, 2, 1, sense({ sq }, false, barks))
+		t.eq(d.mode, "chase", "coming in over the edge: it runs to the fence")
+		-- but it barks (and a player is told it chases them out) only at one in its yard
+		now = run(d, now, 20, sense({ sq }, false, barks))
+		t.eq(#barks, 0, "no bark at one just outside")
+		sq.x = y.x1 - 1
+		run(d, now, 1, sense({ sq }, false, barks))
+		t.eq(#barks, 1, "a bark once it is in")
 	end)
 
 	t.test("a dog treat calms it: it sits, ignores squirrels, and is itself again after", function()

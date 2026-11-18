@@ -8,8 +8,8 @@
 -- What a dog does (think, at THINK seconds, only with a player near: Server/Wildlife/YardHazards on the town's
 -- brain scheduler):
 --   wander  ambles about its yard to a new spot every few seconds
---   chase   a squirrel or the Spicy Rodent on the ground in its yard: it runs at it (never out of the yard) and
---           barks (BARK_EVERY seconds apart): a computer squirrel bolts, a player is told to clear off, people
+--   chase   a squirrel or the Spicy Rodent on the ground in its yard: it runs at it (never out of the yard; one
+--           just outside, SENSE, only to the fence) and barks (BARK_EVERY seconds apart): a computer squirrel bolts, a player is told to clear off, people
 --           near a bark at the rodent notice it (v5.4: a bark put the people within 12 units on alert). No harm.
 --   calm    a dog treat given near it (Shared/Items/ItemRules dog_treats: calm_dog): it sits and wags and ignores
 --           squirrels for the treat's seconds
@@ -60,7 +60,7 @@ YardDogs.FUR = table.freeze({
 })
 
 YardDogs.THINK = 0.5 -- seconds between a dog's looks (the scheduler calls more often; the brain waits)
-YardDogs.SENSE = 3 -- studs past its yard's edge a dog notices a squirrel coming in
+YardDogs.SENSE = 3 -- studs past its yard's edge a dog notices a squirrel coming in (runs to it; barks once it is in)
 YardDogs.ABOVE = 6 -- studs above the ground: a squirrel higher up (a fence, a branch) is out of reach and ignored
 YardDogs.BELOW = 3 -- studs below it: one in a storm drain under the yard is not there for a dog
 YardDogs.BARK_EVERY = 8 -- seconds between barks (v5.4's barkCooldown)
@@ -184,7 +184,8 @@ function YardDogs.think(d: Dog, now: number, sense: Sense): boolean
 	if s then
 		d.mode, d.target = "chase", s.id
 		d.tx, d.tz = YardDogs.clampToYard(y, s.x, s.z)
-		if now - d.lastBark >= YardDogs.BARK_EVERY then
+		-- (a bark tells a player it chases them out of its yard: only once they are in it)
+		if YardDogs.inYard(y, s.x, s.z) and now - d.lastBark >= YardDogs.BARK_EVERY then
 			d.lastBark = now
 			if sense.bark then
 				sense.bark(d, s)
