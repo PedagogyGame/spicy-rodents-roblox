@@ -60,13 +60,21 @@ return function(t)
 			t.eq(Staff.FIGURES[k].d, a[3])
 		end
 		local G = LoungeClassic.GUARDED
-		t.truthy(G.d0 <= Style.FORECOURT_D - 1 and G.d1 == Style.DOOR_D + Style.WALL)
+		t.truthy(G.d0 == Style.FORECOURT_D and G.d1 == Style.DOOR_D + Style.WALL)
 		t.truthy(G.x >= Style.FORECOURT_X)
 		t.truthy(LoungeClassic.guarded(0, -2.4, -30)) -- the forecourt
 		t.truthy(LoungeClassic.guarded(0, 0, LoungeClassic.DOOR_OUTSIDE.d)) -- the landing
 		t.truthy(LoungeClassic.guarded(-4, -1.2, -26)) -- the steps
 		t.truthy(not LoungeClassic.guarded(0, 0, 0)) -- the room (the inside check covers it)
 		t.truthy(not LoungeClassic.guarded(0, -5, -40)) -- Bowl Lane, beyond the planned sidewalk
+		t.truthy(LoungeClassic.guarded(0, -2.4, Style.FORECOURT_D)) -- the forecourt's street edge
+		for _, gx in { 0, -10.9, 10.9 } do
+			for sd = -32.5, -38, -0.5 do -- Bowl Lane's planned sidewalk (world z -330..-324): nobody is struck there
+				for _, gy in { -2.4, -3 } do
+					t.truthy(not LoungeClassic.guarded(gx, gy, sd), `the sidewalk at X {gx} D {sd}`)
+				end
+			end
+		end
 		t.truthy(not LoungeClassic.guarded(20, 0, -30)) -- along the front, away from the entry
 		local pc = anchor("pass_check")
 		t.truthy(LoungeClassic.guarded(pc[1], pc[2], pc[3]), "the pass check stands in the guarded entry")

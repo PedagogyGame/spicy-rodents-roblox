@@ -33,8 +33,9 @@ LoungeClassic.DOOR_INSIDE = { x = 0, d = -18.6, faceD = 1 }
 
 -- the room: the walls' inner faces; near the door (|X| < 6) the room starts at the door wall (D -21)
 LoungeClassic.INSIDE = { x = 24, d0 = -27, d1 = 27, doorX = 6, doorD = -21, y0 = -1, y1 = 13 }
--- where the guards strike: the forecourt and the entry (to the door), from the ground to the canopy
-LoungeClassic.GUARDED = { x = 11, d0 = -33, d1 = -21, y0 = -6, y1 = 11 }
+-- where the guards strike: the forecourt and the entry (to the door), from the ground to the canopy; not past the
+-- forecourt's street edge (D -32: Bowl Lane's planned sidewalk starts there)
+LoungeClassic.GUARDED = { x = 11, d0 = -32, d1 = -21, y0 = -6, y1 = 11 }
 LoungeClassic.GUARD_POSTS = { { x = -6, d = -31 }, { x = 6, d = -31 } } -- data/expansion.json guard_1, guard_2
 LoungeClassic.COUNTER = { x0 = -12, x1 = 12, d = 15 } -- the bar's front face (the order prompts stand on it)
 

@@ -9,8 +9,8 @@
 --   buy       with 25c the podium sells the pass (20c gone) and the person is inside; with 7c it is refused with
 --             the wallet's words, nothing taken, still outside
 --   squirrel  a squirrel's press is refused with words; on the forecourt, on the steps, on the landing or in the
---             room the guards knock it out (once per body, the nearest guard steps in and back); on Bowl Lane, on
---             the roof or along the front away from the entry nobody touches it
+--             room the guards knock it out (once per body, the nearest guard steps in and back); on Bowl Lane (its
+--             planned sidewalk too), on the roof or along the front away from the entry nobody touches it
 --   drink     inside, each of the four drinks: charged its price only when it is in the hand, sipped SIPS times
 --             (the cup up at the face and back down), then "All gone."; a second order while holding one, and an
 --             order from outside, are refused with words and take nothing
@@ -235,7 +235,11 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 			table.insert(spots, { gx, 0, gd, 1 })
 		end
 	end
-	for _, s in { { 0, -5, -40 }, { 0, 14.2, 0 }, { 20, -3, -30 }, { -30, -3, 0 }, { 0, -3, 32 } } do
+	local spare = { { 0, -5, -40 }, { 0, 14.2, 0 }, { 20, -3, -30 }, { -30, -3, 0 }, { 0, -3, 32 } }
+	for _, s in { { 0, -2.4, -32.6 }, { 10, -2.4, -33 }, { -10, -2.4, -35 } } do -- Bowl Lane's planned sidewalk
+		table.insert(spare, s)
+	end
+	for _, s in spare do
 		table.insert(spots, { s[1], s[2], s[3], 0 })
 	end
 	for i, s in spots do

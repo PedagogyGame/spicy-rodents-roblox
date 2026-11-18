@@ -90,7 +90,7 @@ return function(t)
 				local g = result.numbers.guards
 				t.truthy(g.struck >= 40, `{g.struck} struck`)
 				t.eq(g.wrong, 0)
-				t.eq(g.spared, 5)
+				t.eq(g.spared, 8)
 				t.eq(result.numbers.drinks.spent, 10 + 12 + 8 + 6)
 			end)
 		end
