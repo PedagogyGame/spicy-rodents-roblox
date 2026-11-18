@@ -7,7 +7,10 @@
 --   * with no asset id (as now) the loader does nothing at all;
 --   * given a Model, it puts every piece at its place over a cabinet the real bake built, a mole's pieces in its
 --     Mole model and the mallet's in the Mallet (their pivots untouched), hides the baked look and keeps the
---     bake's collision and lettering; a second time it does nothing.
+--     bake's collision and lettering; a second time it does nothing;
+--   * and it removes the baked parts nothing needs any more (a mole or the mallet keeps only its pivot, the
+--     shell only what collides or carries lettering), and brings every part carrying lettering NUDGE toward the
+--     viewer, off the mesh face it would share.
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -128,6 +131,25 @@ return function(t: Test.T)
 		function()
 			local model = cabinet()
 			local N = Layout.NAMES
+			-- (where each part carrying lettering stood, and which way its lettering looks)
+			local lettered = {}
+			for _, gui in model:GetDescendants() do
+				if gui:IsA("SurfaceGui") then
+					local cf = gui.Parent.CFrame
+					local face = gui.Face.Name
+					local out = if face == "Front"
+						then -cf.LookVector
+						elseif face == "Top" then cf.UpVector
+						else error(`lettering on a {face} face: add it to this spec`)
+					lettered[gui.Parent] = { at = cf.Position, out = out }
+				end
+			end
+			local baked = 0
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") then
+					baked += 1
+				end
+			end
 			local pivots = {}
 			for i = 1, 5 do
 				pivots[i] = model:FindFirstChild(`{N.mole}{i}`).PrimaryPart
@@ -172,6 +194,42 @@ return function(t: Test.T)
 			local value = model:FindFirstChild(N.score):FindFirstChild(N.display):FindFirstChild(N.value)
 			t.truthy(value ~= nil, "the SCORE window's text kept")
 			t.eq(model:GetAttribute("Art"), "123")
+			-- the lettering off the meshes' faces
+			local nLettered = 0
+			for part, was in lettered do
+				nLettered += 1
+				t.truthy(part.Parent ~= nil, `{part.Name} kept`)
+				local moved = part.CFrame.Position - was.at
+				t.near(moved:Dot(was.out), WhackArt.NUDGE, 1e-4, `{part.Name} toward the viewer`)
+				t.near(moved.Magnitude, WhackArt.NUDGE, 1e-4, `{part.Name} only that`)
+			end
+			t.truthy(nLettered >= 7, `{nLettered} parts carry lettering`)
+			t.eq(report.nudged, nLettered)
+			-- the baked parts nothing needs are gone: a mole and the mallet keep only their pivots; the shell
+			-- what collides or carries lettering
+			for _, name in { N.mallet, `{N.mole}1`, `{N.mole}2`, `{N.mole}3`, `{N.mole}4`, `{N.mole}5` } do
+				local m = model:FindFirstChild(name)
+				t.truthy(m.PrimaryPart ~= nil and m.PrimaryPart.Parent == m, `{name} keeps its pivot`)
+				for _, d in m:GetDescendants() do
+					if d:IsA("BasePart") and not d:IsA("MeshPart") then
+						t.eq(d, m.PrimaryPart, `{name}: only the pivot is left of the bake ({d.Name})`)
+					end
+				end
+			end
+			local left = 0
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and not d:IsA("MeshPart") then
+					left += 1
+					if d:IsDescendantOf(shell) then
+						t.truthy(
+							d.CanCollide or d:FindFirstChildWhichIsA("SurfaceGui") ~= nil,
+							`{d.Name} neither collides nor carries lettering`
+						)
+					end
+				end
+			end
+			t.eq(baked - left, report.removed)
+			t.truthy(left < 40, `{left} of the {baked} baked parts are left`)
 			local again = WhackArt.install(model, PLACE, data, { env = roblox :: any, load = asset })
 			t.falsy(again.loaded)
 			t.eq(again.why, "already installed")

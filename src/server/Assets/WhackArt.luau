@@ -11,13 +11,16 @@
 --     or queries);
 --   * a mole's pieces go into its Mole model and the mallet's into the Mallet, so the clients' PivotTo of those
 --     models carries them (each model's PrimaryPart stays the baked one: the pivot the clients use);
---   * the baked parts they replace are made invisible, not removed: the cabinet's collision stays the bake's,
---     and so does every SurfaceGui (WHACK A MOLE, the windows' live SCORE and TIME, FREE PLAY, the hole numbers:
---     the meshes carry no lettering).
+--   * the baked parts they replace are made invisible and the ones nothing needs any more are removed (fewer
+--     parts to replicate): a mole or the mallet keeps only its pivot (its PrimaryPart), the shell only the parts
+--     that collide or carry lettering. The cabinet's collision stays the bake's, and so does every SurfaceGui
+--     (WHACK A MOLE, the windows' live SCORE and TIME, FREE PLAY, the hole numbers: the meshes carry no
+--     lettering); each part that carries lettering is brought NUDGE studs toward the viewer, off the mesh face
+--     it would otherwise share (his coin door, the glass, the leather deck) and flicker against.
 -- Started by the station's own server half (Server/Minigames/Games/WhackAMole) once its cabinet is found: the
 -- load runs off the caller's path, and a Model that fails to load leaves the baked cabinet as it was (warned).
--- Interface: install(model, place, data, opts?) -> report { loaded, why?, pieces, unknown, hidden }; start(model,
---   place, opts?) -> boolean (false: no art to load); colour(piece) -> { r, g, b }
+-- Interface: install(model, place, data, opts?) -> report { loaded, why?, pieces, unknown, hidden, removed,
+--   nudged }; start(model, place, opts?) -> boolean (false: no art to load); colour(piece) -> { r, g, b }; NUDGE
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -26,6 +29,8 @@ local Layout =
 	Import.shared("Minigames/WhackAMole/Layout") :: typeof(require("../../shared/Minigames/WhackAMole/Layout"))
 
 local WhackArt = {}
+
+WhackArt.NUDGE = 0.03 -- studs a part carrying lettering is brought toward the viewer over the meshes
 
 export type Env = { CFrame: any, Color3: any, Enum: any }
 export type Opts = {
@@ -58,7 +63,8 @@ end
 function WhackArt.install(model: Instance, place: any, data: any, opts: Opts?): { [string]: any }
 	local o: Opts = opts or {}
 	local e = o.env or engineEnv()
-	local report = { loaded = false, why = nil :: string?, pieces = 0, unknown = 0, hidden = 0 }
+	local report =
+		{ loaded = false, why = nil :: string?, pieces = 0, unknown = 0, hidden = 0, removed = 0, nudged = 0 }
 	local id = tonumber(data and data.assetId)
 	if id == nil then
 		report.why = "no asset id"
@@ -137,6 +143,51 @@ function WhackArt.install(model: Instance, place: any, data: any, opts: Opts?): 
 		if window and window:IsA("BasePart") then
 			window.Transparency = 1
 			report.hidden += 1
+		end
+	end
+	-- the hidden parts nothing needs any more go: all of a mole or the mallet but its pivot, and of the shell
+	-- whatever neither collides nor carries lettering (before the meshes move in)
+	local function prune(root: Instance?, pivot: Instance?)
+		if root == nil then
+			return
+		end
+		for _, d in root:GetDescendants() do
+			if
+				d:IsA("BasePart")
+				and d.Transparency >= 1
+				and d ~= pivot
+				and (pivot ~= nil or not d.CanCollide)
+				and d:FindFirstChildWhichIsA("SurfaceGui") == nil
+			then
+				d:Destroy()
+				report.removed += 1
+			end
+		end
+	end
+	prune(shell, nil)
+	for _, name in { N.mallet, `{N.mole}1`, `{N.mole}2`, `{N.mole}3`, `{N.mole}4`, `{N.mole}5` } do
+		local m = model:FindFirstChild(name)
+		if m and m:IsA("Model") then
+			prune(m, m.PrimaryPart)
+		end
+	end
+	-- the lettering off the meshes' faces: each part with a SurfaceGui comes NUDGE toward where its face looks
+	local nudged: { [Instance]: boolean } = {}
+	for _, gui in model:GetDescendants() do
+		local part = gui.Parent
+		if gui:IsA("SurfaceGui") and part and part:IsA("BasePart") and not nudged[part] then
+			nudged[part] = true
+			local cf = part.CFrame
+			local face = (gui.Face :: any).Name
+			local out = if face == "Front"
+				then -cf.LookVector
+				elseif face == "Back" then cf.LookVector
+				elseif face == "Top" then cf.UpVector
+				elseif face == "Bottom" then -cf.UpVector
+				elseif face == "Right" then cf.RightVector
+				else -cf.RightVector
+			part.CFrame = cf + out * WhackArt.NUDGE
+			report.nudged += 1
 		end
 	end
 	for _, d in holder:GetDescendants() do
