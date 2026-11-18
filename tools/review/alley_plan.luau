@@ -10,6 +10,7 @@ local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 
 local L = require("../../src/shared/Attractions/AlleyLayout")
+local AlleyStaff = require("../../src/shared/Attractions/AlleyStaff")
 local Games = require("../../src/shared/Minigames/Games")
 local WhackLayout = require("../../src/shared/Minigames/WhackAMole/Layout")
 local Attractions = require("../../generated/Attractions") :: any
@@ -202,6 +203,8 @@ local doc = {
 	posts = L.POSTS,
 	machinePosts = machinePosts,
 	routes = routes,
+	-- the alley's employees and their work loops (Shared/Attractions/AlleyStaff; alley_plan.py --staff draws them)
+	staff = AlleyStaff.EMPLOYEES,
 	standing = (function(): { any }
 		-- the tables' floors, and the games that keep their own (the whack-a-mole cabinet: its Layout)
 		local list: { any } = L.standing()
