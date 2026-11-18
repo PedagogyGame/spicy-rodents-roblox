@@ -120,7 +120,7 @@ Tunables.tree = {
 	            fashionUnlockLifetimeCents = { v = 150, src = "v5.4's 150 lifetime coins gate the fashion stand (rev 4, CR3 VD-3)" } },
 	reputation = { votesPerDay = { v = { up = 5, down = 5 }, unit = "per game day", src = "v2 §13a (Q2)" }, voteWeightClamp = { v = { 0.25, 1.5 } },
 	               cafeTickPerHour = { v = 1 }, rankGateDays = { v = "Ladder.params", src = "ladder number; not here" } },
-	paintball = { projectileSpeed = { v = 90, unit = "st/s" }, drop = { v = 9.8 }, magazine = { v = 5 }, lagHistorySecs = { v = 1.0 },
+	paintball = { projectileSpeed = { v = 150, unit = "st/s", src = "paintball review 2026-11-13 (Contract.FEEL)" }, drop = { v = 19.6 }, magazine = { v = 5 }, lagHistorySecs = { v = 1.0 },
 	              matchSecs = { v = 480 }, teamSize = { v = { 4, 8 } }, sprintMult = { v = 1.4 } },
 	minigames = { inputDelayBudgetMs = { v = 120, src = "S13 pass bar (shooter's local feel)" }, jengaBlocks = { v = 54 }, dartsWobble = { v = 0.04 },
 	              labyrinthTiltDegPerS = { v = 25 } },

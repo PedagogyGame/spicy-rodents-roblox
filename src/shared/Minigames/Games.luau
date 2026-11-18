@@ -35,6 +35,10 @@
 --      So a stream of input (flippers, a tilt, a pull) is never a message per key or per frame: the client keeps
 --      a log by tick and sends its next segment about ten times a second, { fromTick, toTick, packed events },
 --      and the server replays to the tick the segment declares (tests/lib/FakeGames' machine is the example).
+--      ONE EXCEPTION: paintball's real-time stream (poses, clicks, snapshots, balls, splats) goes on five remotes
+--      of its own. Minigames/Paintball/Wire gives the reasons; its Table reaches them through a Port it is handed
+--      and only where its arena stands, so no other game's test ever meets one (tests/lib/PaintballRig carries
+--      them beside the rig). Everything else of paintball's goes the way this rule says.
 --   2. Two clocks. The service's own (ServerGame.Ctx.now) is for durations on the server. Anything a client
 --      stamps and the server judges by time uses the shared clock: ctx.stamp() on both sides (or "which script,
 --      and how many seconds into it", which needs no clock at all).

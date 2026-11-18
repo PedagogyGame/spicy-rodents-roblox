@@ -56,3 +56,23 @@ Named but not placed yet (no Sound instance exists; the natural trigger is given
 | `SkyLift.WindAtHeight` | looped, louder the higher the cabin | wind round a cabin |
 | `Telescope.Click` | Client/Rides/Telescope in and out | the same click as the server's |
 | `Lookout.Fireplace`, `Lookout.DiningRoom`, `Lookout.TerraceWind` | looped at the fire, in the dining room, on the terrace | crackle; low murmur and cutlery; wind |
+
+### Paintball (`src/client/Minigames/Games/Paintball.luau`, table `sounds`)
+Every cue below is timed and placed already. Until the owner chooses the set, eleven of them play a PLACEHOLDER that ships with every Roblox client (`rbxasset://sounds/...`, nothing uploaded, no licence needed), so the fire, the hits and the dry click can be judged at the playtest; `paintball.step` is empty (no single footstep ships with the client: the body's own stock footsteps are heard meanwhile). A placeholder that does not exist in the client is silent and the Output says it failed to load. Volumes are in `src/client/Minigames/Paintball/Tuning.luau`. Another player's cues are played from where they happened and dulled by each floor between (`World.luau`).
+
+| Cue | When it plays | Volume | Placeholder now | Wanted |
+|---|---|---|---|---|
+| `paintball.fire` | your ball leaves | `volFire` 0.7 | `paintball.wav` (the classic Paintball Gun gear's pop) | a toy "thup": a light pneumatic pop, not a gunshot |
+| `paintball.fire_far` | another player's or a bot's ball leaves, from where they stand | `volFireFar` 0.6 | `paintball.wav` | the same pop, duller and further off |
+| `paintball.splat` | a ball bursts on a wall, a floor or a body (yours at once on your screen, others' where they land) | `volSplat` 0.45 | `splat.wav` | a wet splat |
+| `paintball.tag` | the server says YOU tagged someone | `volTag` 0.9 | `electronicpingshort.wav` | a bright two-note ding, unmistakable |
+| `paintball.tagged` | you were tagged out | `volTagged` 1.0 | `uuhhh.mp3` | a loud low thwack (the loudest thing in the game) |
+| `paintball.reload` | your reload starts (R, or by itself after the fifth ball); another's, placed | `volReload` 0.5, `volReloadFar` 0.35 | `switch.wav` | a plastic hopper rattle, about a second and a half |
+| `paintball.dry` | a press on an empty or reloading marker (at most one per `drySecs`) | `volDry` 0.5 | `clickfast.wav` | a dry click |
+| `paintball.step` | each stride: loud sprinting, soft walking, silent crouched; others' placed | `stepLoud` 0.6, `stepQuiet` 0.22 | none | soft footsteps on a hard floor |
+| `paintball.ready` | the reload is done: the magazine is full | `volReady` 0.45 | `button.wav` | a short click-clack |
+| `paintball.go` | the briefing is over, the match is live | `volGo` 0.8 | `electronicpingshort.wav` | a horn |
+| `paintball.back` | you are back from being tagged out | `volBack` 0.6 | `action_get_up.mp3` | a short rising chime |
+| `paintball.over` | full time | `volGo` 0.8 | `victory.wav` | a whistle |
+
+Twelve sounds if each is uploaded; the fire and the far fire, and the reload and the ready, could be one recording each at two volumes.

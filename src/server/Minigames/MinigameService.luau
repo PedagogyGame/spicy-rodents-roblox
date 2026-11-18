@@ -80,6 +80,7 @@ export type Opts = {
 		pass: ServerGame.Pass?, -- the town's one timed pass (Boot/Game: wallet.pass)
 		best: ((player: any, key: string, value: number?, lower: boolean?) -> number?)?,
 	}?,
+	paintball: { [string]: any }?, -- paintball's deps (PaintballService.Deps), read by its Table as ctx.opts.paintball
 }
 
 type Station = {
@@ -708,6 +709,10 @@ function MinigameService._refresh(self: any, st: Station)
 		local doorPrompt = door.prompt
 		if doorPrompt then
 			local action, object = promptTexts(st, door.label)
+			-- (a door that does something of its own says so: the paintball pass desk's "Buy a pass")
+			if door.def.action ~= nil and not st.broken then
+				action = door.def.action
+			end
 			doorPrompt.ActionText = action
 			doorPrompt.ObjectText = object
 		end

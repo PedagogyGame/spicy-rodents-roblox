@@ -31,6 +31,7 @@
 -- Pure; Lune-tested (tests/unit/pinball_machine.spec.luau, pinball_rules.spec.luau, pinball_games.spec.luau).
 -- Interface: BTN (button bits), PHASE, CUE, SAY (the callouts every table shares), TEXT; BALLS, MAX_PLAYERS and
 --   the tuning constants; new(table, seed, players) -> State; step(table, state, buttons, out);
+--   resting(table, state) -> the ball on the plunger waiting for the player's hand (0: none);
 --   forfeit(table, state, out) (an abandoned ball is played out dead); retire(table, state, seat, out) (a
 --   player has gone for good); buttons(bits, pull) -> the number step() takes; pullOf(buttons) -> 0..31;
 --   lamps(table, state, into) -> into;
@@ -393,6 +394,16 @@ local function onPlunger(m: State, tbl: Table): number
 		end
 	end
 	return 0
+end
+
+-- resting(table, state): the ball sitting on the plunger waiting for the player's own hand, or 0 (none there,
+-- or the machine launches it itself: a ball given back by the save, a ball fed to a multiball, a tilt, a ball
+-- played out dead). A drawer reads it; it changes nothing (a touch screen's right half is the plunger only then).
+function Machine.resting(tbl: Table, m: State): number
+	if m.phase ~= PLAY or m.autoIn > 0 or m.tilted or m.forfeit then
+		return 0
+	end
+	return onPlunger(m, tbl)
 end
 
 local function startBall(m: State, tbl: Table, out: { number })

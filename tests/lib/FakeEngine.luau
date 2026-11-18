@@ -21,7 +21,7 @@
 -- Interface: new(className, name?, props?) -> Instance; install(); uninstall(); with(fn); part(name, cframe,
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
---   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
+--   bound; signal() -> { Connect, Once, fire }; a Sound's Play() and Stop() (Playing, played); uis() -> the fake UserInputService; input(kind "began" | "ended" |
 --   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position?, id? };
 --   with an id every event from that id's "began" to its "ended" is handed over as ONE InputObject, as the
 --   engine does for a finger: a controller can follow a touch by the object, which is the only sound way);
@@ -134,6 +134,16 @@ function methods.FindFirstChild(self: any, name: string): any
 		end
 	end
 	return nil
+end
+
+-- Sound:Play() and Stop(): a fake sound only remembers that it was asked (Playing, and `played` times)
+function methods.Play(self: any)
+	rawset(self, "Playing", true)
+	rawset(self, "played", (rawget(self, "played") or 0) + 1)
+end
+
+function methods.Stop(self: any)
+	rawset(self, "Playing", false)
 end
 
 -- (a fake tree is always complete: waiting is finding)
@@ -429,6 +439,15 @@ function FakeEngine.signal(): any
 				end
 			end,
 		}
+	end
+	-- (Once: connected for the next fire only, as the engine's)
+	function sig.Once(self: any, fn: (...any) -> ()): any
+		local conn: any
+		conn = sig.Connect(self, function(...: any)
+			conn.Disconnect()
+			fn(...)
+		end)
+		return conn
 	end
 	function sig.fire(...: any)
 		for _, fn in table.clone(handlers) do

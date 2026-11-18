@@ -26,6 +26,7 @@ local Games = require("../../src/shared/Minigames/Games")
 local GameBakes = require("./GameBakes")
 local Kit = require("./alley/Kit")
 local Alley = require("./alley/Alley")
+local Ways = require("./Ways")
 
 local out = "build/Attractions.rbxm"
 local i = 1
@@ -84,8 +85,31 @@ for _, v in (Expansion :: any).venues do
 		venues[v.id] = v
 	end
 end
-local onVenues = GameBakes.venueSites(roblox, folder, Games.stations(places), places, venues)
+local stations = Games.stations(places)
+local onVenues = GameBakes.venueSites(roblox, folder, stations, places, venues)
 parts += onVenues.parts
+
+-- the way from the town to each venue built above (tools/bake/Ways): its walk, the new street it meets, a
+-- forecourt, the street's lamps and a fingerpost where the street leaves the town road it continues
+local builtVenues: { [string]: any } = {}
+local labels: { [string]: { string } } = {}
+for _, m in folder:GetChildren() do
+	local id = m:GetAttribute("Site")
+	if type(id) == "string" and venues[id] ~= nil then
+		builtVenues[id] = venues[id]
+		-- (the name without its note: "WBLW CHANNEL 7 (ABANDONED)" reads "WBLW CHANNEL 7")
+		labels[id] = { (string.gsub(venues[id].name, "%s*%b()", "")) }
+	end
+end
+for _, st in stations do
+	local l = labels[st.site]
+	if l ~= nil and st.joins == nil and table.find(l, string.upper(st.game)) == nil then
+		table.insert(l, string.upper(st.game))
+	end
+end
+local ways = Ways.plan(builtVenues, labels)
+local wayParts = Ways.build(roblox, folder, ways)
+parts += wayParts
 
 local bytes = roblox.serializeModel({ folder })
 if not fs.isDir("build") then
@@ -95,4 +119,5 @@ fs.writeFile(out, bytes)
 local built = table.concat(onVenues.built, ", ")
 local took = string.format("%.2f", os.clock() - t0)
 print(`attractions: {#doc.attractions} building(s), {onVenues.sites} venue site(s) [{built}], {parts} parts`)
+print(`attractions: {#ways.ways} way(s) to the venues, {#ways.roads} strips, {wayParts} parts`)
 print(`attractions: -> {out} ({#bytes} bytes) in {took} s`)

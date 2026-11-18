@@ -1,0 +1,1246 @@
+{
+  "board_dimensions": [
+    486,
+    1024
+  ],
+  "board_world_bounds": {
+    "x": [
+      0,
+      0.672
+    ],
+    "z": [
+      -1.372,
+      0.0448
+    ]
+  },
+  "backglass_dimensions": [
+    854,
+    1024
+  ],
+  "backglass_text_bands_from_top": {
+    "Title": [
+      0.03,
+      0.23
+    ],
+    "Score": [
+      0.26,
+      0.5
+    ],
+    "Info": [
+      0.52,
+      0.62
+    ],
+    "Say": [
+      0.64,
+      0.8
+    ],
+    "Best": [
+      0.83,
+      0.95
+    ]
+  },
+  "machines": {
+    "acorn": {
+      "title": "ACORN ATTACK",
+      "board_texture": "Acorn_Board.png",
+      "apron_texture": "Acorn_Apron.png",
+      "labels": [
+        {
+          "text": "A",
+          "centre": [
+            0.112,
+            -0.6202
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "C",
+          "centre": [
+            0.1288,
+            -0.6454
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "O",
+          "centre": [
+            0.1456,
+            -0.6706
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "R",
+          "centre": [
+            0.1624,
+            -0.6958
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "N",
+          "centre": [
+            0.1792,
+            -0.721
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "THE HOARD",
+          "centre": [
+            0.3101,
+            -0.518
+          ],
+          "width": 0.168,
+          "height": 0.0224
+        },
+        {
+          "text": "2X",
+          "centre": [
+            0.2709,
+            -0.3976
+          ],
+          "width": 0.0336,
+          "height": 0.0168
+        },
+        {
+          "text": "3X",
+          "centre": [
+            0.3101,
+            -0.3976
+          ],
+          "width": 0.0336,
+          "height": 0.0168
+        },
+        {
+          "text": "5X",
+          "centre": [
+            0.3493,
+            -0.3976
+          ],
+          "width": 0.0336,
+          "height": 0.0168
+        },
+        {
+          "text": "SPIN",
+          "centre": [
+            0.56,
+            -0.6748
+          ],
+          "width": 0.084,
+          "height": 0.0196
+        },
+        {
+          "text": "OAK",
+          "centre": [
+            0.448,
+            -0.826
+          ],
+          "width": 0.056,
+          "height": 0.0196
+        },
+        {
+          "text": "OAK",
+          "centre": [
+            0.1722,
+            -0.826
+          ],
+          "width": 0.056,
+          "height": 0.0196
+        },
+        {
+          "text": "EXTRA BALL",
+          "centre": [
+            0.4676,
+            -0.7504
+          ],
+          "width": 0.112,
+          "height": 0.0168
+        },
+        {
+          "text": "SHOOT AGAIN",
+          "centre": [
+            0.3101,
+            -0.0742
+          ],
+          "width": 0.1176,
+          "height": 0.014
+        },
+        {
+          "text": "FILL THE HOARD BEFORE WINTER",
+          "centre": [
+            0.3101,
+            -0.35
+          ],
+          "width": 0.266,
+          "height": 0.0224
+        }
+      ],
+      "lamp_rings": [
+        {
+          "name": "Lamp1",
+          "id": "top_1",
+          "colour": "amber",
+          "centre": [
+            0.2338,
+            -1.176
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp2",
+          "id": "top_2",
+          "colour": "amber",
+          "centre": [
+            0.2982,
+            -1.176
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp3",
+          "id": "top_3",
+          "colour": "amber",
+          "centre": [
+            0.3626,
+            -1.176
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp4",
+          "id": "bumper_1",
+          "colour": "white",
+          "centre": [
+            0.2072,
+            -1.0136
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp5",
+          "id": "bumper_2",
+          "colour": "white",
+          "centre": [
+            0.392,
+            -1.0136
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp6",
+          "id": "bumper_3",
+          "colour": "white",
+          "centre": [
+            0.2996,
+            -0.8848
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp7",
+          "id": "acorn_a",
+          "colour": "green",
+          "centre": [
+            0.0896,
+            -0.6286
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp8",
+          "id": "acorn_c",
+          "colour": "green",
+          "centre": [
+            0.1064,
+            -0.6538
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp9",
+          "id": "acorn_o",
+          "colour": "green",
+          "centre": [
+            0.1232,
+            -0.679
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp10",
+          "id": "acorn_r",
+          "colour": "green",
+          "centre": [
+            0.14,
+            -0.7042
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp11",
+          "id": "acorn_n",
+          "colour": "green",
+          "centre": [
+            0.1568,
+            -0.7294
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp12",
+          "id": "spinner",
+          "colour": "red",
+          "centre": [
+            0.56,
+            -0.7
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp13",
+          "id": "oak_r",
+          "colour": "yellow",
+          "centre": [
+            0.448,
+            -0.8008
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp14",
+          "id": "oak_l",
+          "colour": "yellow",
+          "centre": [
+            0.1722,
+            -0.8008
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp15",
+          "id": "hoard_1",
+          "colour": "orange",
+          "centre": [
+            0.2541,
+            -0.49
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp16",
+          "id": "hoard_2",
+          "colour": "orange",
+          "centre": [
+            0.2821,
+            -0.49
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp17",
+          "id": "hoard_3",
+          "colour": "orange",
+          "centre": [
+            0.3101,
+            -0.49
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp18",
+          "id": "hoard_4",
+          "colour": "orange",
+          "centre": [
+            0.3381,
+            -0.49
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp19",
+          "id": "hoard_5",
+          "colour": "orange",
+          "centre": [
+            0.3661,
+            -0.49
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp20",
+          "id": "bonus_2x",
+          "colour": "white",
+          "centre": [
+            0.2709,
+            -0.42
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp21",
+          "id": "bonus_3x",
+          "colour": "white",
+          "centre": [
+            0.3101,
+            -0.42
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp22",
+          "id": "bonus_5x",
+          "colour": "white",
+          "centre": [
+            0.3493,
+            -0.42
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp23",
+          "id": "extra_ball",
+          "colour": "red",
+          "centre": [
+            0.4676,
+            -0.7728
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp24",
+          "id": "shoot_again",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.098
+          ],
+          "radius": 0.014
+        }
+      ],
+      "emblem": "original image-generation illustration with exact layout applied from data"
+    },
+    "rodent": {
+      "title": "SPICY RODENT",
+      "board_texture": "Rodent_Board.png",
+      "apron_texture": "Rodent_Apron.png",
+      "labels": [
+        {
+          "text": "S",
+          "centre": [
+            0.1176,
+            -0.5768
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "P",
+          "centre": [
+            0.1344,
+            -0.6328
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "I",
+          "centre": [
+            0.3388,
+            -0.7924
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "C",
+          "centre": [
+            0.4858,
+            -0.6328
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "Y",
+          "centre": [
+            0.5026,
+            -0.5768
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "CALM",
+          "centre": [
+            0.2345,
+            -0.3416
+          ],
+          "width": 0.084,
+          "height": 0.0196
+        },
+        {
+          "text": "FERAL",
+          "centre": [
+            0.1925,
+            -0.42
+          ],
+          "width": 0.0896,
+          "height": 0.0196
+        },
+        {
+          "text": "RABID",
+          "centre": [
+            0.1925,
+            -0.5208
+          ],
+          "width": 0.0896,
+          "height": 0.0196
+        },
+        {
+          "text": "SUPER",
+          "centre": [
+            0.1925,
+            -0.6216
+          ],
+          "width": 0.0896,
+          "height": 0.0196
+        },
+        {
+          "text": "THE WIRE",
+          "centre": [
+            0.2408,
+            -0.6412
+          ],
+          "width": 0.1176,
+          "height": 0.0196
+        },
+        {
+          "text": "THE BITE",
+          "centre": [
+            0.392,
+            -0.8932
+          ],
+          "width": 0.1176,
+          "height": 0.0196
+        },
+        {
+          "text": "HOT LANE",
+          "centre": [
+            0.5894,
+            -0.8092
+          ],
+          "width": 0.112,
+          "height": 0.0168
+        },
+        {
+          "text": "EXTRA BALL",
+          "centre": [
+            0.3976,
+            -0.854
+          ],
+          "width": 0.112,
+          "height": 0.0168
+        },
+        {
+          "text": "SHOOT AGAIN",
+          "centre": [
+            0.3101,
+            -0.0742
+          ],
+          "width": 0.1176,
+          "height": 0.014
+        },
+        {
+          "text": "CLIMB TO SUPER",
+          "centre": [
+            0.3101,
+            -0.2856
+          ],
+          "width": 0.196,
+          "height": 0.0252
+        }
+      ],
+      "lamp_rings": [
+        {
+          "name": "Lamp1",
+          "id": "wire",
+          "colour": "red",
+          "centre": [
+            0.2408,
+            -0.616
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp2",
+          "id": "spicy_s",
+          "colour": "orange",
+          "centre": [
+            0.0952,
+            -0.5768
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp3",
+          "id": "spicy_p",
+          "colour": "orange",
+          "centre": [
+            0.112,
+            -0.6328
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp4",
+          "id": "spicy_i",
+          "colour": "orange",
+          "centre": [
+            0.3388,
+            -0.7672
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp5",
+          "id": "spicy_c",
+          "colour": "orange",
+          "centre": [
+            0.5082,
+            -0.6328
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp6",
+          "id": "spicy_y",
+          "colour": "orange",
+          "centre": [
+            0.525,
+            -0.5768
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp7",
+          "id": "hot_lane",
+          "colour": "red",
+          "centre": [
+            0.5894,
+            -0.784
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp8",
+          "id": "bite",
+          "colour": "red",
+          "centre": [
+            0.42,
+            -0.9184
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp9",
+          "id": "extra_ball",
+          "colour": "red",
+          "centre": [
+            0.3976,
+            -0.8736
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp10",
+          "id": "bumper_1",
+          "colour": "red",
+          "centre": [
+            0.084,
+            -1.0416
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp11",
+          "id": "bumper_2",
+          "colour": "red",
+          "centre": [
+            0.2744,
+            -0.966
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp12",
+          "id": "bumper_3",
+          "colour": "red",
+          "centre": [
+            0.1008,
+            -0.9184
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp13",
+          "id": "heat_1",
+          "colour": "yellow",
+          "centre": [
+            0.3101,
+            -0.3416
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp14",
+          "id": "heat_2",
+          "colour": "yellow",
+          "centre": [
+            0.3101,
+            -0.3752
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp15",
+          "id": "heat_3",
+          "colour": "yellow",
+          "centre": [
+            0.3101,
+            -0.4088
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp16",
+          "id": "heat_4",
+          "colour": "orange",
+          "centre": [
+            0.3101,
+            -0.4424
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp17",
+          "id": "heat_5",
+          "colour": "orange",
+          "centre": [
+            0.3101,
+            -0.476
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp18",
+          "id": "heat_6",
+          "colour": "orange",
+          "centre": [
+            0.3101,
+            -0.5096
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp19",
+          "id": "heat_7",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.5432
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp20",
+          "id": "heat_8",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.5768
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp21",
+          "id": "heat_9",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.6104
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp22",
+          "id": "feral",
+          "colour": "yellow",
+          "centre": [
+            0.2541,
+            -0.42
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp23",
+          "id": "rabid",
+          "colour": "orange",
+          "centre": [
+            0.2541,
+            -0.5208
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp24",
+          "id": "super",
+          "colour": "red",
+          "centre": [
+            0.2541,
+            -0.6216
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp25",
+          "id": "shoot_again",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.098
+          ],
+          "radius": 0.014
+        }
+      ],
+      "emblem": "original image-generation illustration with exact layout applied from data"
+    },
+    "space": {
+      "title": "SPACE SQUIRREL",
+      "board_texture": "Space_Board.png",
+      "apron_texture": "Space_Apron.png",
+      "labels": [
+        {
+          "text": "F",
+          "centre": [
+            0.27322,
+            -0.65315
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "U",
+          "centre": [
+            0.15518,
+            -0.63317
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "E",
+          "centre": [
+            0.46502,
+            -0.63317
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "L",
+          "centre": [
+            0.34698,
+            -0.65315
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "3",
+          "centre": [
+            0.2541,
+            -0.5628
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "2",
+          "centre": [
+            0.3101,
+            -0.5628
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "1",
+          "centre": [
+            0.3661,
+            -0.5628
+          ],
+          "width": 0.0308,
+          "height": 0.0308
+        },
+        {
+          "text": "LAUNCH",
+          "centre": [
+            0.3101,
+            -0.616
+          ],
+          "width": 0.112,
+          "height": 0.0196
+        },
+        {
+          "text": "COMBO",
+          "centre": [
+            0.3101,
+            -0.4228
+          ],
+          "width": 0.1008,
+          "height": 0.0196
+        },
+        {
+          "text": "JACKPOT",
+          "centre": [
+            0.3101,
+            -0.7532
+          ],
+          "width": 0.112,
+          "height": 0.0196
+        },
+        {
+          "text": "ORBIT",
+          "centre": [
+            0.0644,
+            -0.6524
+          ],
+          "width": 0.0672,
+          "height": 0.0168
+        },
+        {
+          "text": "ORBIT",
+          "centre": [
+            0.5558,
+            -0.6524
+          ],
+          "width": 0.0672,
+          "height": 0.0168
+        },
+        {
+          "text": "RAMP",
+          "centre": [
+            0.2296,
+            -0.6496
+          ],
+          "width": 0.0616,
+          "height": 0.0168
+        },
+        {
+          "text": "RAMP",
+          "centre": [
+            0.3906,
+            -0.6496
+          ],
+          "width": 0.0616,
+          "height": 0.0168
+        },
+        {
+          "text": "LOCK",
+          "centre": [
+            0.0476,
+            -0.6832
+          ],
+          "width": 0.0616,
+          "height": 0.0168
+        },
+        {
+          "text": "LOCK",
+          "centre": [
+            0.5726,
+            -0.6832
+          ],
+          "width": 0.0616,
+          "height": 0.0168
+        },
+        {
+          "text": "SHOOT AGAIN",
+          "centre": [
+            0.3101,
+            -0.0742
+          ],
+          "width": 0.1176,
+          "height": 0.014
+        },
+        {
+          "text": "COUNTDOWN TO MULTIBALL",
+          "centre": [
+            0.3101,
+            -0.3416
+          ],
+          "width": 0.266,
+          "height": 0.0224
+        }
+      ],
+      "lamp_rings": [
+        {
+          "name": "Lamp1",
+          "id": "dock",
+          "colour": "blue",
+          "centre": [
+            0.43521,
+            -1.19047
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp2",
+          "id": "orbit_l",
+          "colour": "blue",
+          "centre": [
+            0.0308,
+            -0.686
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp3",
+          "id": "orbit_r",
+          "colour": "blue",
+          "centre": [
+            0.5894,
+            -0.686
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp4",
+          "id": "bumper_1",
+          "colour": "blue",
+          "centre": [
+            0.238,
+            -1.0248
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp5",
+          "id": "bumper_2",
+          "colour": "blue",
+          "centre": [
+            0.3822,
+            -1.0248
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp6",
+          "id": "bumper_3",
+          "colour": "blue",
+          "centre": [
+            0.3101,
+            -0.896
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp7",
+          "id": "ramp_l",
+          "colour": "white",
+          "centre": [
+            0.2296,
+            -0.672
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp8",
+          "id": "ramp_r",
+          "colour": "white",
+          "centre": [
+            0.3906,
+            -0.672
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp9",
+          "id": "fuel_f",
+          "colour": "yellow",
+          "centre": [
+            0.27322,
+            -0.67555
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp10",
+          "id": "fuel_l",
+          "colour": "yellow",
+          "centre": [
+            0.34698,
+            -0.67555
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp11",
+          "id": "fuel_u",
+          "colour": "yellow",
+          "centre": [
+            0.15518,
+            -0.65557
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp12",
+          "id": "fuel_e",
+          "colour": "yellow",
+          "centre": [
+            0.46502,
+            -0.65557
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp13",
+          "id": "pod_1",
+          "colour": "green",
+          "centre": [
+            0.0476,
+            -0.7112
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp14",
+          "id": "pod_2",
+          "colour": "green",
+          "centre": [
+            0.5726,
+            -0.7112
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp15",
+          "id": "extra_ball",
+          "colour": "red",
+          "centre": [
+            0.084,
+            -0.672
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp16",
+          "id": "count_1",
+          "colour": "red",
+          "centre": [
+            0.2541,
+            -0.588
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp17",
+          "id": "count_2",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.588
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp18",
+          "id": "count_3",
+          "colour": "red",
+          "centre": [
+            0.3661,
+            -0.588
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp19",
+          "id": "combo_1",
+          "colour": "white",
+          "centre": [
+            0.2429,
+            -0.448
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp20",
+          "id": "combo_2",
+          "colour": "white",
+          "centre": [
+            0.2765,
+            -0.448
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp21",
+          "id": "combo_3",
+          "colour": "white",
+          "centre": [
+            0.3101,
+            -0.448
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp22",
+          "id": "combo_4",
+          "colour": "white",
+          "centre": [
+            0.3437,
+            -0.448
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp23",
+          "id": "combo_5",
+          "colour": "white",
+          "centre": [
+            0.3773,
+            -0.448
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp24",
+          "id": "jackpot",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.728
+          ],
+          "radius": 0.014
+        },
+        {
+          "name": "Lamp25",
+          "id": "shoot_again",
+          "colour": "red",
+          "centre": [
+            0.3101,
+            -0.098
+          ],
+          "radius": 0.014
+        }
+      ],
+      "emblem": "original image-generation illustration with exact layout applied from data"
+    }
+  }
+}

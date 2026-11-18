@@ -1,13 +1,148 @@
 --!strict
--- tools/bake/games/Paintball: the paintball arena's place in the world. NOT BUILT YET: no build, so nothing is baked and the
--- game has no site (its Spec, src/shared/Minigames/Paintball/Spec, lists no station either).
--- It goes on site "f3_tv_station" (the venue's frame in generated/Expansion), anchor "arena_origin" at local (0, 0, 15).
--- To build it: return { build = function(kit, parent, station, venue) ... end }. kit is tools/bake/alley/Kit in
--- the venue's frame (X across, Y above the floor, D into the site; kit:box / at / cyl / ball / wedge / model /
--- gui / label / light), parent is the site's Model (Workspace.Attractions.f3_tv_station in the game: make one sub-model
--- of your own under it and give every part the server or client must find a unique name), station is the
--- Spec's StationDef and venue the venue's record from generated/Expansion (anchors, footprint, site, ground:
--- how deep a plinth must go). Build the play surface first and enough floor and steps to walk onto it.
--- Interface: { build? } (a stub: none)
+-- tools/bake/games/Paintball: the paintball arena's place in the world (brief v2 §13; checklist PB-5): WBLW
+-- Channel 7, the abandoned five-storey TV station on site "f3_tv_station" (the venue's frame in generated/Expansion).
+-- OWNED BY THE ARENA LANE of the paintball contract (src/shared/Minigames/Paintball/Contract). The building is DATA
+-- (ArenaDataPlan through ArenaData.plan()); tools/games/paintball/arena/PartList turns that data into a list of
+-- parts, one for each collision box, the same size in the same place, and this file only makes the Instances:
+-- what is drawn solid inside the arena is exactly what a ball stops on, and a spec holds it to that.
+-- build is called once for each of paintball's two stations: it builds everything for the arena's own and nothing
+-- for the pass desk's prompt (station.joins ~= nil).
+-- WHAT THE REST OF PAINTBALL FINDS BY NAME, all under ONE sub-model of the site's Model named Arena.MODEL
+-- ("PaintballArena"; attribute Boxes = how many collision boxes it was baked from):
+--   Floor0 .. Floor4, Roof   a Model a storey (the building streams in pieces): one Part for each box, with the
+--             attribute Box = its index in arena.boxes; an invisible Part "Ramp" for each stair ramp, attribute Ramp
+--             = its index (CanCollide: bodies walk on it. The engine honours CanQuery = false only on a part that
+--             does not collide, so a ramp IS hit by workspace:Raycast, up to half a stud over the steps: a ray that
+--             stands for a ball or an eye takes an Include list of the parts with a Box attribute, or leaves out
+--             the parts named Ramp); on the middle storey one Part for each
+--             spawn-room doorway named Arena.CURTAIN .. team ("Curtain1", "Curtain2": see-through, in the team's
+--             colour, CanCollide false; a seated client makes the other team's solid on its own screen).
+--   Monitor   every part named Arena.MONITOR (old sets on carts about the floors, master control's wall, one in
+--             the lobby): attribute ScreenFace = the NormalId its screen is on, and on that face a SurfaceGui
+--             named "Screen" holding one TextLabel "Text" (the station's name until the server writes the score).
+--             Inside the volume a monitor is a `prop` box's own part: a ball stops on it.
+--   Lobby, Outside   the annex with the pass desk and the two windows onto the atrium, and the building from the
+--             street: parts only, all outside the arena volume.
+--   Paint     words are SurfaceGuis on their box's part; the plan's marks (tape, cables lying on a floor, stains,
+--             papers, a floor's words) are labels in a second SurfaceGui named "Paint" on the same face, under
+--             the signs, lit by the room (LightInfluence 1). Nothing of either is a part.
+-- Lights are PointLights without shadows inside the strip lights, stage lamps and lobby fittings, each with the
+-- attribute ArenaLight = true: baked on, so the building is lit whatever else runs; a client may switch them off
+-- while its camera is further than Arena.AUDIENCE_MARGIN outside the volume, where none of them can be seen.
+-- PB-15: every SurfaceGui of the building and the lobby (words, paint, screens) stops drawing past GUI_DISTANCE
+-- (paint) or SIGN_DISTANCE (words, screens) studs, so the town does not draw the station's insides; the street's
+-- own signs (Outside) are seen from anywhere.
+-- Interface: { build(kit, parent, station, venue) }
+local Arena = require("../../../src/shared/Minigames/Paintball/Arena")
+local ArenaData = require("../../../src/shared/Minigames/Paintball/ArenaData")
+local PartList = require("../../games/paintball/arena/PartList")
 
-return {}
+local Bake = {}
+
+Bake.GUI_DISTANCE = 2 * Arena.HALF -- studs: paint (tape, stains, a floor's words) is not drawn from further
+Bake.SIGN_DISTANCE = 160 -- studs: nor are the words on the walls and the monitors' screens
+
+local function make(kit: any, model: any, groups: { [string]: any }, p: PartList.Part): any
+	local group = groups[p.group]
+	if group == nil then
+		group = kit:model(model, p.group)
+		groups[p.group] = group
+	end
+	local roblox = kit.roblox
+	local attrs: { [string]: any } = {}
+	if p.box then
+		attrs.Box = p.box
+	end
+	if p.screen then
+		attrs.ScreenFace = p.screen
+	end
+	if p.ramp then
+		attrs.Ramp = p.ramp
+	end
+	local opts = {
+		collide = p.collide,
+		query = if p.query == nil then p.collide else p.query,
+		shadow = p.shadow,
+		transparency = p.transparency,
+		rot = if p.tilt then roblox.CFrame.Angles(0, 0, p.tilt) else nil,
+		attrs = attrs,
+	}
+	local part = kit:box(group, p.name, p.x0, p.x1, p.y0, p.y1, p.d0, p.d1, p.color, p.material, opts)
+	-- one SurfaceGui a face for its signs (lit of themselves, as the kit makes them), and one under it, named
+	-- "Paint", for its marks: tape, cables, stains and a floor's words take the room's light like the face
+	local guis: { [string]: any } = {}
+	local function gui(face: string, paint: boolean?): any
+		local key = if paint then "Paint" .. face else face
+		local g = guis[key]
+		if g == nil then
+			local w = math.max(p.x1 - p.x0, p.y1 - p.y0, p.d1 - p.d0)
+			g = kit:gui(part, face, math.clamp(math.floor(900 / w), 8, 50))
+			if p.group ~= "Outside" then
+				g.MaxDistance = if paint then Bake.GUI_DISTANCE else Bake.SIGN_DISTANCE
+			end
+			if paint then
+				g.Name = "Paint"
+				g.LightInfluence = 1
+				g.Brightness = 1
+			else
+				g.ZOffset = 1
+			end
+			guis[key] = g
+		end
+		return g
+	end
+	local stacked: { [any]: number } = {}
+	for _, s in p.signs or {} do
+		local props: { [string]: any } = { Text = s.text, TextColor = PartList.TONE[s.tone], Font = "GothamBlack" }
+		if s.rect then
+			props.Pos = { s.rect[1], s.rect[2] }
+			props.Size = { s.rect[3], s.rect[4] }
+		end
+		if s.bg then
+			props.Bg = PartList.TONE[s.bg]
+		end
+		local g = gui(s.face, s.paint)
+		local label = kit:label(g, props)
+		if s.paint and s.bg then
+			label.BorderSizePixel = 0
+		end
+		-- marks on one face are drawn in the plan's order (a meter on a cabinet's door, a board across a window's
+		-- pane): the engine's order for siblings of one ZIndex is not a promise
+		stacked[g] = (stacked[g] or 0) + 1
+		label.ZIndex = stacked[g]
+	end
+	if p.screen then
+		local screen = gui(p.screen)
+		screen.Name = "Screen"
+		local label =
+			kit:label(screen, { Text = "WBLW 7", TextColor = { 96, 110, 104 }, Bg = { 14, 18, 20 }, Font = "Code" })
+		label.Name = "Text"
+	end
+	if p.light then
+		local light = kit:light(
+			part,
+			"PointLight",
+			{ Color = p.light.color, Range = p.light.range, Brightness = p.light.brightness, Shadows = false }
+		)
+		light:SetAttribute("ArenaLight", true)
+	end
+	return part
+end
+
+function Bake.build(kit: any, parent: any, station: any, venue: any?)
+	if station.joins ~= nil then
+		return -- the pass desk's prompt: the desk itself is part of the lobby, built with the arena
+	end
+	local model = kit:model(parent, Arena.MODEL)
+	local plan = ArenaData.plan()
+	model:SetAttribute("Boxes", #plan.kinds)
+	local groups: { [string]: any } = {}
+	for _, p in PartList.solids(plan) do
+		make(kit, model, groups, p)
+	end
+	for _, p in PartList.dressing(venue) do
+		make(kit, model, groups, p)
+	end
+end
+
+return Bake

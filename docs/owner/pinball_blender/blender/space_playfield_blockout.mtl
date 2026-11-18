@@ -1,0 +1,48 @@
+newmtl apron
+Kd 0.118 0.141 0.275
+
+newmtl bumper
+Kd 0.588 0.471 1.000
+
+newmtl cap
+Kd 0.863 0.941 1.000
+
+newmtl dark
+Kd 0.094 0.094 0.102
+
+newmtl field
+Kd 0.086 0.133 0.353
+
+newmtl lamp_blue
+Kd 0.314 0.588 1.000
+
+newmtl lamp_green
+Kd 0.314 1.000 0.431
+
+newmtl lamp_red
+Kd 1.000 0.235 0.196
+
+newmtl lamp_white
+Kd 1.000 0.980 0.922
+
+newmtl lamp_yellow
+Kd 1.000 0.925 0.275
+
+newmtl metal
+Kd 0.804 0.816 0.839
+
+newmtl plastic
+Kd 0.471 0.863 1.000
+
+newmtl red
+Kd 0.902 0.157 0.157
+
+newmtl rubber
+Kd 0.961 0.961 0.941
+
+newmtl target
+Kd 0.471 1.000 0.627
+
+newmtl wood
+Kd 0.745 0.784 0.863
+

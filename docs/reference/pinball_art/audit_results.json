@@ -1,0 +1,3836 @@
+{
+  "audit_version": 1,
+  "scope": "Supplemental structural audit; the original checker remains the authority for footprint tolerances.",
+  "files": [
+    {
+      "file": "Pinball_Flipper.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 516,
+      "triangle_budget": 600,
+      "mesh_objects": 3,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Bat": {
+          "material": "Rubber | warm white",
+          "baseColor": [
+            0.9386857151985168,
+            0.9130986332893372,
+            0.8227857351303101,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Tip": {
+          "material": "Tip | red rubber",
+          "baseColor": [
+            0.7379103899002075,
+            0.039546236395835876,
+            0.024157632142305374,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Pin": {
+          "material": "Pivot | gunmetal",
+          "baseColor": [
+            0.02955683507025242,
+            0.03433980792760849,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Bat": {
+          "triangles": 232,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.012600000016391277,
+              -0.009800000116229057,
+              -0.012583269737660885
+            ],
+            [
+              0.10023999959230423,
+              0.010425000451505184,
+              0.012583269737660885
+            ]
+          ]
+        },
+        "Tip": {
+          "triangles": 124,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.08440320193767548,
+              -0.009995999746024609,
+              -0.007996800355613232
+            ],
+            [
+              0.10039679706096649,
+              0.009995999746024609,
+              0.007996800355613232
+            ]
+          ]
+        },
+        "Pin": {
+          "triangles": 160,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0043973978608846664,
+              -0.010289999656379223,
+              -0.0043973978608846664
+            ],
+            [
+              0.0043973978608846664,
+              0.011099999770522118,
+              0.0043973978608846664
+            ]
+          ]
+        }
+      },
+      "bytes": 25252,
+      "sha256": "709bb716a7596d4ad22f387bbba4c74b3574ef7d1772b1ca1619082a2c534064"
+    },
+    {
+      "file": "Pinball_PopBumper.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 964,
+      "triangle_budget": 1500,
+      "mesh_objects": 3,
+      "decoration_objects": 1,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Body": {
+          "material": "Bumper body | recolourable",
+          "baseColor": [
+            0.4019777774810791,
+            0.045186202973127365,
+            0.012983032502233982,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Cap": {
+          "material": "Bumper cap | recolourable",
+          "baseColor": [
+            1,
+            0.838798999786377,
+            0.4564110338687897,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_StrikeRing": {
+          "material": "Bumper strike ring | chrome",
+          "baseColor": [
+            0.5520114302635193,
+            0.5840784311294556,
+            0.6172065734863281,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Body": {
+          "triangles": 500,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0364999994635582,
+              0.0,
+              -0.0364999994635582
+            ],
+            [
+              0.0364999994635582,
+              0.04479999840259552,
+              0.0364999994635582
+            ]
+          ]
+        },
+        "Cap": {
+          "triangles": 276,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.02855999954044819,
+              0.04479999840259552,
+              -0.02855999954044819
+            ],
+            [
+              0.02855999954044819,
+              0.05649999901652336,
+              0.02855999954044819
+            ]
+          ]
+        },
+        "Deco_StrikeRing": {
+          "triangles": 188,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.029999999329447746,
+              0.012000000104308128,
+              -0.029999999329447746
+            ],
+            [
+              0.029999999329447746,
+              0.01600000075995922,
+              0.029999999329447746
+            ]
+          ]
+        }
+      },
+      "bytes": 20376,
+      "sha256": "dc14a0a726b86868014b946bbcbec297495d8a5a457e72a77a2e29ceffdbf75d"
+    },
+    {
+      "file": "Pinball_Plunger.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 312,
+      "triangle_budget": 400,
+      "mesh_objects": 2,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Rod": {
+          "material": "Plunger shaft | brushed steel",
+          "baseColor": [
+            0.5088813304901123,
+            0.5394794940948486,
+            0.5906188488006592,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Knob": {
+          "material": "Plunger knob | red resin",
+          "baseColor": [
+            0.6938717365264893,
+            0.03688944876194,
+            0.027320891618728638,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Rod": {
+          "triangles": 92,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.006000000052154064,
+              -0.006000000052154064,
+              -0.2240000069141388
+            ],
+            [
+              0.006000000052154064,
+              0.006000000052154064,
+              -0.014000000432133675
+            ]
+          ]
+        },
+        "Knob": {
+          "triangles": 220,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.015399999916553497,
+              -0.015399999916553497,
+              -0.014000000432133675
+            ],
+            [
+              0.015399999916553497,
+              0.015399999916553497,
+              0.014000000432133675
+            ]
+          ]
+        }
+      },
+      "bytes": 7728,
+      "sha256": "063a9f3d93c57dae3570131996b92773b72b8bed7fab2b28271c9d499e7bcf91"
+    },
+    {
+      "file": "Pinball_Gate.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 112,
+      "triangle_budget": 200,
+      "mesh_objects": 1,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Flap": {
+          "material": "Gate | polished wire",
+          "baseColor": [
+            0.5394794940948486,
+            0.5840784311294556,
+            0.637596845626831,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Flap": {
+          "triangles": 112,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.029440000653266907,
+              -0.014299999922513962,
+              -0.0013000000035390258
+            ],
+            [
+              0.029440000653266907,
+              0.0013000000035390258,
+              0.0013000000035390258
+            ]
+          ]
+        }
+      },
+      "bytes": 3344,
+      "sha256": "20796766f3733e4fd83a971ad3ed932601621db2e547bd51d0552a58f39ff12c"
+    },
+    {
+      "file": "Pinball_Cabinet.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 3560,
+      "triangle_budget": 5000,
+      "mesh_objects": 27,
+      "decoration_objects": 10,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Body": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "SideWall_L": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "SideWall_R": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "FrontWall": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "BackWall": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "LockdownBar": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Glass": {
+          "material": "Glass | 95 percent clear",
+          "baseColor": [
+            0.7991027235984802,
+            0.8796223998069763,
+            0.9473065137863159,
+            0.05000000074505806
+          ],
+          "alphaMode": "BLEND",
+          "textureFields": []
+        },
+        "FlipperButton_L": {
+          "material": "Flipper buttons | red",
+          "baseColor": [
+            0.7379103899002075,
+            0.039546236395835876,
+            0.024157632142305374,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "FlipperButton_R": {
+          "material": "Flipper buttons | red",
+          "baseColor": [
+            0.7379103899002075,
+            0.039546236395835876,
+            0.024157632142305374,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "CoinDoor": {
+          "material": "Access door | graphite",
+          "baseColor": [
+            0.014443843625485897,
+            0.016807375475764275,
+            0.024157632142305374,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Leg_FL": {
+          "material": "Cabinet legs | recolourable",
+          "baseColor": [
+            0.5149176716804504,
+            0.4019777774810791,
+            0.18782077729701996,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Leg_FR": {
+          "material": "Cabinet legs | recolourable",
+          "baseColor": [
+            0.5149176716804504,
+            0.4019777774810791,
+            0.18782077729701996,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Leg_BL": {
+          "material": "Cabinet legs | recolourable",
+          "baseColor": [
+            0.5149176716804504,
+            0.4019777774810791,
+            0.18782077729701996,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Leg_BR": {
+          "material": "Cabinet legs | recolourable",
+          "baseColor": [
+            0.5149176716804504,
+            0.4019777774810791,
+            0.18782077729701996,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Backbox": {
+          "material": "Cabinet lacquer | recolourable",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Backglass": {
+          "material": "Backglass | dark backdrop",
+          "baseColor": [
+            0.005181516520678997,
+            0.006512090563774109,
+            0.016807375475764275,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "LightStrip": {
+          "material": "Light strip | recolourable",
+          "baseColor": [
+            1,
+            0.838798999786377,
+            0.4564110338687897,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_LevelerFeet": {
+          "material": "Feet and vents | black",
+          "baseColor": [
+            0.005605391692370176,
+            0.007499032188206911,
+            0.011612244881689548,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_SideRails": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_CabinetPinstripe": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_AccessDoorBezel": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_FreePlay": {
+          "material": "Light strip | recolourable",
+          "baseColor": [
+            1,
+            0.838798999786377,
+            0.4564110338687897,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_BackboxBezel": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_BackboxVents": {
+          "material": "Feet and vents | black",
+          "baseColor": [
+            0.005605391692370176,
+            0.007499032188206911,
+            0.011612244881689548,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_CornerPlates": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_Fasteners": {
+          "material": "Cabinet legs | recolourable",
+          "baseColor": [
+            0.5149176716804504,
+            0.4019777774810791,
+            0.18782077729701996,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_ButtonCollars": {
+          "material": "Cabinet trim | recolourable",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Body": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.335999995470047,
+              0.6849893927574158,
+              -0.675601065158844
+            ],
+            [
+              0.335999995470047,
+              0.8867605924606323,
+              0.7315310835838318
+            ]
+          ]
+        },
+        "SideWall_L": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3779999911785126,
+              0.6808991432189941,
+              -0.7005881667137146
+            ],
+            [
+              -0.335999995470047,
+              1.2456707954406738,
+              0.8077681660652161
+            ]
+          ]
+        },
+        "SideWall_R": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.335999995470047,
+              0.6808991432189941,
+              -0.7005881667137146
+            ],
+            [
+              0.3779999911785126,
+              1.2456707954406738,
+              0.8077681660652161
+            ]
+          ]
+        },
+        "FrontWall": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.335999995470047,
+              0.6808989644050598,
+              0.7281174659729004
+            ],
+            [
+              0.335999995470047,
+              1.0733810663223267,
+              0.8079125285148621
+            ]
+          ]
+        },
+        "BackWall": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.335999995470047,
+              0.8541902303695679,
+              -0.6979601979255676
+            ],
+            [
+              0.335999995470047,
+              1.2314410209655762,
+              -0.6309497952461243
+            ]
+          ]
+        },
+        "LockdownBar": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.38359999656677246,
+              1.071131706237793,
+              0.7737708687782288
+            ],
+            [
+              0.38359999656677246,
+              1.0890083312988281,
+              0.8111991286277771
+            ]
+          ]
+        },
+        "Glass": {
+          "triangles": 12,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.335999995470047,
+              1.0620900392532349,
+              -0.6310399770736694
+            ],
+            [
+              0.335999995470047,
+              1.2318999767303467,
+              0.7317600250244141
+            ]
+          ]
+        },
+        "FlipperButton_L": {
+          "triangles": 188,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3919999897480011,
+              0.8746750354766846,
+              0.6247050166130066
+            ],
+            [
+              -0.3752000033855438,
+              0.9048750400543213,
+              0.6549050211906433
+            ]
+          ]
+        },
+        "FlipperButton_R": {
+          "triangles": 188,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.3752000033855438,
+              0.8746750354766846,
+              0.6247050166130066
+            ],
+            [
+              0.3919999897480011,
+              0.9048750400543213,
+              0.6549050211906433
+            ]
+          ]
+        },
+        "CoinDoor": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.09799999743700027,
+              0.7075223326683044,
+              0.7647461891174316
+            ],
+            [
+              0.09799999743700027,
+              0.8610376715660095,
+              0.7911938428878784
+            ]
+          ]
+        },
+        "Leg_FL": {
+          "triangles": 76,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.34189000725746155,
+              0.0,
+              0.6745800375938416
+            ],
+            [
+              -0.2909099757671356,
+              0.6879100203514099,
+              0.7255600094795227
+            ]
+          ]
+        },
+        "Leg_FR": {
+          "triangles": 76,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.2909099757671356,
+              0.0,
+              0.6745800375938416
+            ],
+            [
+              0.34189000725746155,
+              0.6879100203514099,
+              0.7255600094795227
+            ]
+          ]
+        },
+        "Leg_BL": {
+          "triangles": 76,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.34189000725746155,
+              0.0,
+              -0.6319499611854553
+            ],
+            [
+              -0.2909099757671356,
+              0.8454499840736389,
+              -0.5809699892997742
+            ]
+          ]
+        },
+        "Leg_BR": {
+          "triangles": 76,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.2909099757671356,
+              0.0,
+              -0.6319499611854553
+            ],
+            [
+              0.34189000725746155,
+              0.8454499840736389,
+              -0.5809699892997742
+            ]
+          ]
+        },
+        "Backbox": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3779999911785126,
+              1.246000051498413,
+              -0.6859999895095825
+            ],
+            [
+              0.3779999911785126,
+              2.1559998989105225,
+              -0.5347999930381775
+            ]
+          ]
+        },
+        "Backglass": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.34439998865127563,
+              1.2879999876022339,
+              -0.5347999930381775
+            ],
+            [
+              0.34439998865127563,
+              2.114000082015991,
+              -0.5180000066757202
+            ]
+          ]
+        },
+        "LightStrip": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3779999911785126,
+              2.1224000453948975,
+              -0.5347999930381775
+            ],
+            [
+              0.3779999911785126,
+              2.1559998989105225,
+              -0.5123999714851379
+            ]
+          ]
+        },
+        "Deco_LevelerFeet": {
+          "triangles": 176,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3434000015258789,
+              0.0,
+              -0.6334599852561951
+            ],
+            [
+              0.3434000015258789,
+              0.008999999612569809,
+              0.7270700335502625
+            ]
+          ]
+        },
+        "Deco_SideRails": {
+          "triangles": 56,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3610000014305115,
+              1.0750398635864258,
+              -0.648690402507782
+            ],
+            [
+              0.3610000014305115,
+              1.2529600858688354,
+              0.785690426826477
+            ]
+          ]
+        },
+        "Deco_CabinetPinstripe": {
+          "triangles": 80,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3824000060558319,
+              0.732077419757843,
+              -0.6893582344055176
+            ],
+            [
+              0.3824000060558319,
+              0.9229455590248108,
+              0.7481158971786499
+            ]
+          ]
+        },
+        "Deco_AccessDoorBezel": {
+          "triangles": 112,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.10400000214576721,
+              0.7039999961853027,
+              0.7730000019073486
+            ],
+            [
+              0.10400000214576721,
+              0.8670000433921814,
+              0.7980000376701355
+            ]
+          ]
+        },
+        "Deco_FreePlay": {
+          "triangles": 380,
+          "origin_m": [
+            0.0,
+            0.7900000214576721,
+            0.7875000238418579
+          ],
+          "bounds_m": [
+            [
+              -0.04917000234127045,
+              0.7834295274086424,
+              0.7865610027359486
+            ],
+            [
+              0.05084200203418732,
+              0.7984489093631997,
+              0.7886655402077725
+            ]
+          ]
+        },
+        "Deco_BackboxBezel": {
+          "triangles": 176,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.36000001430511475,
+              1.2719999551773071,
+              -0.515999972820282
+            ],
+            [
+              0.36000001430511475,
+              2.130000114440918,
+              -0.5099999904632568
+            ]
+          ]
+        },
+        "Deco_BackboxVents": {
+          "triangles": 96,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.3799999952316284,
+              1.3359999656677246,
+              -0.6554999947547913
+            ],
+            [
+              0.3799999952316284,
+              1.4190000295639038,
+              -0.5705000162124634
+            ]
+          ]
+        },
+        "Deco_CornerPlates": {
+          "triangles": 176,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.382999986410141,
+              0.7049999833106995,
+              -0.6959999799728394
+            ],
+            [
+              0.382999986410141,
+              0.9399999976158142,
+              0.7519999742507935
+            ]
+          ]
+        },
+        "Deco_Fasteners": {
+          "triangles": 416,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.38499999046325684,
+              0.6592726707458496,
+              -0.6854000091552734
+            ],
+            [
+              0.38499999046325684,
+              0.9314000010490417,
+              0.796999990940094
+            ]
+          ]
+        },
+        "Deco_ButtonCollars": {
+          "triangles": 120,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.38199999928474426,
+              0.8707749843597412,
+              0.620805025100708
+            ],
+            [
+              0.38199999928474426,
+              0.9087749719619751,
+              0.6588050127029419
+            ]
+          ]
+        }
+      },
+      "bytes": 125440,
+      "sha256": "b7fd0d98925d4929d109c45cd4ef43af2a02acfe62fc4cca1e20021b2d517b4a"
+    },
+    {
+      "file": "Acorn_Playfield.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 56,
+      "triangle_budget": 300,
+      "mesh_objects": 2,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [
+        {
+          "size": [
+            486,
+            1024
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        },
+        {
+          "size": [
+            1024,
+            260
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        }
+      ],
+      "textured_objects": [
+        "Apron",
+        "Board"
+      ],
+      "materials": {
+        "Board": {
+          "material": "Acorn_Board_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        },
+        "Apron": {
+          "material": "Acorn_Apron_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        }
+      },
+      "nodes": {
+        "Board": {
+          "triangles": 12,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.0,
+              -0.01679999940097332,
+              -1.371999979019165
+            ],
+            [
+              0.671999990940094,
+              0.0,
+              0.04479999840259552
+            ]
+          ]
+        },
+        "Apron": {
+          "triangles": 44,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.10010000318288803,
+              0.0,
+              -0.06159999966621399
+            ],
+            [
+              0.5200999975204468,
+              0.01679999940097332,
+              0.04479999840259552
+            ]
+          ]
+        }
+      },
+      "bytes": 204004,
+      "sha256": "e4d242d7f2f3b54f4981b4af6b13c1d3b95819b0fb047ba5780aba38b65585cb"
+    },
+    {
+      "file": "Acorn_Guides.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 5732,
+      "triangle_budget": 6000,
+      "mesh_objects": 7,
+      "decoration_objects": 2,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Guides_Wood": {
+          "material": "Acorn_sealed_wood",
+          "baseColor": [
+            0.18116424977779388,
+            0.06847816705703735,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Metal": {
+          "material": "Acorn_polished_metal",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Metal": {
+          "material": "Acorn_polished_metal",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Rubber": {
+          "material": "Acorn_ivory_rubber",
+          "baseColor": [
+            0.9046611785888672,
+            0.8468732237815857,
+            0.7454041838645935,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Rubber": {
+          "material": "Acorn_ivory_rubber",
+          "baseColor": [
+            0.9046611785888672,
+            0.8468732237815857,
+            0.7454041838645935,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_PostScrewCaps": {
+          "material": "Acorn_polished_metal",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_RailCrests": {
+          "material": "Acorn_polished_metal",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Guides_Wood": {
+          "triangles": 1140,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.00839999970048666,
+              0.0,
+              -1.3803999423980713
+            ],
+            [
+              0.680400013923645,
+              0.0560000017285347,
+              0.0
+            ]
+          ]
+        },
+        "Guides_Metal": {
+          "triangles": 1440,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0030799999367445707,
+              0.0,
+              -1.2182799577713013
+            ],
+            [
+              0.6750800013542175,
+              0.030799999833106995,
+              -0.08091999590396881
+            ]
+          ]
+        },
+        "Posts_Metal": {
+          "triangles": 360,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.039659999310970306,
+              0.0,
+              -0.4726699888706207
+            ],
+            [
+              0.5805400013923645,
+              0.03920000046491623,
+              -0.3961000144481659
+            ]
+          ]
+        },
+        "Guides_Rubber": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.04297507554292679,
+              0.0,
+              -1.207889437675476
+            ],
+            [
+              0.13623875379562378,
+              0.02239999920129776,
+              -0.631530225276947
+            ]
+          ]
+        },
+        "Posts_Rubber": {
+          "triangles": 1564,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.04983999952673912,
+              0.0,
+              -1.2208000421524048
+            ],
+            [
+              0.5521600246429443,
+              0.030799999833106995,
+              -0.2599799931049347
+            ]
+          ]
+        },
+        "Deco_PostScrewCaps": {
+          "triangles": 408,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.054680000990629196,
+              0.031200001016259193,
+              -1.2166849374771118
+            ],
+            [
+              0.5473199486732483,
+              0.03150000050663948,
+              -0.2646550238132477
+            ]
+          ]
+        },
+        "Deco_RailCrests": {
+          "triangles": 732,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.000995929236523807,
+              0.05574999749660492,
+              -1.3729958534240723
+            ],
+            [
+              0.672995924949646,
+              0.0580499991774559,
+              0.0
+            ]
+          ]
+        }
+      },
+      "bytes": 187528,
+      "sha256": "354602cd04e8d1a2d1ae0a0e122f00a1eeabedf64123396f8d0f53af39c3c38f"
+    },
+    {
+      "file": "Acorn_Slingshots.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 536,
+      "triangle_budget": 800,
+      "mesh_objects": 5,
+      "decoration_objects": 1,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "SlingBody1": {
+          "material": "Acorn_sling_plastic",
+          "baseColor": [
+            0.7912979125976562,
+            0.3049873113632202,
+            0.03189603239297867,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling1": {
+          "material": "Acorn_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "SlingBody2": {
+          "material": "Acorn_sling_plastic",
+          "baseColor": [
+            0.7912979125976562,
+            0.3049873113632202,
+            0.03189603239297867,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling2": {
+          "material": "Acorn_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_SlingScrewHeads": {
+          "material": "Acorn_sling_screws",
+          "baseColor": [
+            0.5520114302635193,
+            0.35153260827064514,
+            0.10702310502529144,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "SlingBody1": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11479999870061874,
+              0.0,
+              -0.4108508825302124
+            ],
+            [
+              0.17433622479438782,
+              0.028999999165534973,
+              -0.26650556921958923
+            ]
+          ]
+        },
+        "Sling1": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11068885028362274,
+              0.0,
+              -0.41277799010276794
+            ],
+            [
+              0.1787511557340622,
+              0.025200000032782555,
+              -0.2646920084953308
+            ]
+          ]
+        },
+        "SlingBody2": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.44586384296417236,
+              0.0,
+              -0.4108508825302124
+            ],
+            [
+              0.5054000020027161,
+              0.028999999165534973,
+              -0.26650556921958923
+            ]
+          ]
+        },
+        "Sling2": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.4414488673210144,
+              0.0,
+              -0.41277799010276794
+            ],
+            [
+              0.5095111727714539,
+              0.025200000032782555,
+              -0.2646920084953308
+            ]
+          ]
+        },
+        "Deco_SlingScrewHeads": {
+          "triangles": 144,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11838719993829727,
+              0.029399998486042023,
+              -0.39255279302597046
+            ],
+            [
+              0.5018128156661987,
+              0.02969999983906746,
+              -0.27950841188430786
+            ]
+          ]
+        }
+      },
+      "bytes": 33272,
+      "sha256": "b0dad6fc1cf415474bf067daef7a2f4c7e82ca6fcb78b6789cb1a78eb2532d7c"
+    },
+    {
+      "file": "Acorn_Targets.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 884,
+      "triangle_budget": 1200,
+      "mesh_objects": 7,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 2.794265752115166e-05,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Drop1": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Drop2": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Drop3": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Drop4": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Drop5": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup6": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup7": {
+          "material": "Acorn_target_colour",
+          "baseColor": [
+            0.8713670969009399,
+            0.577580451965332,
+            0.045186202973127365,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Drop1": {
+          "triangles": 80,
+          "origin_m": [
+            0.06440000236034393,
+            0.0,
+            -0.6425999999046326
+          ],
+          "bounds_m": [
+            [
+              0.054057312197983265,
+              0.0,
+              -0.6550010563805699
+            ],
+            [
+              0.0747426925227046,
+              0.03359999880194664,
+              -0.6301989434286952
+            ]
+          ]
+        },
+        "Drop2": {
+          "triangles": 128,
+          "origin_m": [
+            0.0812000036239624,
+            0.0,
+            -0.6678000092506409
+          ],
+          "bounds_m": [
+            [
+              0.07085731346160173,
+              0.0,
+              -0.6802010657265782
+            ],
+            [
+              0.09154269378632307,
+              0.03359999880194664,
+              -0.6553989527747035
+            ]
+          ]
+        },
+        "Drop3": {
+          "triangles": 140,
+          "origin_m": [
+            0.09799999743700027,
+            0.0,
+            -0.6930000185966492
+          ],
+          "bounds_m": [
+            [
+              0.0876573072746396,
+              0.0,
+              -0.7054010750725865
+            ],
+            [
+              0.10834268759936094,
+              0.03359999880194664,
+              -0.6805989621207118
+            ]
+          ]
+        },
+        "Drop4": {
+          "triangles": 128,
+          "origin_m": [
+            0.11479999870061874,
+            0.0,
+            -0.7182000279426575
+          ],
+          "bounds_m": [
+            [
+              0.10445730853825808,
+              0.0,
+              -0.7306010844185948
+            ],
+            [
+              0.1251426888629794,
+              0.03359999880194664,
+              -0.7057989714667201
+            ]
+          ]
+        },
+        "Drop5": {
+          "triangles": 80,
+          "origin_m": [
+            0.1316000074148178,
+            0.0,
+            -0.743399977684021
+          ],
+          "bounds_m": [
+            [
+              0.12125731725245714,
+              0.0,
+              -0.7558010341599584
+            ],
+            [
+              0.14194269757717848,
+              0.03359999880194664,
+              -0.7309989212080836
+            ]
+          ]
+        },
+        "Standup6": {
+          "triangles": 164,
+          "origin_m": [
+            0.459199994802475,
+            0.0,
+            -0.8288000226020813
+          ],
+          "bounds_m": [
+            [
+              0.43555350601673126,
+              0.0,
+              -0.8409043755382299
+            ],
+            [
+              0.4828464835882187,
+              0.03359999880194664,
+              -0.8166956696659327
+            ]
+          ]
+        },
+        "Standup7": {
+          "triangles": 164,
+          "origin_m": [
+            0.16099999845027924,
+            0.0,
+            -0.8288000226020813
+          ],
+          "bounds_m": [
+            [
+              0.13735350966453552,
+              0.0,
+              -0.8409043755382299
+            ],
+            [
+              0.18464648723602295,
+              0.03359999880194664,
+              -0.8166956696659327
+            ]
+          ]
+        }
+      },
+      "bytes": 54452,
+      "sha256": "aaf57284d9c774d540c6cd6320a7b6a8f3000dd1b5e194bcd039574024ac2890"
+    },
+    {
+      "file": "Rodent_Playfield.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 56,
+      "triangle_budget": 300,
+      "mesh_objects": 2,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [
+        {
+          "size": [
+            486,
+            1024
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        },
+        {
+          "size": [
+            1024,
+            260
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        }
+      ],
+      "textured_objects": [
+        "Apron",
+        "Board"
+      ],
+      "materials": {
+        "Board": {
+          "material": "Rodent_Board_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        },
+        "Apron": {
+          "material": "Rodent_Apron_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        }
+      },
+      "nodes": {
+        "Board": {
+          "triangles": 12,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.0,
+              -0.01679999940097332,
+              -1.371999979019165
+            ],
+            [
+              0.671999990940094,
+              0.0,
+              0.04479999840259552
+            ]
+          ]
+        },
+        "Apron": {
+          "triangles": 44,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.10010000318288803,
+              0.0,
+              -0.06159999966621399
+            ],
+            [
+              0.5200999975204468,
+              0.01679999940097332,
+              0.04479999840259552
+            ]
+          ]
+        }
+      },
+      "bytes": 186580,
+      "sha256": "29e916b99c0debac58c1d98aec3cf8309efae69096e85d52a68c9b8aa9115b8d"
+    },
+    {
+      "file": "Rodent_Guides.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 4288,
+      "triangle_budget": 6000,
+      "mesh_objects": 7,
+      "decoration_objects": 2,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Guides_Wood": {
+          "material": "Rodent_sealed_wood",
+          "baseColor": [
+            0.012983032502233982,
+            0.00802319310605526,
+            0.01032982300966978,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Metal": {
+          "material": "Rodent_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Metal": {
+          "material": "Rodent_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Plastic": {
+          "material": "Rodent_moulded_plastic",
+          "baseColor": [
+            1,
+            0.18782077729701996,
+            0.012983032502233982,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Rubber": {
+          "material": "Rodent_ivory_rubber",
+          "baseColor": [
+            0.9046611785888672,
+            0.8468732237815857,
+            0.7454041838645935,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_PostScrewCaps": {
+          "material": "Rodent_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_RailCrests": {
+          "material": "Rodent_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Guides_Wood": {
+          "triangles": 1084,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.00839999970048666,
+              0.0,
+              -1.3803999423980713
+            ],
+            [
+              0.680400013923645,
+              0.0560000017285347,
+              0.0
+            ]
+          ]
+        },
+        "Guides_Metal": {
+          "triangles": 1024,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0030799999367445707,
+              0.0,
+              -1.193079948425293
+            ],
+            [
+              0.6750800013542175,
+              0.030799999833106995,
+              -0.08091999590396881
+            ]
+          ]
+        },
+        "Posts_Metal": {
+          "triangles": 180,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.029910000041127205,
+              0.0,
+              -1.0997300148010254
+            ],
+            [
+              0.561959981918335,
+              0.03920000046491623,
+              -0.38339000940322876
+            ]
+          ]
+        },
+        "Guides_Plastic": {
+          "triangles": 120,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.1192300021648407,
+              0.0,
+              -0.8463000059127808
+            ],
+            [
+              0.37310001254081726,
+              0.02800000086426735,
+              -0.6629465222358704
+            ]
+          ]
+        },
+        "Posts_Rubber": {
+          "triangles": 920,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11423999816179276,
+              0.0,
+              -0.9581599831581116
+            ],
+            [
+              0.5647600293159485,
+              0.030799999833106995,
+              -0.2599799931049347
+            ]
+          ]
+        },
+        "Deco_PostScrewCaps": {
+          "triangles": 240,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11907999962568283,
+              0.031200001016259193,
+              -0.9534850120544434
+            ],
+            [
+              0.5599199533462524,
+              0.03150000050663948,
+              -0.2646550238132477
+            ]
+          ]
+        },
+        "Deco_RailCrests": {
+          "triangles": 720,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.000995929236523807,
+              0.05574999749660492,
+              -1.3729958534240723
+            ],
+            [
+              0.672995924949646,
+              0.0580499991774559,
+              0.0
+            ]
+          ]
+        }
+      },
+      "bytes": 139064,
+      "sha256": "56df4a9c0781bfce95162601e1ddfdc6597c082dc11b4be4ddf0404a9ae4d0a1"
+    },
+    {
+      "file": "Rodent_Slingshots.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 536,
+      "triangle_budget": 800,
+      "mesh_objects": 5,
+      "decoration_objects": 1,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "SlingBody1": {
+          "material": "Rodent_sling_plastic",
+          "baseColor": [
+            1,
+            0.18782077729701996,
+            0.012983032502233982,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling1": {
+          "material": "Rodent_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "SlingBody2": {
+          "material": "Rodent_sling_plastic",
+          "baseColor": [
+            1,
+            0.18782077729701996,
+            0.012983032502233982,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling2": {
+          "material": "Rodent_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_SlingScrewHeads": {
+          "material": "Rodent_sling_screws",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "SlingBody1": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.12039999663829803,
+              0.0,
+              -0.3999539911746979
+            ],
+            [
+              0.16318058967590332,
+              0.028999999165534973,
+              -0.2665124833583832
+            ]
+          ]
+        },
+        "Sling1": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11606947332620621,
+              0.0,
+              -0.4015997350215912
+            ],
+            [
+              0.16777051985263824,
+              0.025200000032782555,
+              -0.264980286359787
+            ]
+          ]
+        },
+        "SlingBody2": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.4570193886756897,
+              0.0,
+              -0.3999539613723755
+            ],
+            [
+              0.4997999966144562,
+              0.028999999165534973,
+              -0.2665124833583832
+            ]
+          ]
+        },
+        "Sling2": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.45242947340011597,
+              0.0,
+              -0.4015997350215912
+            ],
+            [
+              0.5041305422782898,
+              0.025200000032782555,
+              -0.264980286359787
+            ]
+          ]
+        },
+        "Deco_SlingScrewHeads": {
+          "triangles": 144,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.12264319509267807,
+              0.029399998486042023,
+              -0.382533997297287
+            ],
+            [
+              0.49755680561065674,
+              0.02969999983906746,
+              -0.27776601910591125
+            ]
+          ]
+        }
+      },
+      "bytes": 33268,
+      "sha256": "d7e4edf2a618c1afc25a0743a853b87a25acc012b6f1a17e8e518e213867afdd"
+    },
+    {
+      "file": "Rodent_Targets.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 676,
+      "triangle_budget": 1200,
+      "mesh_objects": 5,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 2.8991699263514192e-05,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Standup1": {
+          "material": "Rodent_target_colour",
+          "baseColor": [
+            1,
+            0.10224173218011856,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup2": {
+          "material": "Rodent_target_colour",
+          "baseColor": [
+            1,
+            0.10224173218011856,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup3": {
+          "material": "Rodent_target_colour",
+          "baseColor": [
+            1,
+            0.10224173218011856,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup4": {
+          "material": "Rodent_target_colour",
+          "baseColor": [
+            1,
+            0.10224173218011856,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup5": {
+          "material": "Rodent_target_colour",
+          "baseColor": [
+            1,
+            0.10224173218011856,
+            0.021219009533524513,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Standup1": {
+          "triangles": 176,
+          "origin_m": [
+            0.053199999034404755,
+            0.0,
+            -0.5992000102996826
+          ],
+          "bounds_m": [
+            [
+              0.03598290681838989,
+              0.0,
+              -0.6234815064817667
+            ],
+            [
+              0.07041709125041962,
+              0.03359999880194664,
+              -0.5749185141175985
+            ]
+          ]
+        },
+        "Standup2": {
+          "triangles": 140,
+          "origin_m": [
+            0.07559999823570251,
+            0.0,
+            -0.6496000289916992
+          ],
+          "bounds_m": [
+            [
+              0.06349564529955387,
+              0.0,
+              -0.6732465177774429
+            ],
+            [
+              0.08770435117185116,
+              0.03359999880194664,
+              -0.6259535402059555
+            ]
+          ]
+        },
+        "Standup3": {
+          "triangles": 104,
+          "origin_m": [
+            0.33880001306533813,
+            0.0,
+            -0.8008000254631042
+          ],
+          "bounds_m": [
+            [
+              0.3108000122010708,
+              0.0,
+              -0.8071000576019287
+            ],
+            [
+              0.3668000139296055,
+              0.03359999880194664,
+              -0.7961300015449524
+            ]
+          ]
+        },
+        "Standup4": {
+          "triangles": 152,
+          "origin_m": [
+            0.5446000099182129,
+            0.0,
+            -0.6496000289916992
+          ],
+          "bounds_m": [
+            [
+              0.5324956569820642,
+              0.0,
+              -0.6732465177774429
+            ],
+            [
+              0.5567043628543615,
+              0.03359999880194664,
+              -0.6259535402059555
+            ]
+          ]
+        },
+        "Standup5": {
+          "triangles": 104,
+          "origin_m": [
+            0.5669999718666077,
+            0.0,
+            -0.5992000102996826
+          ],
+          "bounds_m": [
+            [
+              0.5497828796505928,
+              0.0,
+              -0.6234815064817667
+            ],
+            [
+              0.5842170640826225,
+              0.03359999880194664,
+              -0.5749185141175985
+            ]
+          ]
+        }
+      },
+      "bytes": 41440,
+      "sha256": "8cfeba057a0558729fcdbab127b55f44bfa9f1198e50d135bb1256a4668164f6"
+    },
+    {
+      "file": "Space_Playfield.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 56,
+      "triangle_budget": 300,
+      "mesh_objects": 2,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [
+        {
+          "size": [
+            486,
+            1024
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        },
+        {
+          "size": [
+            1024,
+            260
+          ],
+          "mode": "RGB",
+          "format": "PNG"
+        }
+      ],
+      "textured_objects": [
+        "Apron",
+        "Board"
+      ],
+      "materials": {
+        "Board": {
+          "material": "Space_Board_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        },
+        "Apron": {
+          "material": "Space_Apron_Printed",
+          "baseColor": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": [
+            "pbrMetallicRoughness.baseColorTexture"
+          ]
+        }
+      },
+      "nodes": {
+        "Board": {
+          "triangles": 12,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.0,
+              -0.01679999940097332,
+              -1.371999979019165
+            ],
+            [
+              0.671999990940094,
+              0.0,
+              0.04479999840259552
+            ]
+          ]
+        },
+        "Apron": {
+          "triangles": 44,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.10010000318288803,
+              0.0,
+              -0.06159999966621399
+            ],
+            [
+              0.5200999975204468,
+              0.01679999940097332,
+              0.04479999840259552
+            ]
+          ]
+        }
+      },
+      "bytes": 194568,
+      "sha256": "826bd8f1a4dbc3b41ad59d80eabbf69deb46eee8881743045453401f3c6c6cf0"
+    },
+    {
+      "file": "Space_Guides.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 5324,
+      "triangle_budget": 6000,
+      "mesh_objects": 7,
+      "decoration_objects": 2,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Guides_Wood": {
+          "material": "Space_sealed_wood",
+          "baseColor": [
+            0.01032982300966978,
+            0.012983032502233982,
+            0.0802198201417923,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Metal": {
+          "material": "Space_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Metal": {
+          "material": "Space_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Guides_Plastic": {
+          "material": "Space_moulded_plastic",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Posts_Rubber": {
+          "material": "Space_ivory_rubber",
+          "baseColor": [
+            0.9046611785888672,
+            0.8468732237815857,
+            0.7454041838645935,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_PostScrewCaps": {
+          "material": "Space_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_RailCrests": {
+          "material": "Space_polished_metal",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Guides_Wood": {
+          "triangles": 1024,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.00839999970048666,
+              0.0,
+              -1.3803999423980713
+            ],
+            [
+              0.680400013923645,
+              0.0560000017285347,
+              0.0
+            ]
+          ]
+        },
+        "Guides_Metal": {
+          "triangles": 1960,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0030799999367445707,
+              0.0,
+              -1.2868293523788452
+            ],
+            [
+              0.6750800013542175,
+              0.030799999833106995,
+              -0.08091999590396881
+            ]
+          ]
+        },
+        "Posts_Metal": {
+          "triangles": 360,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.03954999893903732,
+              0.0,
+              -0.4731000065803528
+            ],
+            [
+              0.5806499719619751,
+              0.03920000046491623,
+              -0.39247000217437744
+            ]
+          ]
+        },
+        "Guides_Plastic": {
+          "triangles": 192,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11253689974546432,
+              0.0,
+              -0.8921012282371521
+            ],
+            [
+              0.5076630711555481,
+              0.02800000086426735,
+              -0.6830381155014038
+            ]
+          ]
+        },
+        "Posts_Rubber": {
+          "triangles": 920,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.10723999887704849,
+              0.0,
+              -1.2627899646759033
+            ],
+            [
+              0.5217000246047974,
+              0.030799999833106995,
+              -0.2599799931049347
+            ]
+          ]
+        },
+        "Deco_PostScrewCaps": {
+          "triangles": 240,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11208000034093857,
+              0.031200001016259193,
+              -1.2581149339675903
+            ],
+            [
+              0.5168599486351013,
+              0.03150000050663948,
+              -0.2646550238132477
+            ]
+          ]
+        },
+        "Deco_RailCrests": {
+          "triangles": 628,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.000995929236523807,
+              0.05574999749660492,
+              -1.3729958534240723
+            ],
+            [
+              0.672995924949646,
+              0.0580499991774559,
+              0.0
+            ]
+          ]
+        }
+      },
+      "bytes": 163964,
+      "sha256": "221db71f0a247863b8284747d5d4f41805d4f556782da6b451095703912e2986"
+    },
+    {
+      "file": "Space_Slingshots.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 536,
+      "triangle_budget": 800,
+      "mesh_objects": 5,
+      "decoration_objects": 1,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "SlingBody1": {
+          "material": "Space_sling_plastic",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling1": {
+          "material": "Space_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "SlingBody2": {
+          "material": "Space_sling_plastic",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Sling2": {
+          "material": "Space_kicking_rubber",
+          "baseColor": [
+            1,
+            0.9301108717918396,
+            0.8069522380828857,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_SlingScrewHeads": {
+          "material": "Space_sling_screws",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "SlingBody1": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11339999735355377,
+              0.0,
+              -0.4081191420555115
+            ],
+            [
+              0.16874052584171295,
+              0.028999999165534973,
+              -0.2665072977542877
+            ]
+          ]
+        },
+        "Sling1": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.10923594981431961,
+              0.0,
+              -0.40998244285583496
+            ],
+            [
+              0.17320404946804047,
+              0.025200000032782555,
+              -0.26475754380226135
+            ]
+          ]
+        },
+        "SlingBody2": {
+          "triangles": 88,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.45145949721336365,
+              0.0,
+              -0.4081191420555115
+            ],
+            [
+              0.5067999958992004,
+              0.028999999165534973,
+              -0.2665072977542877
+            ]
+          ]
+        },
+        "Sling2": {
+          "triangles": 108,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.44699594378471375,
+              0.0,
+              -0.40998244285583496
+            ],
+            [
+              0.510964035987854,
+              0.025200000032782555,
+              -0.26475754380226135
+            ]
+          ]
+        },
+        "Deco_SlingScrewHeads": {
+          "triangles": 144,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11665119975805283,
+              0.029399998486042023,
+              -0.39004117250442505
+            ],
+            [
+              0.503548800945282,
+              0.02969999983906746,
+              -0.2790716290473938
+            ]
+          ]
+        }
+      },
+      "bytes": 33268,
+      "sha256": "002f9d3b11c3b422c2555aa1464abb5e4b2458ca109f80d28fe0096fa086dc13"
+    },
+    {
+      "file": "Space_Targets.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 440,
+      "triangle_budget": 1200,
+      "mesh_objects": 4,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 2.893447881291422e-05,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Standup1": {
+          "material": "Space_target_colour",
+          "baseColor": [
+            0.18782077729701996,
+            1,
+            0.35153260827064514,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup2": {
+          "material": "Space_target_colour",
+          "baseColor": [
+            0.18782077729701996,
+            1,
+            0.35153260827064514,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup3": {
+          "material": "Space_target_colour",
+          "baseColor": [
+            0.18782077729701996,
+            1,
+            0.35153260827064514,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Standup4": {
+          "material": "Space_target_colour",
+          "baseColor": [
+            0.18782077729701996,
+            1,
+            0.35153260827064514,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Standup1": {
+          "triangles": 104,
+          "origin_m": [
+            0.2732200026512146,
+            0.0,
+            -0.7085899710655212
+          ],
+          "bounds_m": [
+            [
+              0.2605632087215781,
+              0.0,
+              -0.717193303629756
+            ],
+            [
+              0.2858767965808511,
+              0.03359999880194664,
+              -0.6999866385012865
+            ]
+          ]
+        },
+        "Standup2": {
+          "triangles": 92,
+          "origin_m": [
+            0.3469800055027008,
+            0.0,
+            -0.7085899710655212
+          ],
+          "bounds_m": [
+            [
+              0.3343232115730643,
+              0.0,
+              -0.717193303629756
+            ],
+            [
+              0.3596367994323373,
+              0.03359999880194664,
+              -0.6999866385012865
+            ]
+          ]
+        },
+        "Standup3": {
+          "triangles": 128,
+          "origin_m": [
+            0.14677999913692474,
+            0.0,
+            -0.6902899742126465
+          ],
+          "bounds_m": [
+            [
+              0.12866156361997128,
+              0.0,
+              -0.7006681729108095
+            ],
+            [
+              0.1648984346538782,
+              0.03359999880194664,
+              -0.6799117755144835
+            ]
+          ]
+        },
+        "Standup4": {
+          "triangles": 116,
+          "origin_m": [
+            0.47341999411582947,
+            0.0,
+            -0.6902899742126465
+          ],
+          "bounds_m": [
+            [
+              0.455301558598876,
+              0.0,
+              -0.7006681729108095
+            ],
+            [
+              0.49153842963278294,
+              0.03359999880194664,
+              -0.6799117755144835
+            ]
+          ]
+        }
+      },
+      "bytes": 27804,
+      "sha256": "8c1b663790d5c865bc2fb0fa5cb04516b996a3d5f70b346a95c0069fe933c45d"
+    },
+    {
+      "file": "Acorn_Spinner.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 188,
+      "triangle_budget": 300,
+      "mesh_objects": 2,
+      "decoration_objects": 1,
+      "max_origin_error_mm": 2.622604367008563e-05,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Spinner1": {
+          "material": "Acorn_spinner_chrome",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_SpinnerWireBracket": {
+          "material": "Acorn_spinner_chrome",
+          "baseColor": [
+            0.5149176716804504,
+            0.577580451965332,
+            0.715693473815918,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Spinner1": {
+          "triangles": 72,
+          "origin_m": [
+            0.5831000208854675,
+            0.02800000086426735,
+            -0.8399999737739563
+          ],
+          "bounds_m": [
+            [
+              0.5442000031471252,
+              0.014000000432133675,
+              -0.8411199738038704
+            ],
+            [
+              0.621999979019165,
+              0.042000001296401024,
+              -0.8388799737440422
+            ]
+          ]
+        },
+        "Deco_SpinnerWireBracket": {
+          "triangles": 116,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.5392000079154968,
+              0.0,
+              -0.8428000211715698
+            ],
+            [
+              0.6269999742507935,
+              0.04894990473985672,
+              -0.8371999859809875
+            ]
+          ]
+        }
+      },
+      "bytes": 8764,
+      "sha256": "d2bb27036bb248a9064e31b28bf5686f110c52ac201762f6d1b09398bed176cb"
+    },
+    {
+      "file": "Rodent_Wire.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 730,
+      "triangle_budget": 3000,
+      "mesh_objects": 3,
+      "decoration_objects": 2,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Ramp_wire": {
+          "material": "Ramp track | tinted clear plastic",
+          "baseColor": [
+            1,
+            0.18782077729701996,
+            0.012983032502233982,
+            0.46000000834465027
+          ],
+          "alphaMode": "BLEND",
+          "textureFields": []
+        },
+        "Deco_EntranceFlaps": {
+          "material": "Ramp entrance | polished steel",
+          "baseColor": [
+            0.5394794940948486,
+            0.5840784311294556,
+            0.637596845626831,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_RampEdgeBeads": {
+          "material": "Ramp entrance | polished steel",
+          "baseColor": [
+            0.5394794940948486,
+            0.5840784311294556,
+            0.637596845626831,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Ramp_wire": {
+          "triangles": 306,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11728840321302414,
+              -0.00559999980032444,
+              -1.2885485887527466
+            ],
+            [
+              0.6157084107398987,
+              0.10599999874830246,
+              -0.3386322557926178
+            ]
+          ],
+          "reference_track_surface_samples": 180,
+          "reference_track_surface_max_error_mm": 4.114189653333881e-14
+        },
+        "Deco_EntranceFlaps": {
+          "triangles": 24,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.20418420433998108,
+              -0.0007999999797903001,
+              -0.6952093243598938
+            ],
+            [
+              0.5543649792671204,
+              0.0,
+              -0.3354246914386749
+            ]
+          ]
+        },
+        "Deco_RampEdgeBeads": {
+          "triangles": 400,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.11905364692211151,
+              0.001355751184746623,
+              -1.286768913269043
+            ],
+            [
+              0.6140075325965881,
+              0.10669282078742981,
+              -0.3390766382217407
+            ]
+          ]
+        }
+      },
+      "bytes": 28584,
+      "sha256": "1f5d6526ebc09ed4ce1a217ddb5a9dbf4340a3098f52bd98fd5d16876e79f54c"
+    },
+    {
+      "file": "Space_Ramps.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 1040,
+      "triangle_budget": 5000,
+      "mesh_objects": 4,
+      "decoration_objects": 2,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "Ramp_ramp_l": {
+          "material": "Ramp track | tinted clear plastic",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            0.46000000834465027
+          ],
+          "alphaMode": "BLEND",
+          "textureFields": []
+        },
+        "Ramp_ramp_r": {
+          "material": "Ramp track | tinted clear plastic",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            0.46000000834465027
+          ],
+          "alphaMode": "BLEND",
+          "textureFields": []
+        },
+        "Deco_EntranceFlaps": {
+          "material": "Ramp entrance | polished steel",
+          "baseColor": [
+            0.5394794940948486,
+            0.5840784311294556,
+            0.637596845626831,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "Deco_RampEdgeBeads": {
+          "material": "Ramp entrance | polished steel",
+          "baseColor": [
+            0.5394794940948486,
+            0.5840784311294556,
+            0.637596845626831,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "Ramp_ramp_l": {
+          "triangles": 216,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0039062295109033585,
+              -0.00559999980032444,
+              -1.0565252304077148
+            ],
+            [
+              0.2412530481815338,
+              0.10599999874830246,
+              -0.34689828753471375
+            ]
+          ],
+          "reference_track_surface_samples": 126,
+          "reference_track_surface_max_error_mm": 2.31400207829063e-14
+        },
+        "Ramp_ramp_r": {
+          "triangles": 216,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.3789469301700592,
+              -0.00559999980032444,
+              -1.0565252304077148
+            ],
+            [
+              0.624106228351593,
+              0.10599999874830246,
+              -0.34689828753471375
+            ]
+          ],
+          "reference_track_surface_samples": 126,
+          "reference_track_surface_max_error_mm": 4.165202721341396e-14
+        },
+        "Deco_EntranceFlaps": {
+          "triangles": 48,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.058348387479782104,
+              -0.0007999999797903001,
+              -0.7215182185173035
+            ],
+            [
+              0.5618516206741333,
+              0.0,
+              -0.3437856435775757
+            ]
+          ]
+        },
+        "Deco_RampEdgeBeads": {
+          "triangles": 560,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              -0.0022055774461477995,
+              0.0013595432974398136,
+              -1.0544463396072388
+            ],
+            [
+              0.6224055886268616,
+              0.10669282078742981,
+              -0.3473978340625763
+            ]
+          ]
+        }
+      },
+      "bytes": 40972,
+      "sha256": "4e2c991be3ba0134c6f69344ecc834efaed905fc0c9be9133454a7a4ee04bcbc"
+    },
+    {
+      "file": "Space_PodHoods.glb",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "triangles": 392,
+      "triangle_budget": 600,
+      "mesh_objects": 2,
+      "decoration_objects": 0,
+      "max_origin_error_mm": 0.0,
+      "embedded_images": [],
+      "textured_objects": [],
+      "materials": {
+        "PodHood1": {
+          "material": "Pod hood | ice blue lacquer",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        },
+        "PodHood2": {
+          "material": "Pod hood | ice blue lacquer",
+          "baseColor": [
+            0.18782077729701996,
+            0.715693473815918,
+            1,
+            1
+          ],
+          "alphaMode": "OPAQUE",
+          "textureFields": []
+        }
+      },
+      "nodes": {
+        "PodHood1": {
+          "triangles": 196,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.0017999999690800905,
+              0.0,
+              -0.8073999881744385
+            ],
+            [
+              0.0934000015258789,
+              0.004999999888241291,
+              -0.7616000175476074
+            ]
+          ]
+        },
+        "PodHood2": {
+          "triangles": 196,
+          "origin_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bounds_m": [
+            [
+              0.5267999768257141,
+              0.0,
+              -0.8073999881744385
+            ],
+            [
+              0.618399977684021,
+              0.004999999888241291,
+              -0.7616000175476074
+            ]
+          ]
+        }
+      },
+      "bytes": 19396,
+      "sha256": "d1546d402ccb0d36e8d45a097e511385cae734bc3517ac4d6e06a18de7accf5e"
+    },
+    {
+      "file": "Acorn_Backglass.png",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "size": [
+        854,
+        1024
+      ],
+      "bytes": 358801,
+      "sha256": "e81862f0ad396467e4f0bff3a246c3c66324fa3c244a99e6679bc28360cb608e"
+    },
+    {
+      "file": "Rodent_Backglass.png",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "size": [
+        854,
+        1024
+      ],
+      "bytes": 268242,
+      "sha256": "1dcf33f1b6b564f12e21bbf4254690a3840e9929292ab4c9928ff9d14417b59e"
+    },
+    {
+      "file": "Space_Backglass.png",
+      "pass": true,
+      "errors": [],
+      "notes": [],
+      "size": [
+        854,
+        1024
+      ],
+      "bytes": 248280,
+      "sha256": "d4aa52461f7343fb84acaf670a1dfe06b31bb446e0baf4f20bd23b3c11686395"
+    }
+  ],
+  "passed": 24,
+  "expected": 24,
+  "machine_totals": {
+    "acorn": {
+      "triangle_total": 15304,
+      "missing_files": [],
+      "instance_counts": {
+        "Pinball_Cabinet.glb": 1,
+        "Acorn_Playfield.glb": 1,
+        "Acorn_Guides.glb": 1,
+        "Acorn_Slingshots.glb": 1,
+        "Acorn_Targets.glb": 1,
+        "Pinball_Flipper.glb": 2,
+        "Pinball_PopBumper.glb": 3,
+        "Pinball_Plunger.glb": 1,
+        "Pinball_Gate.glb": 1,
+        "Acorn_Spinner.glb": 1
+      },
+      "note": "Static exported geometry, including instanced shared parts. Game-created balls, lights and inserts excluded."
+    },
+    "rodent": {
+      "triangle_total": 14194,
+      "missing_files": [],
+      "instance_counts": {
+        "Pinball_Cabinet.glb": 1,
+        "Rodent_Playfield.glb": 1,
+        "Rodent_Guides.glb": 1,
+        "Rodent_Slingshots.glb": 1,
+        "Rodent_Targets.glb": 1,
+        "Pinball_Flipper.glb": 2,
+        "Pinball_PopBumper.glb": 3,
+        "Pinball_Plunger.glb": 1,
+        "Pinball_Gate.glb": 1,
+        "Rodent_Wire.glb": 1
+      },
+      "note": "Static exported geometry, including instanced shared parts. Game-created balls, lights and inserts excluded."
+    },
+    "space": {
+      "triangle_total": 15696,
+      "missing_files": [],
+      "instance_counts": {
+        "Pinball_Cabinet.glb": 1,
+        "Space_Playfield.glb": 1,
+        "Space_Guides.glb": 1,
+        "Space_Slingshots.glb": 1,
+        "Space_Targets.glb": 1,
+        "Pinball_Flipper.glb": 2,
+        "Pinball_PopBumper.glb": 3,
+        "Pinball_Plunger.glb": 1,
+        "Pinball_Gate.glb": 1,
+        "Space_Ramps.glb": 1,
+        "Space_PodHoods.glb": 1
+      },
+      "note": "Static exported geometry, including instanced shared parts. Game-created balls, lights and inserts excluded."
+    }
+  },
+  "not_automatically_verified": [
+    "Art content restrictions, artistic quality and typography require visual review.",
+    "Ramp samples verify retention of reference upper surfaces within 1 mm; smooth ball contact still requires in-engine review.",
+    "Exact word and lamp artwork coordinates require source-data review; no OCR approximation is used.",
+    "Actual performance and gameplay in Roblox require in-engine verification."
+  ]
+}
