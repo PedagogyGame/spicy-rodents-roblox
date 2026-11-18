@@ -17,7 +17,7 @@ export type Piece = {
 }
 
 return {
-	assetId = "",
+	assetId = "120435227473486",
 	total = 12168,
 	pieces = {
 		Mallet_black = {

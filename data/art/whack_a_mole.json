@@ -4,10 +4,10 @@
  "placement": "InsertService:LoadAsset(assetId):GetChildren()[1] is a Model of MeshParts named as `pieces`; each MeshPart is unrotated in the alley's site frame (the bake's: X across, Y up, -D) and is put at its `centre` (cabinet frame, studs: Shared/Minigames/WhackAMole/Layout.toSite) by Server/Assets/WhackArt, which paints it Layout.COLORS[material] (a mole's fur its own) and parents a mole's pieces to its Mole model and the mallet's to the Mallet.",
  "assets": {
   "whack": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "120435227473486",
+   "moderation": "Approved",
    "displayName": "SR Whack-a-Mole cabinet",
-   "fbxBytes": 552828,
+   "fbxBytes": 552780,
    "sha": "94be11d7e401696b"
   }
  },

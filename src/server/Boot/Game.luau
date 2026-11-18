@@ -82,6 +82,7 @@ local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
+local WhackArt = require("../Assets/WhackArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -1282,6 +1283,8 @@ function Game.start(opts: Opts?): any
 	-- The owner's finished pinball models (Workspace.Attractions.<alley>.GamesRoom.Pinball<i>): Assets/PinballArt
 	-- puts them on the baked machines off the boot path, once every Model is uploaded (until then it says so once)
 	PinballArt.start(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
+	-- and the owner's whack-a-mole cabinet in the same games room (Assets/WhackArt; nothing while it has no id)
+	WhackArt.startIn(workspace:FindFirstChild("Attractions"), { heartbeat = o.heartbeat ~= false })
 
 	return {
 		runtime = rt,

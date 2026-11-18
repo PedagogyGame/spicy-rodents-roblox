@@ -25,7 +25,7 @@
 -- Nothing on the cabinet is moved here: every client near it draws the moles, the mallet and the windows from the
 -- stream (Client/Minigames/WhackAMole/Cabinet). With no cabinet on the site (another game's rig, a bare test) hw is
 -- nil and nobody is looked for: only the seated player is sent anything. Where the cabinet stands, the owner's
--- meshes are put over it once they are uploaded (Server/Assets/WhackArt.start; nothing while there is no id).
+-- meshes are put over it at boot once uploaded (Server/Boot/Game calls Server/Assets/WhackArt.startIn).
 -- Interface: a ServerGame { game = "whack_a_mole", new(ctx) -> Table }; WATCH, LOOK, WORDS (why -> words);
 --   Table.hw { model }; Table.board; Table:round() -> Round.State?; Table:debug("hit" | "miss") (a strike at the
 --   server's own round time on the mole that is up, or on an empty hole: for the engine checks)
@@ -39,7 +39,6 @@ local Round =
 	Import.shared("Minigames/WhackAMole/Round") :: typeof(require("../../../shared/Minigames/WhackAMole/Round"))
 local Rules =
 	Import.shared("Minigames/WhackAMole/Rules") :: typeof(require("../../../shared/Minigames/WhackAMole/Rules"))
-local WhackArt = require("../../Assets/WhackArt")
 local ServerGame = require("../ServerGame")
 
 local Game = {}
@@ -109,10 +108,6 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 	end
 	writeBoard()
-	-- the owner's meshes over the baked cabinet, once uploaded (Assets/WhackArt; nothing while Art has no id)
-	if model then
-		WhackArt.start(model, ctx.place)
-	end
 
 	-- everyone who follows the round: the seated player and the watchers
 	local function followers(): { any }

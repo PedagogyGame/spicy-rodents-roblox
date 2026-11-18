@@ -30,6 +30,7 @@ local Layout =
 
 local WhackArt = {}
 
+WhackArt.SITE = "bowling_alley" -- the venue whose games room holds the cabinet
 WhackArt.NUDGE = 0.03 -- studs a part carrying lettering is brought toward the viewer over the meshes
 
 export type Env = { CFrame: any, Color3: any, Enum: any }
@@ -225,6 +226,27 @@ function WhackArt.start(model: Instance, place: any, opts: Opts?): boolean
 		end
 	end)
 	return true
+end
+
+-- Boot's one call (Server/Boot/Game, like PinballArt): the cabinet in each bowling alley's games room
+-- (Workspace.Attractions.<alley>.GamesRoom.WhackAMole). heartbeat = false (a headless boot) loads nothing.
+function WhackArt.startIn(root: Instance?, opts: (Opts & { heartbeat: boolean? })?): number
+	local o: any = opts or {}
+	if root == nil or o.heartbeat == false then
+		return 0
+	end
+	local n = 0
+	for _, site in root:GetChildren() do
+		if site:GetAttribute("Site") ~= WhackArt.SITE then
+			continue
+		end
+		local room = site:FindFirstChild("GamesRoom")
+		local model = room and room:FindFirstChild(Layout.NAMES.model)
+		if model and WhackArt.start(model, { yaw = site:GetAttribute("Yaw") or 0 }, o) then
+			n += 1
+		end
+	end
+	return n
 end
 
 return WhackArt

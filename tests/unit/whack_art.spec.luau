@@ -109,6 +109,33 @@ return function(t: Test.T)
 		t.eq(WhackArt.colour({ material = "fur", mole = 3, group = "mole" }), Layout.COLORS.charcoal)
 	end)
 
+	t.test(
+		"uploaded: the game's own data names an approved Model, and boot finds the cabinet in the games room",
+		function()
+			t.truthy(tonumber(Art.assetId) ~= nil, "Art carries the asset id")
+			local record = serde.decode("json", fs.readFile("data/art/whack_a_mole.json"))
+			t.eq(record.assets.whack.assetId, tostring(Art.assetId))
+			t.eq(record.assets.whack.moderation, "Approved")
+			local root = roblox.Instance.new("Folder")
+			local site = roblox.Instance.new("Model")
+			site:SetAttribute("Site", WhackArt.SITE)
+			site:SetAttribute("Yaw", 0)
+			site.Parent = root
+			local room = roblox.Instance.new("Folder")
+			room.Name = "GamesRoom"
+			room.Parent = site
+			local model = cabinet()
+			model.Parent = room
+			local spawned = 0
+			local function spawn(_f: () -> ())
+				spawned += 1
+			end
+			t.eq(WhackArt.startIn(root, { spawn = spawn, heartbeat = false }), 0, "a headless boot loads nothing")
+			t.eq(WhackArt.startIn(root, { spawn = spawn }), 1)
+			t.eq(spawned, 1)
+		end
+	)
+
 	t.test("no asset id: the loader does nothing", function()
 		local model = cabinet()
 		local spawned = 0
