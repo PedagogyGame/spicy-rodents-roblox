@@ -104,6 +104,8 @@ type Drink = {
 	down: number?, -- the cup comes back down at this time
 }
 type Strike = { model: any, home: CFrame, untilT: number }
+-- (a row of LoungeClassic.DRINKS: its exported type does not cross the Import cast)
+type DrinkSpec = { id: string, label: string, hot: boolean, cup: { number }, fill: { number } }
 
 local function venueOf(id: string): any
 	local exp = Data.default():module("Expansion") :: any
@@ -283,7 +285,9 @@ function LoungeService._prompts(self: any)
 		table.insert(
 			self.conns,
 			p.Triggered:Connect(function(player: any)
-				local ok, err = pcall(fn, player)
+				local ok, err = pcall(function()
+					fn(player)
+				end)
 				if not ok then
 					warn(`[Lounge] {name} failed: {err}`)
 				end
@@ -395,7 +399,7 @@ function LoungeService.leave(self: any, player: any): boolean
 end
 
 -- The drink in the hand: a cup (or a paper cone for a snow cone) welded to the body's root.
-local function makeDrink(body: any, d: LoungeClassic.Drink): (any, any)
+local function makeDrink(body: any, d: DrinkSpec): (any, any)
 	local root = rootOf(body)
 	local m = Instance.new("Model")
 	m.Name = "LoungeDrink"
@@ -425,7 +429,7 @@ local function makeDrink(body: any, d: LoungeClassic.Drink): (any, any)
 	for _, p in m:GetChildren() do
 		if p ~= vessel then
 			local w = Instance.new("WeldConstraint")
-			w.Part0, w.Part1 = vessel, p
+			w.Part0, w.Part1 = vessel, p :: BasePart
 			w.Parent = p
 		end
 	end
@@ -455,8 +459,8 @@ function LoungeService.order(self: any, player: any, id: string): (boolean, stri
 		self.town.tell(player, W.holding)
 		return false, W.holding
 	end
-	local drink = d :: LoungeClassic.Drink
-	local ok, words = self.town.buy(player, drink.id, function()
+	local drink = d :: DrinkSpec
+	local ok, words = self.town.buy(player, drink.id, function(): (boolean?, string?)
 		local okM, model, weld = pcall(makeDrink, body, drink)
 		if not okM then
 			warn(`[Lounge] the drink could not be made: {model}`)
@@ -470,7 +474,7 @@ function LoungeService.order(self: any, player: any, id: string): (boolean, stri
 			sips = LoungeClassic.SIPS,
 			nextSip = t + LoungeClassic.SIP_EVERY,
 		}
-		return true
+		return true, nil
 	end)
 	self.town.tell(player, words)
 	if ok then

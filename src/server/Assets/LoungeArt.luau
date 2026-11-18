@@ -42,7 +42,8 @@ function LoungeArt.install(root: Instance, place: any, data: any, opts: Opts?): 
 	local function defaultLoad(assetId: number): Instance
 		return game:GetService("InsertService"):LoadAsset(assetId)
 	end
-	local asset = (o.load or defaultLoad)(id)
+	local load: (number) -> Instance = o.load or defaultLoad
+	local asset = load(id)
 	local holder = asset -- (the pieces are found by name anywhere under it)
 	local byName: { [string]: any } = {}
 	for _, p in data.PIECES do
