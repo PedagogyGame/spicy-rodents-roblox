@@ -533,13 +533,19 @@ local function railAbove(index: any, x: number, y: number, z: number, r: number,
 	end
 	local found = false
 	local r2 = r * r
-	index:forEachNear(x, y, z, math.ceil(r / (index.cellSize or 20)), function(_id, _t, sx, sy, sz): boolean?
-		if sy >= minY and (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2 <= r2 then
-			found = true
-			return true
+	index:forEachNear(
+		x,
+		y,
+		z,
+		math.ceil(r / (index.cellSize or 20)),
+		function(_id: number, _t: number, sx: number, sy: number, sz: number): boolean?
+			if sy >= minY and (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2 <= r2 then
+				found = true
+				return true
+			end
+			return nil
 		end
-		return nil
-	end)
+	)
 	return found
 end
 
