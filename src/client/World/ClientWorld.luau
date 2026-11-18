@@ -63,7 +63,7 @@ export type ClientWorld = {
 	rail: () -> any?,
 	ignore: (list: { Instance }) -> (),
 	railReady: boolean,
-	cars: Solid.Set, -- the cars this client draws (Render/VehicleView fills it every frame)
+	cars: any, -- the cars this client draws: a Traffic/Solid set (Render/VehicleView fills it every frame; types do not cross Import)
 }
 
 local ClientWorld = {}

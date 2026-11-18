@@ -12,6 +12,8 @@ local Height = require("@shared/World/Height")
 local ClientWorld = require("@client/World/ClientWorld")
 local BakedWorld = require("../lib/BakedWorld")
 local HumanWalk = require("../lib/HumanWalk")
+local Data = require("@shared/Data")
+local TrafficService = require("@server/Traffic/TrafficService")
 
 local lib = {
 	Instance = roblox.Instance,
@@ -193,4 +195,52 @@ return function(t)
 			t.truthy(through > 0, `{case[1]}: without the solid root the person walked through (the bug)`)
 		end
 	end)
+
+	t.test(
+		"TrafficService.solids: walls are the cars stood still SETTLE s, floors every visible car (the live fleet)",
+		function()
+			local data = Data.default()
+			local traffic =
+				TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 7 })
+			local solids = traffic:solids()
+			local still: { [number]: number } = {}
+			local sawWall, sawMovingWall = 0, 0
+			for _ = 1, 30 * 20 do
+				traffic:step(1 / 30)
+				local visible = 0
+				for _, v in traffic.vehicles do
+					if v.visible then
+						visible += 1
+					end
+					still[v.id] = if v.visible and v.speed < TrafficService.STILL_SPEED
+						then (still[v.id] or 0) + 1 / 30
+						else 0
+				end
+				t.eq(solids.floors.n, visible, "a floor for every visible car")
+				sawWall = math.max(sawWall, solids.walls.n)
+				-- every wall is a car that has stood still SETTLE seconds (counted here as well)
+				for i = 1, solids.walls.n do
+					local h = solids.walls.hulls[i]
+					local found = false
+					for _, v in traffic.vehicles do
+						if math.abs(v.x - h.x) < 1e-6 and math.abs(v.z - h.z) < 1e-6 then
+							found = true
+							if
+								(still[v.id] or 0) < TrafficService.SETTLE - 2 / 30
+								or v.speed >= TrafficService.STILL_SPEED
+							then
+								sawMovingWall += 1
+							end
+						end
+					end
+					t.truthy(found, "a wall is a car")
+				end
+			end
+			print(
+				`      most walls at once: {sawWall} (the parked emergency vehicles, riders at the kerb, cars at stop lines)`
+			)
+			t.truthy(sawWall >= 3, "the parked emergency vehicles are walls")
+			t.eq(sawMovingWall, 0, "never a moving car")
+		end
+	)
 end

@@ -5,11 +5,15 @@
 -- Vehicles/VehicleKinds parameters, driven by InputMap through BodyDriver on the vehicle's root
 -- (the server hands its network ownership to the driver). Bikes lean into turns. The possessed
 -- human stays welded to the DriverSeat by the server; the camera goes first person at EyeSocket.
+-- The town's cars this client draws are solid (Render/VehicleView: their RootPart collides with the bodies this client
+-- simulates, a driven vehicle among them): the motor stops at their boxes (ClientWorld.cars, Traffic/Solid) as at a wall,
+-- so the physics never has to push a driven vehicle back out of one every frame.
 -- Interface: start(vehicle, kind, metrics, ctx) -> stop(); ctx = { world, input }
 -- No side effects on require.
 
 local Import = require("../Import")
 local CarMotor = Import.shared("Movement/CarMotor") :: typeof(require("../../shared/Movement/CarMotor"))
+local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
 local BodyDriver = require("./BodyDriver")
 
 local Vehicle = {}
@@ -27,6 +31,10 @@ function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any },
 		groundAt = world.groundAt,
 		waterAt = world.waterAt,
 		blocked = function(x: number, z: number, y: number, r: number): boolean
+			local cars = world.cars
+			if cars and cars.n > 0 and Solid.blocked(cars, x, z, r, y - 0.5, y + 0.5) then
+				return true
+			end
 			return world.blockedRadius(x, z, y, r)
 		end,
 		clamp = world.clamp,
