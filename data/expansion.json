@@ -373,6 +373,7 @@
       ],
       "features": ["1970s_layout", "checkout_counter", "22_shelf_items", "price_tags", "bell_on_door", "dumpster"],
       "partBudget": 900,
+      "built": "tools/bake/corner_store.luau",
       "notes": "1970s-style layout (not literally period): linoleum, three low gondola aisles, wall cooler, pegboard, candy rack at the till. 22 item_shelf anchors = the 22 items of Items/ItemRules (bird seed and kite on the wall behind the checkout)."
     },
     {

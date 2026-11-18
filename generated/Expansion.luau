@@ -1163,6 +1163,7 @@ return {
 				},
 			},
 			approval = "corner store",
+			built = "tools/bake/corner_store.luau",
 			entrances = {
 				{
 					id = "front",
