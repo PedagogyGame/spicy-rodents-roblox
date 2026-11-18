@@ -3,12 +3,14 @@
 -- 10 simulated minutes of honest circuits with 150 ms jitter and 2 % loss produce 0 violations; the
 -- cheat harness (speed x2, 30-st teleport, illegal 20-st leap, wall pass, non-adjacent hop) flags each
 -- within 1 s at >= 95 % with 0 false positives on the honest warm-ups; <= 0.05 ms per squirrel per
--- tick. The honest run is long (6 squirrels x 10 min = 216,000 motor frames); set
+-- tick; a player's rodent held still by the water gun's stun (its client gives the motor no input) is honest
+-- too. The honest run is long (6 squirrels x 10 min = 216,000 motor frames); set
 -- SPICY_FAST=1 to run a 1-minute version while iterating.
 local process = require("@lune/process")
 local Units = require("@shared/Config/Units")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local MoveValidator = require("@server/Movement/MoveValidator")
+local Squirrel = require("@client/Controllers/Squirrel")
 local Harness = require("@tests/cheat/Harness")
 local TestWorld = require("@tests/cheat/TestWorld")
 
@@ -61,6 +63,64 @@ return function(t)
 		t.truthy(x ~= nil and y ~= nil and z ~= nil)
 		t.truthy((x :: number) <= s.x and (z :: number) < s.z, "earlier pose is behind the body")
 		t.eq(v:pose("none", 0), nil)
+	end)
+
+	t.test("the water gun's stun: a sprinting, leaping rodent given no input for 1.3 s is never flagged", function()
+		local v = MoveValidator.new(world)
+		local s = SquirrelMotor.new(Units.st(-572), world.groundHeight, Units.st(-522))
+		local yaw = -math.pi / 2 -- camera behind, forward is +x (into the open ground)
+		local stunnedUntil: number? = nil
+		local seq, frames, violations, flagged = 0, 0, 0, 0
+		local stoodAt: { number }? = nil
+		local function run(seconds: number, press: (i: number) -> SquirrelMotor.Input)
+			for i = 1, math.floor(seconds * 60 + 0.5) do
+				frames += 1
+				local now = frames / 60
+				local inp = press(i)
+				-- the client's gate (Controllers/Squirrel): no input reaches the motor while stunned
+				if Squirrel.stunned(stunnedUntil, now) then
+					inp = SquirrelMotor.idleInput(inp.cameraYaw)
+				end
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+				if frames % 2 == 0 then
+					seq += 1
+					local out = v:accept("rodent", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, now + 0.08)
+					if not out.ok then
+						violations += 1
+						print(`      VIOLATION {out.violations[1].code}: {out.violations[1].detail}`)
+					end
+					if out.flagged then
+						flagged += 1
+					end
+				end
+			end
+		end
+		local function sprint(leapAt: number?): (i: number) -> SquirrelMotor.Input
+			return function(i: number): SquirrelMotor.Input
+				local inp = SquirrelMotor.idleInput(yaw)
+				inp.fw, inp.sprint = 1, true
+				inp.leap = i == leapAt
+				return inp
+			end
+		end
+		run(1.0, sprint(50)) -- a sprint and a leap
+		t.falsy(s.grounded, "in the air when the squirt lands")
+		stunnedUntil = frames / 60 + 1.3
+		run(1.3, sprint(nil)) -- the player holds W and Shift and mashes nothing: the stun wins
+		t.truthy(s.grounded, "came down during the stun")
+		t.truthy(math.abs(s.vx) + math.abs(s.vz) < 4, "and slowing (no input: the ground's drag)")
+		stoodAt = { s.x, s.z }
+		run(1.0, sprint(30)) -- off again, leaping
+		local here = stoodAt :: { number }
+		t.truthy((s.x - here[1]) > 5, "it runs on after the stun")
+		run(0.6, sprint(nil))
+		t.truthy(s.grounded and s.vx > 5, "sprinting on the ground")
+		stunnedUntil = frames / 60 + 1.3
+		run(1.3 - 1 / 60, sprint(nil)) -- squirted mid-sprint on the ground (to its last stunned frame)
+		t.truthy(math.abs(s.vx) + math.abs(s.vz) < 0.2, "stands still by the stun's end")
+		run(0.5, sprint(nil))
+		t.eq(violations, 0, "honest violations")
+		t.eq(flagged, 0, "flags")
 	end)
 
 	t.test(

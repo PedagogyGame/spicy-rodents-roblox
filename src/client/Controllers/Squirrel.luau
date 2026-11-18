@@ -27,6 +27,7 @@
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
+-- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
@@ -34,7 +35,7 @@
 --   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
 --   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
---   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
+--   string (pure); launch(events, vy) -> action?, airSeconds? (pure); stunned(untilTime, now) -> boolean (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -45,6 +46,8 @@ local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../s
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
@@ -153,6 +156,13 @@ end
 Squirrel.OUTSIDE_SLACK = 2
 function Squirrel.movedFromOutside(gap: number, speed: number, frameDt: number): boolean
 	return gap > Squirrel.OUTSIDE_SLACK + speed * math.max(frameDt, 0) * 2
+end
+
+-- Whether the body is stunned now (the water gun: its StunnedUntil attribute, server time, against `now`):
+-- the motor then gets no input at all, so the body stands (or falls, or rolls to a stop) as if nothing were
+-- pressed, which the server's MoveValidator already takes as honest. Pure.
+function Squirrel.stunned(untilTime: any, now: number): boolean
+	return type(untilTime) == "number" and now < untilTime
 end
 
 -- What the held body is doing, for a rig that plays clips (KinematicPose.mode): on a rail it is on a
@@ -303,6 +313,12 @@ function Squirrel.start(
 			-- keep the AI's stride: forward along the current heading (camera behind the body)
 			mi.fw = 1
 			mi.cameraYaw = state.yaw + math.pi
+		end
+		-- (the server clock is read only for a body that has ever been stunned)
+		local stunnedUntil = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
+		if stunnedUntil ~= nil and Squirrel.stunned(stunnedUntil, workspace:GetServerTimeNow()) then
+			mi = SquirrelMotor.idleInput(f.cameraYaw)
+			holding = false
 		end
 		local wasOnRoute = state.routeId ~= nil
 		local _, events = SquirrelMotor.step(state, mi, dt, motorWorld :: any)

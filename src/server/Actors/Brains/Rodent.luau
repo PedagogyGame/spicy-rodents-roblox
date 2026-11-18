@@ -4,6 +4,8 @@
 -- v5.4's normal AI squirrels do (wildlife_foraging §2.2): target = hide + (sin(phase 0.83 + i) W,
 -- cos(phase 0.63 + 1.3 i) W), W = 8 u, root lerps toward it with min(1, 2 dt), yaw faces the
 -- target; phase runs x1.3 when infected. Stalk/pounce/bite are W1 (CombatRules).
+-- Events: "infected"; "stun" { untilTime } (the water gun: it stands where it is until then, the brain's own
+-- hold, so a player taking the body meanwhile changes nothing about it).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -21,6 +23,7 @@ type Brain = Common.Brain & {
 	actor: Common.Actor,
 	params: Params,
 	phase: number,
+	stunUntil: number, -- world time (ctx.now) until which it stands still
 }
 
 local Rodent = {}
@@ -32,8 +35,16 @@ local LERP_RATE = 2 -- min(1, dt * 2) toward the target
 local Methods = {}
 Methods.__index = Methods
 
-function Methods.think(self: Brain, dt: number, _ctx: Common.Ctx)
+function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local actor = self.actor
+	if ctx.now < self.stunUntil then
+		local intent = actor.intent
+		intent.mode = "walk"
+		intent.tx, intent.tz = actor.x, actor.z
+		intent.laneAxis = nil
+		intent.speed = 0
+		return
+	end
 	local p = self.params
 	self.phase += dt * (if p.infected then 1.3 else 1.0)
 	local w = if p.infected then W_INFECTED else W
@@ -63,6 +74,8 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 	if evt.type == "infected" then
 		self.params.infected = true
 		self.phase += 3
+	elseif evt.type == "stun" and type(evt.untilTime) == "number" then
+		self.stunUntil = math.max(self.stunUntil, evt.untilTime)
 	end
 end
 
@@ -72,6 +85,7 @@ function Rodent.new(actor: Common.Actor, params: Params): Common.Brain
 		actor = actor,
 		params = params,
 		phase = params.index * 1.7,
+		stunUntil = -math.huge,
 	}, Methods)
 	actor.x, actor.z = params.hideX, params.hideZ
 	return (self :: any) :: Common.Brain

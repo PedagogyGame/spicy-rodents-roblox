@@ -6,6 +6,8 @@
 -- x0.6 on wood kinds (trunk, branch, bridge, lookout) [routes_movement §10]. The motor
 -- (Server/AI/Kinematics) advances `s` every frame; the brain only sets routeId, dir, speed.
 -- W1 replaces the polyline data with Shared/Routes (Curve, Registry, Graph, Motion).
+-- Events: "startle" (a full-sprint flee for 3-6 s), "bait" { x, z, untilTime } (a pile of peanuts or bird seed near its
+-- route: it goes to the route's nearest point and stays there until untilTime or a startle).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -34,6 +36,8 @@ type Brain = Common.Brain & {
 	runUntil: number,
 	sprint: boolean,
 	lastLinkS: number,
+	bait: { s: number, untilTime: number }?, -- a pile of peanuts near the route: go to its nearest point and stay
+	startled: boolean, -- a startle not yet timed (onEvent has no clock: the next think gives the flee its end)
 }
 
 local Squirrel = {}
@@ -44,6 +48,35 @@ local WOOD = { trunk = true, branch = true, bridge = true, lookout = true }
 local WOOD_MULT = 0.6
 local LINK_REACH = Units.st(1.0)
 local TRANSFER_CHANCE = 0.35
+
+local BAIT_REACH = 16 -- studs: a pile further than this from the route is not worth leaving it for
+local BAIT_AT = 1.0 -- studs: close enough to nibble
+local FLEE_SECS = { 3, 6 } -- a startle's sprint, then the usual pause and an ordinary run
+
+-- The distance along a route of its point nearest to (x, z), and how far that point is.
+local function nearestS(route: RouteLike, x: number, z: number): (number, number)
+	local bestS, bestD = 0, math.huge
+	local s = 0
+	local pts = route.points
+	for i = 1, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local ex, ez = b[1] - a[1], b[3] - a[3]
+		local len = math.sqrt(ex * ex + ez * ez + (b[2] - a[2]) ^ 2)
+		local l2 = ex * ex + ez * ez
+		local u = if l2 > 1e-9 then math.clamp(((x - a[1]) * ex + (z - a[3]) * ez) / l2, 0, 1) else 0
+		local px, pz = a[1] + ex * u, a[3] + ez * u
+		local d = math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
+		if d < bestD then
+			bestD, bestS = d, s + len * u
+		end
+		s += len
+	end
+	-- (the polyline's length can differ a little from the route's own: scale onto it)
+	if s > 0 then
+		bestS = bestS * route.length / s
+	end
+	return bestS, bestD
+end
 
 local function railSpeed(route: RouteLike, sprint: boolean): number
 	local base = if sprint then RAIL_SPRINT else RAIL_WALK
@@ -65,6 +98,27 @@ end
 function Methods.think(self: Brain, _dt: number, ctx: Common.Ctx)
 	local intent = self.actor.intent
 	local rng = self.params.rng
+	if self.startled then
+		self.startled = false
+		self.runUntil = ctx.now + Common.range(rng, FLEE_SECS[1], FLEE_SECS[2])
+	end
+	-- bait: along the route to the point nearest the pile, then nibbling there until it is gone
+	local bait = self.bait
+	if bait then
+		if ctx.now >= bait.untilTime then
+			self.bait = nil
+		else
+			intent.mode = "rail"
+			local gap = bait.s - intent.s
+			if math.abs(gap) <= BAIT_AT then
+				intent.speed = 0
+			else
+				intent.dir = if gap > 0 then 1 else -1
+				intent.speed = railSpeed(self.route, false)
+			end
+			return
+		end
+	end
 	if ctx.now < self.idleUntil then
 		intent.mode = "rail"
 		intent.speed = 0
@@ -151,11 +205,18 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
-	if evt.type == "startle" then
-		-- full-sprint flee on rails when chased (BUILD_PLAN §1.4 Squirrel brain)
+	if evt.type == "bait" and type(evt.x) == "number" and type(evt.z) == "number" then
+		local s, d = nearestS(self.route, evt.x, evt.z)
+		if d <= BAIT_REACH then
+			self.bait = { s = s, untilTime = evt.untilTime or 0 }
+		end
+	elseif evt.type == "startle" then
+		self.bait = nil
+		-- full-sprint flee on rails when chased (BUILD_PLAN §1.4 Squirrel brain), for FLEE_SECS (timed by the next
+		-- think); then it pauses and its next run rolls its pace afresh (startRun)
 		self.sprint = true
 		self.idleUntil = 0
-		self.runUntil = math.huge
+		self.startled = true
 		self.actor.intent.speed = railSpeed(self.route, true)
 	end
 end
@@ -173,6 +234,7 @@ function Squirrel.new(actor: Common.Actor, params: Params): Common.Brain
 		runUntil = 0,
 		sprint = false,
 		lastLinkS = -math.huge,
+		startled = false,
 	}, Methods)
 	local intent = actor.intent
 	intent.mode = "rail"

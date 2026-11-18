@@ -81,6 +81,11 @@ step "bake the Neighbourhood Shop's shell (tools/bake/neighbourhood_shop.luau ->
 lune run tools/bake/neighbourhood_shop.luau
 done_step
 
+# Pepper's Corner Store (Workspace.Expansion.F1) is its own bake too, for the same reason.
+step "bake Pepper's Corner Store (tools/bake/corner_store.luau -> build/Expansion_F1.rbxm)"
+lune run tools/bake/corner_store.luau
+done_step
+
 # THE GILDED ACORN, the 1940s lounge (Workspace.Expansion.LoungeClassic), is its own bake too.
 step "bake the lounge (tools/bake/lounge_classic.luau -> build/Expansion_LoungeClassic.rbxm)"
 lune run tools/bake/lounge_classic.luau

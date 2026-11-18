@@ -277,11 +277,9 @@ return function(t)
 			end
 			t.truthy(lounge ~= nil and (lounge :: Colliders.Box).hw >= 25 and (lounge :: Colliders.Box).hd >= 28)
 			-- only a built venue is a box: the planned ones have nothing standing yet
+			local built = { f1_neighbourhood_shop = true, f1_corner_store = true, f3_lounge_classic = true }
 			for _, b in colliders.boxes do
-				t.truthy(
-					not string.find(b.id, "^f%d_") or b.id == "f1_neighbourhood_shop" or b.id == "f3_lounge_classic",
-					b.id
-				)
+				t.truthy(not string.find(b.id, "^f%d_") or built[b.id], b.id)
 			end
 		end
 	)
