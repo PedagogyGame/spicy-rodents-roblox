@@ -57,7 +57,8 @@ export type Flags = {
 export type MouthRecord = Enclosure.MouthRecord
 export type EnclosureRecord = Enclosure.Record
 -- As data/attractions.json writes a route (local [X, Y, D]); `enclosure` as Shared/Routes/Enclosure's Record with
--- its mouths' `out` in the local frame.
+-- its mouths' `out` in the local frame. `hint`: what the squirrel's player is told on stopping at the route's far
+-- end; `onwardHint`: on going on from its far end onto the next route by itself (Client/Controllers/Squirrel).
 export type LocalRoute = {
 	id: number,
 	name: string,
@@ -67,6 +68,8 @@ export type LocalRoute = {
 	flags: Flags,
 	points: { { number } },
 	enclosure: EnclosureRecord?,
+	hint: string?,
+	onwardHint: string?,
 	note: string,
 }
 
@@ -292,6 +295,7 @@ local ROUTES: { LocalRoute } = {
 		surfaceRadius = 0.35,
 		flags = flags(false, true, false),
 		points = { { 206.5, -10.9, 7.6 }, { 206.5, -1.3, 7.6 }, { 206.5, 8.35, 7.6 } },
+		hint = "Face the roof and hold W to climb on",
 		note = "On the house's north face by its north-east corner: run into it and the squirrel climbs (walk-in "
 			.. "allowed, unlike the town's downspouts). Its top meets the gutter.",
 	},
@@ -303,6 +307,7 @@ local ROUTES: { LocalRoute } = {
 		visualOffset = 0,
 		flags = flags(true, false, false),
 		points = { { 206.5, 8.35, 7.6 }, { 207.5, 17.1, 20.0 } },
+		hint = "Turn toward the tree: the ridge runs that way",
 		note = "From the downspout's head up the north roof slope to the ridge's east end (exactly its first point: "
 			.. "a joint short of it would be met part-way along the ridge and turned back east). Its line rides "
 			.. "0.15 over the slates, so the body is drawn on it (visualOffset 0, not a bough's lift).",
@@ -314,6 +319,7 @@ local ROUTES: { LocalRoute } = {
 		surfaceRadius = 0.5,
 		flags = flags(false, false, false),
 		points = { { 207.5, 17.1, 20.0 }, { 184.5, 17.1, 20.0 } },
+		hint = "Jump now to reach the branch",
 		note = "The ridge, east to west. Its west end faces the tree: Space there leaps onto the house bough.",
 	},
 	{
@@ -334,6 +340,7 @@ local ROUTES: { LocalRoute } = {
 			{ 147.6, 15.25, 20.6 },
 			{ 145.5, 14.3, 20.0 },
 		},
+		hint = "Q: drop onto the roof",
 		note = "One limb from 3 st past where it crosses the ridge's line (D 20, 14 west of the ridge's end and 5.5 "
 			.. "above it, where a leap west off the ridge's end lands on it held, sprinting or with no key), down to "
 			.. "the trunk's top and on west as the roof crossing, drooping over the games wing's east parapet (1.0 "
@@ -370,6 +377,7 @@ local ROUTES: { LocalRoute } = {
 				{ t = 1, opens = "link", links = { { route = 9120, t = 0, dir = 1 } }, name = "boot" } :: MouthRecord,
 			},
 		},
+		onwardHint = "In the rafters: hold Ctrl to creep, E takes a crossing beam",
 		note = "In through the bent louvre slat, up the plenum, through the duct in the hall's raised east wall, down "
 			.. "the elbow and out of the boot onto the truss chord over lane 18 (9120). Both ways.",
 	},
@@ -523,6 +531,7 @@ function AlleyRoof.records(place: AlleyLayout.Place, lotId: string?): { any }
 		if r.visualOffset ~= nil then
 			rec.visualOffset = r.visualOffset
 		end
+		rec.hint, rec.onwardHint = r.hint, r.onwardHint
 		if r.enclosure then
 			local e = deepCopy(r.enclosure)
 			for _, m in e.mouths or {} do

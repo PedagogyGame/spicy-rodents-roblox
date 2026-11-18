@@ -641,6 +641,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
+					hint = "Face the roof and hold W to climb on",
 					note = "On the house's north face by its north-east corner: run into it and the squirrel climbs (walk-in allowed, unlike the town's downspouts). Its top meets the gutter.",
 					points = {
 						{ 206.5, -10.9, 7.6 },
@@ -660,6 +661,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
+					hint = "Turn toward the tree: the ridge runs that way",
 					note = "From the downspout's head up the north roof slope to the ridge's east end (exactly its first point: a joint short of it would be met part-way along the ridge and turned back east). Its line rides 0.15 over the slates, so the body is drawn on it (visualOffset 0, not a bough's lift).",
 					points = {
 						{ 206.5, 8.35, 7.6 },
@@ -679,6 +681,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
+					hint = "Jump now to reach the branch",
 					note = "The ridge, east to west. Its west end faces the tree: Space there leaps onto the house bough.",
 					points = {
 						{ 207.5, 17.1, 20 },
@@ -697,6 +700,7 @@ return {
 						isPole = false,
 						treeTravel = true,
 					},
+					hint = "Q: drop onto the roof",
 					note = "One limb from 3 st past where it crosses the ridge's line (D 20, 14 west of the ridge's end and 5.5 above it, where a leap west off the ridge's end lands on it held, sprinting or with no key), down to the trunk's top and on west as the roof crossing, drooping over the games wing's east parapet (1.0 above its coping) to end 0.7 above the wing roof: Q drops the squirrel onto it. One route, so once W carries the squirrel down the bough it carries on to the roof whatever the camera does.",
 					points = {
 						{ 171.25, 23.1, 17 },
@@ -746,6 +750,7 @@ return {
 						treeTravel = false,
 					},
 					note = "In through the bent louvre slat, up the plenum, through the duct in the hall's raised east wall, down the elbow and out of the boot onto the truss chord over lane 18 (9120). Both ways.",
+					onwardHint = "In the rafters: hold Ctrl to creep, E takes a crossing beam",
 					points = {
 						{ 117, 13.62, 16.5 },
 						{ 115.2, 13.62, 16.5 },
@@ -1750,6 +1755,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Face the roof and hold W to climb on",
 			length = 19.25,
 			lotId = "bowling_alley",
 			origin = "attraction",
@@ -1774,6 +1780,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Turn toward the tree: the ridge runs that way",
 			length = 15.2093,
 			lotId = "bowling_alley",
 			origin = "attraction",
@@ -1798,6 +1805,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Jump now to reach the branch",
 			length = 23,
 			lotId = "bowling_alley",
 			origin = "attraction",
@@ -1821,6 +1829,7 @@ return {
 				isPole = false,
 				treeTravel = true,
 			},
+			hint = "Q: drop onto the roof",
 			length = 42.4624,
 			lotId = "bowling_alley",
 			origin = "attraction",
@@ -1876,6 +1885,7 @@ return {
 			},
 			length = 21.1781,
 			lotId = "bowling_alley",
+			onwardHint = "In the rafters: hold Ctrl to creep, E takes a crossing beam",
 			origin = "attraction",
 			points = {
 				{ 1417, 30.12, -436.5 },

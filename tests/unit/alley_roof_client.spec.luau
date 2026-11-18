@@ -2,10 +2,11 @@
 -- The alley roof run on the squirrel's own screen (BRIEF_ADDENDUM D9, lane L6), the pure parts:
 --   * the hints on the way in, from the real motor: holding W to the house ridge's west end says "Jump now to reach
 --     the branch", holding W to the end of the bough over the games wing's roof says "Q: drop onto the roof"
---     (Client/Controllers/Squirrel.feedback on the motor's own railEnd events); at the gutter's top with the view
+--     (Client/Controllers/Squirrel.feedback on the motor's own railEnd events, read from the route records' `hint`,
+--     as the game ships them in generated/Attractions); at the gutter's top with the view
 --     turned away from the tree (where the motor stops: the ridge leaves at a right angle) "Turn toward the tree",
---     and turning on runs along the ridge; out of the vent's boot onto the first truss, the rafters' keys; the other
---     ends say nothing, nor does any other route's end;
+--     and turning on runs along the ridge; out of the vent's boot onto the first truss, the rafters' keys (the vent's
+--     `onwardHint`); the other ends say nothing, nor does any other route's end;
 --   * the sneak meter's look (Client/UI/SneakMeter.look): hidden off the rafters, a calm amber eye, "They're
 --     watching: creep (hold Ctrl) or get back in the vent" past WATCH (kept until it falls under CALM), and
 --     "Spotted!" over a full red eye.
@@ -16,6 +17,7 @@ local SpatialIndex = require("@shared/Routes/SpatialIndex")
 local Graph = require("@shared/Routes/Graph")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local Squirrel = require("@client/Controllers/Squirrel")
+local Data = require("@shared/Data")
 local SneakMeter = require("@client/UI/SneakMeter")
 
 local PLACE = { x = 1300, z = -420, floorY = 16.5, yaw = 0 }
@@ -35,6 +37,9 @@ return function(t)
 			return false
 		end,
 	}
+	local function routeOf(id: number): any
+		return registry:get(id)
+	end
 	local function pt(id: number, u: number): Curve.Vec3
 		return registry:pointAt(registry:get(id) :: Registry.Route, u)
 	end
@@ -53,7 +58,7 @@ return function(t)
 			input.cameraYaw = math.atan2(-(goal.x - state.x), -(goal.z - state.z))
 			local wasOn = state.routeId ~= nil
 			local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
-			local say = Squirrel.feedback(input :: any, events :: any, wasOn, state.railT)
+			local say = Squirrel.feedback(input :: any, events :: any, wasOn, state.railT, routeOf)
 			if say and said[#said] ~= say then
 				table.insert(said, say)
 			end
@@ -79,7 +84,7 @@ return function(t)
 			input.fw = 1
 			local wasOn = state.routeId ~= nil
 			local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
-			local say = Squirrel.feedback(input :: any, events :: any, wasOn, state.railT)
+			local say = Squirrel.feedback(input :: any, events :: any, wasOn, state.railT, routeOf)
 			if say and said[#said] ~= say then
 				table.insert(said, say)
 			end
@@ -131,9 +136,15 @@ return function(t)
 			return yawLocal(-1, 0)
 		end)
 		t.eq(table.concat(rode, " "), "9107 9120")
-		t.eq(table.concat(said, " | "), Squirrel.RAFTERS_HINT)
+		t.eq(table.concat(said, " | "), "In the rafters: hold Ctrl to creep, E takes a crossing beam")
 		t.eq(
-			Squirrel.feedback({ fw = 1 }, { { kind = "autoSwitch", routeId = 9120, fromRouteId = 9139 } }, true, 0),
+			Squirrel.feedback(
+				{ fw = 1 },
+				{ { kind = "autoSwitch", routeId = 9120, fromRouteId = 9139 } },
+				true,
+				0,
+				routeOf
+			),
 			nil
 		)
 	end)
@@ -152,29 +163,44 @@ return function(t)
 		t.eq(table.concat(said, " | "), "Q: drop onto the roof")
 	end)
 
-	t.test("routeHint: only the far ends of the way in (downspout, gutter, ridge, bough)", function()
-		t.eq(Squirrel.routeHint(AlleyRoof.RIDGE, 1), "Jump now to reach the branch")
-		t.eq(Squirrel.routeHint(AlleyRoof.BOUGH, 1), "Q: drop onto the roof")
-		t.eq(Squirrel.routeHint(AlleyRoof.GUTTER, 1), "Turn toward the tree: the ridge runs that way")
-		t.eq(Squirrel.routeHint(AlleyRoof.DOWNSPOUT, 1), "Face the roof and hold W to climb on")
-		t.eq(Squirrel.routeHint(AlleyRoof.GUTTER, 0), nil)
-		t.eq(Squirrel.routeHint(AlleyRoof.RIDGE, 0), nil, "the ridge's east end leads on to the gutter")
-		t.eq(Squirrel.routeHint(AlleyRoof.BOUGH, 0), nil, "the bough's house end")
-		t.eq(Squirrel.routeHint(9120, 1), nil)
-		t.eq(Squirrel.routeHint(nil, 1), nil)
+	t.test("the hints are the route records' own: only the far ends of the way in, as the game ships them", function()
+		local function hint(id: number?, u: number?): string?
+			return Squirrel.routeHint(if id then routeOf(id) else nil, u)
+		end
+		t.eq(hint(AlleyRoof.RIDGE, 1), "Jump now to reach the branch")
+		t.eq(hint(AlleyRoof.BOUGH, 1), "Q: drop onto the roof")
+		t.eq(hint(AlleyRoof.GUTTER, 1), "Turn toward the tree: the ridge runs that way")
+		t.eq(hint(AlleyRoof.DOWNSPOUT, 1), "Face the roof and hold W to climb on")
+		t.eq(hint(AlleyRoof.GUTTER, 0), nil)
+		t.eq(hint(AlleyRoof.RIDGE, 0), nil, "the ridge's east end leads on to the gutter")
+		t.eq(hint(AlleyRoof.BOUGH, 0), nil, "the bough's house end")
+		t.eq(hint(9120, 1), nil)
+		t.eq(hint(nil, 1), nil)
+		-- the compiled records the game loads (generated/Attractions) carry the same words
+		local shipped = Registry.fromRecords((Data.default():module("Attractions") :: any).routes)
+		local n = 0
+		for _, r in AlleyRoof.routes() do
+			local got = shipped:get(r.id) :: Registry.Route
+			t.eq(got.hint, r.hint, `route {r.id}'s hint`)
+			t.eq(got.onwardHint, r.onwardHint, `route {r.id}'s onward hint`)
+			n += if r.hint or r.onwardHint then 1 else 0
+		end
+		t.eq(n, 5, "the downspout, gutter, ridge and bough, and the vent")
 		-- a railEnd anywhere else says nothing new; the motor's own hints still come first
 		local idle = { fw = 1, grab = false, drop = false }
-		t.eq(Squirrel.feedback(idle, { { kind = "railEnd", routeId = 9120 } }, true, 1), nil)
+		t.eq(Squirrel.feedback(idle, { { kind = "railEnd", routeId = 9120 } }, true, 1, routeOf), nil)
 		t.eq(
 			Squirrel.feedback(
 				idle,
 				{ { kind = "hint", reason = "noRoom" }, { kind = "railEnd", routeId = 9103 } },
 				true,
-				1
+				1,
+				routeOf
 			),
 			"No room to jump in here: run on to an opening"
 		)
-		t.eq(Squirrel.feedback(idle, { { kind = "railEnd", routeId = 9103 } }, true), nil, "no t: nothing")
+		t.eq(Squirrel.feedback(idle, { { kind = "railEnd", routeId = 9103 } }, true, nil, routeOf), nil, "no t")
+		t.eq(Squirrel.feedback(idle, { { kind = "railEnd", routeId = 9103 } }, true, 1), nil, "no records: nothing")
 	end)
 
 	t.test("SneakMeter.look: hidden, calm, watched (with its words held until it calms), spotted", function()

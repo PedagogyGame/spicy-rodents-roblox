@@ -72,6 +72,8 @@
             "kind": { "enum": ["trunk", "branch", "bridge", "lookout", "roof", "wire", "fence", "tunnel"] },
             "pair": { "type": "integer" }, "surfaceRadius": { "type": "number", "minimum": 0 },
             "visualOffset": { "type": "number" }, "note": { "type": "string" },
+            "hint": { "type": "string", "description": "what the squirrel's player is told on stopping at the route's far end" },
+            "onwardHint": { "type": "string", "description": "what the squirrel's player is told on going on from the route's far end by itself" },
             "flags": { "type": "object", "additionalProperties": false, "properties": {
               "autoGrabExcluded": { "type": "boolean" }, "isPole": { "type": "boolean" }, "isGiant": { "type": "boolean" },
               "fixedSurfaceZ": { "type": "boolean" }, "treeTravel": { "type": "boolean" } } },

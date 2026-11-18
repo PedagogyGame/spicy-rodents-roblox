@@ -25,6 +25,8 @@ local KEY_ORDER = {
 	"treeTravel",
 	"points",
 	"enclosure",
+	"hint",
+	"onwardHint",
 	"hidden",
 	"width",
 	"height",

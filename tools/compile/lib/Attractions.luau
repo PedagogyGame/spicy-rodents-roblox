@@ -150,6 +150,7 @@ function Attractions.compile(ctx: any): any?
 			if r.visualOffset ~= nil then
 				rec.visualOffset = r.visualOffset
 			end
+			rec.hint, rec.onwardHint = r.hint, r.onwardHint
 			if r.enclosure ~= nil then
 				rec.enclosure = worldEnclosure(place, r.enclosure)
 			end
