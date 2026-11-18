@@ -12,6 +12,7 @@
 --   FogCards  SurfaceGui cards with a vertical UIGradient (alpha) at the foot of each range (three layers,
 --             lighter and bluer with distance); Client/World/Sky tints them by time of day
 --   Trees     hedgerows and copses on the plains and a tree line on the foothill crest (ellipsoids)
+--   Edge      the first field boundary just past the clamp on the land sides: a hedgerow with gaps and oaks
 --   Road      a distant road across the plains (Client/World/Sky runs impostor cars on it)
 --   Farms     farmsteads for scale
 --   Ocean     tiles from the coast to beyond the horizon, lighter with distance
@@ -903,6 +904,73 @@ do
 			end
 		end
 	end
+end
+
+---------------------------------------------------------------------------------------------- edge
+-- The first field boundary past the world clamp on the three land sides (backdrop sweep, owner D10): a
+-- hedgerow wandering EDGE_OFF st (+- EDGE_WANDER) out on the band terrain, with gaps, and a hedgerow oak (trunk and
+-- crown) every few clumps. Without it the town's own fields run on to the far hedgerows (650 st and more past the
+-- clamp) as one bare lawn; with it a player at the edge looks at a field's end, not the edge of the world. Out
+-- of reach (the band is beyond the clamp), so nothing collides, as everywhere in the backdrop.
+local EDGE_OFF, EDGE_WANDER, EDGE_STEP, EDGE_TO_Z = 170, 45, 66, 1180
+local EDGE_HEDGE = { hex("4f6a3d"), hex("56703f"), hex("4a6239"), hex("5c7444") }
+local EDGE_TRUNK = hex("5b4a3a")
+do
+	local edge = model(root, "Edge")
+	local n = 0
+	local function line(x0: number, z0: number, x1: number, z1: number, ox: number, oz: number, seed: number)
+		local len = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
+		local along = math.atan2(x1 - x0, z1 - z0)
+		local count = math.floor(len / EDGE_STEP)
+		for s = 0, count do
+			local f = s / count
+			-- the line wanders outward (ox, oz: the outward unit normal) by a slow sum of two waves
+			local w = EDGE_OFF + EDGE_WANDER * (0.6 * math.sin(f * 17 + seed) + 0.4 * math.sin(f * 41 + seed * 2))
+			local x, z = x0 + (x1 - x0) * f + ox * w, z0 + (z1 - z0) * f + oz * w
+			local y = Backdrop.groundAt(x, z)
+			if y > Backdrop.SEA_Y + 1.5 then
+				if hash(seed, s, 61) > 0.14 then -- gaps
+					local hgt = 14 + 9 * hash(seed, s, 62)
+					local col = shade(
+						EDGE_HEDGE[1 + math.floor(hash(seed, s, 63) * #EDGE_HEDGE)],
+						0.92 + 0.14 * hash(seed, s, 64)
+					)
+					ellipsoid(
+						edge,
+						"Hedge",
+						Vector3.new(22 + 6 * hash(seed, s, 65), hgt, EDGE_STEP + 8 + 16 * hash(seed, s, 66)),
+						CFrame.new(x, y + hgt * 0.3, z) * CFrame.Angles(0, along + 0.08 * (hash(seed, s, 67) - 0.5), 0),
+						col,
+						"edge"
+					)
+					n += 1
+				end
+				if s % 3 == 1 and hash(seed, s, 68) > 0.35 then -- a hedgerow oak standing in the line
+					local th = 20 + 8 * hash(seed, s, 69)
+					local tx, tz = x + ox * 6, z + oz * 6
+					local ty = Backdrop.groundAt(tx, tz)
+					pillar(edge, "OakTrunk", Vector3.new(tx, ty - 1, tz), th + 1, 3.4, EDGE_TRUNK, "Wood", "edge")
+					local cw = 46 + 18 * hash(seed, s, 70)
+					local ch = 34 + 12 * hash(seed, s, 71)
+					local col = shade(TREE[1 + math.floor(hash(seed, s, 72) * #TREE)], 0.95 + 0.12 * hash(seed, s, 73))
+					ellipsoid(
+						edge,
+						"OakCrown",
+						Vector3.new(cw, ch, cw * (0.85 + 0.2 * hash(seed, s, 74))),
+						CFrame.new(tx, ty + th + ch * 0.32, tz) * CFrame.Angles(0, hash(seed, s, 75) * math.pi, 0),
+						col,
+						"edge"
+					)
+					n += 2
+				end
+			end
+		end
+	end
+	-- south (outward -Z), east (-X) and west (+X); the north side is the coast
+	line(clamp.minX - EDGE_OFF, clamp.minZ, clamp.maxX + EDGE_OFF, clamp.minZ, 0, -1, 1)
+	line(clamp.minX, clamp.minZ + 60, clamp.minX, EDGE_TO_Z, -1, 0, 2)
+	line(clamp.maxX, clamp.minZ + 60, clamp.maxX, EDGE_TO_Z, 1, 0, 3)
+	assert(n < 400, `edge: {n} parts`)
 end
 
 ---------------------------------------------------------------------------------------------- road

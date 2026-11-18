@@ -2,7 +2,8 @@
 -- World/Backdrop and tools/bake/backdrop (BUILD_PLAN W6 #1, worldgen_districts_art §14.4): the boot terrain beyond
 -- the clamp is continuous with World/Height and hides the land mesh it settles on; the coast reaches the sea at the
 -- waterline; the sun model matches the engine's measured GetSunDirection; the tower stands on the sunset azimuth;
--- and the baked rbxm keeps every part <= 2048 st per axis, anchored, untouchable and inside Persistent models.
+-- the baked rbxm keeps every part <= 2048 st per axis, anchored, untouchable and inside Persistent models; and the
+-- hedgerow just past the clamp (Edge) is out of reach, on the ground and never collides.
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
@@ -130,6 +131,7 @@ return function(t)
 		t.eq(root.Name, "Backdrop")
 		local parts, bad, models, notPersistent = 0, 0, 0, 0
 		local beacon, cards, roadSegs = nil :: any, 0, 0
+		local edge, edgeBad = 0, {} :: { string }
 		for _, d in root:GetDescendants() do
 			if d:IsA("BasePart") then
 				parts += 1
@@ -147,6 +149,27 @@ return function(t)
 				if d.Parent and d.Parent.Name == "Road" then
 					roadSegs += 1
 				end
+				if d.Parent and d.Parent.Name == "Edge" then
+					-- the field boundary past the clamp: out of reach (its near side beyond the clamp), on the
+					-- ground (its foot not over the band terrain), never colliding
+					edge += 1
+					local cf = d.CFrame
+					local pos, half = cf.Position, math.max(s.X, s.Y, s.Z) / 2
+					-- the world-vertical half extent (the trunks are cylinders turned upright)
+					local halfY = (
+						math.abs(cf.RightVector.Y) * s.X
+						+ math.abs(cf.UpVector.Y) * s.Y
+						+ math.abs(cf.LookVector.Y) * s.Z
+					) / 2
+					local foot = pos.Y - halfY
+					if Backdrop.outside(pos.X, pos.Z) - half < 20 then
+						table.insert(edgeBad, `{d.Name} at {pos} within reach`)
+					elseif d.Name ~= "OakCrown" and foot > Backdrop.groundAt(pos.X, pos.Z) + 0.5 then
+						table.insert(edgeBad, `{d.Name} at {pos} floats`)
+					elseif d.CanCollide or d.CanQuery or d.CastShadow then
+						table.insert(edgeBad, `{d.Name} collides, queries or casts a shadow`)
+					end
+				end
 			elseif d:IsA("Model") then
 				models += 1
 				if d.ModelStreamingMode.Name ~= "Persistent" then
@@ -161,6 +184,8 @@ return function(t)
 		t.truthy(parts > 2000 and parts < 4500, `{parts} parts`)
 		t.truthy(cards >= 30, "fog cards")
 		t.truthy(roadSegs > 50, "road")
+		t.truthy(edge > 100 and edge < 400, `{edge} edge parts`)
+		t.eq(#edgeBad, 0, table.concat(edgeBad, "; "))
 		t.truthy(beacon ~= nil, "tower beacon")
 		if beacon then
 			local T = Backdrop.TOWER
