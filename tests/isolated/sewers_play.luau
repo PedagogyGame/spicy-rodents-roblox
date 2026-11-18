@@ -4,7 +4,8 @@
 -- The storm drains end to end, the three sewer lanes joined as Boot/Game and Client/Main join them: the Spicy Rodent
 -- stands on P1's north-west grate in front of a policeman and four people, presses E, runs W through the crossing's
 -- chamber and climbs out at the south-east verge. One frame drives everything:
---   the real SquirrelMotor on the real sewer bake (tools/bake/sewers/Build, in memory, through tests/lib/BakedWorld)
+--   the real SquirrelMotor on the real sewer bake (tools/bake/sewers/Build, in memory) over the baked town
+--     (build/Town.rbxm), as the game loads them, through tests/lib/BakedWorld
 --   the server: the real town AI (AI/TownAI) with World/SewerService started as Boot/Game starts it (the carve on
 --     a recording terrain, after the terrain write); the held rodent's root fed to the AI every frame
 --   the client: World/SewerAmbience started as Client/Main starts it, the held body posed from the motor, the
@@ -98,7 +99,16 @@ return function(t)
 			local layout = SewerLayout.default() :: SewerLayout.Layout
 			local art = serde.decode("json", fs.readFile("data/art/sewer_modules.json"))
 			local bakeRoot = Build.build(roblox, layout, art)
-			local motorWorld = BakedWorld.fromModel(bakeRoot):motorWorld(data)
+			-- the motor stands on what the game loads: the baked town (its roads, kerbs and pavements over the carved
+			-- columns round each shaft) and the sewers' bake over it
+			t.truthy(fs.isFile("build/Town.rbxm"), "build/Town.rbxm (lune run tools/bake/main.luau)")
+			local both = roblox.Instance.new("Folder")
+			for _, r in roblox.deserializeModel(fs.readFile("build/Town.rbxm")) do
+				r.Parent = both
+			end
+			bakeRoot.Parent = both
+			local motorWorld = BakedWorld.fromModel(both):motorWorld(data)
+			bakeRoot.Parent = nil
 			local nw = layout.mouth("P1.NW") :: Mouth
 			local se = layout.mouth("P1.SE") :: Mouth
 			local chamber = layout.chambers[1]
@@ -238,14 +248,36 @@ return function(t)
 			})
 			t.eq(next(over.routes), nil, "walked over the grate: not down it")
 			t.eq(over.violations, 0)
+			-- and across it on the diagonals, from 5 studs out: level all the way (the town's pavement round the frame),
+			-- the server agreeing with every frame
+			local lid = nw.opening
+			local midX, midZ = (lid.x0 + lid.x1) / 2, (lid.z0 + lid.z1) / 2
+			for _, d in { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } } do
+				local dx, dz = d[1] * 0.7071, d[2] * 0.7071
+				local ax, az = midX - dx * 5, midZ - dz * 5
+				local a = SquirrelMotor.new(ax, motorWorld.groundAt(ax, az, nw.y + 1), az)
+				a.yaw = math.atan2(dx, dz)
+				local lowest = math.huge
+				local diag = BakedWorld.drive(motorWorld, a, 75, function(): SquirrelMotor.Input
+					return BakedWorld.keys(BakedWorld.cameraYawToward(dx, dz), { fw = 1 })
+				end, {
+					validator = true,
+					stop = function(st: SquirrelMotor.State): boolean
+						lowest = math.min(lowest, st.y)
+						return false
+					end,
+				})
+				local where = `across the grate heading ({d[1]}, {d[2]})`
+				t.eq(next(diag.routes), nil, `{where}: not down it`)
+				t.eq(diag.violations, 0, where)
+				t.truthy(lowest > nw.y - 0.15, `{where}: no dip ({lowest} vs the street {nw.y})`)
+			end
 			t.truthy(
 				(said[string.format(SewerAmbience.PROMPT.step, nw.kind)] or 0) >= 1,
 				"near it: stand on the grate and press E"
 			)
 			-- back onto it (the middle of the grate), then a second standing there: the prompt, and the people see it
 			-- there
-			local lid = nw.opening
-			local midX, midZ = (lid.x0 + lid.x1) / 2, (lid.z0 + lid.z1) / 2
 			local back = BakedWorld.drive(motorWorld, s, 60 * 4, function(): SquirrelMotor.Input?
 				local dx, dz = midX - s.x, midZ - s.z
 				if dx * dx + dz * dz < 0.3 * 0.3 then
