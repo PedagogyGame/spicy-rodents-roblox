@@ -620,7 +620,7 @@ function ItemWorld.start(opts: StartOpts): World
 				elseif t.player == nil and root then
 					local b = brainOf(t.id)
 					if b and (t.kind == "squirrel" or t.kind == "rodent") then
-						b:onEvent({ type = "startle" })
+						b:onEvent({ type = "startle", x = root.Position.X, z = root.Position.Z })
 					elseif b and t.kind == "human" then
 						b:onEvent({
 							type = "witness",

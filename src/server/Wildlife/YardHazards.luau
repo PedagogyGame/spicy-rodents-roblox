@@ -11,7 +11,7 @@
 --     walking trot, sitting and wagging while a treat lasts, lying in front of its house at night, the head up for
 --     a bark.
 --   * A bark (YardDogs.BARK_EVERY apart, at a squirrel on the ground in its yard): the cue "Dogs.Bark" (a Sound
---     with an empty id: the lead picks a library bark), a computer squirrel bolts (its brain's "startle"), a player
+--     with an empty id: the lead picks a library bark), a computer squirrel bolts (its brain's "startle", away from the dog), a player
 --     on a squirrel or the rodent is told to clear off (a notice: no shove, no harm), and at the Spicy Rodent the
 --     computer-run people within YardDogs.ALERT_RADIUS notice it (their brain's "witness": v5.4's bark alert).
 --   * A dog treat (Items/ItemWorld "calm_dog", the corner store's dog treats): near(x, z, r) lists the dogs as
@@ -218,7 +218,7 @@ function YardHazards.start(opts: StartOpts): Handle
 		else
 			local b = world.brains and world.brains[s.id]
 			if b then
-				b:onEvent({ type = "startle" })
+				b:onEvent({ type = "startle", x = dog.x, z = dog.z }) -- (away from the dog)
 			end
 		end
 		-- at the Spicy Rodent: the people near the bark notice it (v5.4: a bark put them on alert)

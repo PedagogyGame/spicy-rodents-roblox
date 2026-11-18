@@ -215,6 +215,8 @@ return function(t)
 				r.frame(1.5)
 				t.eq(r.dogs.dogs[2].mode, "chase")
 				t.eq(r.events[11][1] and r.events[11][1].type, "startle", "the computer squirrel bolts")
+				-- away from the dog: where it stood barking
+				t.truthy(YardDogs.inYard(y, r.events[11][1].x, r.events[11][1].z), "from the dog's place")
 				-- a player on the rodent, and a person near the bark
 				local rod = r.squirrel(12, y.x1 - 3, y.z1 - 3, "spicy")
 				r.held[12] = { Name = "P" }

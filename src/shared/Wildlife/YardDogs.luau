@@ -9,8 +9,10 @@
 -- brain scheduler):
 --   wander  ambles about its yard to a new spot every few seconds
 --   chase   a squirrel or the Spicy Rodent on the ground in its yard: it runs at it (never out of the yard; one
---           just outside, SENSE, only to the fence) and barks (BARK_EVERY seconds apart): a computer squirrel bolts, a player is told to clear off, people
---           near a bark at the rodent notice it (v5.4: a bark put the people within 12 units on alert). No harm.
+--           just outside, SENSE, only to the fence) and barks (BARK_EVERY seconds apart): a computer squirrel bolts
+--           away from it (none of their routes crosses a yard on the ground today), a player is told to clear off,
+--           people near a bark at the rodent notice it (v5.4: a bark put the people within 12 units on alert). No
+--           harm.
 --   calm    a dog treat given near it (Shared/Items/ItemRules dog_treats: calm_dog): it sits and wags and ignores
 --           squirrels for the treat's seconds
 --   sleep   at night it walks to its house and lies down in front of the door
