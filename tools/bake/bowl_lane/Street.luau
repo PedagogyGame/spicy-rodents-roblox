@@ -340,8 +340,8 @@ function Street.build(roblox: any, parent: any): any
 		local board = kit:box(
 			m,
 			"Board",
-			s.x - 3.6,
-			s.x + 3.6,
+			s.x + 0.25, -- hung beside the post, east along the lane
+			s.x + 7.45,
 			g + 7.6,
 			g + 8.9,
 			-s.z - 0.08,
