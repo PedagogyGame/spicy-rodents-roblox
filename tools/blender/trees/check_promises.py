@@ -328,6 +328,12 @@ def check_tree(info, parts, routes, clearance_warn=False):
             a = 2 * math.pi * k / RAYS
             d = np.array([math.cos(a), 0.0, math.sin(a)])
             out = [c for c in crossings(bark, p, d, want + 8.0) if c[1] > 0]
+            for dy in (0.002, -0.002):
+                # (a level ray at a ring's exact height can slip through the edge two faces share: nudged
+                # a hair up or down, it meets the bark there is)
+                if out:
+                    break
+                out = [c for c in crossings(bark, p + np.array([0.0, dy, 0.0]), d, want + 8.0) if c[1] > 0]
             hits.append((k, p + d * out[0][0] if out else None))
         got = [(k, hp) for k, hp in hits if hp is not None]
         if got and len(allB):
