@@ -3,7 +3,7 @@
 -- The route-true trees of the new generator (tools/blender/trees: natural branching, bending side branches, full
 -- canopies of leaf sprays), one Model per tree, as Server/Assets/TreeArt needs them to swap a baked tree's meshes
 -- for the new ones: per trunk route the Model's asset id (nil until the lead uploads it; tools/blender/trees/
--- publish.py), its world pivot and its triangles. STUDS, Roblox axes.
+-- publish.py), its world pivot, its triangles and its leaf sprays' part colour. STUDS, Roblox axes.
 -- Invariants: one record per trunk route; every tree passed check_promises.py (no broken promise) and, if it is
 -- hollow, check_hollows.py, before it has an id (one that did not is held back); its bark and leaves inside the
 -- generator's budgets; an asset id is digits.
@@ -44,12 +44,25 @@ function TreeArtNext.compile(ctx: any): any?
 		)
 		ctx.invariant(what .. ": an asset id is digits", id == nil or string.match(tostring(id), "^%d+$") ~= nil)
 		total += t.tris.total
+		-- the leaf sprays' part colour (what shows before or without the maps): the Leaves* parts share one green
+		local leaf = nil
+		for _, name in { "LeavesSun", "LeavesMid", "LeavesShade" } do
+			local part = t.parts and t.parts[name]
+			if part and part.color then
+				ctx.invariant(
+					what .. ": one leaf colour",
+					leaf == nil or (leaf[1] == part.color[1] and leaf[2] == part.color[2] and leaf[3] == part.color[3])
+				)
+				leaf = leaf or part.color
+			end
+		end
 		table.insert(trees, {
 			trunkRoute = t.trunkRoute,
 			label = t.label,
 			assetId = if id then tostring(id) else nil,
 			pivot = t.pivot,
 			tris = t.tris.total,
+			leaf = leaf,
 		})
 	end
 	table.sort(trees, function(a, b)
@@ -64,7 +77,8 @@ function TreeArtNext.compile(ctx: any): any?
 		source = rel,
 		header = {
 			"STUDS, Roblox axes. One record per tree trunk route: the new generator's Model (assetId nil until uploaded),",
-			"its world pivot and triangles. Server/Assets/TreeArt swaps the baked tree's meshes for it when it has an id.",
+			"its world pivot, triangles and leaf colour (RGB 0-255). Server/Assets/TreeArt swaps the baked tree's meshes",
+			"for it when it has an id.",
 		},
 	}
 end

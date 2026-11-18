@@ -4,15 +4,20 @@
 -- the colour map on TextureID (WorldGen/Factory), which the Open Cloud publisher keeps; a SurfaceAppearance is
 -- never saved into the place. Per tree, off the boot path:
 --   * a tree whose trunk route has a v2 Model with an id (the new generator's tree, data/art/trees_v2.json ->
---     Shared/Generated/TreeArtNext) has its baked meshes swapped for that Model's: they are pivoted onto the tree's
---     root and made visual only like the baked ones (the baked proxies keep colliding), the leaf sprays drawn from
---     both sides with their alpha cut (where the engine lets a script set that; the rebake path,
---     tools/blender/trees/harvest_meshes.py --art data/art/trees_v2.json, bakes it in);
+--     Shared/Generated/TreeArtNext) and baked meshes of its own has those swapped for the Model's: they are pivoted
+--     onto the tree's root and made visual only like the baked ones (the baked proxies keep colliding), the leaf
+--     sprays drawn from both sides with their alpha cut and the data's leaf green as their part colour. The engine
+--     must take both leaf writes (DoubleSided, AlphaMode Transparency: S8 left them unverified for a script): they are
+--     read back before anything baked goes, and a Model whose leaves did not take them is not swapped in. This is the
+--     fallback: the way to ship v2 is the rebake (tools/blender/trees/harvest_meshes.py --art
+--     data/art/trees_v2.json, then the bake), where Lune writes DoubleSided and Box collision fidelity, which a
+--     script cannot (a swapped part keeps the importer's Default fidelity);
 --     (a tree already baked from its v2 Model, ArtAsset = its id, only gets that Model's maps, as below);
---   * any other tree from an uploaded Model (the Tree model's ArtAsset attribute) gets that Model's
---     SurfaceAppearances (colour, normal and roughness maps) moved onto its baked parts of the same name.
+--   * any other tree from an uploaded Model (the Tree model's ArtAsset attribute), and a tree whose v2 Model did not
+--     load or swap, gets that Model's SurfaceAppearances (colour, normal and roughness maps) moved onto its baked
+--     parts of the same name.
 -- A tree whose Model does not load keeps what was baked, so nothing here can leave a tree bare.
--- Interface: trees(town, next?) -> { Model }; apply(tree, asset) -> moved; swap(tree, asset, pivot, env?) -> parts;
+-- Interface: trees(town, next?) -> { Model }; apply(tree, asset) -> moved; swap(tree, asset, pivot, env?, leaf?) -> parts;
 --   nextByTrunk(list?) -> { [trunkRoute]: Next }; run(town, opts?) -> { trees, upgraded, swapped, failed, seconds }
 --   (yields: call it from a task)
 -- No side effects on require.
@@ -24,18 +29,18 @@ local TreeArt = {}
 -- the MeshParts a tree Model carries (tools/blender/trees: build_trees.py LEAF_PARTS, Bark, Apples)
 TreeArt.MESHES = table.freeze({ Bark = true, LeavesShade = true, LeavesMid = true, LeavesSun = true, Apples = true })
 
-export type Next = { trunkRoute: number, assetId: string?, pivot: { number } }
-export type Env = { CFrame: any, Enum: any }
+export type Next = { trunkRoute: number, assetId: string?, pivot: { number }, leaf: { number }? }
+export type Env = { CFrame: any, Enum: any, Color3: any }
 export type Opts = {
 	load: ((assetId: number) -> Instance)?, -- default InsertService:LoadAsset
 	pause: number?, -- seconds between trees (default 0.05)
 	near: Vector3?, -- load the trees nearest this point first
 	next: { Next }?, -- default Shared/Generated/TreeArtNext (absent: no swaps)
-	env: Env?, -- default the engine's CFrame and Enum (Lune specs pass @lune/roblox)
+	env: Env?, -- default the engine's CFrame, Enum and Color3 (Lune specs pass @lune/roblox)
 }
 
 local function engineEnv(): Env
-	return { CFrame = CFrame, Enum = Enum }
+	return { CFrame = CFrame, Enum = Enum, Color3 = Color3 }
 end
 
 -- The v2 Models that have an id, by trunk route.
@@ -91,11 +96,15 @@ function TreeArt.apply(tree: Instance, asset: Instance): number
 	return moved
 end
 
+local function isLeaves(p: Instance): boolean
+	return string.sub(p.Name, 1, 6) == "Leaves"
+end
+
 -- A leaf spray part: alpha-cut cards seen from both sides (a script may not be allowed to set these: then they stay
--- as the importer left them, or as baked).
-local function cutLeaves(p: MeshPart, e: Env)
-	if string.sub(p.Name, 1, 6) ~= "Leaves" then
-		return
+-- as the importer left them, or as baked). True when both read back as written.
+local function cutLeaves(p: MeshPart, e: Env): boolean
+	if not isLeaves(p) then
+		return true
 	end
 	pcall(function()
 		(p :: any).DoubleSided = true
@@ -106,13 +115,34 @@ local function cutLeaves(p: MeshPart, e: Env)
 			(look :: any).AlphaMode = e.Enum.AlphaMode.Transparency
 		end)
 	end
+	local ok, took = pcall(function(): boolean
+		return (p :: any).DoubleSided == true
+			and look ~= nil
+			and (look :: any).AlphaMode == e.Enum.AlphaMode.Transparency
+	end)
+	return ok and took
+end
+
+-- Whether a tree has baked meshes to swap out (the bake's Mesh attribute, or a baked Bark): a tree built of
+-- primitives keeps them, and the v2 Model is not laid over it.
+local function baked(tree: Instance): boolean
+	if tree:GetAttribute("Mesh") == true then
+		return true
+	end
+	local bark = tree:FindFirstChild("Bark")
+	return bark ~= nil and bark:IsA("MeshPart")
 end
 
 -- Replaces the baked tree's meshes (TreeArt.MESHES) with the v2 Model's: `asset` is what LoadAsset returned (the
--- uploaded Model inside it), `pivot` the tree's root (its FBX origin). Returns the parts put in; 0 (and the tree
--- left as baked) when the Model has no Bark.
-function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: Env?): number
+-- uploaded Model inside it), `pivot` the tree's root (its FBX origin), `leaf` the leaf sprays' part colour (what
+-- shows where a map has not streamed in; default the importer's). Returns the parts put in; 0, and the tree left as
+-- baked, when the tree has no baked meshes, the Model has no Bark, or a leaf part did not take DoubleSided and
+-- AlphaMode Transparency (read back before anything baked is removed).
+function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: Env?, leaf: { number }?): number
 	local e = env or engineEnv()
+	if not baked(tree) then
+		return 0
+	end
 	local model = asset:FindFirstChildWhichIsA("Model") or asset
 	local fresh: { MeshPart } = {}
 	local bark = false
@@ -124,6 +154,14 @@ function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: E
 	end
 	if not bark then
 		return 0
+	end
+	for _, p in fresh do
+		if not cutLeaves(p, e) then
+			return 0
+		end
+		if leaf and isLeaves(p) then
+			p.Color = e.Color3.fromRGB(leaf[1], leaf[2], leaf[3])
+		end
 	end
 	-- (Model:PivotTo, done part by part: the uploaded Model's pivot is its FBX origin, the tree's root)
 	local from = if model:IsA("Model")
@@ -147,7 +185,6 @@ function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: E
 		p.CanQuery = false
 		p.CanTouch = false
 		p.CastShadow = true
-		cutLeaves(p, e)
 		p.Parent = tree
 	end
 	return #fresh
@@ -175,35 +212,63 @@ function TreeArt.run(
 	end
 	local t0 = os.clock()
 	local upgraded, swapped, failed = 0, 0, 0
+	-- a tree's live Model (ArtAsset), loaded and its maps moved over: "moved", "none" (loaded, nothing to move, or
+	-- no live Model) or "failed" (did not load)
+	local function upgrade(tree: Instance, assetId: number?): string
+		if not assetId then
+			return "none"
+		end
+		local ok, asset = pcall(function(): Instance
+			return load(assetId)
+		end)
+		if not (ok and asset) then
+			return "failed"
+		end
+		local moved = TreeArt.apply(tree, asset) > 0
+		asset:Destroy()
+		return if moved then "moved" else "none"
+	end
 	for _, tree in list do
 		local n = next[tonumber(tree:GetAttribute("TrunkRoute")) or -1]
-		local assetId = tonumber(if n then n.assetId else tree:GetAttribute("ArtAsset"))
-		local ok, asset = pcall(function(): Instance
-			return load(assetId :: number)
-		end)
-		if ok and asset then
-			if n and tostring(tree:GetAttribute("ArtAsset")) == n.assetId then
-				-- rebaked from the v2 Model already (harvest_meshes.py --art): only its maps move over
-				if TreeArt.apply(tree, asset) > 0 then
+		local live = tonumber(tree:GetAttribute("ArtAsset"))
+		if n and tostring(tree:GetAttribute("ArtAsset")) ~= n.assetId then
+			-- the v2 Model swapped in; one that does not load or swap leaves the tree with today's maps
+			local ok, asset = pcall(function(): Instance
+				return load(tonumber(n.assetId) :: number)
+			end)
+			local put = 0
+			if ok and asset then
+				put = TreeArt.swap(tree, asset, n.pivot, o.env, n.leaf)
+				asset:Destroy()
+			end
+			if put > 0 then
+				swapped += 1
+			else
+				failed += 1
+				if upgrade(tree, live) == "moved" then
 					upgraded += 1
 				end
-				for _, p in tree:GetChildren() do
-					if p:IsA("MeshPart") then
-						cutLeaves(p, o.env or engineEnv())
-					end
-				end
-			elseif n then
-				if TreeArt.swap(tree, asset, n.pivot, o.env) > 0 then
-					swapped += 1
-				else
-					failed += 1
-				end
-			elseif TreeArt.apply(tree, asset) > 0 then
-				upgraded += 1
 			end
-			asset:Destroy()
+		elseif n then
+			-- rebaked from the v2 Model already (harvest_meshes.py --art): only its maps move over
+			local got = upgrade(tree, live)
+			if got == "moved" then
+				upgraded += 1
+			elseif got == "failed" then
+				failed += 1
+			end
+			for _, p in tree:GetChildren() do
+				if p:IsA("MeshPart") then
+					cutLeaves(p, o.env or engineEnv())
+				end
+			end
 		else
-			failed += 1
+			local got = upgrade(tree, live)
+			if got == "moved" then
+				upgraded += 1
+			elseif got == "failed" then
+				failed += 1
+			end
 		end
 		local pause = o.pause or 0.05
 		if pause > 0 then
