@@ -2,14 +2,14 @@
  "$schema": "art/people v1",
  "src": "tools/blender/people (build_people.py: sculpt, paint and the manifest; check_people.py; export_people.py: the six upload files; publish.py: the upload, this file and src/shared/Avatar/PeopleAssets.luau).",
  "placement": "InsertService:LoadAsset(assetId) holds MeshParts named as `objects`, each unrotated with a SurfaceAppearance. Server/Assets/PeopleArt swaps a stock R15's fifteen parts for them (same names, the Motor6Ds and attachments kept and moved to the rig below), welds the outfit's extras and the hair and hat, and dresses an outfit or a face by cloning the SurfaceAppearance of the matching square in `outfits` (Outfit_<outfit>) or `faces` (Face_<face>_<expression>).",
- "generated": "2026-11-18T16:04:00Z",
+ "generated": "2026-11-18T16:56:59Z",
  "assets": {
   "bodySlim": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople slim body",
    "file": "upload/body_slim.fbx",
-   "fbxBytes": 2681404,
+   "fbxBytes": 1371964,
    "objects": [
     "UpperTorso",
     "LowerTorso",
@@ -31,14 +31,14 @@
     "RightCoatTail"
    ],
    "triangles": 3964,
-   "sha": "9cecb4e09c71aa86"
+   "sha": "31aa2efa6f2c4243"
   },
   "bodyBroad": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople broad body",
    "file": "upload/body_broad.fbx",
-   "fbxBytes": 2681820,
+   "fbxBytes": 1372380,
    "objects": [
     "UpperTorso",
     "LowerTorso",
@@ -60,26 +60,26 @@
     "RightCoatTail"
    ],
    "triangles": 3964,
-   "sha": "f608457780089971"
+   "sha": "f402749c148a052b"
   },
   "head": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople head",
    "file": "upload/head.fbx",
-   "fbxBytes": 1451404,
+   "fbxBytes": 699836,
    "objects": [
     "Head"
    ],
    "triangles": 1092,
-   "sha": "db60f205913737c6"
+   "sha": "21ad20613efc8323"
   },
   "headwear": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople hair and hats",
    "file": "upload/headwear.fbx",
-   "fbxBytes": 4296220,
+   "fbxBytes": 2171836,
    "objects": [
     "Hair_short",
     "Hair_parted",
@@ -93,14 +93,14 @@
     "Hat_beret"
    ],
    "triangles": 3090,
-   "sha": "0cdb7b80c4032ec5"
+   "sha": "b1a71459077c4fd8"
   },
   "outfits": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople outfits",
    "file": "upload/outfits.fbx",
-   "fbxBytes": 17395004,
+   "fbxBytes": 8207820,
    "objects": [
     "Outfit_shirt",
     "Outfit_jacket",
@@ -111,14 +111,14 @@
     "Outfit_mime"
    ],
    "triangles": 14,
-   "sha": "006bfb2e5128cfcb"
+   "sha": "eebc835b9aa114a6"
   },
   "faces": {
    "assetId": null,
    "moderation": "not uploaded",
    "displayName": "SR townspeople faces",
    "file": "upload/faces.fbx",
-   "fbxBytes": 3457244,
+   "fbxBytes": 2640188,
    "objects": [
     "Face_plain_calm",
     "Face_plain_worried",
@@ -128,7 +128,7 @@
     "Face_mime_frightened"
    ],
    "triangles": 12,
-   "sha": "df181c2008292a2d"
+   "sha": "8fdcf8e187b55bcd"
   }
  },
  "rig": {
