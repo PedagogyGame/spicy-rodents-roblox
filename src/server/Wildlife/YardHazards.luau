@@ -108,7 +108,9 @@ local function poseOf(name: string, rest: Vector3, dog: Dog, t: number, barking:
 	local legs = string.sub(name, 1, 3) == "Leg"
 	if dog.lying then
 		if legs then
-			return CFrame.new(rest.X * 1.4, -0.35, rest.Z) -- tucked under
+			-- paws out in front, back legs folded alongside
+			local fwd = if rest.Z < 0 then -0.5 else 0.2
+			return CFrame.new(rest.X * 1.1, -0.45, rest.Z + fwd) * CFrame.Angles(math.rad(90), 0, 0)
 		elseif name == "Head" or name == "Snout" or name == "Nose" or name == "EarL" or name == "EarR" then
 			return CFrame.new(rest + Vector3.new(0, -0.5, 0))
 		end
@@ -126,7 +128,7 @@ local function poseOf(name: string, rest: Vector3, dog: Dog, t: number, barking:
 			then math.sin(t * 14) * 0.7
 			elseif dog.mode == "chase" then math.sin(t * 9) * 0.3
 			else 0
-		return CFrame.new(rest) * CFrame.Angles(0, wag, 0) * CFrame.Angles(math.rad(35), 0, 0)
+		return CFrame.new(rest) * CFrame.Angles(0, wag, 0) * CFrame.Angles(math.rad(-35), 0, 0)
 	end
 	if barking and (name == "Head" or name == "Snout" or name == "Nose" or name == "EarL" or name == "EarR") then
 		return CFrame.new(rest + Vector3.new(0, 0.25, 0))
