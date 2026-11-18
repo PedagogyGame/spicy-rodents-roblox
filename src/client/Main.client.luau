@@ -47,6 +47,7 @@ local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
 local SewerAmbience = require("./World/SewerAmbience")
 local LoungeMusic = require("./World/LoungeMusic")
+local SeatGetUp = require("./World/SeatGetUp")
 local SewerArt = require("./World/SewerArt")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
@@ -186,6 +187,12 @@ end
 local okJazz, jazzErr = pcall(LoungeMusic.start, { current = client.current })
 if not okJazz then
 	warn(`Client: LoungeMusic failed: {jazzErr}`)
+end
+
+-- THE GILDED ACORN's seats: moving gets up, as jump does (World/SeatGetUp)
+local okSeat, seatErr = pcall(SeatGetUp.start, { current = client.current })
+if not okSeat then
+	warn(`Client: SeatGetUp failed: {seatErr}`)
 end
 
 -- the corner store's kite in the air: A/D lean it, W/S let out and reel in (UI/KiteSteer; the server flies it)
