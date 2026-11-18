@@ -114,9 +114,9 @@ local function newPart(name: string, size: Vector3, cf: CFrame, color: Color3, p
 	return p
 end
 
--- A player's rodent stunned: only the deadline (server time) on its body. Its own client gives the motor no input
--- until then (Controllers/Squirrel), so nothing here anchors the body, owns it or runs a timer: a release or a new
--- driver in the meantime changes nothing, and a later stun only ever lengthens it.
+-- A rodent's body stunned: only the deadline (server time) on it. A driving client gives its motor no input until
+-- then (Controllers/Squirrel), so nothing here anchors the body, owns it or runs a timer: a release or a new driver
+-- in the meantime changes nothing, and a later stun only ever lengthens it.
 function ItemWorld.stunBody(body: Instance, now: number, secs: number)
 	local was = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
 	local untilTime = now + secs
@@ -449,17 +449,17 @@ function ItemWorld.start(opts: StartOpts): World
 						notify(t.player, "Squirted! Stunned for a moment.")
 					end
 				else
+					-- the computer's rodent: its own brain holds it (never Possession's suspend, which a player
+					-- taking the body in the meantime also uses); the body carries the deadline too, so a player
+					-- who takes it before then stands for the rest
 					local world = rt and rt.world
-					local a = world and world.actorsById[t.id]
-					if world and a then
-						local TownAI = require("../AI/TownAI") :: any
-						TownAI.suspend(world, t.id)
-						local x, y, z = a.x, a.y, a.z
-						task.delay(e.secs, function()
-							if world.possessed[t.id] then
-								TownAI.resume(world, t.id, x, y, z)
-							end
-						end)
+					local b = brainOf(t.id)
+					if world and b then
+						b:onEvent({ type = "stun", untilTime = world.now + e.secs })
+					end
+					local actor = rt and rt.byTownId and rt.byTownId[t.id]
+					if actor and actor.body then
+						ItemWorld.stunBody(actor.body, workspace:GetServerTimeNow(), e.secs)
 					end
 				end
 			end

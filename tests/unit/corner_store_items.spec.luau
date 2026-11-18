@@ -12,6 +12,8 @@ local SquirrelController = require("@client/Controllers/Squirrel")
 local ItemWorld = require("@server/Items/ItemWorld")
 local PossessionState = require("@shared/Actors/PossessionState")
 local FakeEngine = require("@tests/lib/FakeEngine")
+local TownAI = require("@server/AI/TownAI")
+local Data = require("@shared/Data")
 
 type Rig = {
 	svc: ItemService.Service,
@@ -567,6 +569,43 @@ return function(t)
 				`back to its ordinary pauses ({idleAfter} idle ticks against {idleBefore})`
 			)
 			t.truthy((brain :: any).runUntil < math.huge, "never a flee for ever")
+		end
+	)
+	t.test(
+		"the computer's rodent stunned: its own brain stands it still, and a player taking it meanwhile is safe",
+		function()
+			local world = TownAI.build({ data = Data.default(), seed = 3 })
+			local id: number? = nil
+			for _, a in world.actors do
+				if a.species == "squirrel" and a.variant == "spicy" then
+					id = a.id
+				end
+			end
+			assert(id, "the town has its rodent")
+			local a = world.actorsById[id]
+			local brain = world.brains[id]
+			local c: any = {
+				now = 10,
+				rng = function(): number
+					return 0.5
+				end,
+			}
+			brain:onEvent({ type = "stun", untilTime = 11.3 }) -- ItemWorld: world.now + 1.3
+			brain:think(0.1, c)
+			t.eq(a.intent.speed, 0, "stands")
+			t.eq(a.intent.tx, a.x)
+			t.falsy(world.possessed[id], "never Possession's suspend")
+			t.truthy(world.scheduler.byId[id] ~= nil, "still the AI's")
+			-- a player takes it inside the 1.3 s and lets go after: Possession's suspend and resume alone, no error
+			TownAI.suspend(world, id)
+			local ok, err = pcall(function()
+				TownAI.resume(world, id, a.x, a.y, a.z)
+			end)
+			t.truthy(ok, `release: {err}`)
+			t.falsy(world.possessed[id])
+			c.now = 11.4
+			brain:think(0.1, c)
+			t.truthy(a.intent.speed > 0 or a.intent.tx ~= a.x, "off again once the stun is over")
 		end
 	)
 end
