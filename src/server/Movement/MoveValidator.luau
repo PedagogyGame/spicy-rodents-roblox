@@ -24,8 +24,11 @@
 --   * A packet with a number that is not finite is never judged nor taken (SquirrelWire.sane).
 --   * A gap too long to judge move by move (a stall, a loss burst, a client sending sparsely) is judged as a whole
 --     (hop(): reach at the fastest pace over the time the server's own arrivals allow, no climb or height above a
---     leap without a rail or a trampoline near, walls chord by chord), and more than gapMax of them in gapWindow
---     flag; it is never a snap target. MovementService uses hop() for the first packet after a move it made.
+--     leap without a rail as high near or a trampoline, walls chord by chord), and more than gapMax of them in
+--     gapWindow flag; it is never a snap target. MovementService uses hop() for the first packet after a move it made.
+--   * Bounded cost: the world's rail index answers no query wider than C.RAIL_REACH_MAX, a long line's walls take at
+--     most ValidatorWorld.C.MAX_CHORDS chords: no packet's numbers and no silence make a judgement dear.
+--   * The clock over the long run (C.CLOCK_RUN_*): a clock a little fast adds up past any latency's drop.
 --   * Marks (the clock's history, recent gaps and walls, the sprint meter) outlive a reset; forget() drops them.
 --   * The server's own sprint meter (_stamina): a sprint that never tires shows.
 --   * The client's own river recovery (Movement/Recovery.riverFall: a fall into the river puts the body on the

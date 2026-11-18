@@ -62,6 +62,16 @@ return function(t)
 		t.truthy(string.find(src, ":GetNetworkPing()", 1, true), "from the engine's own measure")
 		-- the root is watched fifteen times a second (walls between samples stay inside one chord)
 		t.truthy(string.find(src, "if watchAcc < 1 / 15 then", 1, true), "watched at 15 Hz")
+		-- a new squirrel body is the server's until its driver's first packet passes the gate
+		t.truthy(string.find(src, "pin = function(actorId: any, on: boolean)", 1, true), "engine.pin wired")
+		t.truthy(string.find(src, "root.Anchored = true", 1, true), "pinned: anchored")
+		-- a body a game moves itself (the paintball arena) is told to the validator
+		t.truthy(
+			string.find(src, "moved = function(body: any, why: string)\n\t\t\t\tmovedBody(body, why)", 1, true),
+			"moved wired"
+		)
+		local pb = fs.readFile("src/server/Minigames/Paintball/PaintballService.luau")
+		t.truthy(string.find(pb, 'moved(body, "paintball")', 1, true), "the arena tells every move")
 	end)
 
 	t.test("SquirrelWire: every field the validator reads crosses the wire", function()
