@@ -71,7 +71,10 @@ PeopleLooks.ROLES = table.freeze({
 } :: { [string]: Role })
 
 -- A population post -> the role its people are dressed as (hospital staff take turns, as Actors/BodyFactory
--- colours them); a post not listed is a townsperson.
+-- colours them); a post not listed is a townsperson. (data/population.json's note counts THE GILDED ACORN's two
+-- guards and two bartenders among attraction_staff, but in the game those actors stand at the town's shops
+-- (AI/TownAI): the lounge's own guards and bartender are its baked figures, which Assets/PeopleArt dresses as the
+-- doorman and the bartender. So attraction_staff wear the attendant's jacket.)
 PeopleLooks.POSTS = table.freeze({
 	police = "officer",
 	ambulance_crew = "paramedic",

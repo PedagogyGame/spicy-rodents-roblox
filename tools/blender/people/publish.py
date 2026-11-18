@@ -14,6 +14,9 @@ its stock bodies (Server/Assets/PeopleArt does nothing without all six ids).
 Then it writes data/art/people.json (the ids, moderation states and the rig the loader needs from the manifest)
 and src/shared/Avatar/PeopleAssets.luau (the same as a Luau table; tests/unit/people_art.spec.luau fails when the
 two disagree).
+Before the ids are committed, in Studio: every SurfaceAppearance in the six Models must read AlphaMode Overlay (the
+colour maps are mostly clear; Server/Assets/PeopleArt refuses to install anything else and the town keeps its stock
+bodies), and one dressed body is looked at (outfit and face squares carried over, the tint showing through).
 """
 import argparse
 import json

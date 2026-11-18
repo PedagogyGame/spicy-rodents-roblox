@@ -12,7 +12,9 @@
 -- red-eyed spicy rodent, a red fox, white-tailed deer; every bone a Motor6D the client gait drives),
 -- (4) the S5 part-built puppet (Server/AI/Puppets) if that fails. A stock R15 is dressed as a rounded
 -- townsperson (Assets/PeopleArt, Shared/Avatar/PeopleLooks: its post's role, the same colours) once those Models
--- are uploaded and loaded; a dress that fails leaves the stock body. Every body is readied by
+-- are uploaded and loaded; a dress that fails leaves the stock body. The novelty riders and motorcyclists
+-- (variant "rider") are not dressed, on purpose: each is a part-built rider welded onto its bike with no R15 joints
+-- (Infection/InfectionService: never a patient), so there is no rig to swap the art onto. Every body is readied by
 -- ActorService.prepareBody (anchored root, Atomic streaming, no server Animator, Dead disabled, no name
 -- label, replicated ActorId/Species attributes) and stamped with Variant and Post.
 -- Interface: build(species, variant, index, post?) -> Model; template(species) -> Model?;
