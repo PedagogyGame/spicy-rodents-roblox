@@ -8,7 +8,9 @@
 --   * on the real town (AI/TownAI) the five are the first attraction staff, each a Staff brain on their work loop:
 --     over a few simulated minutes each one walks, stops and works (the body's task: the shoe clerk sprays, the
 --     mechanic kneels at the pinsetters, the cleaner mops, the front desk cooks and greets, the attendant polishes
---     and racks), stays inside the building on its floor, and can be suspended and resumed (a player takes over);
+--     and racks), stays inside the building on its floor, and can be suspended and resumed (a player takes over):
+--     let go anywhere, the employee walks back to work by the doors and the alley's routes (Shared/Attractions/
+--     AlleyWalk), never through a wall or down a lane; let go at the stop being worked, the work goes on;
 --   * the client poses a kneel (AnimationDriver.taskPose: the sit clip, part way down) and a patient's pose wins.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyStaff = require("@shared/Attractions/AlleyStaff")
@@ -205,6 +207,99 @@ return function(t)
 		end
 		t.truthy(AlleyStaff.inside(place, clerk.x, clerk.z), "back at work inside")
 	end)
+	t.test("let go anywhere by a player, an employee walks back to work by the doors and the routes", function()
+		-- (on the lawn by Bowl Lane, on the concourse, in the back corridor, in the games room: through no wall, no
+		-- counter, no machine, never down a lane; at work again inside)
+		local data = Data.default()
+		local world = TownAI.build({ data = data, seed = 3 })
+		local place = (data:module("Attractions") :: any).attractions[1].place
+		local baked = BakedWorld.bakeAlley()
+		local staff: { [string]: any } = {}
+		for _, a in world.actors do
+			if a.job then
+				staff[a.job] = a
+			end
+		end
+		for _ = 1, 60 * 15 do
+			TownAI.stepFrame(world, 1 / 15)
+		end
+		local function solidAt(x: number, z: number): any?
+			local X, _, D = L.toLocal(place, x, 0, z)
+			local floor = L.floorAt(X, D) or 0
+			local wx, wy, wz = L.toWorld(place, X, floor + KNEE + (HEAD - KNEE) / 2, D)
+			return baked.overlapBox(
+				wx,
+				wy,
+				wz,
+				{ { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } },
+				{ BODY_HALF, (HEAD - KNEE) / 2, BODY_HALF },
+				function(p: any): boolean
+					return p.collide == true
+				end
+			)[1]
+		end
+		local cases = {
+			{ "mechanic", 22, -90, "on the front lawn" },
+			{ "mechanic", 22, -40, "on the concourse" },
+			{ "cleaner", 60, 72, "in the back corridor" },
+			{ "front_desk", 5, 72, "in the back corridor" },
+			{ "shoe_clerk", 120, -20, "in the games room" },
+			{ "games_attendant", 22, -40, "on the concourse" },
+		}
+		for _, c in cases do
+			local a = staff[c[1]]
+			TownAI.suspend(world, a.id)
+			local x, y, z = L.toWorld(place, c[2], 0, c[3])
+			TownAI.resume(world, a.id, x, y + a.hip, z)
+			local hits, lanes, worked = 0, 0, false
+			for f = 1, 60 * 30 do
+				TownAI.stepFrame(world, 1 / 15)
+				if f % 2 == 0 then
+					local X, _, D = L.toLocal(place, a.x, 0, a.z)
+					if inBallPath(X, D) then
+						lanes += 1
+					end
+					-- (outside, where the floor plan has no floor, the body is on the town's ground)
+					local h = if AlleyStaff.inside(place, a.x, a.z) then solidAt(a.x, a.z) else nil
+					if h then
+						hits += 1
+						if hits <= 2 then
+							t.truthy(false, `{c[1]} let go {c[4]} walks into {h.path} at ({X}, {D})`)
+						end
+					end
+					worked = worked or a.task ~= nil
+				end
+			end
+			t.eq(lanes, 0, `{c[1]} let go {c[4]}: steps in a lane's ball path`)
+			t.truthy(worked and AlleyStaff.inside(place, a.x, a.z), `{c[1]} let go {c[4]} is back at work inside`)
+		end
+	end)
+
+	t.test("let go at the stop they were working at, an employee carries on with the work", function()
+		local data = Data.default()
+		local world = TownAI.build({ data = data, seed = 3 })
+		local clerk: any = nil
+		for _, a in world.actors do
+			if a.job == "shoe_clerk" then
+				clerk = a
+			end
+		end
+		for _ = 1, 60 * 15 do
+			TownAI.stepFrame(world, 1 / 15)
+			if clerk.task ~= nil then
+				break
+			end
+		end
+		local act = clerk.task
+		t.truthy(act ~= nil, "the clerk is at work")
+		TownAI.suspend(world, clerk.id)
+		t.eq(clerk.task, nil, "no work shown on a body a player holds")
+		TownAI.resume(world, clerk.id, clerk.x, clerk.y, clerk.z)
+		t.eq(clerk.task, act, "the work goes on where it was let go")
+		TownAI.stepFrame(world, 1 / 15)
+		t.eq(clerk.task, act, "and is still shown a moment later")
+	end)
+
 	t.test("the client's pose for the work: a kneel is the sit clip part way down; a patient's pose wins", function()
 		local foot = 3.1
 		local k = AnimationDriver.taskPose("kneel", foot)

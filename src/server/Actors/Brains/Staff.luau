@@ -11,8 +11,11 @@
 -- WORK STOPS (the bowling alley's employees, Shared/Attractions/AlleyStaff): `stops` replaces the circuit with a
 -- loop of world points, each with its own `hold` (seconds of work there; 0: walk straight on), `act` (what the work
 -- is: the actor's `task` while holding, which the runtime writes as the body's Task attribute) and `yaw` (the way
--- to face while working). The loop starts at the first stop.
--- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
+-- to face while working). The loop starts at the first stop. `way` (the alley's Shared/Attractions/AlleyWalk) is how
+-- the employee gets back to the loop from anywhere else: let go by a player on the lawn, at the end of a bitten run,
+-- back from the hospital, they walk that way (by the doors and the alley's routes) to the nearest leg's end, never
+-- straight through the walls; let go at the stop they were working at, they carry on with the work.
+-- Interface: new(actor, params), think, suspend, resume, rejoin, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
@@ -27,6 +30,7 @@ export type Params = {
 	patient: boolean?,
 	circuit: { { number } }?, -- optional explicit local circuit (studs offsets)
 	stops: { Stop }?, -- optional work loop (world studs): replaces the circuit
+	way: ((x0: number, z0: number, x1: number, z1: number) -> { { number } })?, -- the way back to the loop
 }
 
 export type Stop = { x: number, z: number, hold: number, act: string?, yaw: number? }
@@ -39,6 +43,8 @@ type Brain = Common.Brain & {
 	target: number,
 	pause: number,
 	directive: Directive.State,
+	back: { { number } }?, -- the way back to the loop being walked (work stops with a `way`)
+	backAt: number,
 }
 
 local Staff = {}
@@ -56,6 +62,28 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	if Directive.think(self.directive, actor, dt, ctx) then
 		actor.task = nil
 		return
+	end
+	if Directive.takeReleased(self.directive) then
+		self:rejoin() -- an order ended (a bitten run, the walk back from the hospital): back to the loop
+	end
+	local back = self.back
+	if back then
+		local q = back[self.backAt]
+		while q and Common.dist2d(actor.x, actor.z, q[1], q[2]) < REACH do
+			self.backAt += 1
+			q = back[self.backAt]
+		end
+		if q then
+			actor.task = nil
+			intent.mode = "walk"
+			intent.tx, intent.tz = q[1], q[2]
+			intent.laneAxis = nil
+			intent.speed = PACE
+			intent.turnRate = 6
+			intent.damp = 8
+			return
+		end
+		self.back = nil
 	end
 	local p = self.points[self.target]
 	local d = Common.dist2d(actor.x, actor.z, p[1], p[2])
@@ -97,6 +125,7 @@ end
 
 function Methods.suspend(self: Brain): Common.Snapshot
 	self.actor.task = nil
+	self.back = nil
 	return { target = self.target, pause = self.pause, directive = Directive.snapshot(self.directive) }
 end
 
@@ -105,6 +134,47 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.pause = snapshot.pause or 0
 	Directive.restore(self.directive, snapshot.directive)
 	Common.halt(self.actor) -- no walking on the old intent before the next think
+	self:rejoin()
+end
+
+-- Back to the work loop from where the body stands now (work stops only): still at the stop being worked, the
+-- work goes on (its act and facing); otherwise on to the end of the nearest leg, by the `way` when there is one
+-- and the body is off the loop.
+function Methods.rejoin(self: Brain)
+	local stops = self.stops
+	if stops == nil then
+		return
+	end
+	local actor = self.actor
+	local n = #stops
+	self.back = nil
+	if self.pause > 0 then
+		local s = stops[(self.target - 2) % n + 1] -- the stop being worked (the target is the next one)
+		if s.hold > 0 and Common.dist2d(actor.x, actor.z, s.x, s.z) < REACH then
+			actor.task = s.act
+			actor.intent.heading = if s.yaw and s.yaw ~= 0 then s.yaw else 1e-6
+			return
+		end
+		self.pause = 0
+	end
+	local best, bestD = self.target, math.huge
+	for i = 1, n do
+		local a, b = stops[i], stops[i % n + 1]
+		local ex, ez = b.x - a.x, b.z - a.z
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((actor.x - a.x) * ex + (actor.z - a.z) * ez) / l2, 0, 1) else 0
+		local d = Common.dist2d(actor.x, actor.z, a.x + ex * t, a.z + ez * t)
+		if d < bestD then
+			best, bestD = i % n + 1, d
+		end
+	end
+	self.target = best
+	local way = self.params.way
+	if way and bestD >= REACH then
+		local goal = stops[best]
+		self.back = way(actor.x, actor.z, goal.x, goal.z)
+		self.backAt = 1
+	end
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
@@ -141,6 +211,8 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 		target = start,
 		pause = 0.4 + (i % 3) * 0.3,
 		directive = Directive.new(),
+		back = nil,
+		backAt = 1,
 	}, Methods)
 	actor.x, actor.z = points[start][1], points[start][2]
 	return (self :: any) :: Common.Brain

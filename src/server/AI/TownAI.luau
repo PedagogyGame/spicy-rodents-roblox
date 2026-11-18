@@ -42,6 +42,7 @@ local HospitalLayout =
 	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
 local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
+local AlleyWalk = Import.shared("Attractions/AlleyWalk") :: typeof(require("../../shared/Attractions/AlleyWalk"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
@@ -408,7 +409,15 @@ function TownAI.build(opts: Opts): World
 				actor.job = job.id
 				register(
 					actor,
-					Staff.new(actor, { stationX = stops[1].x, stationZ = stops[1].z, index = k, stops = stops })
+					Staff.new(actor, {
+						stationX = stops[1].x,
+						stationZ = stops[1].z,
+						index = k,
+						stops = stops,
+						way = function(x0: number, z0: number, x1: number, z1: number): { { number } }
+							return AlleyWalk.way(alley, x0, z0, x1, z1)
+						end,
+					})
 				)
 			elseif id == "shop_worker" or id == "attraction_staff" then
 				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }

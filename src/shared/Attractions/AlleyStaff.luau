@@ -21,7 +21,7 @@
 -- A player may take over any of them like any other person (Server/Actors/Possession): the body is a town person.
 -- Interface: EMPLOYEES; MECHANIC_LANES; APPROACH_MOP; ACTS; employee(id) -> Employee; shift(place, employee) ->
 --   { WorldStop } (world studs, the loop in order); floorAt(place, x, z) -> y? (the floor under a world point inside
---   the building's walls); inside(place, x, z) -> boolean
+--   the building's walls); inside(place, x, z) -> boolean; insideLocal(X, D) -> boolean
 -- Pure; studs. No side effects on require.
 
 local AlleyLayout = require("./AlleyLayout")
@@ -190,12 +190,17 @@ function AlleyStaff.shift(place: AlleyLayout.Place, e: Employee): { WorldStop }
 	return out
 end
 
--- Inside the building's walls (the hall and the games room), in world studs.
-function AlleyStaff.inside(place: AlleyLayout.Place, x: number, z: number): boolean
-	local X, _, D = L.toLocal(place, x, 0, z)
+-- Inside the building's walls (the hall and the games room), in the alley's frame.
+function AlleyStaff.insideLocal(X: number, D: number): boolean
 	local hall = X >= L.X0 and X <= L.HALL_X1 and D >= L.FRONT_D and D <= L.REAR_WALL_D
 	local wing = X >= L.HALL_X1 and X <= L.X1 and D >= L.GAME_ROOM_D0 and D <= L.GAME_ROOM_D1
 	return hall or wing
+end
+
+-- The same in world studs.
+function AlleyStaff.inside(place: AlleyLayout.Place, x: number, z: number): boolean
+	local X, _, D = L.toLocal(place, x, 0, z)
+	return AlleyStaff.insideLocal(X, D)
 end
 
 -- The floor's height under a world point inside the building (nil outside its walls).
