@@ -7,7 +7,8 @@
 --   Everyone near the cabinet is drawn the same round on the same parts: watch() hands every message to
 --     Client/Minigames/WhackAMole/Cabinet (whack_round, whack_rise, whack_hit, whack_over, whack_idle), which
 --     moves the moles and the mallet and writes the SCORE, TIME and status windows on the sign.
---   The card: how to play in one sentence (for the device in hand), the score and the time left. The end card:
+--   The card: how to play in one sentence (for the device in hand), the score and the time left (written by the
+--     Cabinet with the sign's windows, so the two never disagree). The end card:
 --     the cabinet's board of best rounds (the house's to beat at first) with this round on it, highlighted, at
 --     the place it took, or under it when it did not make the board; this round's hits, misses and how many
 --     strikes hit; and a new personal best (the server's state: place, best, newBest, board).
@@ -46,17 +47,21 @@ local function card(frame: Frame, view: { [string]: any }, _you: number?, kit: a
 		Enum.Font.FredokaOne
 	)
 	label(frame, howLine(), UDim2.new(1, -12, 0, 18), UDim2.fromOffset(6, 28), C.WHITE)
-	local left = tonumber(g.left) or Round.SECONDS
-	local ready = tonumber(g.ready) or 0
-	local time = if ready > 0 then `READY {math.ceil(ready)}` else `TIME {math.ceil(left)}`
-	label(
-		frame,
-		`SCORE {g.score or 0}    {time}`,
-		UDim2.new(1, -12, 0, 30),
-		UDim2.fromOffset(6, 52),
-		C.CYAN,
-		Enum.Font.GothamBold
-	)
+	-- the score and the time: the cabinet writes them with the sign, every frame they change (Cabinet.card); the
+	-- server's state (once a second) only until the controller is open
+	local c = Controller.current
+	local text
+	if c then
+		text = Cabinet.cardLine(c.cab)
+	else
+		local left = tonumber(g.left) or Round.SECONDS
+		local ready = tonumber(g.ready) or 0
+		text = `SCORE {g.score or 0}    {if ready > 0 then `READY {math.ceil(ready)}` else `TIME {math.ceil(left)}`}`
+	end
+	local line = label(frame, text, UDim2.new(1, -12, 0, 30), UDim2.fromOffset(6, 52), C.CYAN, Enum.Font.GothamBold)
+	if c then
+		Cabinet.card(c.cab, line)
+	end
 end
 
 local function endCard(view: { [string]: any }, _you: number?): { [string]: any }?
@@ -139,6 +144,10 @@ local entry: ClientGame.ClientGame = {
 	new = Controller.new,
 	card = card,
 	cardSig = function(view: { [string]: any }): any
+		-- (once the controller is open the cabinet keeps the card's numbers: it is built again only then)
+		if Controller.current then
+			return "live"
+		end
 		local g = view.game or {}
 		return `{g.score or 0}:{math.ceil(tonumber(g.left) or 0)}:{math.ceil(tonumber(g.ready) or 0)}`
 	end,

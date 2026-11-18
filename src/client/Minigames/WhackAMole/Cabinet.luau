@@ -29,7 +29,7 @@
 -- The parts are found lazily and may be missing (streaming, a place without the cabinet): then nothing is drawn
 -- and nothing breaks.
 -- Interface: get(station, place?) -> Cab; round(cab, msg); rise(cab, msg); hit(cab, msg); over(cab, msg);
---   idle(cab, msg); refused(cab); swing(cab, hole, at) (this player's own strike, at = shared-clock time); take(cab) / release(cab)
+--   idle(cab, msg); refused(cab); card(cab, label?); cardLine(cab) -> string; swing(cab, hole, at) (this player's own strike, at = shared-clock time); take(cab) / release(cab)
 --   (the player's own cabinet stays awake wherever the body is); roundTime(cab) -> number?; heightOf(cab, hole,
 --   t?) -> 0..1; hittable(cab, hole, t?) -> bool; malletPose(cab, now) -> (u, v, w, rx, ry, rz) (the pivot in the
 --   cabinet frame and its turn); cframe(cab, u, v, w) -> CFrame; windows(cab) -> { score, time, status } (the
@@ -92,6 +92,7 @@ export type Cab = {
 	awake: boolean,
 	far: number,
 	live: boolean, -- the local player's own cabinet
+	cardLabel: TextLabel?, -- the player's card line, written with the sign (card())
 	counted: number, -- the count-in's last second sounded
 	went: boolean, -- GO sounded
 	hurried: number, -- the last of the final seconds sounded
@@ -227,6 +228,7 @@ function Cabinet.get(station: string, place: any?): Cab
 			awake = false,
 			far = 0,
 			live = false,
+			cardLabel = nil,
 			counted = math.huge,
 			went = false,
 			hurried = math.huge,
@@ -390,6 +392,7 @@ end
 
 function Cabinet.release(cab: Cab)
 	cab.live = false
+	cab.cardLabel = nil
 end
 
 function Cabinet.roundTime(cab: Cab): number?
@@ -539,6 +542,24 @@ local function write(cab: Cab, label: TextLabel?, key: string, text: string)
 	end
 end
 
+-- The player's card line: the score and the seconds left as the sign has them this frame (the server's state,
+-- once a second, would trail the sign by up to a second).
+function Cabinet.cardLine(cab: Cab): string
+	local t = Cabinet.roundTime(cab)
+	local words = Cabinet.windows(cab)
+	local time = if t and t < 0 and not cab.free then `READY {math.ceil(-t)}` else `TIME {tonumber(words.time)}`
+	return `SCORE {cab.score}    {time}`
+end
+
+-- card(cab, label?): the card's line is this label from now on, written every frame it changes (nil: none)
+function Cabinet.card(cab: Cab, label: TextLabel?)
+	cab.cardLabel = label
+	cab.shown.card = nil
+	if label then
+		write(cab, label, "card", Cabinet.cardLine(cab))
+	end
+end
+
 -- the count-in and the last seconds, heard once each; a mole's pop as it starts up
 local function cues(cab: Cab, t: number)
 	if cab.free or cab.done then
@@ -609,6 +630,10 @@ local function draw(cab: Cab): boolean
 		write(cab, p.score, "score", words.score)
 		write(cab, p.time, "time", words.time)
 		write(cab, p.status, "status", words.status)
+	end
+	local line = cab.cardLabel
+	if line then
+		write(cab, line, "card", Cabinet.cardLine(cab))
 	end
 	local m = cab.mallet
 	if m and tnow - m.at < Cabinet.MOVE + Cabinet.DOWN + Cabinet.UP + Cabinet.HOVER + Cabinet.HOME then

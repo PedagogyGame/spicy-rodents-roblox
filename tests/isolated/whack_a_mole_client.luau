@@ -489,6 +489,48 @@ return function(t: any)
 		end, opts())
 	end)
 
+	t.test("the card's score and time are the sign's, frame by frame", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			local function cardLine(): string?
+				for _, text in Rig.texts(w.gui) do
+					if string.sub(text, 1, 6) == "SCORE " then
+						return text
+					end
+				end
+				return nil
+			end
+			local checked, readyShown = 0, false
+			local struck: { [number]: boolean } = {}
+			for _ = 1, (Round.READY + 6) * 60 do
+				Rig.frame(w)
+				local c = Controller.current
+				local line = cardLine()
+				if c and line then
+					local hole = upNow(c.cab, 0.2)
+					if hole and not struck[c.cab.byHole[hole][#c.cab.byHole[hole]].id] then
+						struck[c.cab.byHole[hole][#c.cab.byHole[hole]].id] = true
+						press(KEYS[hole])
+					end
+					local ready = string.match(line, "READY (%d+)")
+					local time = string.match(line, "TIME (%d+)")
+					local status = window(w, N.status)
+					if ready then
+						readyShown = true
+						t.truthy(string.find(status, `READY  {ready}`, 1, true), `{line} / {status}`)
+					else
+						t.eq(tonumber(time), tonumber(window(w, N.time)), `{line} / {window(w, N.time)}`)
+					end
+					t.eq(tonumber(string.match(line, "SCORE (%d+)")), tonumber(window(w, N.score)), line)
+					checked += 1
+				end
+			end
+			t.truthy(readyShown, "the count-in on the card")
+			t.truthy(checked > 400, `{checked} frames`)
+			t.truthy(tbl(w):round().hits > 0, "scores came in")
+		end, opts())
+	end)
+
 	t.test("TIME: every mole drops at the end, and a key after it sends nothing and says nothing", function()
 		Rig.play(function(w: Rig.World)
 			Rig.press(w, ID)
