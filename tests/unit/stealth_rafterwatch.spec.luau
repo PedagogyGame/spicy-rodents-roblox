@@ -83,6 +83,19 @@ return function(t)
 		local dark = RafterWatch.rate(squirrel(DARK_X, CHORD_D, WALK), facing(squirrel(DARK_X, CHORD_D, WALK), 12))
 		t.near(lit, RafterWatch.C.walk, 1e-9)
 		t.near(dark, RafterWatch.C.walk * RafterWatch.C.dark, 1e-9)
+		-- (the lamps are made once, not again on every tick: AlleyRoof.lamps builds a list of 72 each call)
+		local made, lamps = 0, AlleyRoof.lamps
+		AlleyRoof.lamps = function(): { { number } }
+			made += 1
+			return lamps()
+		end
+		local ok, err = pcall(function()
+			RafterWatch.rate(squirrel(LIT_X, CHORD_D, WALK), o)
+			RafterWatch.step(RafterWatch.new(), { squirrel(LIT_X, CHORD_D, WALK) }, { o }, nil, DT, SEE)
+		end)
+		AlleyRoof.lamps = lamps
+		t.truthy(ok, err)
+		t.eq(made, 0, "the lamps made again on a tick")
 	end)
 
 	t.test("one person 12 st off, lit, in view: walking is spotted within 1.5 s, sprinting within 0.5 s", function()

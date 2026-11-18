@@ -135,6 +135,9 @@ local function motion(s: Squirrel): number
 	return C.walk
 end
 
+-- the hall's lamps, made once (AlleyRoof.lamps builds a new list each call; step runs five times a second)
+local LAMPS = AlleyRoof.lamps()
+
 local function light(s: Squirrel, lamps: { { number } }): number
 	local r2 = C.lampReach * C.lampReach
 	for _, l in lamps do
@@ -183,7 +186,7 @@ function RafterWatch.rate(s: Squirrel, o: Observer, lamps: { { number } }?): num
 	if not counts(s) or not watching(o) then
 		return 0
 	end
-	return motion(s) * exposure(s, o, light(s, lamps or AlleyRoof.lamps()))
+	return motion(s) * exposure(s, o, light(s, lamps or LAMPS))
 end
 
 -- The lane a point is over (the beds and their gutters), or nil over the aisles.
@@ -233,7 +236,7 @@ function RafterWatch.step(
 		error("RafterWatch.step: canSee (the line of sight from a person to the squirrel) is required")
 	end
 	local events: { Event } = {}
-	local lampList = lamps or AlleyRoof.lamps()
+	local lampList = lamps or LAMPS
 	state.clock += dt
 	local present: { [string]: boolean } = {}
 	for _, s in squirrels do
