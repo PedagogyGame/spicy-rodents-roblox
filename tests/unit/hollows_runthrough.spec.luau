@@ -349,14 +349,14 @@ return function(t)
 							hi = mid
 						end
 					end
-					local outside = onRoute(h.trunk :: number, lo, 1)
-					inside.clock = outside.clock + 1 / 60
-					local code = judge(outside, inside)
+					local onBark = onRoute(h.trunk :: number, lo, 1)
+					inside.clock = onBark.clock + 1 / 60
+					local code = judge(onBark, inside)
 					t.truthy(
 						string.find(code, "enclosure", 1, true) ~= nil,
 						`{h.id} {rid} t {tt}: in through the bark ({code})`
 					)
-					local back = SquirrelMotor.clone(outside)
+					local back = SquirrelMotor.clone(onBark)
 					back.clock = inside.clock + 1 / 60
 					local code2 = judge(inside, back)
 					t.truthy(
