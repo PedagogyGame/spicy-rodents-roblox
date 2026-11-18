@@ -196,6 +196,138 @@ return function(t)
 		end
 	end)
 
+	-- a person's body as Render/VehicleView gives it (an R15 root 2 x 2 x 1 at hip 2: its centre column, the feet up)
+	local function personBody(x: number, z: number, feet: number): Ghost.Body
+		return { x = x, z = z, half = 0.4, y0 = feet, y1 = feet + 2 + 2 }
+	end
+
+	t.test("Ghost.solidFor: a near-still car is a wall, a moving one or one already over the body is not", function()
+		local function pose(speed: number, visible: boolean?): Ghost.Pose
+			return {
+				id = 1,
+				x = 0,
+				z = 0,
+				yaw = 0,
+				speed = speed,
+				visible = visible ~= false,
+				beacons = false,
+				teleported = false,
+				stopped = speed == 0,
+			}
+		end
+		local sedan = Boxes.get("sedan")
+		local h = Solid.hull("sedan", 0, 0, 0, 0)
+		local away = personBody(10, 0, 0)
+		t.truthy(Ghost.solidFor(pose(0), h, away), "parked")
+		t.truthy(Ghost.solidFor(pose(0.5), h, away), "creeping")
+		t.truthy(Ghost.solidFor(pose(0), h, nil), "no body")
+		t.falsy(Ghost.solidFor(pose(1.0), h, away), "moving at 1 st/s")
+		t.falsy(Ghost.solidFor(pose(20), h, away), "driving")
+		t.falsy(Ghost.solidFor(pose(0, false), h, away), "hidden")
+		t.falsy(Ghost.solidFor(pose(0), h, personBody(0, 0, 0)), "over the body")
+		t.falsy(Ghost.solidFor(pose(0), h, personBody(sedan.width / 2 - 0.2, 0, 0)), "just over the body's edge")
+		-- pressed on its side (the root's centre half its depth out) or standing on its roof: a wall
+		t.truthy(Ghost.solidFor(pose(0), h, personBody(sedan.width / 2 + 0.5, 0, 0)), "pressed on the side")
+		t.truthy(Ghost.solidFor(pose(0), h, personBody(0, 0, h.top)), "on the roof")
+	end)
+
+	-- one client frame after another: the pose stream through a real Ghost buffer (60 Hz frames, 20 Hz sends), the car
+	-- drawn as Ghost.view gives it. Returns the frames a colliding root overlapped the body (a squeeze), the frames it
+	-- moved more than a creep since the last frame (a shove), whether it was a wall at the end, and its wall frames
+	local function replay(
+		kind: string,
+		serverAt: (t: number) -> (number, number, boolean?), -- z, speed, teleported
+		bodyAt: (t: number) -> Ghost.Body,
+		seconds: number
+	): (number, number, boolean, number)
+		local buffer = Ghost.new()
+		local kinds = { [1] = { kind = kind } }
+		local flat = function(_x: number, _z: number): number
+			return 0
+		end
+		local sendT = 0
+		local squeezed, shoved, solid, solidFrames = 0, 0, false, 0
+		local lastZ: number? = nil
+		local frame = 1 / 60
+		local tt = 0
+		while tt < seconds do
+			while sendT <= tt do
+				local z, speed, teleported = serverAt(sendT)
+				buffer:push(sendT, {
+					Ghost.encode({
+						id = 1,
+						x = 0,
+						z = z,
+						yaw = 0,
+						speed = speed,
+						visible = true,
+						beacons = false,
+						teleported = teleported == true,
+						stopped = speed == 0,
+					}),
+				})
+				sendT += 0.05
+			end
+			local body = bodyAt(tt)
+			Ghost.view(buffer, tt, kinds, flat, function(_id, p, k, x, y, z, yaw)
+				local hull = Solid.hull(k.kind, x, y - VehiclePuppet.baseOffset(k.kind), z, yaw)
+				solid = Ghost.solidFor(p, hull, body)
+				if solid then
+					solidFrames += 1
+					if Solid.overlaps(hull, body.x, body.z, body.half, body.y0, body.y1) then
+						squeezed += 1
+					end
+					if lastZ and math.abs(z - lastZ) > Ghost.STILL_SPEED * frame + 1e-3 then
+						shoved += 1
+					end
+				end
+				lastZ = z
+			end)
+			tt += frame
+		end
+		return squeezed, shoved, solid, solidFrames
+	end
+
+	t.test("a person in a car's way: a colliding root never moves into the body nor starts over it", function()
+		local sedan = Boxes.get("sedan")
+		local function standing(x: number, z: number): (t: number) -> Ghost.Body
+			return function(_t: number): Ghost.Body
+				return personBody(x, z, 0)
+			end
+		end
+		-- the ambulance's incident edge (AICarMotor: 5 st/s after 4 s waiting) crawls through a person standing in it
+		local sq, sh, _, n = replay("ambulance", function(s: number)
+			return -20 + 5 * s, 5
+		end, standing(0, 0), 8)
+		t.eq(sq + sh, 0, `ambulance edging through: {sq} squeezed, {sh} shoved`)
+		t.eq(n, 0, "a moving car is never a wall")
+		-- a sedan at 20 st/s the server stopped short of the person: drawn late, it brakes hard to a stop on them
+		sq, sh = replay("sedan", function(s: number)
+			if s < 1 then
+				return -30 + 20 * s, 20
+			end
+			local u = math.min(s - 1, 0.5)
+			return -10 + 20 * u - 20 * u * u, math.max(20 - 40 * u, 0)
+		end, standing(0, -5 + sedan.length / 2 - 0.5), 4)
+		t.eq(sq + sh, 0, `braking hard onto the person: {sq} squeezed, {sh} shoved`)
+		-- a car that appears (a dispatch, a wrap) on the person: no wall until they step out sideways, then a wall
+		local walkOut = function(s: number): Ghost.Body
+			local x = if s < 1 then 0 else math.min((s - 1) * 7, sedan.width / 2 + 0.5)
+			return personBody(x, 0, 0)
+		end
+		local solid
+		sq, sh, solid = replay("sedan", function(_t: number)
+			return 0, 0, true
+		end, walkOut, 3)
+		t.eq(sq + sh, 0, `appeared over the person: {sq} squeezed, {sh} shoved`)
+		t.truthy(solid, "once out, pressed on its side, the car is a wall again")
+		-- a parked car the person walks up to: a wall all the time
+		local _, _, parkedSolid, frames = replay("sedan", function(_t: number)
+			return 0, 0
+		end, standing(sedan.width / 2 + 0.5, 0), 2)
+		t.truthy(parkedSolid and frames >= 110, `parked: a wall ({frames} frames)`)
+	end)
+
 	t.test(
 		"TrafficService.solids: walls are the cars stood still SETTLE s, floors every visible car (the live fleet)",
 		function()

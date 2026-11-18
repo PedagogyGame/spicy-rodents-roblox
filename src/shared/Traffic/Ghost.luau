@@ -9,9 +9,12 @@
 --            (pure: the root pose a player sees); view(buffer, now, kinds, heightAt, visit) (pure: one
 --            client frame, `visit` called per vehicle with its sampled and seen pose);
 --            rootCFrame(lib, x, y, z, yaw, pitch, visible, roll?) (the CFrame of that pose, lib = PartBuilder.Lib);
---            render(buffer, now, folder, kinds, heightAt, models, cars?) (engine: placeholder models, one BulkMoveTo;
---            `cars`, a Traffic/Solid set, is refilled with the boxes of the cars drawn this frame);
---            solidify(model) (a ghost's collision: only its invisible RootPart, the logical box, is solid).
+--            render(buffer, now, folder, kinds, heightAt, models, cars?, body?) (engine: placeholder models, one
+--            BulkMoveTo; `cars`, a Traffic/Solid set, is refilled with the boxes of the cars drawn this frame; `body`,
+--            this client's own body as a Body box, keeps off the root of a car drawn over it);
+--            solidify(model) (a ghost's collision: only its invisible RootPart, the logical box, is solid);
+--            solidFor(pose, hull, body?) (pure: does that root collide this frame: only a near-still car, never one
+--            already over the body).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
 -- clients take it from the ground they are given (traffic.md §13 "Terrain"; the game passes
@@ -524,7 +527,35 @@ function Ghost.solidify(model: any)
 	end
 end
 
--- render(buffer, now, folder, kinds, heightAt, models): engine only. `kinds` maps id -> {kind, color};
+-- A person's body for `solidFor`: the upright box of its centre column (studs), its feet to its top.
+export type Body = { x: number, z: number, half: number, y0: number, y1: number }
+
+-- Review 2026-11-18: an anchored box moved by CFrame into a Humanoid shoves it, squeezes it into a wall or flings it,
+-- and a car is drawn some way behind the server's (Ghost.DELAY and the link): a car the server stopped short of a person
+-- can still be drawn driving into them, and one that appears (a dispatch, a wrap) can appear on them. So a ghost's root
+-- collides only while the car as drawn is near still (under STILL_SPEED studs/s: parked, queued, waiting at a light or
+-- for a person in its way), and never while it is already over this client's own body (a car that came over it, or a
+-- body handed over or put back inside one: the same "starts inside does not count" rule as the squirrel's motor and
+-- the validator): the body walks out, then the car is a wall again. A moving car is drawn, never felt; the server's
+-- braking rule (Traffic/AICarMotor) is unchanged.
+Ghost.STILL_SPEED = 1.0
+
+-- solidFor(pose, hull, body?): does the root of the car drawn at `pose` (its box `hull`, Traffic/Solid) collide this
+-- frame? Pure.
+function Ghost.solidFor(p: Pose, hull: Solid.Hull, body: Body?): boolean
+	if not p.visible or p.speed >= Ghost.STILL_SPEED then
+		return false
+	end
+	if body and Solid.overlaps(hull, body.x, body.z, body.half, body.y0, body.y1) then
+		return false
+	end
+	return true
+end
+
+-- the collision each ghost's root was last given (models are cached for the session; weak, so a destroyed one goes)
+local colliding: { [Model]: boolean } = setmetatable({} :: any, { __mode = "k" })
+
+-- render(buffer, now, folder, kinds, heightAt, models, cars?, body?): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
 function Ghost.render(
@@ -534,7 +565,8 @@ function Ghost.render(
 	kinds: Kinds,
 	heightAt: (x: number, z: number) -> number,
 	models: { [number]: Model },
-	cars: Solid.Set?
+	cars: Solid.Set?,
+	body: Body?
 ): number
 	local lib = PartBuilder.engineLib()
 	local parts, cframes = {}, {}
@@ -542,9 +574,10 @@ function Ghost.render(
 		Solid.clear(cars)
 	end
 	Ghost.view(buffer, now, kinds, heightAt, function(id, p, k, x, y, z, yaw, pitch, roll)
-		if cars and p.visible then
-			-- the box as drawn, level (the drawn car pitches and rolls with the road by a few degrees)
-			Solid.add(cars, Solid.hull(k.kind, x, y - VehiclePuppet.baseOffset(k.kind), z, yaw))
+		-- the box as drawn, level (the drawn car pitches and rolls with the road by a few degrees)
+		local hull = if p.visible then Solid.hull(k.kind, x, y - VehiclePuppet.baseOffset(k.kind), z, yaw) else nil
+		if cars and hull then
+			Solid.add(cars, hull)
 		end
 		local model = models[id]
 		if not model then
@@ -555,8 +588,14 @@ function Ghost.render(
 			models[id] = built
 			model = built
 		end
-		if model.PrimaryPart then
-			table.insert(parts, model.PrimaryPart)
+		local root = model.PrimaryPart
+		if root then
+			local solid = hull ~= nil and Ghost.solidFor(p, hull, body)
+			if colliding[model] ~= solid then
+				colliding[model] = solid
+				root.CanCollide = solid
+			end
+			table.insert(parts, root)
 			table.insert(cframes, Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible, roll))
 		end
 	end)

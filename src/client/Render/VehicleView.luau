@@ -9,7 +9,8 @@
 -- the headless replay (tools/sim) runs as well; this file only wires them to the engine. The kinds come once from the PlayNet folder's
 -- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts and are
 -- local to this client; each one's invisible RootPart (the logical box) is solid to this client's own body
--- (Ghost.solidify: a person walks into a car, not through it), the drawn parts never collide. The server's swept test
+-- (Ghost.solidify: a person walks into a car, not through it) while the car is near still and not already over that
+-- body (Ghost.solidFor: a moving box would shove a Humanoid), the drawn parts never collide. The server's swept test
 -- stays the authority on a run-over.
 -- The boxes of the cars drawn this frame go into `opts.cars` (a Traffic/Solid set: Client/World/ClientWorld's `cars`),
 -- where the squirrel's motor meets them as walls and roofs.
@@ -80,13 +81,31 @@ function VehicleView.start(opts: { cars: any? }?): () -> ()
 			receiver:packet(b, workspace:GetServerTimeNow())
 		end)
 	)
+	-- this client's own body (the possessed one is the player's Character), for Ghost.solidFor: its root's centre
+	-- column, a little inside the root so a body pressed on a car's side does not count as inside it, from the feet
+	local player = game:GetService("Players").LocalPlayer
+	local body = { x = 0, z = 0, half = 0, y0 = 0, y1 = 0 }
+	local function bodyBox(): { x: number, z: number, half: number, y0: number, y1: number }?
+		local character = player.Character
+		local root = character and character.PrimaryPart
+		if root == nil then
+			return nil
+		end
+		local humanoid = (character :: Model):FindFirstChildOfClass("Humanoid")
+		local p, size = root.Position, root.Size
+		body.x, body.z = p.X, p.Z
+		body.half = math.min(size.X, size.Z) * 0.4
+		body.y0 = p.Y - size.Y / 2 - (if humanoid then humanoid.HipHeight else 0)
+		body.y1 = p.Y + size.Y / 2
+		return body
+	end
 	local warned = false
 	table.insert(
 		conns,
 		RunService.RenderStepped:Connect(function(dt: number)
 			local good, err = pcall(function()
 				local at = receiver:at(workspace:GetServerTimeNow(), dt)
-				Ghost.render(receiver.buffer, at, folder, kinds, ground, models, cars)
+				Ghost.render(receiver.buffer, at, folder, kinds, ground, models, cars, bodyBox())
 			end)
 			if not good and not warned then
 				warned = true
