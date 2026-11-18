@@ -1,0 +1,368 @@
+--!strict
+-- The corner store's 22 items in use (Shared/Items/ItemRules says what each does; Server/Items/ItemService
+-- applies it over fake deps that record what reaches the world): ownership, people only, cooldowns, uses used
+-- up, and each item's effect, simplest first.
+local ItemRules = require("@shared/Items/ItemRules")
+local ItemService = require("@server/Items/ItemService")
+local Inventory = require("@server/Items/Inventory")
+
+type Rig = {
+	svc: ItemService.Service,
+	inv: Inventory.Inventory,
+	player: any,
+	clock: number,
+	night: boolean,
+	zone: string?,
+	species: string?,
+	about: { ItemService.Target },
+	acts: { { [string]: any } },
+	told: { string },
+	refused: { string },
+}
+
+local function rig(): Rig
+	local r: Rig = {
+		player = { UserId = 7 },
+		clock = 100,
+		night = false,
+		zone = nil,
+		species = "human",
+		about = {},
+		acts = {},
+		told = {},
+		refused = {},
+	} :: any
+	r.inv = Inventory.new()
+	r.svc = ItemService.new({
+		inventory = r.inv,
+		now = function(): number
+			return r.clock
+		end,
+		pose = function(_p: any): ItemService.Pose?
+			return { x = 0, y = 3, z = 0, lx = 0, lz = 1 } -- facing +Z
+		end,
+		speciesOf = function(_p: any): string?
+			return r.species
+		end,
+		night = function(): boolean
+			return r.night
+		end,
+		zoneAt = function(_x: number, _z: number): string?
+			return r.zone
+		end,
+		nearby = function(x: number, z: number, radius: number): { ItemService.Target }
+			local out = {}
+			for _, t in r.about do
+				if (t.x - x) ^ 2 + (t.z - z) ^ 2 <= radius * radius then
+					table.insert(out, t)
+				end
+			end
+			return out
+		end,
+		filter = function(_p: any, text: string): string?
+			return (string.gsub(text, "badword", "#######"))
+		end,
+		notify = function(_p: any, words: string)
+			table.insert(r.told, words)
+		end,
+		refuse = function(_p: any, words: string)
+			table.insert(r.refused, words)
+		end,
+		act = function(_p: any, effect: { [string]: any }, targets: { ItemService.Target }?): boolean?
+			local e = table.clone(effect)
+			e.targets = targets
+			table.insert(r.acts, e)
+			return true
+		end,
+	})
+	return r
+end
+
+local function kinds(r: Rig): { string }
+	local out = {}
+	for _, a in r.acts do
+		table.insert(out, a.kind)
+	end
+	return out
+end
+
+local function use(r: Rig, id: string, payload: any?): (boolean, string?)
+	r.clock += 10 -- past any cooldown
+	return r.svc:use(r.player, id, payload)
+end
+
+return function(t)
+	t.test("the rules: every one of the 22 does something (no todo left but none), and nothing is a gamble", function()
+		for _, def in ItemRules.CATALOG do
+			t.truthy(ItemRules.validate(def))
+			local fx = ItemRules.use(def, { userId = 1, zone = "park", text = "hi", targetInRange = false })
+			t.truthy(#fx >= 1, def.id)
+			t.truthy(fx[1].kind ~= "todo", `{def.id} does nothing yet`)
+			t.truthy(ItemRules.COOLDOWN[def.id] ~= nil, `{def.id}: a cooldown`)
+			if fx[1].kind == "sound" or (fx[2] and fx[2].kind == "sound") then
+				local s = if fx[1].kind == "sound" then fx[1] else fx[2]
+				t.truthy(type(s.cue) == "string" and string.find(s.cue, "^Items%.") ~= nil, `{def.id}: a cue name`)
+			end
+		end
+		for id in ItemRules.USES do
+			t.truthy(ItemRules.def(id) ~= nil, id)
+		end
+	end)
+
+	t.test("only an owner who is a person, with a body, uses it; a cooldown between uses", function()
+		local r = rig()
+		t.eq(r.svc:use(r.player, "harmonica"), false)
+		t.eq(r.refused[#r.refused], ItemService.WORDS.notOwned)
+		r.inv.add(r.player, "harmonica")
+		r.species = "squirrel"
+		t.eq(use(r, "harmonica"), false)
+		t.eq(r.refused[#r.refused], ItemService.WORDS.animal)
+		r.species = nil
+		t.eq(use(r, "harmonica"), false)
+		r.species = "human"
+		t.truthy(use(r, "harmonica"))
+		t.eq(r.svc:use(r.player, "harmonica"), false, "pressed again at once: too soon")
+		t.eq(#kinds(r), 1)
+		t.eq(r.acts[1].cue, "Items.Harmonica")
+		t.eq(r.inv.count(r.player, "harmonica"), 1, "a harmonica lasts")
+	end)
+
+	t.test("soda and ice cream: a sugar rush for D35's seconds, then gone", function()
+		local r = rig()
+		r.inv.add(r.player, "soda")
+		r.inv.add(r.player, "ice_cream_bar")
+		t.truthy(use(r, "soda"))
+		t.eq(r.acts[1].kind, "treat")
+		t.eq(r.acts[1].secs, 45)
+		t.truthy(r.acts[1].scale > 1 and r.acts[1].scale <= 1.2)
+		t.eq(r.inv.count(r.player, "soda"), 0, "drunk")
+		t.truthy(use(r, "ice_cream_bar"))
+		t.eq(r.acts[3].secs, 30)
+		t.eq(r.inv.count(r.player, "ice_cream_bar"), 0)
+	end)
+
+	t.test(
+		"harmonica, bike horn, air horn: sounds; the air horn startles people and squirrels within 12 only",
+		function()
+			local r = rig()
+			for _, id in { "bike_horn", "air_horn" } do
+				r.inv.add(r.player, id)
+			end
+			r.about = {
+				{ kind = "human", id = 1, x = 5, y = 0, z = 5 },
+				{ kind = "squirrel", id = 2, x = -8, y = 0, z = 0 },
+				{ kind = "rodent", id = 3, x = 0, y = 0, z = 11 },
+				{ kind = "human", id = 4, x = 30, y = 0, z = 0 },
+			}
+			t.truthy(use(r, "bike_horn"))
+			t.eq(r.acts[1].cue, "Items.BikeHorn")
+			t.truthy(use(r, "air_horn"))
+			t.eq(r.acts[2].cue, "Items.AirHorn")
+			t.eq(r.acts[3].kind, "startle")
+			local ids = {}
+			for _, tg in r.acts[3].targets do
+				ids[tg.id] = true
+			end
+			t.truthy(ids[1] and ids[2] and ids[3])
+			t.eq(ids[4], nil, "30 studs off: not startled")
+			t.eq(r.inv.count(r.player, "air_horn"), 1)
+		end
+	)
+
+	t.test("umbrella, flashlight, radio: toggles; the flashlight strong only at night; the radio's playlist", function()
+		local r = rig()
+		for _, id in { "umbrella", "flashlight", "radio" } do
+			r.inv.add(r.player, id)
+		end
+		t.truthy(use(r, "umbrella"))
+		t.eq(r.acts[1].on, true)
+		t.truthy(use(r, "umbrella"))
+		t.eq(r.acts[3].on, false)
+		t.truthy(use(r, "flashlight"))
+		t.eq(r.acts[5].kind, "light")
+		t.eq(r.acts[5].strong, false, "by day")
+		t.truthy(use(r, "flashlight"))
+		r.night = true
+		t.truthy(use(r, "flashlight"))
+		t.eq(r.acts[9].on, true)
+		t.eq(r.acts[9].strong, true, "at night")
+		t.truthy(use(r, "radio"))
+		local last = r.acts[#r.acts]
+		t.eq(last.kind, "playlist")
+		t.eq(last.on, true)
+		t.eq(#last.tracks, #ItemRules.RADIO_PLAYLIST)
+		for _, cue in last.tracks do
+			t.truthy(string.find(cue, "^Radio%.") ~= nil, cue)
+		end
+	end)
+
+	t.test("bubbles: a few seconds of bubbles, thirty to a bottle", function()
+		local r = rig()
+		r.inv.add(r.player, "bubbles")
+		for _ = 1, ItemRules.USES.bubbles - 1 do
+			t.truthy(use(r, "bubbles"))
+		end
+		t.eq(r.inv.count(r.player, "bubbles"), 1)
+		t.truthy(use(r, "bubbles"))
+		t.eq(r.inv.count(r.player, "bubbles"), 0, "the bottle is empty")
+		t.eq(r.acts[1].kind, "vfx")
+		t.eq(r.acts[1].vfx, "bubbles")
+	end)
+
+	t.test(
+		"newspaper: read first (a headline), thrown next; frisbee and football leave the hand when thrown",
+		function()
+			local r = rig()
+			for _, id in { "newspaper", "frisbee", "football" } do
+				r.inv.add(r.player, id)
+			end
+			t.truthy(use(r, "newspaper"))
+			t.eq(r.acts[1].kind, "read")
+			t.truthy(table.find(ItemRules.HEADLINES, r.acts[1].headline) ~= nil)
+			t.eq(r.inv.count(r.player, "newspaper"), 1)
+			t.truthy(use(r, "newspaper"))
+			t.eq(r.acts[3].kind, "throw")
+			t.eq(r.inv.count(r.player, "newspaper"), 0)
+			t.truthy(use(r, "frisbee"))
+			t.eq(r.acts[4].kind, "throw")
+			t.eq(r.acts[4].item, "frisbee")
+			t.eq(r.inv.count(r.player, "frisbee"), 0, "in the air: whoever picks it up has it")
+			t.truthy(use(r, "football"))
+			t.eq(r.inv.count(r.player, "football"), 0)
+		end
+	)
+
+	t.test("peanuts and bird seed: bait for the squirrels near enough, used up; bird seed brings birds", function()
+		local r = rig()
+		r.inv.add(r.player, "peanuts")
+		r.inv.add(r.player, "bird_seed")
+		r.about = {
+			{ kind = "squirrel", id = 1, x = 10, y = 0, z = 0 },
+			{ kind = "squirrel", id = 2, x = 50, y = 0, z = 0 },
+			{ kind = "human", id = 3, x = 5, y = 0, z = 0 },
+		}
+		t.truthy(use(r, "peanuts"))
+		t.eq(r.acts[1].kind, "bait")
+		t.eq(#r.acts[1].targets, 1, "only the squirrel within 40")
+		t.eq(r.acts[1].birds, 0)
+		t.eq(r.inv.count(r.player, "peanuts"), 0)
+		t.truthy(use(r, "bird_seed"))
+		t.eq(#r.acts[3].targets, 2, "bird seed reaches 60")
+		t.truthy(r.acts[3].birds > 0)
+	end)
+
+	t.test("dog treats: a dog near is calmed (three to a box); with no dog about, words and nothing used", function()
+		local r = rig()
+		r.inv.add(r.player, "dog_treats")
+		t.eq(use(r, "dog_treats"), false)
+		t.eq(r.refused[#r.refused], ItemService.WORDS.noDog)
+		r.about = { { kind = "dog", id = 9, x = 4, y = 0, z = 0 } }
+		for _ = 1, 3 do
+			t.truthy(use(r, "dog_treats"))
+		end
+		t.eq(r.inv.count(r.player, "dog_treats"), 0)
+		t.eq(r.acts[1].targets[1].id, 9)
+	end)
+
+	t.test("chalk: asks for words, writes them filtered, at most 20 letters, one stick", function()
+		local r = rig()
+		r.inv.add(r.player, "chalk")
+		t.truthy(use(r, "chalk"))
+		t.eq(r.acts[1].kind, "askText")
+		t.eq(r.acts[1].max, 20)
+		t.eq(r.inv.count(r.player, "chalk"), 1, "asking uses nothing")
+		t.eq(use(r, "chalk", { text = "this is far too long for one stick" }), false)
+		t.eq(use(r, "chalk", { text = "   " }), false)
+		t.truthy(use(r, "chalk", { text = " hi badword " }))
+		t.eq(r.acts[2].kind, "write")
+		t.eq(r.acts[2].text, "hi #######")
+		t.eq(r.inv.count(r.player, "chalk"), 0)
+	end)
+
+	t.test(
+		"camera: a screenshot, 24 to a camera; duct tape: ten strips; whoopee cushion and lawn chair set down",
+		function()
+			local r = rig()
+			for _, id in { "camera", "duct_tape", "whoopee_cushion", "lawn_chair" } do
+				r.inv.add(r.player, id)
+			end
+			for _ = 1, 24 do
+				t.truthy(use(r, "camera"))
+			end
+			t.eq(r.inv.count(r.player, "camera"), 0)
+			t.eq(r.acts[1].kind, "screenshot")
+			for _ = 1, 10 do
+				t.truthy(use(r, "duct_tape"))
+			end
+			t.eq(r.inv.count(r.player, "duct_tape"), 0)
+			r.acts = {}
+			t.truthy(use(r, "whoopee_cushion"))
+			t.eq(r.acts[1].kind, "place")
+			t.eq(r.acts[1].prop, "whoopee_cushion")
+			t.eq(r.inv.count(r.player, "whoopee_cushion"), 0, "it is on the ground now")
+			t.truthy(use(r, "lawn_chair"))
+			t.eq(r.acts[2].prop, "lawn_chair")
+			t.eq(r.acts[2].sit, true)
+		end
+	)
+
+	t.test("water gun: people get wet; the rodent is stunned 1.3 s the first time per player, never again", function()
+		local r = rig()
+		r.inv.add(r.player, "water_gun")
+		t.truthy(use(r, "water_gun"))
+		t.eq(r.acts[1].hit, false, "nobody ahead")
+		r.about = { { kind = "human", id = 1, x = 0, y = 0, z = 8 } }
+		t.truthy(use(r, "water_gun"))
+		t.eq(r.acts[2].hit, true)
+		t.eq(r.acts[2].react, "wet")
+		r.about = {
+			{ kind = "rodent", id = 2, x = 0.5, y = 0, z = 10 },
+			{ kind = "human", id = 3, x = 10, y = 0, z = 0 }, -- off to the side: not in the squirt
+		}
+		t.truthy(use(r, "water_gun"))
+		local stun = nil
+		for _, a in r.acts do
+			if a.kind == "stun" then
+				stun = a
+			end
+		end
+		t.truthy(stun ~= nil)
+		t.eq(stun.secs, 1.3)
+		t.eq(stun.targets[1].id, 2)
+		local n = #r.acts
+		t.truthy(use(r, "water_gun"))
+		for i = n + 1, #r.acts do
+			t.truthy(r.acts[i].kind ~= "stun", "once per player")
+		end
+		-- another player's first hit still stuns
+		local r2 = rig()
+		r2.player = { UserId = 8 }
+		r2.inv.add(r2.player, "water_gun")
+		r2.about = r.about
+		t.truthy(use(r2, "water_gun"))
+		t.truthy(table.find(kinds(r2), "stun") ~= nil)
+	end)
+
+	t.test("kite: flies in the park and on the beach only, and comes back down", function()
+		local r = rig()
+		r.inv.add(r.player, "kite")
+		t.eq(use(r, "kite"), false)
+		t.truthy(string.find(r.refused[#r.refused], "park", 1, true) ~= nil)
+		for _, z in { "park", "beach" } do
+			r.zone = z
+			t.truthy(use(r, "kite"))
+			local a = r.acts[#r.acts - 1]
+			t.eq(a.kind, "kite")
+			t.eq(a.zone, z)
+			t.eq(a.on, true)
+			t.truthy(use(r, "kite"))
+			t.eq(r.acts[#r.acts - 1].on, false, "reeled in")
+		end
+		t.eq(r.inv.count(r.player, "kite"), 1, "a kite lasts")
+		-- the zones themselves: the plan's two kite rectangles
+		local Expansion = require("../../generated/Expansion") :: any
+		t.eq(ItemService.kiteZoneAt(Expansion.zones, 0, 900), "park")
+		t.eq(ItemService.kiteZoneAt(Expansion.zones, 500, 1300), "beach")
+		t.eq(ItemService.kiteZoneAt(Expansion.zones, 957, 84), nil, "not in the store")
+	end)
+end

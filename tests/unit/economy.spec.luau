@@ -72,7 +72,7 @@ return function(t)
 		local again = ItemRules.use(gun, { userId = 1, targetKind = "rodent", targetInRange = true, stunUsed = true })
 		t.eq(#again, 1) -- once per player
 		t.eq(ItemRules.use(gun, { userId = 1, targetInRange = false })[1].hit, false)
-		t.eq(ItemRules.use(ItemRules.def("kite") :: any, { userId = 1 })[1].kind, "todo")
+		t.eq(ItemRules.use(ItemRules.def("kite") :: any, { userId = 1 })[1].kind, "refuse") -- (not in the park or on the beach)
 	end)
 
 	t.test("gigs: quality >= 0.9 tips, < 0.4 dings; mow quality from coverage and time", function()
