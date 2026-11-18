@@ -34,12 +34,16 @@ return function(t)
 		return false
 	end
 
-	-- people facing the pins: on the approaches of the given lanes (eye 5.2), or on the settees (eye 5.0 over the
-	-- floor, AlleyLayout.SETTEE_D) at the given X
+	-- people facing the pins: the computer bowlers on the approaches of the given lanes (RafterService.BOWLER_EYE),
+	-- or people on the settees (eye 5.0 over the floor, AlleyLayout.SETTEE_D) at the given X
 	local function bowlers(lanes: { number }): { RafterWatch.Observer }
 		local out = {}
+		local e = RafterService.BOWLER_EYE
 		for _, lane in lanes do
-			table.insert(out, { id = `bowler {lane}`, X = AlleyLayout.laneX(lane), Y = 5.2, D = -6, faceX = 0, faceD = 1 })
+			table.insert(
+				out,
+				{ id = `bowler {lane}`, X = AlleyLayout.laneX(lane), Y = e.y, D = e.d, faceX = 0, faceD = 1 }
+			)
 		end
 		return out
 	end
