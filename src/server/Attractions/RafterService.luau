@@ -5,7 +5,8 @@
 -- from the game's step (Boot/Game), it works at TICK (5 Hz):
 --   * the squirrels: every squirrel-family body, read from where its body is (Stealth/RafterSense: the rafter or
 --     the vent it is on, its speed, a landing); one on no rafter, not in the vent and not in the air of the roof
---     space is not watched;
+--     space is not watched. A watched one's body is also sampled every frame between the ticks (RafterSense.sample),
+--     so its speed is the fastest it went, not the tick's average: tapping W is walking;
 --   * the people: every person whose root is in the lane hall (AlleyRoof.inHall) looking the way their root faces,
 --     eye EYE_OVER_ROOT over it, and the computer bowlers (no bodies: an eye 5.2 up on their lane's approach, facing
 --     the pins), so a bowling game against the computer has eyes in it;
@@ -200,6 +201,7 @@ function RafterService.new(opts: Opts): any
 		glows = {} :: { [any]: number }, -- model -> server time its glow ends
 		shown = {} :: { [any]: { meter: number?, seen: boolean? } }, -- player -> what their attributes say
 		covers = {} :: { number },
+		sampled = {} :: { [string]: any }, -- body id -> model: the squirrels watched at the last tick
 		stats = { ticks = 0, spotted = 0, lines = 0, callouts = 0, alarms = 0 } :: Stats,
 	}, RafterService)
 	for _, box in RafterService.covers(place) do
@@ -221,6 +223,13 @@ end
 
 function RafterService.step(self: any, dt: number)
 	self.acc += dt
+	for id, model in self.sampled do
+		local root = rootOf(model)
+		if root then
+			local X, Y, D = local3(self, root.Position)
+			RafterSense.sample(self.sense, id, X, Y, D, dt)
+		end
+	end
 	if self.acc < RafterService.TICK then
 		return
 	end
@@ -237,6 +246,7 @@ function RafterService._tick(self: any, dt: number)
 	local byId: { [string]: Body } = {}
 	local heldHumans: { Held } = {}
 	local present: { [string]: boolean } = {}
+	table.clear(self.sampled)
 	for _, body in self.town.bodies() do
 		local root = rootOf(body.model)
 		if root == nil then
@@ -264,6 +274,7 @@ function RafterService._tick(self: any, dt: number)
 			local s = RafterSense.sense(self.sense, body.id, X, feet, D, dt)
 			if s then
 				table.insert(squirrels, s)
+				self.sampled[body.id] = body.model
 			end
 		end
 	end

@@ -5,7 +5,8 @@
 -- left and the landing is flagged once; out of the vent's boot onto the chord is not a landing; deep in the vent the
 -- squirrel is hidden and at the louvre it is not; off the rafters (down on a lane, out on the roof) the watch ends;
 -- and with the real RafterWatch a creep along the chord in front of a bowler is not spotted for 15 s while a walk is
--- within 1.5 s (the service's own tick, 5 Hz).
+-- within 1.5 s (the service's own tick, 5 Hz); sampled every frame, W tapped in bursts reads as the walk it is while a
+-- creep whose positions arrive late and in bunches still reads as a creep.
 -- Combat/Cover with Combat/PlayRules: a box stops a kick and a bite from one side of it to the other, and does
 -- nothing once removed.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -191,6 +192,81 @@ return function(t)
 		-- (a walk reads slowest where it turns at an end: the body went part of the tick back the way it came)
 		print(string.format("      50 ms of staleness: a creep read at most %.1f st/s", fastest))
 	end)
+
+	t.test(
+		"sampled every frame: tapping W reads as walking; a creep whose positions arrive in bunches still creeps",
+		function()
+			-- (review finding: on the tick's average, W tapped five times a second, 7.5 st/s, read as a creep every tick)
+			local FRAME = 1 / 60
+			local X0 = AlleyLayout.laneX(17)
+			-- 6 s along chord 9120 at 60 Hz. moving(frame) says whether the body moves this frame (at `speed`); the server
+			-- sees the newest of the positions the body sent 20 times a second, each `delay()` seconds late (0..50 ms, so
+			-- some arrive together). Returns the slowest and fastest speed a tick read and how many ticks read a creep.
+			local function run(
+				speed: number,
+				moving: (frame: number) -> boolean,
+				seed: number
+			): (number, number, number)
+				local a = seed * 7919
+				local function delay(): number
+					a = (a * 1103515245 + 12345) % 2147483648
+					return 0.05 * a / 2147483648
+				end
+				local st = RafterSense.new()
+				local X, sent, seen = X0, {}, X0
+				local lo, hi, creeps = math.huge, 0, 0
+				for frame = 1, 360 do
+					local now = frame * FRAME
+					if moving(frame) then
+						X -= speed * FRAME
+					end
+					if frame % 3 == 0 then
+						table.insert(sent, { now + delay(), X })
+					end
+					local newest = -1
+					for _, p in sent do
+						if p[1] <= now and p[1] > newest then
+							newest, seen = p[1], p[2]
+						end
+					end
+					RafterSense.sample(st, "sq", seen, AlleyRoof.CHORD.y1, 16.5, FRAME)
+					if frame % 12 == 0 then
+						local s = RafterSense.sense(st, "sq", seen, AlleyRoof.CHORD.y1, 16.5, TICK)
+						if s and frame > 24 then
+							lo, hi = math.min(lo, s.speed), math.max(hi, s.speed)
+							creeps += if s.focus then 1 else 0
+						end
+					end
+				end
+				return lo, hi, creeps
+			end
+			local function always(): boolean
+				return true
+			end
+			local function tapping(frame: number): boolean
+				return frame % 12 < 5
+			end
+			for seed = 1, 5 do
+				local _, crept, creepTicks = run(3, always, seed)
+				t.truthy(crept <= RafterWatch.C.stalkSpeed, `a creep (seed {seed}) read up to {crept} st/s`)
+				t.eq(creepTicks, 28, "every tick a creep")
+				local tapped, _, tapCreeps = run(18, tapping, seed)
+				t.eq(
+					tapCreeps,
+					0,
+					`tapping W (seed {seed}): read as a creep in {tapCreeps} ticks (slowest {tapped} st/s)`
+				)
+				local walked = run(18, always, seed)
+				t.truthy(walked > RafterWatch.C.stalkSpeed, `a walk (seed {seed}) read down to {walked} st/s`)
+			end
+			-- not sampled (a body the service has only just found): the tick's average, as before
+			local st = RafterSense.new()
+			RafterSense.sense(st, "sq", X0, AlleyRoof.CHORD.y1, 16.5, TICK)
+			local s = RafterSense.sense(st, "sq", X0 - 0.6, AlleyRoof.CHORD.y1, 16.5, TICK) :: RafterWatch.Squirrel
+			t.near(s.speed, 3, 1e-6)
+			t.truthy(s.focus)
+		end
+	)
 
 	t.test("Cover: a box stops a kick and a bite through its walls, and nothing once removed", function()
 		Cover.clear()

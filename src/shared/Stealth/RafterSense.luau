@@ -7,19 +7,25 @@
 --   locate(X, Y, D)  the rafter route (or the vent duct 9107) whose line passes within C.across studs of the feet
 --                    point level and C.updown vertically (routes draw the body on the line: kind fence, and the
 --                    vent with visualOffset 0), with its arc-length t; nil off every one.
+--   sample(state, id, X, Y, D, dt)  one frame for a body on the rafters (the service samples every frame between
+--                    its ticks): the fastest it went over any C.window seconds since the last tick is kept.
 --   sense(state, id, X, Y, D, dt) -> RafterWatch.Squirrel?  one tick for one body. nil when the body is neither on
 --                    one of those routes nor in the air of the roof space (the squirrel left the rafters: its watch
---                    ends). speed is the distance moved since its last tick over dt; creeping is any speed up to
---                    RafterWatch.C.stalkSpeed (8 st/s: the rail stalk is 3 and the rail walk 18, nothing on a beam
---                    moves between, so the Ctrl key the server cannot see is read from the speed even from positions
---                    that arrive a little late). In the air between beams (a leap)
+--                    ends). speed is that fastest stretch since the last tick when it was sampled, else the distance
+--                    moved since its last tick over dt; creeping is any speed up to RafterWatch.C.stalkSpeed (8 st/s:
+--                    the rail stalk is 3 and the rail walk 18, nothing on a beam moves between, so the Ctrl key the
+--                    server cannot see is read from the speed even from positions that arrive a little late). The
+--                    fastest stretch, not the tick's average: tapping W (the walk in bursts, 7.5 st/s on average)
+--                    is walking. C.window is long enough that positions arriving in bunches do not make a creep read
+--                    fast. In the air between beams (a leap)
 --                    the body still counts on the beam it left (a leap does not wipe the meter); the first tick on
 --                    a beam after the air is a landing (`landed`). In the vent, away from its mouths, it is hidden
 --                    (Routes/Enclosure.hidden).
 -- Everything in the alley's local frame (Shared/Attractions/AlleyLayout: X across, Y up from the floor, D down the
 -- lane), the FEET point (the caller takes the body's hip off its root).
 -- Interface: C; ROUTES (the ids it knows); locate(X, Y, D) -> (routeId?, t); inRoofSpace(X, Y, D) -> boolean;
---   new() -> State; sense(state, id, X, Y, D, dt) -> RafterWatch.Squirrel?; forget(state, id)
+--   new() -> State; sample(state, id, X, Y, D, dt); sense(state, id, X, Y, D, dt) -> RafterWatch.Squirrel?;
+--   forget(state, id)
 -- Pure.
 
 local AlleyRoof = require("../Attractions/AlleyRoof")
@@ -33,6 +39,7 @@ RafterSense.C = {
 	across = 0.9, -- level distance from the route's line that still counts as on it (the drawn body eases after it)
 	updown = 1.0, -- vertical
 	step = 0.5, -- studs between the samples the lines are cut into
+	window = 0.1, -- seconds: the shortest stretch a sampled speed is measured over (six frames at 60 Hz)
 	-- the roof space over the lanes (AlleyRoof.HALL_ROOF), from under the light rails to the deck
 	airY0 = 8.5,
 	airY1 = AlleyRoof.HALL_ROOF.deckY0,
@@ -132,14 +139,40 @@ function RafterSense.inRoofSpace(X: number, Y: number, D: number): boolean
 end
 
 type Track = { X: number, Y: number, D: number, routeId: number?, beam: number? }
-export type State = { tracks: { [string]: Track } }
+-- a body's frames since the last tick: its clock, the positions of the last C.window seconds (and the one before),
+-- and the fastest stretch of C.window
+type Frames = { clock: number, at: { { number } }, peak: number? }
+export type State = { tracks: { [string]: Track }, frames: { [string]: Frames } }
 
 function RafterSense.new(): State
-	return { tracks = {} }
+	return { tracks = {}, frames = {} }
 end
 
 function RafterSense.forget(state: State, id: string)
 	state.tracks[id] = nil
+	state.frames[id] = nil
+end
+
+-- sample(state, id, X, Y, D, dt): one frame of a body (any point that moves with it).
+function RafterSense.sample(state: State, id: string, X: number, Y: number, D: number, dt: number)
+	local f = state.frames[id]
+	if f == nil then
+		f = { clock = 0, at = {} }
+		state.frames[id] = f
+	end
+	f.clock += dt
+	local at = f.at
+	table.insert(at, { f.clock, X, Y, D })
+	-- keep the newest position at least C.window old, and everything after it
+	while #at >= 2 and at[2][1] <= f.clock - C.window do
+		table.remove(at, 1)
+	end
+	local o = at[1]
+	local span = f.clock - o[1]
+	if span >= C.window - 1e-9 then
+		local v = math.sqrt((X - o[2]) ^ 2 + (Y - o[3]) ^ 2 + (D - o[4]) ^ 2) / span
+		f.peak = math.max(f.peak or 0, v)
+	end
 end
 
 -- sense(state, id, X, Y, D, dt): this tick's RafterWatch squirrel for the body `id` (feet at X, Y, D), or nil.
@@ -149,12 +182,19 @@ function RafterSense.sense(state: State, id: string, X: number, Y: number, D: nu
 	local air = routeId == nil and RafterSense.inRoofSpace(X, Y, D)
 	-- the beam it counts on: the one it is on, or in the air the one it left
 	local beam = if routeId and AlleyRoof.isRafter(routeId) then routeId elseif air and prev then prev.beam else nil
+	local frames = state.frames[id]
+	local peak = frames and frames.peak
+	if frames then
+		frames.peak = nil
+	end
 	if routeId == nil and beam == nil then
-		state.tracks[id] = nil
+		RafterSense.forget(state, id)
 		return nil
 	end
 	local speed = 0
-	if prev and dt > 0 then
+	if prev and peak then
+		speed = peak
+	elseif prev and dt > 0 then
 		speed = math.sqrt((X - prev.X) ^ 2 + (Y - prev.Y) ^ 2 + (D - prev.D) ^ 2) / dt
 	end
 	local landed = prev ~= nil and prev.routeId == nil and routeId ~= nil and AlleyRoof.isRafter(routeId)

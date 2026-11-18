@@ -52,8 +52,9 @@ RafterWatch.C = {
 	walk = 0.8, -- 1.25 s
 	sprint = 2.4, -- 0.42 s
 	-- studs/s: the rail stalk is 3 (Motion.C.railStalk), the rail walk 18. The server reads speed from where the body
-	-- was at each tick, and a replicated position can be some tens of milliseconds stale, so a creep can read 25% fast
-	-- or more: the line sits half way, where no timing error moves a creep or a walk across it.
+	-- was (its fastest tenth of a second since the last tick: Stealth/RafterSense), and a replicated position can be
+	-- some tens of milliseconds stale, so a creep can read 25% fast or more: the line sits half way, where no timing
+	-- error moves a creep or a walk across it.
 	stalkSpeed = 8,
 	stillSpeed = 0.2,
 	sprintSpeed = 24, -- between the rail walk (18) and sprint (30.5)

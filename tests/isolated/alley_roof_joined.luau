@@ -10,7 +10,8 @@
 --   * there, under the Server/Attractions/RafterService the game starts (Boot/Game's own arguments: possession,
 --     runtime, fire, attractions with a bowling game against the computer), walking along the chord it is spotted by
 --     the computer bowler, glows, its player's meter reads "Spotted!" (Client/UI/SneakMeter.look) and the guard on
---     the platform is told the lane; creeping (Ctrl) along the same chord from the same place it is not;
+--     the platform is told the lane; creeping (Ctrl) along the same chord from the same place it is not; tapping W
+--     to get on at more than twice a creep's speed is walking, and it is seen;
 --   * a person walks from the foot of the stair in the yard up the three flights to the guard's spot on the platform
 --     (tests/lib/HumanWalk) and, from there, kicks the squirrel standing at the louvre (where the motor put it), but
 --     not the one inside the unit (where the motor took it), until the service stops;
@@ -40,6 +41,7 @@ local HIP = 0.6 -- the squirrel's root over its feet (its body's HipHeight attri
 local ROOT = 3 -- a person's root over their soles
 local BOWLER_LANE = 17
 local TURN = 6 -- studs either side of the bowler's lane the squirrel turns back at
+local TAP = { 12, 5 } -- tapping W five times a second: held 5 frames of every 12 (7.5 st/s on the rail)
 
 type State = SquirrelMotor.State
 
@@ -172,7 +174,7 @@ return function(t)
 	-- held squirrel, the guard held by another player on the platform, a bowling game against the computer on
 	-- BOWLER_LANE. Then `seconds` of the motor from `from` with W held along the chord (and Ctrl when `creep`), the
 	-- body following it and the service stepped every frame.
-	local function onTheChord(from: State, creep: boolean, seconds: number): { [string]: any }
+	local function onTheChord(from: State, creep: boolean | string, seconds: number): { [string]: any }
 		local out: { [string]: any } = {}
 		FakeEngine.with(function()
 			local squirrelP, guardP = FakeEngine.new("Player", "Squirrel"), FakeEngine.new("Player", "Guard")
@@ -232,7 +234,8 @@ return function(t)
 					west, pause = not west, 6
 				end
 				local input = SquirrelMotor.idleInput(yawToward(s, pt(R.FIRST_RAFTER, if west then 1 else 0)))
-				input.fw, input.focus = if pause > 0 then 0 else 1, creep
+				local key = if creep == "tap" then frame % TAP[1] < TAP[2] else true
+				input.fw, input.focus = if pause > 0 or not key then 0 else 1, creep == true
 				pause = math.max(0, pause - 1)
 				local ox, oz = s.x, s.z
 				SquirrelMotor.step(s, input, DT, motorWorld :: any)
@@ -298,11 +301,19 @@ return function(t)
 			t.truthy(creep.travelled > 15, `creeping it got on ({creep.travelled} st)`)
 			t.eq(creep.spotted, 0, `creeping: not spotted (meter {creep.meter})`)
 			t.truthy(type(creep.meter) == "number" and creep.meter < 1, "watched, the eye not full")
+			-- tapping W (no Ctrl) gets on at more than twice a creep: that is walking, and it is seen
+			local tap = onTheChord(onChord, "tap", 8)
+			t.truthy(tap.travelled > 1.8 * creep.travelled, `tapping got on {tap.travelled} st`)
+			t.eq(tap.spotted, 1, `tapping W: spotted (meter {tap.meter})`)
+			t.truthy(tap.spottedAt ~= nil and tap.spottedAt < 8, `tapping W: spotted after {tap.spottedAt} s`)
 			print(
 				`      {seq}: on chord 9120 at X {string.format("%.1f", cX)}; walking spotted by the lane {BOWLER_LANE} bowler after {string.format(
 					"%.1f",
 					walk.spottedAt
-				)} s; creeping {string.format("%.1f", creep.travelled)} st in 8 s, meter {creep.meter}`
+				)} s; creeping {string.format("%.1f", creep.travelled)} st in 8 s, meter {creep.meter}; tapping W {string.format(
+					"%.1f",
+					tap.travelled
+				)} st, spotted after {tap.spottedAt} s`
 			)
 
 			-- a person climbs the stair from the yard to the guard's spot
