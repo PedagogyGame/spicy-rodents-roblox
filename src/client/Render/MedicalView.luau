@@ -195,8 +195,14 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 					local drawn = head ~= nil and head:IsA("BasePart") and head.LocalTransparencyModifier < 0.5
 					if drawn then
 						local cf = (head :: BasePart).CFrame
-						eyes[1].CFrame = cf * CFrame.new(-e.x, e.y, e.z)
-						eyes[2].CFrame = cf * CFrame.new(e.x, e.y, e.z)
+						-- a rounded townsperson's head says where its painted eyes are (Assets/PeopleArt)
+						local at = (head :: BasePart):GetAttribute("EyeOffset")
+						local ex, ey, ez = e.x, e.y, e.z
+						if typeof(at) == "Vector3" then
+							ex, ey, ez = at.X, at.Y, at.Z
+						end
+						eyes[1].CFrame = cf * CFrame.new(-ex, ey, ez)
+						eyes[2].CFrame = cf * CFrame.new(ex, ey, ez)
 						eyes[1].Transparency, eyes[2].Transparency = 0, 0
 					else
 						eyes[1].Transparency, eyes[2].Transparency = 1, 1

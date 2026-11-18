@@ -351,6 +351,7 @@ return function(t: any)
 				t.eq(n, 1, `one {name}`)
 			end
 			t.eq(model.Head:FindFirstChild("face"), nil, "the stock face decal goes")
+			near3(t, model.Head:GetAttribute("EyeOffset"), vec(PeopleArt.EYE), 1e-4, "where the red eyes go")
 			t.eq(model:FindFirstChildOfClass("BodyColors"), nil)
 			t.eq(model.UpperTorso.OriginalSize.Value, model.UpperTorso.Size)
 			local sa = model.UpperTorso:FindFirstChildOfClass("SurfaceAppearance")

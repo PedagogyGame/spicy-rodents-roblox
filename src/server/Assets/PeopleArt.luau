@@ -44,6 +44,9 @@ PeopleArt.KEYS = table.freeze({ "bodySlim", "bodyBroad", "head", "headwear", "ou
 PeopleArt.STAFF_ROLES = table.freeze({ guard = "doorman", bartender = "bartender" } :: { [string]: string })
 PeopleArt.FIGURE_HEIGHT = 5.8 -- studs: a baked figure's Root at scale 1 (tools/bake/lounge_classic/Staff)
 PeopleArt.LOAD_TIMEOUT = 20 -- seconds install waits for the six loads
+-- where the painted eyes are on the head, from its centre (tools/blender/people paint.py EYE_X, EYE_Z and sculpt.py's
+-- eye sockets): the Head's EyeOffset attribute, where Client/Render/MedicalView puts an infected person's red eyes
+PeopleArt.EYE = table.freeze({ 0.225, 0.2, -0.62 })
 
 export type Lib = { Instance: any, Vector3: any, CFrame: any, Color3: any }
 export type Library = {
@@ -446,6 +449,7 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 	end
 	-- the soles 3 studs under the root's centre, as on the stock R15 (the possessed body's motor stands on this)
 	humanoid.HipHeight = PeopleAssets.ROOT.hipHeight
+	new.Head:SetAttribute("EyeOffset", v3(L, PeopleArt.EYE))
 	stamp(model, dress)
 	return true
 end
