@@ -136,7 +136,6 @@ local function lotPos(data: any, id: string, fallbackU: { number }): (number, nu
 	return st(fallbackU[1]), st(fallbackU[2])
 end
 
--- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant
 -- The bowling alley's placement (generated/Attractions), or nil when the data has none.
 local function alleyPlace(data: any): any?
 	local ok, mod = pcall(function()
@@ -150,6 +149,7 @@ local function alleyPlace(data: any): any?
 	return nil
 end
 
+-- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant
 local function shopSites(data: any): { { number } }
 	local out = {}
 	for _, lot in data:lots() do
