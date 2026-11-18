@@ -39,6 +39,7 @@
 --   spaceOf(routeId) -> string?      the space (= the routes' enclosure id, "hollow.H1") of a hollow route, else nil
 --   hollowOfRoute(routeId) -> Hollow?
 --   contains(x, y, z) -> string?     the space whose cavity holds the point (the server's refuge test)
+--   within(hollow, x, y, z) -> boolean   that hollow's cavity holds the point (its Combat/Cover shape)
 --   nearest(x, z, maxDist?) -> (Hollow?, number)   level distance to the trunk's foot (the log's middle)
 -- A Hollow (compiled): id, tier, variant, tree, trunk (route id; nil for the log), space, claimable, x, y, z (the
 --   trunk's foot; the log's middle on the ground), routes { id }, mouths { Mouth }, chambers { Chamber } (where nuts
@@ -147,6 +148,7 @@ export type Layout = {
 	spaceOf: (routeId: number) -> string?,
 	hollowOfRoute: (routeId: number) -> Hollow?,
 	contains: (x: number, y: number, z: number) -> string?,
+	within: (h: Hollow, x: number, y: number, z: number) -> boolean,
 	nearest: (x: number, z: number, maxDist: number?) -> (Hollow?, number),
 }
 
@@ -985,22 +987,29 @@ function HollowLayout.new(compiled: Compiled): Layout
 		local h = byRoute[routeId]
 		return if h then h.space else nil
 	end
+	function layout.within(h: Hollow, x: number, y: number, z: number): boolean
+		for _, c in h.cavities do
+			local a, bb = c.a, c.b
+			if a and bb then
+				-- the log: within its radius of the segment a -> b, between its open ends (a squirrel out past an end
+				-- is in the open)
+				local abx, aby, abz = bb[1] - a[1], bb[2] - a[2], bb[3] - a[3]
+				local l2 = abx * abx + aby * aby + abz * abz
+				local tt = ((x - a[1]) * abx + (y - a[2]) * aby + (z - a[3]) * abz) / l2
+				local px, py, pz = a[1] + abx * tt - x, a[2] + aby * tt - y, a[3] + abz * tt - z
+				if tt >= 0 and tt <= 1 and px * px + py * py + pz * pz <= (c.radius + 0.3) ^ 2 then
+					return true
+				end
+			elseif y >= c.bottom - 0.5 and y <= c.top and (x - c.x) ^ 2 + (z - c.z) ^ 2 <= (c.radius + 0.6) ^ 2 then
+				return true
+			end
+		end
+		return false
+	end
 	function layout.contains(x: number, y: number, z: number): string?
 		for _, h in compiled.hollows do
-			for _, c in h.cavities do
-				local a, bb = c.a, c.b
-				if a and bb then
-					-- the log: within its radius of the segment a -> b
-					local abx, aby, abz = bb[1] - a[1], bb[2] - a[2], bb[3] - a[3]
-					local l2 = abx * abx + aby * aby + abz * abz
-					local tt = math.clamp(((x - a[1]) * abx + (y - a[2]) * aby + (z - a[3]) * abz) / l2, 0, 1)
-					local px, py, pz = a[1] + abx * tt - x, a[2] + aby * tt - y, a[3] + abz * tt - z
-					if px * px + py * py + pz * pz <= (c.radius + 0.3) ^ 2 then
-						return h.space
-					end
-				elseif y >= c.bottom - 0.5 and y <= c.top and (x - c.x) ^ 2 + (z - c.z) ^ 2 <= (c.radius + 0.6) ^ 2 then
-					return h.space
-				end
+			if layout.within(h, x, y, z) then
+				return h.space
 			end
 		end
 		return nil

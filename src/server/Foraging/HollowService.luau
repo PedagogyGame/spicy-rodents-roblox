@@ -6,7 +6,8 @@
 --   * The shell: start() builds every hollow's inside as plain parts (World/HollowShell) under Workspace.HollowTrees.
 --   * Cover: a squirrel whose body is in a hollow's cavity (HollowLayout.contains) is out of AI/TownAI's threat grid
 --     (TownAI.addCover, as the storm drains), so people do not see or hear it, the fox does not hunt it, the crowd's
---     fears leave it out. A body let go inside is put at the hole, standing, facing out.
+--     fears leave it out. A body let go inside is put at the hole, standing, facing out. Each hollow's cavities are a
+--     Combat/Cover shape while the service runs, so a kick or a bite does not reach through the bark either way.
 --   * No bites from cover and the rodent's rest: mayBite is false inside; the Spicy Rodent heals inside at the hollow
 --     rate (Tunables rodent.regenHollow) while fed (World/SewerService.fed), as in a drain.
 --   * The nut meter and the claim (Shared/Foraging/HollowClaim; Tunables forage.*): each claimable hollow keeps a
@@ -32,6 +33,7 @@ local Import = require("../Import")
 local HollowClaim = Import.shared("Foraging/HollowClaim") :: typeof(require("../../shared/Foraging/HollowClaim"))
 local HollowLayout = Import.shared("World/HollowLayout") :: typeof(require("../../shared/World/HollowLayout"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
+local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 local TownAI = require("../AI/TownAI")
 local HollowShell = require("../World/HollowShell")
 
@@ -49,7 +51,7 @@ HollowService.C = {
 export type Opts = {
 	world: TownAI.World,
 	layout: Layout?, -- default HollowLayout.default()
-	cover: boolean?, -- default true
+	cover: boolean?, -- default true (the threat grid's cover and the Combat/Cover shapes)
 	-- the tree's attributes and pennant: called with (hollowId, attrs) whenever they change (start wires the models)
 	show: ((hollowId: string, attrs: { [string]: any }) -> ())?,
 	nameOf: ((id: number) -> string?)?, -- a squirrel's shown name (a player's), nil for the computer's
@@ -108,12 +110,30 @@ function HollowService.new(opts: Opts): Service
 		end
 	end
 	if opts.cover ~= false then
-		self.uncover = TownAI.addCover(opts.world, {
+		local uncoverAI = TownAI.addCover(opts.world, {
 			under = layout.contains,
 			surface = function(x: number, y: number, z: number): (number?, number?, number?, number?)
 				return self:surface(x, y, z)
 			end,
 		})
+		local keys = {}
+		for _, h in layout.hollows do
+			table.insert(
+				keys,
+				Cover.addShape({
+					name = `hollow {h.id}`,
+					test = function(x: number, y: number, z: number): boolean
+						return layout.within(h, x, y, z)
+					end,
+				})
+			)
+		end
+		self.uncover = function()
+			uncoverAI()
+			for _, key in keys do
+				Cover.remove(key)
+			end
+		end
 	end
 	return self
 end
@@ -310,6 +330,7 @@ end
 
 function HollowService.stop(self: Service)
 	self.uncover()
+	self.uncover = function() end
 	if self.root then
 		self.root:Destroy()
 		self.root = nil

@@ -9,6 +9,8 @@
 --   inside a hollow a squirrel is out of the threat grid and people around the tree never spot it; at the hole,
 --   in the open, they do; a body let go inside comes back at the hole facing out; no bites from inside; the fed
 --   rodent heals inside at the hollow rate; the log hides but is never claimed; the Spicy Rodent claims nothing
+--   a kick (PlayRules.kickTarget) or a bite (biteVictims) does not reach through the bark of any hollow or the log
+--   (each is a Combat/Cover shape while the service runs), at the hole in the open it does
 local Data = require("@shared/Data")
 local HollowClaim = require("@shared/Foraging/HollowClaim")
 local HollowLayout = require("@shared/World/HollowLayout")
@@ -16,6 +18,8 @@ local Tunables = require("@shared/Config/Tunables")
 local Common = require("@server/Actors/Brains/Common")
 local TownAI = require("@server/AI/TownAI")
 local HollowService = require("@server/Foraging/HollowService")
+local Cover = require("@shared/Combat/Cover")
+local PlayRules = require("@shared/Combat/PlayRules")
 
 local DT = 1 / 60
 
@@ -247,5 +251,82 @@ return function(t)
 		TownAI.stepFrame(world, DT)
 		t.eq(svc:heal(rodent.id, 50, 100, 10, true), 50)
 		svc:stop()
+	end)
+	t.test("no kick or bite through the bark: every chamber and the log, from the hole and the far side", function()
+		local before = #Cover.list()
+		local _, svc = rig()
+		t.eq(#Cover.list(), before + #layout.hollows, "a cover shape per hollow while the service runs")
+		local HUMAN, SQ = 2.6, 0.5 -- a person's root over the ground, a squirrel's over its line
+		local checked = 0
+		local function refused(who: PlayRules.Point, look: { x: number, z: number }, sq: PlayRules.Point, what: string)
+			t.eq(PlayRules.kickTarget(who, look, { sq }), nil, `kicked {what}`)
+			local bitten = PlayRules.biteVictims(sq, { who }, 100, {})
+			-- (the bite's reach is 3.5 studs: only a person that close is tested)
+			if (who.x - sq.x) ^ 2 + (who.z - sq.z) ^ 2 <= PlayRules.BITE_RANGE ^ 2 then
+				t.eq(#bitten, 0, `bitten {what}`)
+			end
+			checked += 1
+		end
+		for _, h in layout.hollows do
+			local hole: HollowLayout.Mouth? = nil
+			for _, m in h.mouths do
+				if m.opens == "ground" then
+					hole = m
+				end
+			end
+			assert(hole, h.id)
+			local ol = math.sqrt(hole.out[1] ^ 2 + hole.out[3] ^ 2)
+			local ox, oz = hole.out[1] / ol, hole.out[3] / ol
+			local spots: { { number } } = {}
+			for _, c in h.chambers do
+				table.insert(spots, { c.x, c.y + SQ, c.z })
+			end
+			if h.variant == "log" then
+				table.insert(spots, { h.x, h.y + 0.1 + SQ, h.z })
+			end
+			for _, at in spots do
+				local sq = { id = "sq", x = at[1], y = at[2], z = at[3] }
+				t.truthy(layout.within(h, sq.x, sq.y, sq.z), `{h.id}: the chamber is in its cavity`)
+				-- from the hole, one stud out of its mouth point, facing in
+				local px, pz = hole.x + ox, hole.z + oz
+				refused(
+					{ id = "me", x = px, y = hole.y + HUMAN, z = pz },
+					{ x = -ox, z = -oz },
+					sq,
+					`{h.id} from the hole`
+				)
+				-- against the bark, facing it, from four sides at the squirrel's height (the log: its two long sides)
+				local trunk = if h.trunk then data:routes():get(h.trunk) else nil
+				local r = if trunk then trunk.surfaceRadius + 1 else 3
+				local la, lb = h.cavities[1].a, h.cavities[1].b
+				local base = if la and lb then math.atan2(lb[1] - la[1], lb[3] - la[3]) + math.pi / 2 else 0
+				for k = 0, if trunk then 3 else 1 do
+					local ang = base + k * (if trunk then math.pi / 2 else math.pi)
+					local dx, dz = math.sin(ang), math.cos(ang)
+					local cx, cz = if trunk then h.x else sq.x, if trunk then h.z else sq.z
+					local who = { id = "me", x = cx + dx * r, y = math.max(h.y, sq.y - 1) + HUMAN, z = cz + dz * r }
+					refused(who, { x = -dx, z = -dz }, sq, `{h.id} from the side {k}`)
+				end
+				-- a body inside with it reaches it (the cover is the bark, nothing inside; under a stud is always in front)
+				-- (half a stud from it towards the middle of the cavity)
+				local mx, mz = h.x - sq.x, h.z - sq.z
+				local ml = math.max(1e-6, math.sqrt(mx * mx + mz * mz))
+				local s = math.min(0.5, ml)
+				local near = { id = "me", x = sq.x + mx / ml * s, y = sq.y, z = sq.z + mz / ml * s }
+				t.truthy(layout.within(h, near.x, near.y, near.z), `{h.id}: beside it, inside`)
+				t.truthy(PlayRules.kickTarget(near, { x = 1, z = 0 }, { sq }) ~= nil, `{h.id}: inside with it`)
+			end
+			-- a stud out of the hole, in the open, a kick lands (the log's mouth points are its open ends)
+			local sq = { id = "sq", x = hole.x + ox, y = hole.y + SQ, z = hole.z + oz }
+			local hit = PlayRules.kickTarget(
+				{ id = "me", x = hole.x + ox * 3, y = hole.y + HUMAN, z = hole.z + oz * 3 },
+				{ x = -ox, z = -oz },
+				{ sq }
+			)
+			t.eq(hit, "sq", `{h.id}: a squirrel at the hole in the open is kicked`)
+		end
+		t.truthy(checked >= 5 * #layout.hollows, `{checked} positions`)
+		svc:stop()
+		t.eq(#Cover.list(), before, "stopped: the shapes are gone")
 	end)
 end
