@@ -147,3 +147,8 @@ The radio's playlist (the same table): `Radio.Oldies1`, `Radio.Oldies2`, `Radio.
 **The radio, chosen 18 November** (the same licensed library, not yet heard in the game): `Radio.Oldies1` Sunny Side Up, Alan Hawkshaw, 70's Easy FM (1837066444); `Radio.Oldies2` Songbird, Brian Bennett, 70's Easy FM (1837066718); `Radio.SoftRock` Out Of Sight, David Hamer, AOR of the 70s (1847299654); `Radio.Country` Way Out West, Richard Warren Gilks (1840347412); `Radio.Jazz` Coffee Break, Manfred Paulsen (1845444990); `Radio.Weather` A Million Stars, a 15-second sting from Vintage Radio: 1970s (9042143607). One line each in `src/server/Items/ItemWorld.luau`.
 
 Twenty effects and six tracks; all from the library, so none counts against the month's uploads. The six tracks are filled; the twenty effects are still empty.
+
+### The yard dogs (`src/server/Wildlife/YardHazards.luau`, table `SOUNDS`; nothing uploaded)
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | a friendly medium dog's "woof woof", not a growl |
