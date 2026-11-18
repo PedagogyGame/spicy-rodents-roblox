@@ -364,23 +364,31 @@ function TrafficService.markTeleported(self: TrafficService, actorId: any)
 	self.prevActors[actorId] = nil
 end
 
--- The validator's walls and floors after a tick (header): the walls are the cars that stood still SETTLE seconds, the
--- floors every visible car with its trail.
-local function refreshSolids(self: TrafficService, dt: number)
-	local walls, floors = self._solids.walls, self._solids.floors
+-- fillSolids(solids, still, vehicles, prev, dt): the validator's walls and floors after a tick (header): the walls are
+-- the cars that stood still SETTLE seconds, the floors every visible car with its trail. `vehicles`: { id, kind, x, y
+-- (the base), z, yaw, speed, visible, teleported? }; `prev`: id -> the pose a tick before { x, z, visible }; `still`:
+-- id -> seconds stood still (carried from tick to tick). Pure (tests/unit/traffic_solid_rig runs it on its own cars).
+function TrafficService.fillSolids(
+	solids: Solids,
+	still: { [any]: number },
+	vehicles: { any },
+	prev: { [any]: any },
+	dt: number
+)
+	local walls, floors = solids.walls, solids.floors
 	Solid.clear(walls)
 	Solid.clear(floors)
-	for _, v in self.vehicles do
-		local p = self.prev[v.id]
-		local still = v.visible
+	for _, v in vehicles do
+		local p = prev[v.id]
+		local stood = v.visible
 			and not v.teleported
 			and v.speed < TrafficService.STILL_SPEED
 			and p ~= nil
 			and p.visible
 			and math.abs(v.x - p.x) < 0.01
 			and math.abs(v.z - p.z) < 0.01
-		local run = if still then (self.still[v.id] or 0) + dt else 0
-		self.still[v.id] = run
+		local run = if stood then (still[v.id] or 0) + dt else 0
+		still[v.id] = run
 		if v.visible then
 			if run >= TrafficService.SETTLE then
 				Solid.add(walls, Solid.hull(v.kind, v.x, v.y, v.z, v.yaw))
@@ -430,7 +438,7 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 			self._stuckRun[v.id] = 0
 		end
 	end
-	refreshSolids(self, dt)
+	TrafficService.fillSolids(self._solids, self.still, self.vehicles, self.prev, dt)
 	-- the fatal test
 	local actors: { SweptCollision.ActorPose } = {}
 	for _, s in (world.squirrels or {}) :: { Squirrel } do
