@@ -10,7 +10,9 @@
 --   newest, `unstick` the newest at least `minAway` studs from where the body is stuck.
 -- * Reset routing: `resetTarget(history, x, y, z)` picks river recovery, else unstick, else stay.
 -- * onVehicleMoved(car, riders): riders standing on a car's roof are pushed off to the nearer side.
--- Interface: riverFall(x, y, z) -> (x, y, z)?, newHistory(capacity?, interval?), record(h, t, x, y,
+-- * riverLanding(fromX, fromZ, x, y, z, reach): is (x, y, z) where riverFall puts a body that fell in within `reach`
+--   studs of (fromX, fromZ)? The server's MoveValidator takes the client's own recovery as honest with it.
+-- Interface: riverFall(x, y, z) -> (x, y, z)?, riverLanding(fromX, fromZ, x, y, z, reach) -> boolean, newHistory(capacity?, interval?), record(h, t, x, y,
 --   z, grounded), safePos(h), unstick(h, x, y, z, minAway?), resetTarget(h, x, y, z), isSane(x, y, z),
 --   onVehicleMoved(car, riders) -> { { id, x, z } }
 -- Pure; studs. No side effects on require.
@@ -48,6 +50,38 @@ function Recovery.riverFall(x: number, y: number, z: number): (number?, number?,
 	local side = if ux < Height.riverCenterU(uz) then -1 else 1
 	local cz = math.clamp(uz, -225, 425)
 	return (Height.riverCenterU(cz) + side * (R.halfWidth + 5)) * S, (R.bankY + 0.18) * S, cz * S
+end
+
+-- riverLanding(fromX, fromZ, x, y, z, reach): (x, y, z) is a quay spot riverFall gives (its height, its line on
+-- either side), the river's water lies within `reach` of (fromX, fromZ), and the spot's z is one riverFall could give
+-- for a fall within that reach.
+function Recovery.riverLanding(fromX: number, fromZ: number, x: number, y: number, z: number, reach: number): boolean
+	local eps = 0.05
+	if math.abs(y - (R.bankY + 0.18) * S) > eps then
+		return false
+	end
+	local uz = z / S
+	local onQuay = false
+	for _, side in { -1, 1 } do
+		if math.abs(x - (Height.riverCenterU(uz) + side * (R.halfWidth + 5)) * S) <= eps then
+			onQuay = true
+		end
+	end
+	if not onQuay then
+		return false
+	end
+	local lo, hi = math.clamp(fromZ - reach, -225 * S, 425 * S), math.clamp(fromZ + reach, -225 * S, 425 * S)
+	if z < lo - eps or z > hi + eps then
+		return false
+	end
+	-- the water within reach: the river runs north-south, so look across it at the start's z and the landing's
+	for _, wz in { fromZ, z } do
+		local cx = Height.riverCenterU(wz / S) * S
+		if math.abs(fromX - cx) <= R.halfWidth * S + reach then
+			return true
+		end
+	end
+	return false
 end
 
 function Recovery.newHistory(capacity: number?, interval: number?): History

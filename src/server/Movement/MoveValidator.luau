@@ -7,16 +7,30 @@
 -- serialized state; this module judges every transition with `SquirrelMotor.envelope` (adjacency and
 -- transfer gaps against Routes/Graph, per-kind speed caps with tolerance, gravity-consistent arcs,
 -- launch envelopes, wall crossings), keeps a leaky bucket of violation weight per actor, a 1 s pose
--- history for lag compensation (pose(id, t)), a pounce-rate check and a clock-rate check (the client's
+-- history for lag compensation (pose(id, t)), a pounce-rate check and a clock check (the client's
 -- clock may not run faster than real time beyond what jitter explains). A flagged actor gets the last
 -- accepted state as its correction. Pure and steppable: no engine calls, no threads; the service that
 -- owns it drains the remote queue into `accept` each frame (BUILD_PLAN §1.3 step 1) and calls `reset`
 -- on possession, teleports and respawns (§1.5 step 6). Budget (spike S3): <= 0.05 ms per squirrel per
 -- tick.
+-- Live (Boot/Game.movement, 2026-11-18), on top of S3:
+--   * The clock check reads the arrival offset (server time - client clock): an honest clock never runs ahead of
+--     real time, so the offset never falls further below its lowest of a few seconds ago (clockLag) than the
+--     link's latency can swing (clockSlack); a time hack makes it fall without end. (S3's rate over a 1 s window
+--     flagged a packet held up for half a second once it became the oldest of the window.)
+--   * A gap too long to judge (a stall) is still bounded: no further than the fastest the squirrel can go
+--     (fastest(): sprint, leap, the fastest rail with its pipe pace, the chili rush) in that time.
+--   * The client's own river recovery (Movement/Recovery.riverFall: a fall into the river puts the body on the
+--     nearer quay) is taken as honest: the quay spot is the new baseline.
+--   * Floors: a grounded body off the rails must have something under its feet (world.floorBelow, when the world
+--     has one: Movement/ValidatorWorld); "float", a third of a flag each, so a vehicle drawn a little behind the
+--     server's under a body on its roof is not a flag.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
+local Trampoline = Import.shared("Movement/Trampoline") :: typeof(require("../../shared/Movement/Trampoline"))
 
 local MoveValidator = {}
 MoveValidator.__index = MoveValidator
@@ -44,14 +58,15 @@ export type Options = {
 	flagThreshold: number?, -- bucket level that flags (default 1.0)
 	leakPerSecond: number?, -- bucket drain per server second (default 0.5)
 	historySeconds: number?, -- pose ring length (default 1.0)
-	clockWindow: number?, -- seconds of server time the clock-rate check looks back over (default 1.0)
-	clockRatio: number?, -- client/server clock rate that flags (default 1.3; 150 ms jitter reads < 1.2)
+	clockSeconds: number?, -- seconds of server time the clock check keeps offsets for (default 8)
+	clockLag: number?, -- the mark is the lowest offset at least this old (default 3: a 1.12 x hack still shows)
+	clockSlack: number?, -- how far (s) the offset may fall below that lowest (default 0.35: 80 to 300 ms and jitter)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of the chili boost (default: never)
 }
 
 type History = { clock: { number }, x: { number }, y: { number }, z: { number }, head: number, count: number }
 
-type ClockSample = { server: number, client: number }
+type ClockSample = { server: number, offset: number }
 
 type Actor = {
 	last: State,
@@ -60,7 +75,7 @@ type Actor = {
 	bucket: number,
 	flagged: boolean,
 	flaggedAt: number?,
-	clockWindow: { ClockSample },
+	offsets: { ClockSample }, -- the lowest offset in each CLOCK_BUCKET of server time (`server` is the bucket)
 	history: History,
 	packets: number,
 	violations: number,
@@ -75,14 +90,17 @@ export type MoveValidator = typeof(setmetatable(
 		flagThreshold: number,
 		leakPerSecond: number,
 		historySeconds: number,
-		clockWindow: number,
-		clockRatio: number,
+		clockSeconds: number,
+		clockLag: number,
+		clockSlack: number,
 		boostOf: (actorId: any) -> boolean,
 		_actors: { [any]: Actor },
+		_fastest: { [boolean]: number },
 	},
 	MoveValidator
 ))
 
+local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
 local HISTORY_SLOTS = 64 -- 1 s at 60 Hz, with room for bursts
 
 local function newHistory(): History
@@ -114,12 +132,14 @@ function MoveValidator.new(world: World, opts: Options?): MoveValidator
 		flagThreshold = o.flagThreshold or 1.0,
 		leakPerSecond = o.leakPerSecond or 0.5,
 		historySeconds = o.historySeconds or 1.0,
-		clockWindow = o.clockWindow or 1.0,
-		clockRatio = o.clockRatio or 1.3,
+		clockSeconds = o.clockSeconds or 8,
+		clockLag = o.clockLag or 3,
+		clockSlack = o.clockSlack or 0.35,
 		boostOf = o.boostOf or function(_actorId: any): boolean
 			return false
 		end,
 		_actors = {} :: { [any]: Actor },
+		_fastest = {},
 	}, MoveValidator)
 	return self
 end
@@ -140,7 +160,7 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 		bucket = 0,
 		flagged = false,
 		flaggedAt = nil,
-		clockWindow = { { server = now, client = state.clock } },
+		offsets = { { server = math.floor(now / CLOCK_BUCKET), offset = now - state.clock } },
 		history = newHistory(),
 		packets = 0,
 		violations = 0,
@@ -198,35 +218,74 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local dt = next.clock - prev.clock
 	local violations: { Violation } = {}
 
-	-- clock rate: over the last `clockWindow` seconds of server time the client clock may not advance
-	-- faster than real time beyond what jitter explains (a time hack doubles it)
-	local cw = actor.clockWindow
-	table.insert(cw, { server = serverTime, client = next.clock })
-	while #cw > 2 and serverTime - cw[1].server > self.clockWindow do
-		table.remove(cw, 1)
+	-- clock: the arrival offset may not fall more than the link's swing below its lowest of a while ago (a time hack
+	-- runs the client clock ahead, and the offset falls a second per second at double speed); the lowest is taken
+	-- over buckets at least clockLag old, so a hack's own packets never lower the mark they are held to
+	local offset = serverTime - next.clock
+	local buckets = actor.offsets
+	local key = math.floor(serverTime / CLOCK_BUCKET)
+	local newest = buckets[#buckets]
+	if newest and newest.server == key then
+		newest.offset = math.min(newest.offset, offset)
+	else
+		table.insert(buckets, { server = key, offset = offset })
 	end
-	local oldest = cw[1]
-	local serverSpan = serverTime - oldest.server
-	if serverSpan >= self.clockWindow * 0.8 then
-		local ratio = (next.clock - oldest.client) / serverSpan
-		if ratio > self.clockRatio then
-			table.insert(violations, {
-				code = "clock",
-				severity = 1,
-				detail = `client clock runs at {ratio} x real time over {serverSpan} s`,
-			})
+	while #buckets > 1 and (key - buckets[1].server) * CLOCK_BUCKET > self.clockSeconds do
+		table.remove(buckets, 1)
+	end
+	local mark = math.huge
+	for _, b in buckets do
+		if (key - b.server) * CLOCK_BUCKET >= self.clockLag then
+			mark = math.min(mark, b.offset)
 		end
+	end
+	if mark == math.huge then
+		mark = buckets[1].offset -- (newer than the lag: the first bucket since the baseline)
+	end
+	if offset < mark - self.clockSlack then
+		table.insert(violations, {
+			code = "clock",
+			severity = 0.5,
+			detail = `client clock {mark - offset} s ahead of its arrivals`,
+		})
 	end
 
 	local resync = false
-	if dt > SquirrelMotor.envelopeParams.maxDt then
-		-- too long to judge (a stall, a long loss burst): take it as the new baseline, log only
+	local boosted = self.boostOf(actorId)
+	local riverLanding = not next.routeId
+		and next.grounded
+		and Recovery.riverLanding(
+			prev.x,
+			prev.z,
+			next.x,
+			next.y,
+			next.z,
+			Motion.C.airGrab + self:fastest(actorId) * math.max(dt, 0) + 1
+		)
+	if riverLanding then
+		-- the client's own river recovery (Movement/Recovery.riverFall): the quay spot is the new baseline
 		resync = true
 		actor.resyncs += 1
+	elseif dt > SquirrelMotor.envelopeParams.maxDt then
+		-- too long to judge move by move (a stall, a long loss burst): the new baseline, but no further than the
+		-- fastest the squirrel goes in that time (a stall is no way to teleport)
+		resync = true
+		actor.resyncs += 1
+		local reach = self:fastest(actorId) * dt + Motion.C.airGrab + 2
+		local moved = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+		local rise = next.y - prev.y
+		local climb = self:fastest(actorId) * dt + SquirrelMotor.leapApex() + 2
+		if moved > reach or rise > climb then
+			table.insert(violations, {
+				code = "teleport",
+				severity = 1,
+				detail = `moved {moved} st (up {rise}) in a {dt} s gap (reach {reach}, climb {climb})`,
+			})
+		end
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
-		local found, launchUsed = SquirrelMotor.envelope(prev, next, dt, self.world, self.boostOf(actorId))
+		local found, launchUsed = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
 		for _, v in found do
 			table.insert(violations, v)
 		end
@@ -248,6 +307,15 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 				end
 			end
 			actor.lastLaunch = next.clock
+		end
+	end
+
+	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's)
+	local floorBelow = self.world.floorBelow
+	if floorBelow and next.grounded and not next.routeId and not riverLanding then
+		local bed = Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y)
+		if not bed and not floorBelow(next.x, next.y, next.z) then
+			table.insert(violations, { code = "float", severity = 0.34, detail = "grounded with nothing underfoot" })
 		end
 	end
 
@@ -302,6 +370,27 @@ function MoveValidator.pose(self: MoveValidator, actorId: any, clock: number): (
 		end
 	end
 	return nil, nil, nil
+end
+
+-- fastest(actorId): the most studs a second the squirrel can cover honestly (the sprint, a leap, the fastest rail of
+-- the world with its own pace, with the chili rush if the server says it is on), with the envelope's tolerance.
+function MoveValidator.fastest(self: MoveValidator, actorId: any): number
+	local boosted = self.boostOf(actorId)
+	local cached = self._fastest[boosted]
+	if cached then
+		return cached
+	end
+	local rail = SquirrelMotor.railCap(false, boosted)
+	local reg = self.world.registry
+	if reg then
+		for _, r in reg:all() do
+			rail = math.max(rail, SquirrelMotor.routeCap(r, boosted))
+		end
+	end
+	local v = math.max(SquirrelMotor.groundCap(boosted), SquirrelMotor.launchCapXZ(boosted), rail)
+		* SquirrelMotor.envelopeParams.speedTol
+	self._fastest[boosted] = v
+	return v
 end
 
 -- clearFlag(actorId): the service applied the correction; start a fresh bucket.
