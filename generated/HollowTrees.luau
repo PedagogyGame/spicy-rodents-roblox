@@ -3830,6 +3830,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "The hideout: nobody can see you in here (S goes back to the shaft)",
 			length = 2.8013,
 			origin = "hollow",
 			points = {
@@ -3867,6 +3868,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.9079,
 			origin = "hollow",
 			points = {
@@ -3904,6 +3906,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.8928,
 			origin = "hollow",
 			points = {
@@ -3941,6 +3944,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 10.8958,
 			origin = "hollow",
 			points = {
@@ -3978,6 +3982,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 10.2677,
 			origin = "hollow",
 			points = {
@@ -4015,6 +4020,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.9011,
 			origin = "hollow",
 			points = {
@@ -4052,6 +4058,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.9875,
 			origin = "hollow",
 			points = {
@@ -4089,6 +4096,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.8952,
 			origin = "hollow",
 			points = {
@@ -4126,6 +4134,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.9319,
 			origin = "hollow",
 			points = {
@@ -4163,6 +4172,7 @@ return {
 				isPole = false,
 				treeTravel = false,
 			},
+			hint = "Hidden in the hollow: nobody can see you in here (S runs back out)",
 			length = 5.8713,
 			origin = "hollow",
 			points = {

@@ -75,6 +75,12 @@ HollowLayout.C = {
 }
 local C = HollowLayout.C
 
+-- told the player on stopping at the far end of a dead end inside (the route record's `hint`: Client/Controllers/Squirrel)
+HollowLayout.HINTS = {
+	chamber = "Hidden in the hollow: nobody can see you in here (S runs back out)",
+	hideout = "The hideout: nobody can see you in here (S goes back to the shaft)",
+}
+
 export type Vec3 = { x: number, y: number, z: number }
 export type Piece = {
 	role: string,
@@ -527,6 +533,7 @@ VARIANTS.knothole = function(b: Build, design: any, inside: any)
 			cavity = cavityRecord(cav),
 		})
 	)
+	b.routes[#b.routes].hint = HollowLayout.HINTS.chamber
 	chamberAt(hl.chambers, design.chambers[1], id, 1, pts[#pts])
 	tiers(b, floorH - 0.05, floorH + C.room, { { floorH, bearing } })
 	caps(b, floorH, rc0, floorH + C.room, rc0)
@@ -629,6 +636,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 				cavity = cavityRecord(shaftCav),
 			})
 		)
+		b.routes[#b.routes].hint = HollowLayout.HINTS.hideout
 		slab(hl.parts, "shelf", tr.toWorld(hideB, 0.6, hideH + 0.1), tr.toWorld(hideB, rcHide, hideH + 0.2), 1.9, 0.3)
 		-- the middle store: on the shaft half way up to the hideout (a knothole is a mouth: never a hiding place)
 		local midH = (h0 + hideH) / 2
