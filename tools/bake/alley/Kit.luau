@@ -261,7 +261,10 @@ function Kit.rod(
 		o.collide = false
 	end
 	local p = self:at(parent, name, 0, 0, 0, len, diameter, diameter, color, material, o)
-	p.CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.pi / 2, 0)
+	-- an upright rod needs another up vector: lookAt along the default up (Y) gives NaN
+	local dir = (b - a).Unit
+	local up = if math.abs(dir.Y) > 0.999 then self.roblox.Vector3.new(1, 0, 0) else self.roblox.Vector3.new(0, 1, 0)
+	p.CFrame = CFrame.lookAt((a + b) / 2, b, up) * CFrame.Angles(0, math.pi / 2, 0)
 	return p
 end
 

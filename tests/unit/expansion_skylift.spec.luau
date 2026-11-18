@@ -33,6 +33,20 @@ return function(t)
 		return out
 	end
 
+	t.test("every part has a finite place and turn (an upright rod once came out NaN)", function()
+		local bad = {}
+		for _, p in parts(folder) do
+			local c = { p.CFrame:GetComponents() }
+			for _, v in c do
+				if v ~= v or math.abs(v) == math.huge then
+					table.insert(bad, p:GetFullName())
+					break
+				end
+			end
+		end
+		t.eq(#bad, 0, table.concat(bad, ", ", 1, math.min(#bad, 5)))
+	end)
+
 	t.test("the models are there with their attributes, streaming modes and budgets", function()
 		local base = folder:FindFirstChild("f4_lift_base")
 		t.truthy(base ~= nil and base:IsA("Model"))
