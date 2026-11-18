@@ -19,8 +19,9 @@
 --   The end: "whack_over" { g, score, hits, misses, board, place, best, newBest } to everyone following; the board
 --   of best rounds (WhackAMole/HighScores, for as long as the server runs) is written on the cabinet (attribute
 --   "Best") for every client, and each player's best is ctx.town.best's ("whack_a_mole").
---   A player who walks away (the station's reach), leaves or is taken off idle ends the round where it stands; the
---   people near are told the cabinet is free ("whack_idle", one by one).
+--   A player who walks away (the station's reach), leaves or is taken off idle ends the round where it stands. When
+--   the cabinet is free again, the people near it and everyone who was sent this round (a watcher who has since
+--   walked out of the ring included) are told so ("whack_idle", one by one), so no screen keeps a round that ended.
 -- Nothing on the cabinet is moved here: every client near it draws the moles, the mallet and the windows from the
 -- stream (Client/Minigames/WhackAMole/Cabinet). With no cabinet on the site (another game's rig, a bare test) hw is
 -- nil and nobody is looked for: only the seated player is sent anything. Where the cabinet stands, the owner's
@@ -32,6 +33,8 @@
 local Import = require("../../Import")
 local HighScores =
 	Import.shared("Minigames/WhackAMole/HighScores") :: typeof(require("../../../shared/Minigames/WhackAMole/HighScores"))
+local Layout =
+	Import.shared("Minigames/WhackAMole/Layout") :: typeof(require("../../../shared/Minigames/WhackAMole/Layout"))
 local Round =
 	Import.shared("Minigames/WhackAMole/Round") :: typeof(require("../../../shared/Minigames/WhackAMole/Round"))
 local Rules =
@@ -42,7 +45,7 @@ local ServerGame = require("../ServerGame")
 local Game = {}
 Game.game = Rules.GAME
 Game.MODEL = "WhackAMole" -- the cabinet's model under the games room
-Game.WATCH = 40 -- studs from the cabinet within which a bystander is sent the round
+Game.WATCH = Layout.WATCH -- studs from the cabinet within which a bystander is sent the round
 Game.LOOK = 0.5 -- seconds between two looks for who stands near
 Game.BEST = "whack_a_mole" -- the personal best's name (ctx.town.best)
 
@@ -82,6 +85,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		start = nil :: number?, -- the shared-clock time of this round's GO
 		sent = 0, -- moles streamed so far this round
 		watchers = {}, -- people near, not seated: key -> true
+		told = {}, -- everyone sent anything of this round: key -> true (each is told when the cabinet is free)
 		lookAt = -math.huge,
 		over = nil, -- the last round's end, for a watcher who walks up during the end card
 		mine = nil, -- the last round's place on the board and personal best, for the state message
@@ -126,9 +130,14 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		return out
 	end
 
+	local function tell(key: any, payload: { [string]: any })
+		self.told[key] = true
+		ctx.send(key, payload)
+	end
+
 	local function toAll(payload: { [string]: any })
 		for _, key in followers() do
-			ctx.send(key, table.clone(payload))
+			tell(key, table.clone(payload))
 		end
 	end
 
@@ -187,10 +196,10 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 					if not self.watchers[person.key] and (phase == "playing" or phase == "done") then
 						local snap = snapshot()
 						if snap then
-							ctx.send(person.key, snap)
+							tell(person.key, snap)
 						end
 						if phase == "done" and self.over then
-							ctx.send(person.key, table.clone(self.over))
+							tell(person.key, table.clone(self.over))
 						end
 					end
 				end
@@ -305,20 +314,22 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 					msg.best = best
 					msg.newBest = newBest
 				end
-				ctx.send(k, msg)
+				tell(k, msg)
 			end
 		elseif e.kind == "reset" then
 			self.start = nil
-			-- the people near hear the cabinet is free (one by one: nobody is seated now)
+			-- the people near, and everyone this round was sent to who is still in town, hear the cabinet is free
+			-- (one by one: nobody is seated now)
 			if self.hw then
 				for _, person in ctx.town.people() do
 					local d = Vector3.new(person.x, person.y, person.z) - ctx.anchor
-					if d.Magnitude <= Game.WATCH and not isComputer(person.key) then
+					if (d.Magnitude <= Game.WATCH or self.told[person.key]) and not isComputer(person.key) then
 						ctx.send(person.key, { kind = "whack_idle", board = HighScores.lines(self.board) })
 					end
 				end
 			end
 			table.clear(self.watchers)
+			table.clear(self.told)
 		end
 	end
 

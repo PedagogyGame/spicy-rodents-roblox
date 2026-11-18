@@ -13,6 +13,12 @@
 -- is only moved when its height changed (an idle cabinet costs a clock read and five compares a frame), and the
 -- render step is bound only while a cabinet is awake: a round on, a swing or a drop still moving, and this
 -- player's body within SLEEP studs.
+-- A ROUND ENDS ON THIS SCREEN'S CLOCK TOO: past its 45 seconds (and Round.GRACE and LATE) it is over here whether
+-- or not the end was heard (a watcher who walked out of the server's ring, Layout.WATCH, is sent nothing more),
+-- so nothing keeps the render step bound. A cabinet put to sleep because this player walked off past SLEEP
+-- forgets its round and is drawn at rest (moles down, the mallet home, FREE PLAY): walking back into the ring,
+-- the server sends the round as it stands again; and when the cabinet is free the server tells everyone it sent
+-- the round to, so a screen out of the ring at the end shows FREE PLAY too.
 -- The player's own strike is drawn at once (swing(): the mallet goes down, and a mole that could be hit on this
 -- screen drops as it is struck); the server's word follows and wins (a mole it says was missed comes back up).
 -- The windows: SCORE (three digits), TIME (two digits, the round's seconds left; the count-in shows 45), and the
@@ -26,7 +32,7 @@
 --   (the player's own cabinet stays awake wherever the body is); roundTime(cab) -> number?; heightOf(cab, hole,
 --   t?) -> 0..1; hittable(cab, hole, t?) -> bool; malletPose(cab, now) -> (u, v, w, rx, ry, rz) (the pivot in the
 --   cabinet frame and its turn); cframe(cab, u, v, w) -> CFrame; windows(cab) -> { score, time, status } (the
---   words drawn); step(dt) (the render step; specs call it); reset() (specs); SOUNDS; SLEEP; BIND; MOVE; DOWN; UP;
+--   words drawn); step(dt) (the render step; specs call it); reset() (specs); SOUNDS; SLEEP; LATE; BIND; MOVE; DOWN; UP;
 --   HOVER; HOME
 
 local Import = require("../../Import")
@@ -42,7 +48,8 @@ local Cabinet = {}
 
 Cabinet.SITE = "bowling_alley"
 Cabinet.BIND = "SpicyWhackAMole"
-Cabinet.SLEEP = 60 -- studs: a cabinet nobody here plays is not drawn from further than this
+Cabinet.SLEEP = Layout.WATCH + 10 -- studs: a cabinet nobody here plays is not drawn from further than this
+Cabinet.LATE = 1 -- seconds after a round's end (and Round.GRACE) by which it is over on this screen anyway
 -- the mallet's swing (seconds): over to the hole, down, back up, held over it, then home to the bracket
 Cabinet.MOVE = 0.07
 Cabinet.DOWN = 0.06
@@ -274,6 +281,7 @@ function Cabinet.round(cab: Cab, msg: { [string]: any })
 	cab.start = msg.start
 	cab.score = tonumber(msg.score) or 0
 	cab.done = msg.done == true
+	cab.free = false
 	local t = Cabinet.roundTime(cab)
 	if t and t > 0.5 then
 		-- (walked up mid-round: the count-in and GO are not heard now)
@@ -343,13 +351,21 @@ function Cabinet.over(cab: Cab, msg: { [string]: any })
 	wake(cab)
 end
 
-function Cabinet.idle(cab: Cab, _msg: { [string]: any }?)
+-- the cabinet at rest: no round, the moles down, the mallet home, FREE PLAY
+local function forget(cab: Cab)
 	cab.free = true
 	cab.done = false
 	cab.start = nil
 	table.clear(cab.rises)
 	cab.byHole = blankHoles()
+	table.clear(cab.predicted)
 	cab.score = 0
+	cab.mallet = nil
+	cab.sayUntil = -math.huge
+end
+
+function Cabinet.idle(cab: Cab, _msg: { [string]: any }?)
+	forget(cab)
 	wake(cab)
 end
 
@@ -547,7 +563,7 @@ local function draw(cab: Cab): boolean
 	if t then
 		cues(cab, t)
 	end
-	local moving = t ~= nil and not cab.free and not cab.done
+	local moving = t ~= nil and not cab.free and not cab.done and t < Round.SECONDS + Round.GRACE + Cabinet.LATE
 	if p then
 		local pop = Layout.MOLE.pop
 		for hole, mole in p.moles do
@@ -610,12 +626,19 @@ function Cabinet.step(_dt: number)
 			local far = false
 			local at = me
 			if at and cab.place then
-				local x, y, z = AlleyLayout.toWorld(cab.place, Layout.toSite(0, Layout.DECK.top, 0))
+				-- (from the prompt, as the server measures its ring)
+				local P = Layout.PROMPT
+				local x, y, z = AlleyLayout.toWorld(cab.place, Layout.toSite(P.u, P.v, P.w))
 				far = (at - Vector3.new(x, y, z)).Magnitude > Cabinet.SLEEP
 			end
 			if far or not moving then
 				cab.far += _dt
 				if cab.far > 1 then
+					if far then
+						-- (out of sight of the round: drawn at rest, and told the round again on the way back)
+						forget(cab)
+						draw(cab)
+					end
 					cab.awake = false
 					continue
 				end

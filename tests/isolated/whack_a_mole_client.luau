@@ -397,4 +397,87 @@ return function(t: any)
 			t.truthy(tonumber(window(w, N.time)) ~= nil and tonumber(window(w, N.time)) < 35)
 		end, opts({ stand = { site = SITE, x = 60, y = 3, d = 0 } }))
 	end)
+
+	-- (the rig's player as the game's Player.Character, which the cabinet measures how far off it is from)
+	local function seeBody(w: Rig.World)
+		rawset((game :: any):GetService("Players").LocalPlayer, "Character", w.body)
+	end
+
+	-- (a watcher who walks out of the ring the server sends to: Layout.WATCH)
+	local function stepOut(w: Rig.World, studs: number)
+		local X, _, D = Layout.toSite(0, 0, Layout.PROMPT.w - studs)
+		Rig.walkTo(w, SITE, X, 3, D)
+	end
+
+	t.test("a watcher who walks out mid-round is not left with a stuck cabinet or a render step", function()
+		Rig.play(function(w: Rig.World)
+			seeBody(w)
+			local cy = Rig.stub("Cy")
+			t.truthy(w.svc:join(cy, ID))
+			local X, _, D = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X, 3, D)
+			Rig.run(w, Round.READY + 8)
+			t.truthy(Rig.count(w.got, "whack_rise") > 0, "watching")
+			-- out past the ring but still in sight of the cabinet, and the player leaves there
+			stepOut(w, Layout.WATCH + 8)
+			Rig.run(w, 1)
+			t.truthy(Rig.input(w, cy, ID, "leave"))
+			Rig.run(w, 2)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(window(w, N.status), "FREE PLAY  -  PRESS E", "told the cabinet is free")
+			t.eq(window(w, N.time), "45")
+			Rig.run(w, 2)
+			t.eq(FakeEngine.bound(), 0, "no render step once the cabinet has settled")
+			-- a round played while this watcher stands out of the ring ends on the cabinet's own clock
+			t.truthy(w.svc:join(cy, ID))
+			Rig.run(w, 0.5)
+			local X2, _, D2 = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X2, 3, D2)
+			Rig.run(w, Round.READY + 2)
+			stepOut(w, Layout.WATCH + 8)
+			for _ = 1, 8 do
+				Rig.run(w, 5)
+				tbl(w):debug("miss") -- (the player plays on: not taken off idle)
+			end
+			t.eq(w.svc:sessionOf(ID).phase, "playing")
+			Rig.run(w, 6)
+			t.eq(w.svc:sessionOf(ID).phase, "done")
+			t.eq(window(w, N.status), "TIME!", "the round is over on this screen too")
+			t.eq(window(w, N.time), "00")
+			t.eq(FakeEngine.bound(), 0, "and the render step is let go")
+			Rig.run(w, 12)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(window(w, N.status), "FREE PLAY  -  PRESS E", "then told the cabinet is free")
+		end, opts())
+	end)
+
+	t.test("a watcher who walks far off mid-round sees the moles down when back", function()
+		Rig.play(function(w: Rig.World)
+			seeBody(w)
+			local cy = Rig.stub("Cy")
+			t.truthy(w.svc:join(cy, ID))
+			local X, _, D = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X, 3, D)
+			local y0 = {}
+			for hole = 1, 5 do
+				y0[hole] = moleY(w, hole)
+			end
+			local cab = Cabinet.get(ID)
+			-- leave the moment a mole is right up
+			t.truthy(Rig.untilTrue(w, Round.READY + 10, function(): boolean
+				for hole = 1, 5 do
+					if Cabinet.heightOf(cab, hole) >= 1 then
+						return true
+					end
+				end
+				return false
+			end))
+			stepOut(w, Cabinet.SLEEP + 20)
+			Rig.run(w, 3)
+			t.eq(FakeEngine.bound(), 0, "asleep")
+			for hole = 1, 5 do
+				t.near(moleY(w, hole), y0[hole], 1e-6, `mole {hole} is down`)
+			end
+		end, opts())
+	end)
 end

@@ -261,6 +261,9 @@ end
 -- Where the player stands (a little in front of the deck, in the middle), and the prompt.
 Layout.STAND = { u = 0, w = m(-0.565) - 2.4 }
 Layout.PROMPT = { u = 0, v = 3, w = m(-0.565) - 1 }
+-- Studs from the prompt within which a bystander is sent the round as it goes (the server's ring); a screen
+-- further off draws the cabinet at rest instead of a round it is no longer told about.
+Layout.WATCH = 40
 
 -- The floor kept for the game: the cabinet with its mallet bracket on the player's right, the player in front,
 -- and room either side to stand and watch. In the site frame.
