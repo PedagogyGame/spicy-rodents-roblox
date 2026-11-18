@@ -13,9 +13,9 @@
 --   flashlight  on and off; a strong beam at night, hardly anything by day
 --   umbrella    opens and closes over its holder
 --   peanuts, bird seed   a pile put down: nearby squirrels come to it (bird seed also brings birds); used up
---   dog treats  a nearby dog is calmed (it stops barking at squirrels for a while); three to a box. NOT ON SALE
---               (onSale = false) until the town has dogs: Wildlife/YardHazards is still a stub, so a treat could
---               never do anything; the store neither shelves nor sells it (Shared/Items/Basket, the bake)
+--   dog treats  the nearest yard dog within reach is calmed (it sits, wags and leaves squirrels alone for a while:
+--               Wildlife/YardHazards); three to a box. A def with onSale = false would wait off the shelf (the
+--               treats did until the town had dogs)
 --   newspaper   the first use reads it (a headline); the next throws it
 --   camera      a screenshot on its owner's screen (24 shots to a disposable camera)
 --   duct tape   a strip of tape on whatever is in front (ten strips to a roll)
@@ -58,7 +58,7 @@ ItemRules.CATALOG = {
 	{ id = "bubbles", price = 3, effect = "vfx", secs = 4 }, { id = "chalk", price = 2, effect = "write", letters = 20 },
 	{ id = "flashlight", price = 6, effect = "spotlight", nightOnly = true }, { id = "umbrella", price = 5, effect = "cosmetic" },
 	{ id = "peanuts", price = 4, effect = "bait", radius = 40, secs = 45 }, { id = "bird_seed", price = 40, effect = "bait", radius = 60, secs = 90, birds = 3 },
-	{ id = "dog_treats", price = 4, effect = "calm_dog", radius = 12, secs = 120, onSale = false }, { id = "newspaper", price = 2, effect = "read_and_throw", speed = 30, lift = 0.4 },
+	{ id = "dog_treats", price = 4, effect = "calm_dog", radius = 12, secs = 120 }, { id = "newspaper", price = 2, effect = "read_and_throw", speed = 30, lift = 0.4 },
 	{ id = "camera", price = 6, effect = "screenshot" }, { id = "duct_tape", price = 4, effect = "patch_bandage", reach = 6 },
 	{ id = "whoopee_cushion", price = 15, effect = "seat_trap" }, { id = "harmonica", price = 5, effect = "sound" },
 	{ id = "air_horn", price = 5, effect = "startle", radius = 12 }, { id = "soda", price = 4, effect = "stamina", scale = 1.15 },

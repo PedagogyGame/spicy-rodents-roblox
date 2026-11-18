@@ -53,6 +53,7 @@
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
 --   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
+--   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start),
 --   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
@@ -92,6 +93,7 @@ local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
 local CornerStore = require("../Items/CornerStore")
+local YardHazards = require("../Wildlife/YardHazards")
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
@@ -1402,6 +1404,22 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
 	end
 
+	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
+	local dogs: any = nil
+	local okD, errD = pcall(function()
+		dogs = YardHazards.start({
+			world = world,
+			runtime = rt,
+			possession = possession,
+			fire = fire,
+			groundAt = Height.at,
+			heartbeat = o.heartbeat ~= false,
+		})
+	end)
+	if not okD then
+		warn(`[SpicyRodents] the yard dogs failed to start: {errD}`)
+	end
+
 	-- 6c. Pepper's Corner Store (Workspace.Expansion.F1): pick up off the shelves, pay once at the till through the
 	-- town's wallet, nothing out unpaid (Items/CornerStore)
 	local cornerStore: any = nil
@@ -1411,6 +1429,7 @@ function Game.start(opts: Opts?): any
 			expansion = workspace:FindFirstChild("Expansion"),
 			runtime = rt,
 			zones = if expansionData then expansionData.zones else nil,
+			dogs = dogs,
 			wallet = wallet,
 			possession = possession,
 			fire = fire,
@@ -1515,6 +1534,9 @@ function Game.start(opts: Opts?): any
 			if cornerStore and o.heartbeat == false then
 				cornerStore:step()
 			end
+			if dogs and o.heartbeat == false then
+				dogs.step(dt)
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
@@ -1526,6 +1548,7 @@ function Game.start(opts: Opts?): any
 		rafters = rafters,
 		lounge = lounge,
 		cornerStore = cornerStore,
+		dogs = dogs,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1551,6 +1574,9 @@ function Game.start(opts: Opts?): any
 			end
 			if cornerStore and cornerStore.stop then
 				cornerStore.stop()
+			end
+			if dogs then
+				dogs.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

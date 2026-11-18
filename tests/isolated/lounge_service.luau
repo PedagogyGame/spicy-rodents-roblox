@@ -97,7 +97,7 @@ return function(t)
 	)
 
 	t.test(
-		"prompts: the door both ways, the podium's pass and the four drinks with prices, E with Door = true",
+		"prompts: the door both ways, the podium's pass and the four drinks with prices, E (a seat R) with Door = true",
 		function()
 			FakeEngine.with(function()
 				local log = {}
@@ -109,7 +109,9 @@ return function(t)
 					if d.ClassName == "ProximityPrompt" then
 						kinds[d:GetAttribute("Lounge")] = d
 						t.eq(d:GetAttribute("Door"), true)
-						t.eq(d.KeyboardKeyCode, roblox.Enum.KeyCode.E)
+						-- (the seats' "Sit" has its own key: tests/isolated/lounge_seats)
+						local key = if d:GetAttribute("Lounge") == "sit" then LoungeService.SEAT_KEY else "E"
+						t.eq(d.KeyboardKeyCode, (roblox.Enum.KeyCode :: any)[key])
 						t.eq(d.HoldDuration, 0)
 					end
 				end
