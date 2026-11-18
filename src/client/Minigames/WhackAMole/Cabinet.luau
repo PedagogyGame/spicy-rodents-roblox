@@ -86,7 +86,7 @@ export type Cab = {
 	mallet: { hole: number, at: number, from: any }?, -- the swing being drawn (at: shared clock)
 	malletShown: string, -- (what was last drawn, to move it only when it changes)
 	shownH: { number },
-	shown: { [string]: string },
+	shown: { [string]: string? },
 	parts: any?,
 	findAt: number,
 	awake: boolean,
