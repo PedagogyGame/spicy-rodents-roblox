@@ -480,7 +480,8 @@ end
 
 -- start(game): the service on Boot/Game's parts. game = { possession, runtime (Actors/ActorsRuntime), fire
 -- (player, payload), attractions (Server/Attractions: the alley's place and its MinigameService)?, canSee?, now?
--- (specs only: a fake engine has neither raycasts nor a server clock) }. Boot/Game makes it once the alley is open
+-- (specs only: a fake engine has neither raycasts nor a server clock), rand? (specs: the lines' dice; default
+-- math.random) }. Boot/Game makes it once the alley is open
 -- and steps it from its step:
 --   local rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire,
 --       attractions = attractions })      -- and in step(dt): rafters:step(dt)
@@ -581,6 +582,7 @@ function RafterService.start(game: { [string]: any }): any
 			return workspace:GetServerTimeNow()
 		end,
 		canSee = canSee,
+		rand = game.rand,
 	})
 end
 

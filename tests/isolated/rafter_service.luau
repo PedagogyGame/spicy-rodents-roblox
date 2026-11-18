@@ -372,6 +372,9 @@ return function(t)
 				}
 				local sent: { [any]: { { [string]: any } } } = {}
 				local clock = 2000
+				local function dice(): number
+					return 0 -- (every chance of a line is taken: the lines below are certain)
+				end
 				local svc = RafterService.start({
 					possession = possession,
 					runtime = rt,
@@ -399,7 +402,9 @@ return function(t)
 					now = function(): number
 						return clock
 					end,
+					rand = dice,
 				})
+				t.eq(svc.rand, dice, "start(game) hands the dice to the service")
 				local walk = walker(rodent, 18)
 				for _ = 1, math.ceil(6 / DT) do
 					clock += DT
