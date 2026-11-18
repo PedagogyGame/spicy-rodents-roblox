@@ -169,10 +169,14 @@ local function find(cab: Cab): any
 		return nil
 	end
 	local N = CabinetLayout.NAMES
-	local function kids(prefix: string, n: number): { [number]: any }
+	local missing = 0
+	local function kids(prefix: string, n: number, wanted: ((i: number) -> boolean)?): { [number]: any }
 		local out = {}
 		for i = 1, n do
 			out[i] = model:FindFirstChild(`{prefix}{i}`)
+			if out[i] == nil and (wanted == nil or wanted(i)) then
+				missing += 1
+			end
 		end
 		return out
 	end
@@ -182,7 +186,9 @@ local function find(cab: Cab): any
 		art = model:GetAttribute("ArtLoaded"), -- (Server/Assets/PinballArt swaps the parts once: then found again)
 		balls = kids(N.ball, CabinetLayout.BALLS),
 		flippers = kids(N.flipper, #def.flippers),
-		drops = kids(N.drop, #def.targets),
+		drops = kids(N.drop, #def.targets, function(i: number): boolean
+			return def.targets[i].kind == "drop" -- (the others are standups, never moved)
+		end),
 		spinners = kids(N.spinner, #cab.tbl.c.spinners),
 		lamps = kids(N.lamp, #def.lamps),
 		bumpers = kids(N.bumper, #def.bumpers),
@@ -193,14 +199,20 @@ local function find(cab: Cab): any
 		home = {}, -- part -> its baked CFrame (drops, spinners, the plunger: moved from where the bake put them)
 		colour = {}, -- lamp part -> its baked colour
 	}
+	-- a part found again keeps the home it had (this screen may have moved it since)
+	local before = if cab.parts then cab.parts.home else {}
 	for _, list in { parts.drops, parts.spinners } do
 		for _, p in list do
-			parts.home[p] = p.CFrame
+			parts.home[p] = before[p] or p.CFrame
 		end
 	end
 	if parts.plunger then
-		parts.home[parts.plunger] = parts.plunger:GetPivot()
+		parts.home[parts.plunger] = before[parts.plunger] or parts.plunger:GetPivot()
 	end
+	-- streaming can bring the swapped art in after the attribute that says it is there: until every part
+	-- is here, look again (Cabinet.show, every half second)
+	parts.complete = missing == 0 and parts.plunger ~= nil
+	parts.fresh = true -- the flippers' hubs are put back to rest before they turn (Cabinet.show)
 	for _, p in parts.lamps do
 		parts.colour[p] = p.Color
 	end
@@ -324,7 +336,12 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 	cab.clock += step
 	cab.drawn = f
 	local parts = cab.parts
-	if parts == nil or parts.model.Parent == nil or parts.model:GetAttribute("ArtLoaded") ~= parts.art then
+	if
+		parts == nil
+		or parts.model.Parent == nil
+		or parts.model:GetAttribute("ArtLoaded") ~= parts.art
+		or (not parts.complete and cab.clock - cab.findAt >= 0.5)
+	then
 		if cab.clock - cab.findAt < 0.5 and parts == nil then
 			return
 		end
@@ -341,6 +358,20 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 		return
 	end
 	local c = cab.tbl.c
+	if parts ~= nil and parts.fresh then
+		-- the art's flipper meshes arrive placed about the hub at rest (the server never turns it): a hub
+		-- this screen had turned is put back to rest alone first, so mesh and hub agree before PivotTo
+		parts.fresh = false
+		for i, model in parts.flippers do
+			local hub = model.PrimaryPart
+			if hub then
+				local a = c.frest[i]
+				hub.CFrame = pf
+					* CFrame.new(c.fpx[i], CabinetLayout.FLIPPER_H / 2, -c.fpy[i])
+					* CFrame.Angles(0, CabinetLayout.turnOf(c.fmir[i] * math.cos(a), math.sin(a)), 0)
+			end
+		end
+	end
 	-- the balls
 	for i, part in parts.balls do
 		if i <= f.nBalls then

@@ -107,6 +107,15 @@ local function obstacles(tbl: any): { { what: string, dist: (Rect) -> number } }
 	for _, g in def.targets do
 		line(`target {g.id}`, { g.x1, g.y1, g.x2, g.y2 }, 2, 0.015)
 	end
+	for _, sl in def.slings do
+		line(`sling {sl.id}`, { sl.x1, sl.y1, sl.x2, sl.y2 }, 2, 0.015)
+	end
+	for _, sn in def.sensors do
+		line(`{sn.kind} {sn.id}`, { sn.x1, sn.y1, sn.x2, sn.y2 }, 2, 0.01)
+	end
+	for _, g in def.gates do
+		line(`gate {g.id}`, { g.x1, g.y1, g.x2, g.y2 }, 2, 0.01)
+	end
 	for _, s in def.saucers do
 		circle(`hole {s.id}`, s.x, s.y, s.r + Layout.BALL_R)
 	end
