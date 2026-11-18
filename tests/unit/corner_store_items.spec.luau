@@ -394,7 +394,7 @@ return function(t)
 	end)
 
 	t.test(
-		"a squirrel baited: along its route to the point nearest the pile, waits there, and a startle ends it",
+		"a squirrel baited: along its route to the point nearest the pile, waits there; a startle ends it, away from it",
 		function()
 			local route = {
 				id = 1,
@@ -449,6 +449,12 @@ return function(t)
 			c.now = 2
 			brain:think(0.1, c)
 			t.truthy(actor.intent.speed > 0, "off it runs")
+			-- a startle from somewhere: it runs along its route away from it, whichever way it was going
+			actor.intent.s, actor.intent.dir = 25, 1
+			brain:onEvent({ type = "startle", x = 30, z = 2 })
+			t.eq(actor.intent.dir, -1, "away from a fright ahead")
+			brain:onEvent({ type = "startle", x = 10, z = -2 })
+			t.eq(actor.intent.dir, 1, "away from one behind")
 			brain:onEvent({ type = "bait", x = 25, z = 3, untilTime = 3 })
 			c.now = 4
 			brain:think(0.1, c)

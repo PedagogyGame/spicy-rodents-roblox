@@ -148,6 +148,11 @@ The radio's playlist (the same table): `Radio.Oldies1`, `Radio.Oldies2`, `Radio.
 
 Twenty effects and six tracks; all from the library, so none counts against the month's uploads. The six tracks are filled; the twenty effects are still empty.
 
+### The yard dogs (`src/server/Wildlife/YardHazards.luau`, table `SOUNDS`; nothing uploaded)
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | a friendly medium dog's "woof woof", not a growl |
+
 ## Sound effects chosen 18 November (licensed library, nothing uploaded)
 Picked from Roblox's Creator Store by name and length, only from Roblox's verified licensed partners (ProSoundEffects for effects, APMOfficial for stings); not yet heard in the game. Each is one line to swap, in the table named.
 

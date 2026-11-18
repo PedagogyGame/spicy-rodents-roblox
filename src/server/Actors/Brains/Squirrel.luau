@@ -6,7 +6,8 @@
 -- x0.6 on wood kinds (trunk, branch, bridge, lookout) [routes_movement §10]. The motor
 -- (Server/AI/Kinematics) advances `s` every frame; the brain only sets routeId, dir, speed.
 -- W1 replaces the polyline data with Shared/Routes (Curve, Registry, Graph, Motion).
--- Events: "startle" (a full-sprint flee for 3-6 s), "bait" { x, z, untilTime } (a pile of peanuts or bird seed near its
+-- Events: "startle" { x?, z? } (a full-sprint flee for 3-6 s; given where the fright is, along its route away from it),
+-- "bait" { x, z, untilTime } (a pile of peanuts or bird seed near its
 -- route: it goes to the route's nearest point and stays there until untilTime or a startle).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
@@ -217,7 +218,14 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 		self.sprint = true
 		self.idleUntil = 0
 		self.startled = true
-		self.actor.intent.speed = railSpeed(self.route, true)
+		local intent = self.actor.intent
+		intent.speed = railSpeed(self.route, true)
+		if type(evt.x) == "number" and type(evt.z) == "number" then
+			local s = nearestS(self.route, evt.x, evt.z)
+			if s ~= intent.s then
+				intent.dir = if intent.s > s then 1 else -1
+			end
+		end
 	end
 end
 

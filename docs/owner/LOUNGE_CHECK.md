@@ -14,8 +14,9 @@ The lounge is in the leisure quarter, right beside the bowling alley on its east
 3. **Inside.** You stand just inside the door, facing the room, and the camera is **locked to first person**. **V** does nothing here. The jazz would start softly, but it is silent for now (see "Uploads" below).
 4. **Look around.** You should see the long bar with seven leather stools and a brass foot rail, the bartender behind it, and the back bar with its mirror, cups, a coffee urn, a cocoa pot, a teapot and a snow-cone machine. There are four leather booths along the walls with a lamp on each table, and club chairs round four small tables on the rug. The stage at the back left has a grand piano, a microphone and a 1940s radio. The fireplace on the right has two armchairs. Overhead are two chandeliers.
 5. **Order a drink.** Walk up to the bar. Along it, **E** offers **Hot cocoa (10c)**, **Coffee (12c)**, **Green tea (8c)** and **Snow cone (6c)**: the nearest one shows. You pay and the drink is in your hand. You lift it to your mouth four times, five seconds apart, and then read "All gone." You can hold only one drink at a time.
-6. **Leave.** At the door inside, **E** (**Leave**). You are back on the landing facing the street, and your usual camera returns. A drink you were still holding is gone.
-7. **As a squirrel.** Pick a squirrel and run at the door. As soon as you are on the forecourt, the steps or the landing, the nearest guard steps in and you are knocked out: "THE GUARDS! The lounge's guards do not let squirrels in." You go back to the menu, as with any knock-out. Computer squirrels that wander there are sent back where they live. Then try other ways in: the walls, the windows, the roof. There is no way in.
+6. **Sit down.** Walk up to a bar stool, a booth, a club chair or an armchair by the fire: **R** (**Sit**; **Y** on a gamepad, a tap on a phone) sits you on it (the nearest seat shows its prompt; a taken seat shows none). Sitting has its own key so that, standing at the bar, the nearest drink (**E**) and the nearest stool (**R**) both show. The camera stays in first person. From a bar stool, **E** orders the drink nearest you, and you sip it sitting down. **Space** (jump) or any move (W, A, S, D, the stick, the touch thumbstick) gets you up.
+7. **Leave.** At the door inside, **E** (**Leave**). You are back on the landing facing the street, and your usual camera returns. A drink you were still holding is gone.
+8. **As a squirrel.** Pick a squirrel and run at the door. As soon as you are on the forecourt, the steps or the landing, the nearest guard steps in and you are knocked out: "THE GUARDS! The lounge's guards do not let squirrels in." You go back to the menu, as with any knock-out. Computer squirrels that wander there are sent back where they live. Then try other ways in: the walls, the windows, the roof. There is no way in.
 
 ## Please check
 | # | What to look at | What you should see |
@@ -30,11 +31,13 @@ The lounge is in the leisure quarter, right beside the bowling alley on its east
 | 8 | The drink | A white cup (or a paper cone with red ice) in your right hand, lifted to your face four times, then gone |
 | 9 | A squirrel at the door | Knocked out on the forecourt, the steps or the landing, every time |
 | 10 | Nothing alcoholic | No bottles, taps or cocktail glasses anywhere; the menu says HOT COCOA · COFFEE · GREEN TEA · SNOW CONES |
+| 11 | Sitting | On each of the 7 stools, the 4 booths (two places on each bench, 16 in all), the 8 club chairs and the 2 armchairs: you sit on the cushion facing the bar, the table or the fire, not floating or sunk in. Still in first person. Moving or jumping gets you up |
 
 ## What it costs (phones)
 - **Parts:** 480 (the bake's own cap is 800; the plan allowed 1,300).
 - **Lights:** 22. Only 3 cast shadows: the middle pendant over the bar, the back chandelier and the spot on the piano.
 - **The Blender pieces** (bar, booths, wall panelling): 15,448 triangles in 14 meshes, once uploaded. That is about one pinball machine.
+- **The seats:** 33 invisible Seat parts and 33 prompts (only the nearest one shows), no triangles; the server switches a taken seat's prompt off in its five-a-second check. On each screen, one look a frame at whether you sit on a lounge seat.
 - **Work each frame:** the server checks the door, the guards and the room five times a second. It looks only at bodies within 60 studs: squirrels for the guards, and anyone else in the room the door did not let in (with the pass they are let in where they stand; without it they are put out on the landing).
 
 ## Uploads (the lead does these; nothing has been uploaded)
@@ -52,4 +55,4 @@ The lounge is in the leisure quarter, right beside the bowling alley on its east
 ## Not done yet
 - Nothing has run in the engine yet: the cloud check `tools/cloud/tasks/lounge_smoke.luau` is written but not run. It needs the key's Luau Execution permission.
 - Not yet checked on a screen: the drink in the hand (a cup welded to the body's root, not to the hand) and the guard's step.
-- Nobody sits on the stools or in the booths yet.
+- Sitting has not been seen in the engine: where a person sits on each seat (the seat's top is set to the cushion's), and that the sit pose is the one the game's people already use in a car.
