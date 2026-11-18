@@ -314,7 +314,9 @@ function Squirrel.start(
 			mi.fw = 1
 			mi.cameraYaw = state.yaw + math.pi
 		end
-		if Squirrel.stunned(body:GetAttribute(PossessionState.ATTR.StunnedUntil), workspace:GetServerTimeNow()) then
+		-- (the server clock is read only for a body that has ever been stunned)
+		local stunnedUntil = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
+		if stunnedUntil ~= nil and Squirrel.stunned(stunnedUntil, workspace:GetServerTimeNow()) then
 			mi = SquirrelMotor.idleInput(f.cameraYaw)
 			holding = false
 		end
