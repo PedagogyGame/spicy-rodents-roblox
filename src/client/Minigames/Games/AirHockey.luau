@@ -188,15 +188,15 @@ local entry: ClientGame.ClientGame = {
 		return nil
 	end,
 	sounds = {
-		["air_hockey.strike"] = "", -- a mallet meets the puck (volume: how hard)
-		["air_hockey.rail"] = "", -- the puck off a rail
-		["air_hockey.post"] = "", -- the puck off a goal post
+		["air_hockey.strike"] = "rbxassetid://9116202343", -- Knock Slap Plastic 15; a mallet meets the puck (volume: how hard)
+		["air_hockey.rail"] = "rbxassetid://9116201137", -- Knock Slap Plastic 1; the puck off a rail
+		["air_hockey.post"] = "rbxassetid://9116741491", -- Metal Lid Small 2; the puck off a goal post
 		["air_hockey.serve"] = "", -- the puck is let go (every serve: the countdown running out, or a press)
-		["air_hockey.goal_for"] = "", -- you scored
-		["air_hockey.goal_against"] = "", -- they scored
+		["air_hockey.goal_for"] = "rbxassetid://1840076509", -- Through the Roof (sting); you scored
+		["air_hockey.goal_against"] = "rbxassetid://1839996306", -- Feet Do Not Fail Me (sting a); they scored
 		["air_hockey.goal"] = "", -- a goal at a table you are watching
-		["air_hockey.win"] = "", -- the match is yours
-		["air_hockey.lose"] = "", -- the match is theirs
+		["air_hockey.win"] = "rbxassetid://1839982934", -- J Funk (sting); the match is yours
+		["air_hockey.lose"] = "rbxassetid://1837719710", -- Muck and Brass (sting); the match is theirs
 	},
 	words = {
 		idle = "You were taken off the air hockey table: your game stopped answering",

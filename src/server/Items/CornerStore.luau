@@ -52,7 +52,7 @@ CornerStore.WORDS = table.freeze({
 CornerStore.CUES = table.freeze({
 	till = "CornerStore.Till", -- the register's drawer and bell, on a sale
 })
-CornerStore.SOUNDS = { ["CornerStore.Till"] = "" } :: { [string]: string }
+CornerStore.SOUNDS = { ["CornerStore.Till"] = "rbxassetid://9113728049" } :: { [string]: string } -- Cash Register 2 (ProSoundEffects)
 
 export type Deps = {
 	wallet: { buy: (player: any, what: string | { string }, deliver: (() -> (boolean?, string?))?) -> (boolean, string) },
