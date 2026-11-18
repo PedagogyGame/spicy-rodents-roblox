@@ -12,6 +12,9 @@
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
 local Kit = require("../alley/Kit")
+local Fixtures = require("./Fixtures")
+local ItemRules = require("../../../src/shared/Items/ItemRules")
+local EconomyRules = require("../../../src/shared/Economy/EconomyRules")
 
 local Store = {}
 
@@ -251,6 +254,14 @@ function Store.build(kit: Kit.Kit, parent: any, venue: any, groundAt: (number, n
 	kit:box(ent, "FrontThreshold", fd[1], fd[2], base, 0, -OD, -ID, CONCRETE, "Concrete")
 	kit:box(ent, "SideThreshold", IX, OX, base, 0, sdd[1], sdd[2], CONCRETE, "Concrete")
 	kit:box(ent, "ServiceThreshold", sd[1], sd[2], base, 0, ID, OD, CONCRETE, "Concrete")
+
+	-- the furniture and the 22 items on their shelves
+	local prices: { [string]: number } = {}
+	for _, def in ItemRules.CATALOG do
+		prices[def.id] = def.price
+	end
+	local items = Fixtures.build(kit, root, prices, EconomyRules.NAMES :: any)
+	root:SetAttribute("Items", items)
 
 	-- the inside of the shell, carved to air at boot (no terrain pokes through the floor)
 	local hidden = { collide = false, query = false, transparency = 1, shadow = false }

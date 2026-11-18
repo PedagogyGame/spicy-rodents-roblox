@@ -8,6 +8,8 @@ local Height = require("@shared/World/Height")
 local Expansion = require("../../generated/Expansion")
 local Kit = require("../../tools/bake/alley/Kit")
 local Store = require("../../tools/bake/corner_store/Store")
+local Fixtures = require("../../tools/bake/corner_store/Fixtures")
+local ItemRules = require("@shared/Items/ItemRules")
 
 local Instance = roblox.Instance
 local Vector3 = roblox.Vector3
@@ -196,11 +198,105 @@ return function(t)
 		local at = flood(root, v, 1.1, 0.7, (fd[1] + fd[2]) / 2, -Store.IN_D - 2)
 		t.truthy(at(Store.IN_X + 2, (sd[1] + sd[2]) / 2), "out by the side door")
 		t.truthy(at((svc[1] + svc[2]) / 2, Store.IN_D + 2), "out by the service door")
-		for _, c in { { -20, -18 }, { 20, -18 }, { -20, 18 }, { 20, 18 }, { 0, 0 } } do
-			t.truthy(at(c[1], c[2]), `the floor at ({c[1]}, {c[2]})`)
+		-- the corners of the front, every aisle's length, the fridge, the freezer, both sides of the counter
+		local spots = {
+			{ -20, -18, "the east front corner" },
+			{ 20, -18, "the west front corner" },
+			{ -16, -17, "in front of the counter" },
+			{ -16, -10, "behind the counter (the shopkeeper's place)" },
+			{ 11, 16.5, "in front of the fridge" },
+			{ -4, 16.5, "in front of the freezer" },
+			{ -12, 19, "inside the service door" },
+		}
+		local G, H = Fixtures.GONDOLAS, Fixtures.GONDOLA_HALF
+		for i, c in G do
+			local east = c + H
+			local west = if i < #G then G[i + 1] - H else 21.0
+			for _, d in { -2, 6, 14 } do
+				table.insert(spots, { (east + west) / 2, d, `the aisle west of gondola {i}` })
+			end
+		end
+		for _, d in { -2, 6, 14 } do
+			table.insert(spots, { (-21.4 + G[1] - H) / 2, d, "the east aisle" })
+		end
+		for _, c in spots do
+			t.truthy(at(c[1], c[2]), `{c[3]} ({c[1]}, {c[2]})`)
 		end
 		-- nobody walks through a window or a wall
 		t.eq(at(-16, -Store.IN_D - 2), false)
 		t.eq(at(-Store.IN_X - 2, 0), false)
+	end)
+
+	t.test(
+		"the 22 items: each on its shelf with its price, a prompt a person standing in the store can reach",
+		function()
+			local root, v = bake()
+			local items = root:FindFirstChild("Items")
+			t.truthy(items ~= nil)
+			t.eq(root:GetAttribute("Items"), #ItemRules.CATALOG)
+			local fd = Store.FRONT_DOOR
+			local at = flood(root, v, 1.1, 0.7, (fd[1] + fd[2]) / 2, -Store.IN_D - 2)
+			for _, def in ItemRules.CATALOG do
+				local m = items:FindFirstChild("Item_" .. def.id)
+				t.truthy(m ~= nil, def.id)
+				t.eq(m:GetAttribute("ItemId"), def.id)
+				t.eq(m:GetAttribute("Price"), def.price)
+				local sample = m:FindFirstChild("Sample")
+				t.truthy(sample and #sample:GetChildren() >= 1, `{def.id}: a sample to hand over`)
+				for _, p in sample:GetChildren() do
+					t.eq(p.CanCollide, false, `{def.id}: the sample is visual`)
+				end
+				local tag = m:FindFirstChild("PriceTag")
+				t.eq(tag:FindFirstChildWhichIsA("SurfaceGui"):FindFirstChildWhichIsA("TextLabel").Text, `{def.price}c`)
+				local grab = m:FindFirstChild("Grab")
+				local prompt = grab:FindFirstChildWhichIsA("ProximityPrompt")
+				t.truthy(prompt ~= nil, `{def.id}: a prompt`)
+				t.eq(prompt:GetAttribute("StoreItem"), def.id)
+				t.eq(prompt.RequiresLineOfSight, false)
+				t.truthy(string.find(prompt.ObjectText, `{def.price}c`, 1, true) ~= nil, prompt.ObjectText)
+				t.truthy(not string.find(prompt.ObjectText, "_", 1, true), prompt.ObjectText)
+				-- a place to stand (a body's centre 2.5 above the floor) within the prompt's reach, less a stud
+				local x, y, d =
+					AlleyLayout.toLocal(v.place, grab.CFrame.Position.X, grab.CFrame.Position.Y, grab.CFrame.Position.Z)
+				local best = math.huge
+				for gx = x - 12, x + 12, 0.25 do
+					for gd = d - 12, d + 12, 0.25 do
+						if at(gx, gd) then
+							best = math.min(best, math.sqrt((gx - x) ^ 2 + (gd - d) ^ 2 + (2.5 - y) ^ 2))
+						end
+					end
+				end
+				t.truthy(
+					best <= prompt.MaxActivationDistance - 1,
+					`{def.id}: the nearest place to stand is {best} away`
+				)
+			end
+			t.eq(#items:GetChildren(), #ItemRules.CATALOG)
+		end
+	)
+
+	t.test("the plan's anchors are where the bake puts the counter, the shopkeeper and each item", function()
+		local v = venue()
+		local byNote: { [string]: any } = {}
+		local anchors: { [string]: any } = {}
+		for _, a in v.anchors do
+			anchors[a.id] = a
+			if a.kind == "item_shelf" then
+				byNote[a.note] = a
+			end
+		end
+		local c = Fixtures.COUNTER
+		t.near(anchors.checkout.at[1], (c.x0 + c.x1) / 2, 0.01)
+		t.near(anchors.checkout.at[3], (c.d0 + c.d1) / 2, 0.01)
+		t.near(anchors.staff.at[1], Fixtures.STAFF.x, 0.01)
+		t.near(anchors.staff.at[3], Fixtures.STAFF.d, 0.01)
+		for _, def in ItemRules.CATALOG do
+			local a = byNote[def.id]
+			local s = (Fixtures.SLOTS :: any)[def.id]
+			t.truthy(a ~= nil and s ~= nil, def.id)
+			t.near(a.at[1], s.x, 0.01)
+			t.near(a.at[2], s.y, 0.01)
+			t.near(a.at[3], s.d, 0.01)
+		end
 	end)
 end
