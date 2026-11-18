@@ -335,6 +335,7 @@ return function(t: any)
 			local dress = PeopleLooks.dress(case[1] :: string, case[2] :: number)
 			t.eq(PeopleArt.dress(model, dress, opts), true, case[1])
 			t.eq(model:FindFirstChildOfClass("Humanoid"), humanoid)
+			t.eq(humanoid.HipHeight, 2, "HipHeight: the soles 3 studs under the root's centre")
 			t.eq(model.HumanoidRootPart, root)
 			t.eq(model:GetAttribute("PeopleArt"), case[1])
 			local rig = PeopleAssets.BUILDS[dress.build]

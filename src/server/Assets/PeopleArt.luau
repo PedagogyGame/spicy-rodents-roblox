@@ -300,7 +300,8 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 	local L = o.lib or engineLib()
 	local rig = PeopleAssets.BUILDS[dress.build]
 	local root = model:FindFirstChild("HumanoidRootPart")
-	if root == nil or model:FindFirstChildOfClass("Humanoid") == nil then
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if root == nil or humanoid == nil then
 		return false
 	end
 	local old: { [string]: any } = {}
@@ -443,6 +444,8 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 		w.Parent = p
 		p.Parent = model
 	end
+	-- the soles 3 studs under the root's centre, as on the stock R15 (the possessed body's motor stands on this)
+	humanoid.HipHeight = PeopleAssets.ROOT.hipHeight
 	stamp(model, dress)
 	return true
 end
