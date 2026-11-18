@@ -139,6 +139,10 @@ MoveValidator.C = table.freeze({
 	WALL_GAP_WINDOW = 20, -- seconds: a second gap through a wall inside this is a whole flag
 	STAMINA_WALK = 1.2, -- faster than this times the walk on the ground drains the server's sprint meter
 	STAMINA_SLACK = 0.5, -- how far below empty it may go (two seconds of sprint: landings' carry, rounding)
+	-- studs: the widest any rail query of the validator looks (its world's index is bounded to it: a packet's numbers,
+	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
+	-- leaving the tallest trunk is within this of it
+	RAIL_REACH_MAX = 90,
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -166,10 +170,33 @@ local function record(h: History, clock: number, x: number, y: number, z: number
 	end
 end
 
+-- bounded(index): the index with every query's radius held to C.RAIL_REACH_MAX (cells for forEachNear)
+local function bounded(index: any): any
+	if index == nil or index.bounded then
+		return index
+	end
+	local most = MoveValidator.C.RAIL_REACH_MAX
+	local cells = math.ceil(most / (index.cellSize or 20))
+	local b = setmetatable({ bounded = true }, { __index = index })
+	function b.nearest(_self: any, x: number, y: number, z: number, maxDist: number, ...: any): any
+		return index:nearest(x, y, z, math.min(maxDist, most), ...)
+	end
+	function b.nearestOnRoute(_self: any, routeId: number, x: number, y: number, z: number, maxDist: number): any
+		return index:nearestOnRoute(routeId, x, y, z, math.min(maxDist, most))
+	end
+	function b.forEachNear(_self: any, x: number, y: number, z: number, radiusCells: number, fn: any)
+		return index:forEachNear(x, y, z, math.min(radiusCells, cells), fn)
+	end
+	return b
+end
+
 function MoveValidator.new(world: World, opts: Options?): MoveValidator
 	local o: Options = opts or {}
+	-- (its own copy of the world, with the index bounded: Motion's caches on it are the validator's own)
+	local own = table.clone(world)
+	own.index = bounded(world.index)
 	local self = setmetatable({
-		world = world,
+		world = own,
 		flagThreshold = o.flagThreshold or 1.0,
 		leakPerSecond = o.leakPerSecond or 0.5,
 		historySeconds = o.historySeconds or 1.0,
@@ -498,16 +525,36 @@ local function marksOf(self: MoveValidator, actorId: any): Marks
 	return marks :: Marks
 end
 
+-- railAbove(index, x, y, z, r, minY): a rail sample within `r` of the point no lower than minY (the rail a body high
+-- up left, or the one it is on). The scan is bounded by the index (C.RAIL_REACH_MAX).
+local function railAbove(index: any, x: number, y: number, z: number, r: number, minY: number): boolean
+	if index == nil then
+		return false
+	end
+	local found = false
+	local r2 = r * r
+	index:forEachNear(x, y, z, math.ceil(r / (index.cellSize or 20)), function(_id, _t, sx, sy, sz): boolean?
+		if sy >= minY and (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2 <= r2 then
+			found = true
+			return true
+		end
+		return nil
+	end)
+	return found
+end
+
 -- hop(actorId, from, next, dt, serverTime) -> violations: a move judged as a whole, not tick by tick, over `dt` (the
 -- time it can stand for): a gap too long for the envelope (gap()), and the first packet after a move the server
 -- made, from where it put the body (MovementService's gate). `from` holds x, y, z and routeId (nil: off the rails).
---   * reach: no further than the fastest the squirrel goes in that time;
---   * climb: no higher than a leap (and a landing's step) above where it was, unless a rail within reach could have
---     carried it up (the climb then at the fastest pace) or a trampoline bounced it;
---   * the air: off the rails and off the ground, no higher above a floor than a leap, unless a rail within reach (it
---     fell or leapt from one) or a trampoline explains it;
---   * walls: the straight line, chord by chord (world.crossesLong); an honest body may have gone round a corner, so
---     one is a third of a flag and a second inside C.WALL_GAP_WINDOW a whole one.
+--   * reach: no further than the fastest the squirrel goes in that time (arithmetic only: a long gap costs nothing);
+--   * climb: no higher than a leap (and a landing's step) above where it was, unless a rail near where it now is
+--     (within its reach, never more than C.RAIL_REACH_MAX) runs as high as that less a leap (it climbed and leapt from
+--     it, or is on it), or a trampoline bounced it;
+--   * the air (and a body on a rail): no higher above a floor than a leap, unless such a rail or a trampoline explains it;
+--   * walls: the straight line, chord by chord (world.crossesLong, its chords bounded), only when within reach (a
+--     longer one is a teleport already); an honest body may have gone round a corner, so one is a third of a flag and
+--     a second inside C.WALL_GAP_WINDOW a whole one.
+-- Its cost is bounded whatever dt and the packet hold: the rail scans by C.RAIL_REACH_MAX, the walls by the chords.
 function MoveValidator.hop(
 	self: MoveValidator,
 	actorId: any,
@@ -521,7 +568,8 @@ function MoveValidator.hop(
 	local world = self.world
 	local fastest = self:fastest(actorId)
 	local airGrab = Motion.C.airGrab
-	local reach = fastest * dt + airGrab + 2
+	local reach = fastest * math.max(dt, 0) + airGrab + 2
+	local near = math.min(reach, MoveValidator.C.RAIL_REACH_MAX)
 	local moved = math.sqrt((next.x - from.x) ^ 2 + (next.z - from.z) ^ 2)
 	if moved > reach then
 		table.insert(violations, {
@@ -530,22 +578,12 @@ function MoveValidator.hop(
 			detail = `moved {moved} st in a {dt} s gap (reach {reach})`,
 		})
 	end
-	local index = world.index
-	local railNear = next.routeId ~= nil
-		or from.routeId ~= nil
-		or (
-			index ~= nil
-			and (
-				index:nearest(from.x, from.y, from.z, reach) ~= nil
-				or index:nearest(next.x, next.y, next.z, reach) ~= nil
-			)
-		)
 	local apex = SquirrelMotor.leapApex() * E.launchTol * E.launchTol
 	local bounce = 0
 	local tramps = world.trampolines
 	if tramps then
 		for _, site in tramps do
-			local r = Trampoline.C.radius + reach
+			local r = Trampoline.C.radius + near
 			if
 				math.sqrt((from.x - site.x) ^ 2 + (from.z - site.z) ^ 2) <= r
 				or math.sqrt((next.x - site.x) ^ 2 + (next.z - site.z) ^ 2) <= r
@@ -556,28 +594,36 @@ function MoveValidator.hop(
 			end
 		end
 	end
-	local climb = math.max(apex, bounce) + Units.st(1.4) + 2 + (if railNear then fastest * dt + airGrab else 0)
+	local lift = math.max(apex, bounce) + Units.st(1.4) + 2
+	local railUp: boolean? = nil -- (asked once, when needed)
+	local function railHigh(): boolean
+		if railUp == nil then
+			railUp = railAbove(world.index, next.x, next.y, next.z, near, next.y - lift)
+		end
+		return railUp :: boolean
+	end
 	local rise = next.y - from.y
-	if rise > climb then
+	if rise > lift and not railHigh() then
 		table.insert(violations, {
 			code = "climb",
 			severity = 1,
-			detail = `rose {rise} st in a {dt} s gap (climb {climb}{if railNear then ", a rail near" else ""})`,
+			detail = `rose {rise} st in a {dt} s gap (a leap {lift}, no rail near as high)`,
 		})
 	end
 	local landable = world.landable
-	if landable and not next.grounded and not next.routeId and not railNear and bounce == 0 then
-		if not landable(next.x, next.y, next.z, apex + Units.st(1.4) + 2) then
+	if landable and (not next.grounded or next.routeId ~= nil) and bounce == 0 and rise <= lift then
+		if not landable(next.x, next.y, next.z, lift) and not railHigh() then
 			table.insert(violations, {
 				code = "fly",
 				severity = 1,
-				detail = `in the air higher than a leap over any floor after a {dt} s gap, no rail near`,
+				detail = `higher than a leap over any floor after a {dt} s gap, no rail near as high`,
 			})
 		end
 	end
 	local crossesLong = world.crossesLong
 	if
 		crossesLong
+		and moved <= reach
 		and not next.routeId
 		and not from.routeId
 		and crossesLong(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex)
