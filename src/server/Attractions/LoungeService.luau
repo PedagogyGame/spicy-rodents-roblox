@@ -27,8 +27,9 @@
 --     one every SIP_EVERY seconds (the cup goes up to the face for SIP_HOLD), then "All gone." One at a time.
 --     People have no stamina in this game: a drink is for the look. It goes with its holder at the door.
 --   * The seats (LoungeClassic.SEATS: the bar stools, the booths, the club chairs, the armchairs): an invisible
---     Seat on each, sat on through its prompt ("Sit", E) by a person the door let in (Seat:Sit, the game's own
---     sitting; never by walking into it: CanTouch off). First person stays (the body's CameraZone is untouched), a
+--     Seat on each, sat on through its prompt ("Sit", on its own key: SEAT_KEY, SEAT_PAD) by a person the door let in
+--     (Seat:Sit, the game's own sitting; never by walking into it: CanTouch off). Its own key, because a prompt
+--     shows only the nearest of those sharing a key, and in front of the bar the stools are nearer than the drinks. First person stays (the body's CameraZone is untouched), a
 --     drink stays in the hand and is sipped; jump or a move gets up (Client/World/SeatGetUp). A taken seat's prompt
 --     is off. A seated person is in the room whatever the pivot says (inRoom), and is got up before the door or a
 --     release moves the body.
@@ -42,7 +43,7 @@
 --   Service:isInside(player) ->
 --   boolean; Service:inRoom(body) -> boolean; Service:sit(player, index) -> (ok, why?); Service:seatOf(body) ->
 --   index?; Service:counts() -> { inside, drinks, knockedOut, strikes, seated }; Service:stop(); constants TICK,
---   STRIKE, SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, SEAT_DISTANCE, STAND, CUES, FOLDER
+--   STRIKE, SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, SEAT_DISTANCE, SEAT_KEY, SEAT_PAD, STAND, CUES, FOLDER
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
@@ -65,6 +66,10 @@ LoungeService.SIP_HOLD = 1.2 -- seconds the cup is at the face
 LoungeService.SERVE_LOOK = 3 -- seconds the bartender looks at the customer
 LoungeService.PROMPT_DISTANCE = 6
 LoungeService.SEAT_DISTANCE = 5 -- a seat's prompt (the nearest one shows: ProximityPrompt's one per key)
+-- the seats' own keys (the drinks and the doors are E and the gamepad's default X): standing at the bar, the
+-- nearest drink and the nearest stool both show. R and Y: F and X are a person's kick (Client/Input/InputMap).
+LoungeService.SEAT_KEY = "R" -- (Enum.KeyCode names)
+LoungeService.SEAT_PAD = "ButtonY"
 LoungeService.STAND = 3 -- a standing body's pivot over the floor (SkyLiftService's default standOffset)
 LoungeService.CUES = table.freeze({
 	swat = "Lounge.GuardSwat", -- a guard's strike (a whoosh and a thump; library)
@@ -358,6 +363,8 @@ function LoungeService._prompts(self: any)
 		local p =
 			prompt(seat, LoungeClassic.SEAT_WORDS.action, (LoungeClassic.SEAT_WORDS :: any)[st.kind] or "Seat", "sit")
 		p.MaxActivationDistance = LoungeService.SEAT_DISTANCE
+		p.KeyboardKeyCode = (Enum.KeyCode :: any)[LoungeService.SEAT_KEY]
+		p.GamepadKeyCode = (Enum.KeyCode :: any)[LoungeService.SEAT_PAD]
 		self.seatPrompts[i] = p
 		on(p, "sit", function(player)
 			self:sit(player, i)
@@ -389,7 +396,7 @@ function LoungeService.seatOf(self: any, body: any): number?
 	return if part then self.seatIndex[part] else nil
 end
 
--- A seat's prompt: E sits a person the door let in on a free seat (Seat:Sit; a seated one moves seats).
+-- A seat's prompt (R, gamepad Y) sits a person the door let in on a free seat (Seat:Sit; a seated one moves seats).
 function LoungeService.sit(self: any, player: any, index: number): (boolean, string?)
 	local seat = self.seats[index]
 	local body = self.inside[player]

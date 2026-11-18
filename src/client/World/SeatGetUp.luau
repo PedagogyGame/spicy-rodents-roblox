@@ -1,6 +1,6 @@
 --!strict
 -- StarterPlayerScripts.Client.World.SeatGetUp
--- Getting up from THE GILDED ACORN's seats (Server/Attractions/LoungeService sits a person with E on a seat's
+-- Getting up from THE GILDED ACORN's seats (Server/Attractions/LoungeService sits a person with R on a seat's
 -- prompt): jump gets up as from any Seat, and so does moving (W, A, S, D, the stick, the touch thumbstick:
 -- Shared/Attractions/LoungeClassic.standUp), which an engine Seat does not do on its own. Only seats that carry
 -- LoungeClassic.SEAT_ATTRIBUTE: a car's seat or the sky lift's is left alone.

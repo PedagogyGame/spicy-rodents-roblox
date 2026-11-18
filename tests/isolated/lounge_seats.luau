@@ -112,35 +112,39 @@ local function indexOf(id: string): number
 end
 
 return function(t)
-	t.test("a Seat and a Sit prompt (E, Door, near) on every place; never sat on by walking into it", function()
-		FakeEngine.with(function()
-			local svc = svcWith({})
-			t.eq(#svc.seats, #LoungeClassic.SEATS)
-			t.eq(#svc.seatPrompts, #LoungeClassic.SEATS)
-			for i, seat in svc.seats do
-				local st = LoungeClassic.SEATS[i]
-				t.eq(seat.ClassName, "Seat")
-				t.eq(seat.CanTouch, false, "no sitting by touch")
-				t.eq(seat.CanCollide, false)
-				t.eq(seat.Anchored, true)
-				t.eq(seat:GetAttribute(LoungeClassic.SEAT_ATTRIBUTE), st.id)
-				-- where it stands: the seat's top on the place, facing the way the sitter faces
-				local top = seat.CFrame.Position + roblox.Vector3.new(0, 0.1, 0)
-				local x, y, d = AlleyLayout.toLocal(svc.place, top.X, top.Y, top.Z)
-				t.near(x, st.x, 1e-3)
-				t.near(y, st.y, 1e-3)
-				t.near(d, st.d, 1e-3)
-				local p = svc.seatPrompts[i]
-				t.eq(p.ActionText, "Sit")
-				t.eq(p.ObjectText, (LoungeClassic.SEAT_WORDS :: any)[st.kind])
-				t.eq(p:GetAttribute("Door"), true)
-				t.eq(p:GetAttribute("Lounge"), "sit")
-				t.eq(p.KeyboardKeyCode, roblox.Enum.KeyCode.E)
-				t.eq(p.MaxActivationDistance, LoungeService.SEAT_DISTANCE)
-			end
-			svc:stop()
-		end)
-	end)
+	t.test(
+		"a Seat and a Sit prompt (its own key, Door, near) on every place; never sat on by walking into it",
+		function()
+			FakeEngine.with(function()
+				local svc = svcWith({})
+				t.eq(#svc.seats, #LoungeClassic.SEATS)
+				t.eq(#svc.seatPrompts, #LoungeClassic.SEATS)
+				for i, seat in svc.seats do
+					local st = LoungeClassic.SEATS[i]
+					t.eq(seat.ClassName, "Seat")
+					t.eq(seat.CanTouch, false, "no sitting by touch")
+					t.eq(seat.CanCollide, false)
+					t.eq(seat.Anchored, true)
+					t.eq(seat:GetAttribute(LoungeClassic.SEAT_ATTRIBUTE), st.id)
+					-- where it stands: the seat's top on the place, facing the way the sitter faces
+					local top = seat.CFrame.Position + roblox.Vector3.new(0, 0.1, 0)
+					local x, y, d = AlleyLayout.toLocal(svc.place, top.X, top.Y, top.Z)
+					t.near(x, st.x, 1e-3)
+					t.near(y, st.y, 1e-3)
+					t.near(d, st.d, 1e-3)
+					local p = svc.seatPrompts[i]
+					t.eq(p.ActionText, "Sit")
+					t.eq(p.ObjectText, (LoungeClassic.SEAT_WORDS :: any)[st.kind])
+					t.eq(p:GetAttribute("Door"), true)
+					t.eq(p:GetAttribute("Lounge"), "sit")
+					t.eq(p.KeyboardKeyCode, (roblox.Enum.KeyCode :: any)[LoungeService.SEAT_KEY])
+					t.eq(p.GamepadKeyCode, (roblox.Enum.KeyCode :: any)[LoungeService.SEAT_PAD])
+					t.eq(p.MaxActivationDistance, LoungeService.SEAT_DISTANCE)
+				end
+				svc:stop()
+			end)
+		end
+	)
 
 	t.test("only a person the door let in sits, on a free seat; a taken seat's prompt is off", function()
 		FakeEngine.with(function()
@@ -230,6 +234,89 @@ return function(t)
 			local p = ann.body:GetPivot().Position
 			local _, _, d = AlleyLayout.toLocal(svc.place, p.X, p.Y, p.Z)
 			t.near(d, LoungeClassic.DOOR_OUTSIDE.d, 1e-3, "on the landing")
+			svc:stop()
+		end)
+	end)
+
+	-- ProximityPrompt's one per key: of the enabled prompts within reach that share a key, the nearest shows
+	t.test("standing at the bar, the drinks' key shows a drink, never a stool; seated on a stool, too", function()
+		FakeEngine.with(function()
+			local svc = svcWith({})
+			local prompts = {}
+			for _, post in svc.counterPosts do
+				local att = post:FindFirstChildOfClass("Attachment")
+				table.insert(
+					prompts,
+					{ p = att:FindFirstChildOfClass("ProximityPrompt"), at = post.Position, drink = true }
+				)
+			end
+			for i, seat in svc.seats do
+				table.insert(prompts, { p = svc.seatPrompts[i], at = seat.Position, drink = false })
+			end
+			-- a property the fake engine leaves unset has the engine's default (Enabled; the gamepad's X)
+			local DEFAULTS = { Enabled = true, GamepadKeyCode = roblox.Enum.KeyCode.ButtonX }
+			local function prop(p: any, name: string): any
+				local v = p[name]
+				return if v == nil then (DEFAULTS :: any)[name] else v
+			end
+			local drinkKey = prop(prompts[1].p, "KeyboardKeyCode")
+			local drinkPad = prop(prompts[1].p, "GamepadKeyCode")
+			local seatKey = (roblox.Enum.KeyCode :: any)[LoungeService.SEAT_KEY]
+			t.truthy(drinkKey ~= seatKey, "the seats' key is not the drinks'")
+			t.truthy(drinkPad ~= (roblox.Enum.KeyCode :: any)[LoungeService.SEAT_PAD], "nor on the gamepad")
+			-- what shows for a key at a root: the nearest enabled prompt in reach sharing it
+			local function shown(root: any, field: string, key: any): any?
+				local best, bd = nil, math.huge
+				for _, q in prompts do
+					local dist = (q.at - root).Magnitude
+					if
+						prop(q.p, "Enabled")
+						and prop(q.p, field) == key
+						and dist <= q.p.MaxActivationDistance
+						and dist < bd
+					then
+						best, bd = q, dist
+					end
+				end
+				return best
+			end
+			-- every standing spot in front of the bar (a body's root 3 over the floor), not inside a stool
+			local spots, drinks, stools = 0, 0, 0
+			for d = 9.0, 12.31, 0.3 do
+				for x = -12, 12 do
+					local clear = true
+					for _, st in LoungeClassic.SEATS do
+						if st.kind == "stool" and math.abs(st.x - x) < 1.9 and math.abs(st.d - d) < 1.9 then
+							clear = false
+						end
+					end
+					if clear then
+						spots += 1
+						local root = svc:world(x, 3, d)
+						for field, key in { KeyboardKeyCode = drinkKey, GamepadKeyCode = drinkPad } do
+							local q = shown(root, field, key)
+							t.truthy(q == nil or q.drink, `({x}, {d}) {field}: a drink or nothing`)
+							if q and field == "KeyboardKeyCode" then
+								drinks += 1
+							end
+						end
+						if shown(root, "KeyboardKeyCode", seatKey) then
+							stools += 1
+						end
+					end
+				end
+			end
+			t.truthy(drinks > spots * 0.6, `a drink offered at {drinks} of {spots} spots`)
+			t.truthy(stools > spots * 0.6, `a stool offered at {stools} of {spots} spots`)
+			-- seated on each stool (hips a stud over the seat; its own prompt off): a drink shows
+			for i, st in LoungeClassic.SEATS do
+				if st.kind == "stool" then
+					svc.seatPrompts[i].Enabled = false
+					local q = shown(svc:world(st.x, st.y + 1, st.d), "KeyboardKeyCode", drinkKey)
+					t.truthy(q and q.drink, `{st.id}: a drink within reach`)
+					svc.seatPrompts[i].Enabled = true
+				end
+			end
 			svc:stop()
 		end)
 	end)
