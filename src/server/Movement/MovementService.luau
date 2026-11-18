@@ -193,6 +193,9 @@ MovementService.C = table.freeze({
 	PACE_PAIRS = 4, -- the pace is the fastest of this many recent packets (their own velocity, or their step)
 	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
 	PIN_LOG = 20, -- seconds a new body may stay pinned with no packet past the gate before it is logged (it stays)
+	-- seconds: the most of the engine's round trip (Player:GetNetworkPing, up to 10 s) any wait or window here takes; a
+	-- slower link is no reason to let the root sit further off for longer
+	PING_MAX = 1,
 })
 local C = MovementService.C
 
@@ -310,14 +313,18 @@ function MovementService.new(deps: Deps): Movement
 
 	local tell: (self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number) -> ()
 
+	-- pingOf(self, id): the driver's round trip as the engine measures it, never above C.PING_MAX (0: unknown)
+	local function pingOf(self: Movement, id: any): number
+		local v = self.deps.validator
+		local ping = if v then v.pingOf(id) else nil
+		return if type(ping) == "number" and ping >= 0 then math.min(ping, C.PING_MAX) else 0
+	end
+
 	-- ignoredFor(self, id): how long after telling its driver of a move the server waits for packets under the new
 	-- epoch before it takes the old one's for a client ignoring it (a correction and the first packet after it cross
 	-- the link twice: the engine's round trip, twice, and a second)
 	local function ignoredFor(self: Movement, id: any): number
-		local v = self.deps.validator
-		local ping = if v then v.pingOf(id) else nil
-		local p = if type(ping) == "number" and ping >= 0 and ping < 10 then ping else 0
-		return math.max(C.IGNORED, 2 * p + 1)
+		return math.max(C.IGNORED, 2 * pingOf(self, id) + 1)
 	end
 
 	-- a new epoch from `target`: the validator forgets, the first packet of the epoch is gated there; the place before
@@ -456,10 +463,7 @@ function MovementService.new(deps: Deps): Movement
 		while #sq.paces > C.PACE_PAIRS do
 			table.remove(sq.paces, 1)
 		end
-		local validator = self.deps.validator
-		local ping = if validator then validator.pingOf(id) else nil
-		local p = if type(ping) == "number" and ping >= 0 and ping < 10 then ping else 0
-		table.insert(sq.offsets, { at = now, off = now - clock, ping = p })
+		table.insert(sq.offsets, { at = now, off = now - clock, ping = pingOf(self, id) })
 		while #sq.offsets > 1 and now - sq.offsets[1].at > C.SPREAD_WINDOW do
 			table.remove(sq.offsets, 1)
 		end
@@ -622,8 +626,10 @@ function MovementService.new(deps: Deps): Movement
 		end
 		local prior = sq.prior
 		if not ok and prior and now <= sq.priorUntil then
+			-- (never further than a gate's reach: the ping is capped, and so is what it covers)
 			local window = ping + lead + C.DRIFT_FRESH_LAG
-			ok = dist(x, y, z, prior.x, prior.y, prior.z) <= C.DRIFT_BASE + reachIn(v, window, fast)
+			local reach = math.min(C.DRIFT_BASE + reachIn(v, window, fast), C.GATE_SLACK + fast * C.GATE_MOVE)
+			ok = dist(x, y, z, prior.x, prior.y, prior.z) <= reach
 		end
 		local why: string? = if ok then nil else "drift"
 		if why == nil and refX and now - refAt > C.SILENT and dist(x, y, z, refX, refY, refZ) > C.SILENT_MOVE then
