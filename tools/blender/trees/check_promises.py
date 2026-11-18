@@ -577,8 +577,9 @@ def main(argv):
     ap.add_argument("--ids", default="")
     ap.add_argument("--json", default="")
     ap.add_argument("--clearance-warn", action="store_true",
-                    help="the pushed feet on the trunk-clearance stretch of a branch (t < 0.2) only warn; the stretch "
-                         "is checked on the bough's own top line instead")
+                    help="the trunk-clearance stretch of a branch (t < 0.2) is checked on the bough's own top line, "
+                         "where the game draws the squirrel (SquirrelVisual.junctionT); on a late-collar branch the "
+                         "game draws it at the pushed pose, reported apart as a warning (a known game-side issue)")
     args = ap.parse_args(argv)
     routes = load_routes()
     if args.ids:
