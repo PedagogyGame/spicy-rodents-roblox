@@ -6,7 +6,8 @@
 -- the server's MoveValidator applies to every frame.
 --   in at every ground hole by walking or running into it (the run-through mouth style, as the ball return's
 --   grille); not by walking past it, not from the outside trunk with E
---   a single chamber: across the floor to its dead end, S back out of the hole on its feet
+--   a single chamber: across the floor to its dead end, S back out of the hole on its feet; S held on outside does
+--   not take it back in (the log too); W does
 --   the shaft and the escape tree: W climbs the wall to the top knothole and runs on along its bough; E at the
 --   part-way knothole goes out onto the other bough; A or D on the way up picks the hideout or the knothole
 --   the spiral: W climbs the ramp past its landings and runs out of the top knothole onto the outside trunk
@@ -147,6 +148,52 @@ return function(t)
 			t.eq(s.routeId, nil, `{h.id}: S runs back out`)
 			t.truthy(s.grounded, `{h.id}: on its feet`)
 			t.eq(back.violations, 0, `{h.id}: the server accepts the way out`)
+		end
+	end)
+
+	t.test("S held on after backing out leaves the body outside (the hole does not take it back); W goes in", function()
+		for _, h in layout.hollows do
+			if h.variant ~= "knothole" and h.variant ~= "log" then
+				continue
+			end
+			local rid = h.routes[1]
+			local deep = if h.variant == "log" then 0.5 else 0.99
+			local _, s = runIn(h, function(st)
+				return st.routeId == rid and st.railT >= deep
+			end, 60 * 8)
+			t.eq(s.routeId, rid, `{h.id}: inside`)
+			-- S for 3 s, the view following the body inside and left where it was outside (as the camera does)
+			local cam = follow(s)
+			local held = BakedWorld.drive(w, s, 60 * 3, function(_f: number, st: State): SquirrelMotor.Input
+				if st.routeId then
+					cam = follow(st)
+				end
+				return BakedWorld.keys(cam, { fw = -1 })
+			end, { validator = true })
+			t.eq(BakedWorld.count(held, "emerge"), 1, `{h.id}: out once`)
+			t.eq(BakedWorld.count(held, "enter"), 0, `{h.id}: not taken back in while S is held`)
+			t.eq(s.routeId, nil, `{h.id}: outside`)
+			t.eq(held.violations, 0, `{h.id}: the server accepts it`)
+			-- in again, S until it is out, the key let go a frame, then W into the hole: it goes back in
+			local _, s2 = runIn(h, function(st)
+				return st.routeId == rid and st.railT >= deep
+			end, 60 * 8)
+			BakedWorld.drive(w, s2, 60 * 3, function(): SquirrelMotor.Input
+				return BakedWorld.keys(follow(s2), { fw = -1 })
+			end, {
+				stop = function(st: State)
+					return st.routeId == nil
+				end,
+			})
+			t.eq(s2.routeId, nil, `{h.id}: out`)
+			local m = holeOf(h)
+			local inward = BakedWorld.cameraYawToward(-m.out[1], -m.out[3])
+			press(s2, inward, "fw", 0)
+			local back = BakedWorld.drive(w, s2, 60, function(): SquirrelMotor.Input
+				return BakedWorld.keys(inward, { fw = 1 })
+			end, { validator = true })
+			t.eq(BakedWorld.count(back, "enter"), 1, `{h.id}: W goes back in`)
+			t.eq(s2.routeId, rid, `{h.id}: on its run`)
 		end
 	end)
 
