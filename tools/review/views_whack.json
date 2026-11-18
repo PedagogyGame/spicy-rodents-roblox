@@ -1,0 +1,10 @@
+{
+  "_": "The whack-a-mole cabinet in the games room (Shared/Minigames/WhackAMole/Layout: AT X 124, D -64.83, a half turn: the player stands at +D). Local to world as views_alley.json: x = 1300 + X, y = 16.5 + Y, z = -420 - D. Render: lune run tools/bake/attractions.luau; lune run tools/review/export.luau --out build/review_alley/scene.json; then render.py --scene build/review_alley/scene.json --views tools/review/views_whack.json --out build/review_whack. Committed pictures: docs/renders/minigames/whack_a_mole/.",
+  "defaults": { "res": "960x720", "samples": 24, "groups": ["attractions"] },
+  "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
+  "views": [
+    {"name": "wm_01_player_camera", "desc": "What the player sees: the game's own camera (Layout.EYE to Layout.LOOK, 16:9 field of view) over the deck, both windows in view.", "pos": [1424, 25.9, -361.77], "look": [1424, 21.4, -354.87], "fov": 52},
+    {"name": "wm_02_three_quarter", "desc": "From the player's front right, about where the owner's Preview.png looks from: the deck, the sign, the mallet in its bracket, the FREE PLAY plate.", "pos": [1417.5, 25.0, -364.5], "look": [1424, 20.4, -355.2], "fov": 46},
+    {"name": "wm_03_in_the_room", "desc": "The cabinet beside the pinball row along the games room's front wall, from the middle of the room at eye height.", "pos": [1430, 21.7, -382], "look": [1418, 19.5, -356], "fov": 66}
+  ]
+}

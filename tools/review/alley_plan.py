@@ -337,6 +337,9 @@ def draw_plan(data):
     pn.text((pbs[0]["x"] + pbs[-1]["x"]) / 2, K["PINBALL_D"] + 7.2, "PINBALL x 3\n(acorn, rodent, space)", 12, bold=True)
     f = data["fortune"]
     pn.text(f["x"] - 4.5, f["d"] + 1.0, "FORTUNE\nTELLER", 12, bold=True, anchor="rm")
+    wm = data.get("whack")
+    if wm:
+        pn.text(wm["x"] + 1.0, wm["d1"] + 1.8, "WHACK-A-MOLE", 12, bold=True)
 
     # labels: openings
     for o in data["openings"]:

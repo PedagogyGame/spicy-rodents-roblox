@@ -202,8 +202,8 @@ return function(t)
 			t.truthy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "call", args = { "heads" } }))
 			t.falsy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "dance", args = {} }))
 			-- the bowling alley alone: a station per lane (eighteen since brief addendum D5), then the games room's
-			-- ten (darts, the fortune teller, two pool tables, bumper pool, three pinball machines, and air hockey's
-			-- two ends), in registry order: all 28 pinned exactly. A station's seeded stream is numbered by its place in this list, so the twelve new lanes moved
+			-- eleven (darts, the fortune teller, two pool tables, bumper pool, three pinball machines, air hockey's
+			-- two ends and the whack-a-mole cabinet), in registry order: all 29 pinned exactly. A station's seeded stream is numbered by its place in this list, so the twelve new lanes moved
 			-- every later station's stream along by twelve: each is still its own and still repeats for a seed.
 			local alley = Sites.fromData(Data.default(), false)
 			t.truthy(alley.bowling_alley ~= nil)
@@ -214,7 +214,7 @@ return function(t)
 				t.eq(st.site, "bowling_alley")
 				t.eq((Games.get(st.game) :: any).game, st.game)
 			end
-			t.eq(#list, 28, `{#list} stations in the alley`)
+			t.eq(#list, 29, `{#list} stations in the alley`)
 			local expected = {}
 			for lane = 1, 18 do
 				table.insert(expected, `bowling_lane_{lane}`)
@@ -231,6 +231,7 @@ return function(t)
 					"pinball_3",
 					"air_hockey_1",
 					"air_hockey_1_ember",
+					"whack_a_mole_1",
 				}
 			do
 				table.insert(expected, id)

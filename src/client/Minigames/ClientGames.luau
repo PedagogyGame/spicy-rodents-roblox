@@ -26,6 +26,7 @@ ClientGames.LIST = {
 	require("./Games/Labyrinth"),
 	require("./Games/Paintball"),
 	require("./Games/AirHockey"),
+	require("./Games/WhackAMole"),
 } :: { ClientGame.ClientGame }
 
 -- the framework's own message kinds (Client/Minigames/MinigameClient)
