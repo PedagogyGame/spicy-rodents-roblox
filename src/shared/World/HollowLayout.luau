@@ -40,6 +40,8 @@
 --   hollowOfRoute(routeId) -> Hollow?
 --   contains(x, y, z) -> string?     the space whose cavity holds the point (the server's refuge test)
 --   within(hollow, x, y, z) -> boolean   that hollow's cavity holds the point (its Combat/Cover shape)
+--   keepCamera(x, y, z, hx, hy, hz) -> (x, y, z)   a camera point held inside the cavity round a head inside a
+--                                    hollow (C.cameraIn inside its wall, floor and roof); unchanged for a head outside
 --   nearest(x, z, maxDist?) -> (Hollow?, number)   level distance to the trunk's foot (the log's middle)
 -- A Hollow (compiled): id, tier, variant, tree, trunk (route id; nil for the log), space, claimable, x, y, z (the
 --   trunk's foot; the log's middle on the ground), routes { id }, mouths { Mouth }, chambers { Chamber } (where nuts
@@ -73,6 +75,7 @@ HollowLayout.C = {
 	post = 0.55, -- studs: the spiral's heartwood post's clearance inside the ramp's inner edge
 	shelf = 1.5, -- studs: a hideout shelf's length across the shaft
 	logWall = 0.3,
+	cameraIn = 0.3, -- studs: the tunnel camera kept this far inside a cavity's wall (the liner boards stand outside it)
 }
 local C = HollowLayout.C
 
@@ -149,6 +152,7 @@ export type Layout = {
 	hollowOfRoute: (routeId: number) -> Hollow?,
 	contains: (x: number, y: number, z: number) -> string?,
 	within: (h: Hollow, x: number, y: number, z: number) -> boolean,
+	keepCamera: (x: number, y: number, z: number, hx: number, hy: number, hz: number) -> (number, number, number),
 	nearest: (x: number, z: number, maxDist: number?) -> (Hollow?, number),
 }
 
@@ -1013,6 +1017,70 @@ function HollowLayout.new(compiled: Compiled): Layout
 			end
 		end
 		return nil
+	end
+	-- (x, y, z) held inside cavity c (C.cameraIn inside its wall, floor and roof)
+	local function keepIn(c: Cavity, x: number, y: number, z: number): (number, number, number)
+		local a, bb = c.a, c.b
+		local r = math.max(0.05, c.radius - C.cameraIn)
+		if a and bb then
+			-- the log: across its axis within r, along it between its ends (C.cameraIn short of each)
+			local abx, aby, abz = bb[1] - a[1], bb[2] - a[2], bb[3] - a[3]
+			local l2 = abx * abx + aby * aby + abz * abz
+			local tt = ((x - a[1]) * abx + (y - a[2]) * aby + (z - a[3]) * abz) / l2
+			local dx, dy, dz = x - (a[1] + abx * tt), y - (a[2] + aby * tt), z - (a[3] + abz * tt)
+			local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+			if d > r then
+				dx, dy, dz = dx / d * r, dy / d * r, dz / d * r
+			end
+			local edge = math.min(0.5, C.cameraIn / math.sqrt(l2))
+			tt = math.clamp(tt, edge, 1 - edge)
+			return a[1] + abx * tt + dx, a[2] + aby * tt + dy, a[3] + abz * tt + dz
+		end
+		local dx, dz = x - c.x, z - c.z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d > r then
+			dx, dz = dx / d * r, dz / d * r
+		end
+		local y0, y1 = c.bottom + C.cameraIn, c.top - C.cameraIn
+		return c.x + dx, if y1 > y0 then math.clamp(y, y0, y1) else (y0 + y1) / 2, c.z + dz
+	end
+	function layout.keepCamera(
+		x: number,
+		y: number,
+		z: number,
+		hx: number,
+		hy: number,
+		hz: number
+	): (number, number, number)
+		for _, h in compiled.hollows do
+			if not layout.within(h, hx, hy, hz) then
+				continue
+			end
+			-- of the cavities round the head (a floor and its shaft overlap), the one that moves the point least
+			local bx, by, bz, bd = x, y, z, math.huge
+			local held: Cavity? = nil
+			for _, c in h.cavities do
+				if layout.within({ cavities = { c } } :: any, hx, hy, hz) then
+					local kx, ky, kz = keepIn(c, x, y, z)
+					local d = (kx - x) ^ 2 + (ky - y) ^ 2 + (kz - z) ^ 2
+					if d < bd then
+						bx, by, bz, bd, held = kx, ky, kz, d, c
+					end
+				end
+			end
+			-- a shaft too narrow to be behind the body in (held against the head): across the shaft from it and a stud
+			-- lower, looking over at it
+			local c = held
+			if c and c.a == nil and (bx - hx) ^ 2 + (bz - hz) ^ 2 < 1 then
+				local ux, uz = hx - c.x, hz - c.z
+				local ul = math.sqrt(ux * ux + uz * uz)
+				if ul > 0.2 then
+					return keepIn(c, c.x - ux / ul * c.radius, hy - 1, c.z - uz / ul * c.radius)
+				end
+			end
+			return bx, by, bz
+		end
+		return x, y, z
 	end
 	function layout.nearest(x: number, z: number, maxDist: number?): (Hollow?, number)
 		local best, bd = nil, maxDist or math.huge

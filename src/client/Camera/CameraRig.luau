@@ -7,7 +7,9 @@
 --                            Player.CameraMode = LockFirstPerson (the V toggle flips it)
 --   lockFirst                LockFirstPerson with the toggle refused (arena, lounges)
 --   chaseLock                scriptable: behind the body along its facing, looking forward
---   tunnelChase              scriptable: low behind a squirrel in the bowling alley's ball-return tunnel
+--   tunnelChase              scriptable: low behind a squirrel in an enclosed run (the ball return, the drains, a
+--                            hollow tree: there its rays meet only the hollow's own shell, Workspace.HollowTrees,
+--                            never the tree's invisible trunk colliders, and the point stays inside the cavity)
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
 --                            +/-110 degrees of the nose; vehicleThird follows the vehicle root. With
 --                            targets.free (the sky-lift gondola: a seat's EyeSocket) the look is free: no
@@ -31,8 +33,11 @@
 --   (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
 --   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
---   (pure); notify: ((text) -> ())?
+--   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); notify: ((text) -> ())?
 -- No side effects on require (services are looked up inside the functions).
+
+local Import = require("../Import")
+local HollowLayout = Import.shared("World/HollowLayout") :: typeof(require("../../shared/World/HollowLayout"))
 
 local CameraRig = {}
 
@@ -223,6 +228,36 @@ end
 local held = false
 function CameraRig.hold(on: boolean)
 	held = on
+end
+
+-- The tunnel camera's point (pure): for a head at (hx, hy, hz) heading (lx, lz) (level, unit), 3.2 studs behind and
+-- 0.55 over, pulled 0.25 in front of the first thing `cast` meets between, under a ceiling; then `keep` (inside a
+-- hollow tree: HollowLayout's keepCamera) holds it where it may be. cast(ox, oy, oz, dx, dy, dz) -> the hit point
+-- (x, y, z) or nil.
+function CameraRig.tunnelPoint(
+	hx: number,
+	hy: number,
+	hz: number,
+	lx: number,
+	lz: number,
+	cast: (number, number, number, number, number, number) -> (number?, number?, number?),
+	keep: ((number, number, number, number, number, number) -> (number, number, number))?
+): (number, number, number)
+	local wx, wy, wz = hx - lx * 3.2, hy + 0.55, hz - lz * 3.2
+	local px, py, pz = cast(hx, hy, hz, wx - hx, wy - hy, wz - hz)
+	if px and py and pz then
+		local bx, by, bz = hx - wx, hy - wy, hz - wz
+		local bl = math.sqrt(bx * bx + by * by + bz * bz)
+		wx, wy, wz = px + bx / bl * 0.25, py + by / bl * 0.25, pz + bz / bl * 0.25
+	end
+	local _, uy = cast(wx, wy, wz, 0, 0.4, 0)
+	if uy then
+		wy = uy - 0.2
+	end
+	if keep then
+		wx, wy, wz = keep(wx, wy, wz, hx, hy, hz)
+	end
+	return wx, wy, wz
 end
 
 -- How far out the camera may sit when something solid was hit `hitDistance` from the focus: short of it
@@ -535,8 +570,11 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			end)
 		end
 	elseif mode == "tunnelChase" then
-		-- the bowling alley's ball-return tunnel: low behind the squirrel along its heading, pulled in front of
-		-- any wall or ceiling between (raycasts against the duct), smoothed so the climb up the riser reads
+		-- an enclosed run (the ball return, a drain, a hollow tree): low behind the squirrel along its heading, pulled
+		-- in front of any wall or ceiling between (raycasts against the run's own parts), smoothed so a climb reads.
+		-- Inside a hollow tree the rays meet only its shell (Workspace.HollowTrees: the tree's invisible trunk
+		-- colliders fill the cavity and its bark mesh is not queryable), the point stays inside the cavity, and on
+		-- going in the camera cuts inside at once rather than sliding through the bark.
 		local body = targets.body
 		local root = body and body.PrimaryPart
 		if root then
@@ -545,23 +583,42 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			local params = RaycastParams.new()
 			params.FilterType = Enum.RaycastFilterType.Exclude
 			params.FilterDescendantsInstances = { body :: Model }
+			local hollows = HollowLayout.default()
+			local shell = workspace:FindFirstChild("HollowTrees")
+			local inShell = RaycastParams.new()
+			inShell.FilterType = Enum.RaycastFilterType.Include
+			inShell.FilterDescendantsInstances = if shell then { shell } else {}
 			local current = camera.CFrame
+			local wasIn = false
 			bind(function(dt: number)
 				local cf = root.CFrame
 				local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
 				look = if look.Magnitude > 0.05 then look.Unit else Vector3.zAxis
 				local head = cf.Position + Vector3.new(0, 0.35, 0)
-				local want = head - look * 3.2 + Vector3.new(0, 0.55, 0)
-				local hit = workspace:Raycast(head, want - head, params)
-				if hit then
-					want = hit.Position + (head - want).Unit * 0.25
+				local inHollow = hollows ~= nil and hollows.contains(head.X, head.Y, head.Z) ~= nil
+				local rays = if inHollow then inShell else params
+				local wx, wy, wz = CameraRig.tunnelPoint(
+					head.X,
+					head.Y,
+					head.Z,
+					look.X,
+					look.Z,
+					function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
+						local hit = workspace:Raycast(Vector3.new(ox, oy, oz), Vector3.new(dx, dy, dz), rays)
+						if hit then
+							return hit.Position.X, hit.Position.Y, hit.Position.Z
+						end
+						return nil, nil, nil
+					end,
+					if inHollow and hollows then hollows.keepCamera else nil
+				)
+				local target = CFrame.lookAt(Vector3.new(wx, wy, wz), head + look * 3.5)
+				if inHollow and not wasIn then
+					current = target
+				else
+					current = current:Lerp(target, 1 - math.exp(-dt * 10))
 				end
-				local up = workspace:Raycast(want, Vector3.new(0, 0.4, 0), params)
-				if up then
-					want = Vector3.new(want.X, up.Position.Y - 0.2, want.Z)
-				end
-				local target = CFrame.lookAt(want, head + look * 3.5)
-				current = current:Lerp(target, 1 - math.exp(-dt * 10))
+				wasIn = inHollow
 				camera.CFrame = current
 				camera.FieldOfView = 75
 			end)

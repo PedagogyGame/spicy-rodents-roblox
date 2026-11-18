@@ -1204,7 +1204,8 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 						state.yaw = math.atan2(ox, oz)
 						state.vx, state.vy, state.vz = ox * state.moveSpeed, 0, oz * state.moveSpeed
 						emergedAt = if atStart then 0 else 1
-						state.emergedFrom, state.emergedEnd, state.emergedFw = rs.id, emergedAt, math.sign(fw)
+						state.emergedFrom, state.emergedEnd, state.emergedFw =
+							rs.id, if atStart then 0 else 1, math.sign(fw)
 						push(events, "emerge", nil, rs.id)
 					elseif m and m.opens == "link" and #m.links > 0 then
 						if takeLink(state, world, m.links[1], input, events) then

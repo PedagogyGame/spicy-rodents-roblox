@@ -2,8 +2,16 @@
 -- The hollow trees in the baked town (build/Town.rbxm: lune run tools/bake/main.luau; Shared/World/HollowLayout,
 -- Server/World/HollowShell): every ground hole and the 8 studs a squirrel runs in on are open ground (nothing of
 -- the town in the way, the ground level with the hole), and no piece of a hollow's shell stands in a part of the town.
+-- The tunnel camera inside (Client/Camera/CameraRig.tunnelPoint, its rays meeting only the shell, the point held by
+-- HollowLayout's keepCamera) along every way in and up, with the town's invisible trunk colliders present: never
+-- outside the cavity (the screen showing bark), never in the squirrel's head.
 local fs = require("@lune/fs")
+local roblox = require("@lune/roblox")
+local Data = require("@shared/Data")
 local HollowLayout = require("@shared/World/HollowLayout")
+local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local HollowShell = require("@server/World/HollowShell")
+local CameraRig = require("@client/Camera/CameraRig")
 local BakedWorld = require("@tests/lib/BakedWorld")
 
 return function(t)
@@ -66,4 +74,82 @@ return function(t)
 			end
 		end
 	end)
+	t.test(
+		"the tunnel camera in every hollow stays in the cavity and off the head (trunk colliders present)",
+		function()
+			local data = Data.default()
+			local town = roblox.deserializeModel(fs.readFile("build/Town.rbxm"))[1]
+			HollowShell.build(roblox, layout).Parent = town
+			local baked = BakedWorld.fromModel(town)
+			local w = baked:motorWorld(data)
+			-- what the rig's ray meets inside a hollow: the shell's parts only (Workspace.HollowTrees, an Include filter)
+			local function cast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
+				local inside = {}
+				for _, p in baked.containing(ox, oy, oz) do
+					inside[p] = true
+				end
+				local tt, part = baked.raycast(ox, oy, oz, dx, dy, dz, function(p: BakedWorld.Part): boolean
+					return not inside[p]
+						and string.find(p.path, "HollowTrees", 1, true) ~= nil
+						and (p.collide or p.query)
+				end)
+				if tt and part then
+					return ox + dx * tt, oy + dy * tt, oz + dz * tt
+				end
+				return nil, nil, nil
+			end
+			for _, h in layout.hollows do
+				local m = h.mouths[1]
+				for _, mm in h.mouths do
+					if mm.opens == "ground" then
+						m = mm
+					end
+				end
+				local ol = math.sqrt(m.out[1] ^ 2 + m.out[3] ^ 2)
+				local ox, oz = m.out[1] / ol, m.out[3] / ol
+				local x, z = m.x + ox * 6, m.z + oz * 6
+				local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
+				local cam = BakedWorld.cameraYawToward(-ox, -oz)
+				local frames, outside, inHead = 0, 0, 0
+				BakedWorld.drive(w, s, 60 * 20, function(_f: number, st: SquirrelMotor.State): SquirrelMotor.Input
+					return BakedWorld.keys(
+						if st.routeId then BakedWorld.cameraYawToward(math.sin(st.yaw), math.cos(st.yaw)) else cam,
+						{ fw = 1 }
+					)
+				end, {
+					stop = function(st: SquirrelMotor.State): boolean
+						local v = SquirrelMotor.visualPose(st, w)
+						local hx, hy, hz = v.x, v.y + 0.35, v.z -- the rig's head: the root and 0.35 over
+						if layout.contains(hx, hy, hz) == h.space then
+							frames += 1
+							local cx, cy, cz = CameraRig.tunnelPoint(
+								hx,
+								hy,
+								hz,
+								math.sin(st.yaw),
+								math.cos(st.yaw),
+								cast,
+								layout.keepCamera
+							)
+							if not layout.within(h, cx, cy, cz) then
+								outside += 1
+							end
+							if (cx - hx) ^ 2 + (cy - hy) ^ 2 + (cz - hz) ^ 2 < 0.6 ^ 2 then
+								inHead += 1
+							end
+						end
+						if h.variant == "knothole" then
+							return st.routeId == h.routes[1] and st.railT > 0.99
+						elseif h.variant == "log" then
+							return st.routeId == nil and frames > 0
+						end
+						return st.routeId ~= nil and layout.spaceOf(st.routeId) == nil -- out at the top
+					end,
+				})
+				t.truthy(frames >= 10, `{h.id}: {frames} frames inside`)
+				t.eq(outside, 0, `{h.id}: frames with the camera outside the cavity`)
+				t.eq(inHead, 0, `{h.id}: frames with the camera in the squirrel's head`)
+			end
+		end
+	)
 end
