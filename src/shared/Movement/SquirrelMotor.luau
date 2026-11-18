@@ -22,8 +22,10 @@
 -- a walk or a flight); inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
 -- E, A/D and the end-of-route switch never pass the wall; at a mouth they launch from outside its face
 -- (Motion.launchPoint) along its `out` (a mouth's `hop` makes Space and a click a short hop; Q pushes out); an end
--- mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip", where a view
--- turned round with W held turns back; run on along its link), an end without one takes its authored end link,
+-- mouth lets the body out as it says (step out on the ground: "emerge", and that mouth does not take the body back
+-- while the key it came out on is still held and it stays by the mouth: holding S after backing out leaves it outside;
+-- stop with the head out: "lip", where a view turned round with W held turns back; run on along its link), an end
+-- without one takes its authored end link,
 -- else stops ("railEnd" once per arrival); A/D picks an authored fork or part-way link ahead, taken as W passes it
 -- ("forkTaken" / "mouthLink"), E takes one within reach or steps out of a part-way opening ("emerge"). Every one of
 -- these applies only to routes that carry `enclosure`: every other route behaves exactly as before.
@@ -116,6 +118,11 @@ export type State = {
 	routeWasMoving: boolean,
 	routeFreeLook: number,
 	pendingFork: number?, -- branch id of the chosen fork (pendingFork.branch)
+	-- the enclosed run the body last stepped out of on the ground, the end (0 or 1) and the fw it came out on: that
+	-- mouth does not take it back until fw changes or it is P.emergeClear from the mouth (nil: no such run)
+	emergedFrom: number?,
+	emergedEnd: number,
+	emergedFw: number,
 	selectedJunction: number?, -- route id of the A/D junction selection
 	bridge: Bridge?,
 	clock: number, -- accumulated simulated seconds (packet timestamps)
@@ -179,6 +186,9 @@ SquirrelMotor.params = {
 	gravity = st(30), -- SQUIRREL_GRAVITY (L6472)
 	-- walk-in auto-grab (§9.1)
 	autoGrabMinSpeed = st(0.45),
+	-- out of an enclosed run's ground mouth: that mouth takes the body back once it is this far (studs, level) from it
+	-- or the forward key changes (holding S after backing out of a hollow must not pin it at the hole)
+	emergeClear = 3,
 	-- leap and pounce (§13; L5915-5921, L6473-6481)
 	leapForward = st(16.5),
 	leapForwardBoost = st(18.5),
@@ -251,6 +261,9 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		routeFreeLook = 0,
 		pendingFork = nil,
 		selectedJunction = nil,
+		emergedFrom = nil,
+		emergedEnd = 0,
+		emergedFw = 0,
 		bridge = nil,
 		clock = 0,
 		alive = true,
@@ -271,6 +284,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.bridge = nil
 	state.pendingFork = nil
 	state.selectedJunction = nil
+	state.emergedFrom = nil
 	state.routeWasMoving = false
 	state.routeFreeLook = 0
 	state.committedAirborne = false
@@ -357,9 +371,11 @@ local SCALARS = {
 	"routeFreeLook",
 	"clock",
 	"stamina",
+	"emergedEnd",
+	"emergedFw",
 }
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
-local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction" }
+local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
 
 function SquirrelMotor.serialize(state: State): Snapshot
 	local s: Snapshot = {}
@@ -1060,6 +1076,20 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 	-- the air (a leap or a pounce too: going in ends the attack); eased onto the rail. Nothing happens here in a
 	-- world without enclosed runs.
 	local wasGrounded = state.grounded
+	local lockedMouth: number? = nil
+	if state.emergedFrom ~= nil then
+		local er = route(world, state.emergedFrom)
+		local clear = rail ~= nil or er == nil or math.sign(fw) ~= state.emergedFw
+		if not clear and er then
+			local p = reg:pointAt(er, state.emergedEnd)
+			clear = (state.x - p.x) ^ 2 + (state.z - p.z) ^ 2 > P.emergeClear * P.emergeClear
+		end
+		if clear then
+			state.emergedFrom = nil
+		else
+			lockedMouth = state.emergedFrom
+		end
+	end
 	if not rail then
 		local mvx, mvz = 0, 0
 		if state.grounded and state.attackWindow == 0 then
@@ -1072,7 +1102,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 		end
 		if mvx ~= 0 or mvz ~= 0 then
 			local mouth = Motion.mouthEntry(world, state.x, state.y, state.z, mvx, mvz)
-			if mouth and enterRoute(state, world, mouth, input, events, true) then
+			if mouth and mouth.routeId ~= lockedMouth and enterRoute(state, world, mouth, input, events, true) then
 				state.attackWindow, state.attack = 0, 0
 				push(events, "enter", mouth.routeId)
 				rail = route(world, state.routeId)
@@ -1174,6 +1204,8 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 						state.yaw = math.atan2(ox, oz)
 						state.vx, state.vy, state.vz = ox * state.moveSpeed, 0, oz * state.moveSpeed
 						emergedAt = if atStart then 0 else 1
+						state.emergedFrom, state.emergedEnd, state.emergedFw =
+							rs.id, if atStart then 0 else 1, math.sign(fw)
 						push(events, "emerge", nil, rs.id)
 					elseif m and m.opens == "link" and #m.links > 0 then
 						if takeLink(state, world, m.links[1], input, events) then

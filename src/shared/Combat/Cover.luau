@@ -6,11 +6,13 @@
 -- not inside"). A cover is a box in a placed frame (the alley's local frame: X across, Y up, D down-lane, placed as
 -- Shared/Attractions/AlleyLayout places it). A body inside a cover cannot be reached from outside it, nor the other
 -- way round: between(a, b) is true when one of the two points lies inside a cover the other is not inside.
+-- A cover that is not a box (a hollow tree's cavity, the fallen log) is a Shape: a name and its own inside test.
 -- The covers in force are a small registry: the server service that owns a housing adds its boxes when it starts
--- and removes them when it stops (Server/Attractions/RafterService: the vent unit and its duct); PlayRules'
--- kickTarget and biteVictims ask between(). With no cover added (the client, every other spec) nothing changes.
--- Interface: Box; add(box) -> key; remove(key); clear(); list() -> { Box }; inside(box, x, y, z) -> boolean;
---   between(ax, ay, az, bx, by, bz) -> boolean
+-- and removes them when it stops (Server/Attractions/RafterService: the vent unit and its duct;
+-- Server/Foraging/HollowService: each hollow's cavities as a Shape); PlayRules' kickTarget and biteVictims ask
+-- between(). With no cover added (the client, every other spec) nothing changes.
+-- Interface: Box; Shape; add(box) -> key; addShape(shape) -> key; remove(key); clear(); list() -> { Box | Shape };
+--   inside(box, x, y, z) -> boolean; between(ax, ay, az, bx, by, bz) -> boolean
 -- Pure apart from the registry; no engine calls.
 
 export type Place = { x: number, z: number, floorY: number, yaw: number } -- AlleyLayout.Place
@@ -24,10 +26,12 @@ export type Box = {
 	d0: number,
 	d1: number,
 }
+export type Shape = { name: string, test: (x: number, y: number, z: number) -> boolean }
 
 local Cover = {}
 
 local boxes: { [number]: Box } = {}
+local shapes: { [number]: Shape } = {}
 local nextKey = 0
 
 -- add(box) -> key: the box is in force until remove(key).
@@ -37,18 +41,30 @@ function Cover.add(box: Box): number
 	return nextKey
 end
 
+-- addShape(shape) -> key: a cover of any shape (shape.test(x, y, z): the point is inside it) until remove(key).
+function Cover.addShape(shape: Shape): number
+	nextKey += 1
+	shapes[nextKey] = table.freeze(table.clone(shape))
+	return nextKey
+end
+
 function Cover.remove(key: number)
 	boxes[key] = nil
+	shapes[key] = nil
 end
 
 function Cover.clear()
 	table.clear(boxes)
+	table.clear(shapes)
 end
 
-function Cover.list(): { Box }
-	local out = {}
+function Cover.list(): { Box | Shape }
+	local out: { Box | Shape } = {}
 	for _, b in boxes do
 		table.insert(out, b)
+	end
+	for _, sh in shapes do
+		table.insert(out, sh)
 	end
 	return out
 end
@@ -68,6 +84,11 @@ end
 function Cover.between(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean
 	for _, box in boxes do
 		if Cover.inside(box, ax, ay, az) ~= Cover.inside(box, bx, by, bz) then
+			return true
+		end
+	end
+	for _, sh in shapes do
+		if sh.test(ax, ay, az) ~= sh.test(bx, by, bz) then
 			return true
 		end
 	end

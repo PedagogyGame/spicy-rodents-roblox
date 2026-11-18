@@ -29,6 +29,10 @@ return {
 			count = 1,
 			chunks = { "HarvestPatches" },
 		},
+		HollowTrees = {
+			count = 1,
+			chunks = { "HollowTrees" },
+		},
 		Hollows = {
 			count = 1,
 			chunks = { "Hollows" },

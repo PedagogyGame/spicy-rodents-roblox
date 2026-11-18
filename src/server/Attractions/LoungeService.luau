@@ -608,6 +608,13 @@ function LoungeService.order(self: any, player: any, id: string): (boolean, stri
 	return ok, words
 end
 
+-- A staff figure's pivot at `at` facing `toward` (a direction). The baked figures face their Root's +Z (the bake's
+-- -D, tools/bake/lounge_classic/Staff; the rounded people dressed on them by Assets/PeopleArt too), so the pivot's
+-- LookVector points away from where they look.
+function LoungeService.facing(at: Vector3, toward: Vector3): CFrame
+	return CFrame.lookAt(at, at - toward)
+end
+
 -- The nearest guard steps toward the target and will step back.
 function LoungeService._strike(self: any, target: Vector3, t: number)
 	local best, bestD = nil, math.huge
@@ -626,10 +633,10 @@ function LoungeService._strike(self: any, target: Vector3, t: number)
 	local home = s.home
 	local flat = Vector3.new(target.X, home.Position.Y, target.Z)
 	local dir = flat - home.Position
-	local facing = if dir.Magnitude > 1e-3 then dir.Unit else home.LookVector
+	local facing = if dir.Magnitude > 1e-3 then dir.Unit else -home.LookVector
 	local at = home.Position + facing * math.min(LoungeService.LUNGE, dir.Magnitude)
 	pcall(function()
-		s.model:PivotTo(CFrame.lookAt(at, at + facing))
+		s.model:PivotTo(LoungeService.facing(at, facing))
 	end)
 	self.strikes[best] = { model = s.model, home = home, untilT = t + LoungeService.STRIKE }
 	play(self.sounds.swat)
@@ -657,7 +664,10 @@ function LoungeService.step(self: any, _dt: number?)
 		else
 			local h = bt.home.Position
 			pcall(function()
-				bt.model:PivotTo(CFrame.lookAt(h, Vector3.new(serving.at.X, h.Y, serving.at.Z)))
+				local to = Vector3.new(serving.at.X, h.Y, serving.at.Z) - h
+				if to.Magnitude > 1e-3 then
+					bt.model:PivotTo(LoungeService.facing(h, to.Unit))
+				end
 			end)
 		end
 	end
