@@ -12,6 +12,8 @@
 --   part-way knothole goes out onto the other bough; A or D on the way up picks the hideout or the knothole
 --   the spiral: W climbs the ramp past its landings and runs out of the top knothole onto the outside trunk
 --   the log: in at one end, out at the other, both ways
+--   nothing of the shell through the bark: every corner of every piece (but the knothole ovals on it) inside the
+--   bark mesh's flats less HollowLayout.C.barkClear, measured level from the leaning axis at its own height
 --   nothing through walls: the body's section along every route meets nothing of the shell but the knothole's oval
 --   it slips through; inside, away from a mouth, Space, Q, a click and E do nothing
 --   out of sight inside: every chamber is hidden (Enclosure.hidden) and in its cavity (HollowLayout.contains); a
@@ -106,6 +108,28 @@ return function(t)
 				n += if h.variant == v then 1 else 0
 			end
 			t.eq(n, 1, v)
+		end
+	end)
+
+	t.test("nothing of the shell through the bark: every corner inside the bark's flats, lean included", function()
+		local C = HollowLayout.C
+		for _, h in layout.hollows do
+			if h.trunk == nil then
+				continue
+			end
+			local tr = HollowLayout.trunk(reg, h.trunk)
+			local pieces = {}
+			for _, pc in h.parts do
+				-- (a knothole's oval lies on the bark outside by design)
+				if pc.role ~= "knothole" then
+					table.insert(pieces, pc)
+				end
+			end
+			local over = HollowLayout.barkOver(tr, pieces)
+			t.truthy(
+				over <= 1e-9,
+				`{h.id}: a corner {string.format("%.3f", over + C.barkClear)} studs past the bark's flats less {C.barkClear}`
+			)
 		end
 	end)
 

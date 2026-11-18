@@ -76,6 +76,10 @@ HollowLayout.C = {
 	shelf = 1.5, -- studs: a hideout shelf's length across the shaft
 	logWall = 0.3,
 	cameraIn = 0.3, -- studs: the tunnel camera kept this far inside a cavity's wall (the liner boards stand outside it)
+	-- the bark mesh has 14 flats (Builders/Trees, the Blender trees): between its corners it is this much of the
+	-- nominal radius; every corner of the shell stays C.barkClear inside that at its height, lean included
+	barkFace = math.cos(math.pi / 14),
+	barkClear = 0.08,
 }
 local C = HollowLayout.C
 
@@ -274,21 +278,16 @@ function HollowLayout.boughExit(harvest: Harvest, trunk: Trunk, boughId: number)
 	error(`hollow: bough {boughId} never leaves the bark of trunk {trunk.route.id}`)
 end
 
--- A board of a ring: `n` boards round a vertical cylinder of inner radius `radius` from y0 to y1 at (cx, cz),
--- leaving out every board whose arc meets one of `gaps` (bearings, degrees, each `gapChord` studs wide at the ring).
-local function ring(
-	parts: { Piece },
-	role: string,
-	cx: number,
-	cz: number,
-	radius: number,
-	y0: number,
-	y1: number,
-	gaps: { number }
-)
+-- A ring of liner boards round the trunk's axis from a0 to a1 (world points on it; the ring leans with it): boards of
+-- inner radius `radius`, leaving out every board whose arc meets one of `gaps` (bearings, degrees, each `gapChord`
+-- studs wide at the ring).
+local function ring(parts: { Piece }, role: string, a0: { number }, a1: { number }, radius: number, gaps: { number })
 	local n = math.max(C.ringMin, math.ceil(2 * math.pi * radius / C.ringArc))
 	local half = math.pi / n
 	local width = 2 * (radius + C.liner) * math.tan(half) + 0.05
+	local u = unit({ a1[1] - a0[1], a1[2] - a0[2], a1[3] - a0[3] })
+	local len = math.sqrt((a1[1] - a0[1]) ^ 2 + (a1[2] - a0[2]) ^ 2 + (a1[3] - a0[3]) ^ 2)
+	local cx, cy, cz = (a0[1] + a1[1]) / 2, (a0[2] + a1[2]) / 2, (a0[3] + a1[3]) / 2
 	for k = 0, n - 1 do
 		local a = (k + 0.5) * 2 * half -- the board's middle bearing, radians
 		local open = false
@@ -304,17 +303,69 @@ local function ring(
 		if open then
 			continue
 		end
+		-- the bearing's level direction, square to the axis
 		local dx, dz = math.sin(a), math.cos(a)
+		local along = dx * u[1] + dz * u[3]
+		local rad = unit({ dx - u[1] * along, -u[2] * along, dz - u[3] * along })
+		local xv = cross(u, rad)
 		local rr = radius + C.liner / 2
 		table.insert(parts, {
 			role = role,
 			shape = "Block",
-			p = { r4(cx + dx * rr), r4((y0 + y1) / 2), r4(cz + dz * rr) },
-			xv = { r4(dz), 0, r4(-dx) },
-			yv = { 0, 1, 0 },
-			size = { r4(width), r4(y1 - y0), C.liner },
+			p = { r4(cx + rad[1] * rr), r4(cy + rad[2] * rr), r4(cz + rad[3] * rr) },
+			xv = { r4(xv[1]), r4(xv[2]), r4(xv[3]) },
+			yv = { r4(u[1]), r4(u[2]), r4(u[3]) },
+			size = { r4(width), r4(len), C.liner },
 		})
 	end
+end
+
+-- The corners of a piece (a Block's eight; a Cylinder's rims, 24 points each), world points.
+function HollowLayout.corners(pc: Piece): { { number } }
+	local xv, yv = pc.xv, pc.yv
+	local zv = cross(xv, yv)
+	local hx, hy, hz = pc.size[1] / 2, pc.size[2] / 2, pc.size[3] / 2
+	local out = {}
+	local function at(a: number, b: number, c: number)
+		table.insert(out, {
+			pc.p[1] + xv[1] * a + yv[1] * b + zv[1] * c,
+			pc.p[2] + xv[2] * a + yv[2] * b + zv[2] * c,
+			pc.p[3] + xv[3] * a + yv[3] * b + zv[3] * c,
+		})
+	end
+	for _, sx in { -1, 1 } do
+		if pc.shape == "Cylinder" then
+			-- the axis along xv, round in yv and zv
+			for k = 0, 23 do
+				local ang = k * math.pi / 12
+				at(hx * sx, math.cos(ang) * hy, math.sin(ang) * hy)
+			end
+		else
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					at(hx * sx, hy * sy, hz * sz)
+				end
+			end
+		end
+	end
+	return out
+end
+
+-- How far the farthest corner of `pieces` stands outside the bark's flats less C.barkClear (studs; <= 0: inside),
+-- measured level from the axis at each corner's own height. Corners under the trunk's foot are not measured.
+function HollowLayout.barkOver(tr: Trunk, pieces: { Piece }): number
+	local over = -math.huge
+	for _, pc in pieces do
+		for _, c in HollowLayout.corners(pc) do
+			local h = c[2] - tr.foot.y
+			if h >= 0 then
+				local ax, _, az = tr.axisAt(h)
+				local d = math.sqrt((c[1] - ax) ^ 2 + (c[3] - az) ^ 2)
+				over = math.max(over, d - (tr.bark(h) * C.barkFace - C.barkClear))
+			end
+		end
+	end
+	return over
 end
 
 -- A flat disc (a vertical-axis cylinder part) at (cx, cz), its top at `top`.
@@ -484,26 +535,66 @@ local function holeRun(b: Build, bearing: number): ({ { number } }, number, numb
 	return { hole, tr.toWorld(bearing, rc0 + 0.3, floorH) }, floorH, rc0
 end
 
--- rings of liner boards from h0 to h1 (tree-local heights), each tier as wide as the bark lets it be at its top;
--- `gaps` = { {h, bearing} } passages through the ring at those heights
-local function tiers(b: Build, h0: number, h1: number, gaps: { { number } })
-	local tr = b.trunk
+-- The rings of liner boards from h0 to h1 (tree-local heights): each tier C.tier high (a short last one joins the
+-- one under it), leaning with the axis, as wide as the bark lets it be at its top and narrowed until every corner of
+-- its boards stays inside the bark's flats (HollowLayout.barkOver): { h, top, a0, a1, rc }.
+type Tier = { h: number, top: number, a0: { number }, a1: { number }, rc: number }
+local function tierRings(tr: Trunk, h0: number, h1: number): { Tier }
+	local out: { Tier } = {}
 	local h = h0
 	while h < h1 - 0.01 do
 		local top = math.min(h + C.tier, h1)
 		if h1 - top < 1.5 then
 			top = h1
 		end
+		local x0, y0, z0 = tr.axisAt(h)
+		local x1, y1, z1 = tr.axisAt(top)
+		local a0, a1 = { x0, y0, z0 }, { x1, y1, z1 }
+		if h == h0 then
+			-- the bottom ring stands upright on the floor (round the axis at its middle): leaning, its low side would
+			-- dip into the ground
+			local mx, _, mz = tr.axisAt((h + top) / 2)
+			a0, a1 = { mx, y0, mz }, { mx, y1, mz }
+		end
 		local rc = tr.bark(top) - C.wall
-		local x, _, z = tr.axisAt((h + top) / 2)
+		for _ = 1, 40 do
+			local trial: { Piece } = {}
+			ring(trial, "liner", a0, a1, rc, {})
+			local over = HollowLayout.barkOver(tr, trial)
+			if over <= 0 then
+				break
+			end
+			rc -= over + 0.002
+		end
+		table.insert(out, { h = h, top = top, a0 = a0, a1 = a1, rc = rc })
+		h = top
+	end
+	return out
+end
+
+-- the narrowest ring of `rings` within a tier of height h (a climb line between points C.tier apart keeps inside it)
+local function ringNear(rings: { Tier }, h: number): number
+	local rc = math.huge
+	for _, r in rings do
+		if r.top >= h - C.tier and r.h <= h + C.tier then
+			rc = math.min(rc, r.rc)
+		end
+	end
+	return rc
+end
+
+-- the rings of liner boards from h0 to h1 (tierRings); `gaps` = { {h, bearing} } passages through a ring at
+-- those heights
+local function tiers(b: Build, h0: number, h1: number, gaps: { { number } })
+	local tr = b.trunk
+	for _, r in tierRings(tr, h0, h1) do
 		local open = {}
 		for _, g in gaps do
-			if g[1] >= h - 1.0 and g[1] <= top + 1.0 then
+			if g[1] >= r.h - 1.0 and g[1] <= r.top + 1.0 then
 				table.insert(open, g[2])
 			end
 		end
-		ring(b.hollow.parts, "liner", x, z, rc, tr.foot.y + h, tr.foot.y + top, open)
-		h = top
+		ring(b.hollow.parts, "liner", r.a0, r.a1, r.rc, open)
 	end
 end
 
@@ -512,7 +603,17 @@ local function caps(b: Build, floorH: number, rcFloor: number, roofH: number, rc
 	local fx, _, fz = tr.axisAt(floorH)
 	disc(b.hollow.parts, "floor", fx, fz, rcFloor, tr.foot.y + floorH, 0.4)
 	local rx, _, rz = tr.axisAt(roofH)
-	disc(b.hollow.parts, "roof", rx, rz, rcRoof + C.liner, tr.foot.y + roofH + 0.3, 0.3)
+	local roofR = rcRoof + C.liner
+	for _ = 1, 40 do
+		local trial: { Piece } = {}
+		disc(trial, "roof", rx, rz, roofR, tr.foot.y + roofH + 0.3, 0.3)
+		local over = HollowLayout.barkOver(tr, trial)
+		if over <= 0 then
+			break
+		end
+		roofR -= over + 0.002
+	end
+	disc(b.hollow.parts, "roof", rx, rz, roofR, tr.foot.y + roofH + 0.3, 0.3)
 end
 
 local function holeKnot(b: Build, bearing: number, h: number)
@@ -554,8 +655,10 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 	local knotT, _, knotB, knotH = HollowLayout.boughExit(b.harvest, tr, inside.knot)
 	local top = wallH - 1
 	local pts, floorH, rc0 = holeRun(b, bearing)
+	-- the climb's line: C.shaftIn inside the wall above it, and inside the rings round it (narrowed to the bark)
+	local rings = tierRings(tr, floorH - 0.05, top + C.room)
 	local function rho(h: number): number
-		return tr.bark(math.min(h + C.tier, top + C.room)) - C.wall - C.shaftIn
+		return math.min(tr.bark(math.min(h + C.tier, top + C.room)) - C.wall, ringNear(rings, h)) - C.shaftIn
 	end
 	local h0 = floorH + 0.5
 	table.insert(pts, tr.toWorld(wallB, rho(floorH) - 0.7, floorH))
@@ -564,8 +667,8 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 	local h = h0
 	while h < top - 0.01 do
 		table.insert(shaft, tr.toWorld(wallB, rho(h), h))
-		h = math.min(h + C.tier, top)
-		if top - h < 2 then
+		h = math.min(h + C.tier / 2, top) -- (half a tier: the line keeps to a bending axis)
+		if top - h < 1 then
 			h = top
 		end
 	end
