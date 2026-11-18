@@ -65,6 +65,8 @@ local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local LightingPreset = Import.shared("World/LightingPreset") :: typeof(require("../../shared/World/LightingPreset"))
 local PlayRules = Import.shared("Combat/PlayRules") :: typeof(require("../../shared/Combat/PlayRules"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local PowerRules = Import.shared("Rodent/PowerRules") :: typeof(require("../../shared/Rodent/PowerRules"))
 local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
@@ -1001,9 +1003,12 @@ function Game.start(opts: Opts?): any
 			local actor = possession:actorOf(player)
 			if s.role == "rodent" and actor and actor.variant == "spicy" then
 				local root = (actor.body :: Model).PrimaryPart
-				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody
+				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody; nor while
+				-- the water gun has it stunned (Items/ItemWorld)
 				local tid = townIdOf[actor.id]
-				if root and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
+				local stunnedUntil = (actor.body :: Model):GetAttribute(PossessionState.ATTR.StunnedUntil)
+				local stunned = type(stunnedUntil) == "number" and workspace:GetServerTimeNow() < stunnedUntil
+				if root and not stunned and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
 					if humans == nil then
 						humans = {}
 						for _, a in world.actors do

@@ -8,6 +8,10 @@ local Inventory = require("@server/Items/Inventory")
 local Common = require("@server/Actors/Brains/Common")
 local Squirrel = require("@server/Actors/Brains/Squirrel")
 local Human = require("@client/Controllers/Human")
+local SquirrelController = require("@client/Controllers/Squirrel")
+local ItemWorld = require("@server/Items/ItemWorld")
+local PossessionState = require("@shared/Actors/PossessionState")
+local FakeEngine = require("@tests/lib/FakeEngine")
 
 type Rig = {
 	svc: ItemService.Service,
@@ -111,7 +115,6 @@ return function(t)
 			t.truthy(ItemRules.def(id) ~= nil, id)
 		end
 		-- every cue has its row for the lead to fill (a library sound's id), and none is filled with an upload here
-		local ItemWorld = require("@server/Items/ItemWorld")
 		for _, cue in ItemRules.CUES do
 			t.truthy(ItemWorld.SOUNDS[cue] ~= nil, `{cue}: no row in ItemWorld.SOUNDS`)
 		end
@@ -498,5 +501,21 @@ return function(t)
 		t.eq(r.acts[1].on, true, "one press after the change switches it on")
 		t.eq(#r.svc:putAway(r.player), 1)
 		t.eq(#r.svc:putAway(r.player), 0, "nothing left on")
+	end)
+	t.test("a player's rodent stunned: a deadline on the body its client obeys; never anchored, no timer", function()
+		local body = FakeEngine.model("Rodent", nil)
+		local root = FakeEngine.part("Root", nil, body)
+		body.PrimaryPart = root
+		ItemWorld.stunBody(body, 500, 1.3)
+		t.eq(body:GetAttribute(PossessionState.ATTR.StunnedUntil), 501.3)
+		t.eq(root.Anchored, false, "the body stays its client's (anchoring froze only the server's copy)")
+		t.truthy(SquirrelController.stunned(body:GetAttribute(PossessionState.ATTR.StunnedUntil), 501.2), "held still")
+		t.falsy(
+			SquirrelController.stunned(body:GetAttribute(PossessionState.ATTR.StunnedUntil), 501.3),
+			"free at the deadline"
+		)
+		t.falsy(SquirrelController.stunned(nil, 0), "never stunned")
+		ItemWorld.stunBody(body, 500.5, 0.2) -- (a shorter, later stun never cuts one short)
+		t.eq(body:GetAttribute(PossessionState.ATTR.StunnedUntil), 501.3)
 	end)
 end

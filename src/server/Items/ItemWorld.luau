@@ -7,7 +7,8 @@
 --   sound      a Sound named by its cue at the holder (SOUNDS has the ids: empty until the lead fills them from
 --              the stock library; docs/AUDIO_BUDGET.md "Corner store")
 --   squirt     a burst of water from the nozzle; a computer-run person hit hurries off, a player is told
---   stun       the rodent (a player's or the computer's) held still for the seconds
+--   stun       the rodent held still for the seconds: a player's through its body's StunnedUntil (its own client
+--              stops its motor), the computer's in its brain
 --   startle    the air horn: people hurry off, squirrels bolt, players are told
 --   vfx        bubbles from the wand for a few seconds
 --   light      a spotlight in the flashlight's head (bright at night, faint by day); open: the umbrella's canopy
@@ -24,13 +25,15 @@
 --   read, askText, screenshot   a message to the owner's client (Client/Items/ItemClient)
 --   kite       up on its string downwind of its flier, swaying; reeled in on the next use or out of the zone
 -- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
---   body change: toggles off, kite reeled in), stop() }; SOUNDS;
+--   body change: toggles off, kite reeled in), stop() }; stunBody(body, now, secs); SOUNDS;
 --   KITE (the flight's numbers)
 -- Engine only inside the functions; no side effects on require.
 
 local Import = require("../Import")
 local ItemRules = Import.shared("Items/ItemRules") :: typeof(require("../../shared/Items/ItemRules"))
 local Clock = Import.shared("Time/Clock") :: typeof(require("../../shared/Time/Clock"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local ItemService = require("./ItemService")
 
 local ItemWorld = {}
@@ -109,6 +112,17 @@ local function newPart(name: string, size: Vector3, cf: CFrame, color: Color3, p
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
+end
+
+-- A player's rodent stunned: only the deadline (server time) on its body. Its own client gives the motor no input
+-- until then (Controllers/Squirrel), so nothing here anchors the body, owns it or runs a timer: a release or a new
+-- driver in the meantime changes nothing, and a later stun only ever lengthens it.
+function ItemWorld.stunBody(body: Instance, now: number, secs: number)
+	local was = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
+	local untilTime = now + secs
+	if type(was) ~= "number" or was < untilTime then
+		body:SetAttribute(PossessionState.ATTR.StunnedUntil, untilTime)
+	end
 end
 
 function ItemWorld.start(opts: StartOpts): World
@@ -426,25 +440,13 @@ function ItemWorld.start(opts: StartOpts): World
 		elseif kind == "stun" then
 			for _, t in (targets or {}) :: { ItemService.Target } do
 				if t.player then
-					local r = rootOf(t.player)
-					if r then
-						local was = r.Anchored
-						r.Anchored = true
-						r:SetAttribute("Stunned", true)
+					-- a player's body moves on its own client (never anchored here: that would freeze only the
+					-- server's copy and take the body off its client): the deadline on the body, which the
+					-- client's controller honours by giving its motor no input until then (Controllers/Squirrel)
+					local a = actorOf(t.player)
+					if a and a.body then
+						ItemWorld.stunBody(a.body, workspace:GetServerTimeNow(), e.secs)
 						notify(t.player, "Squirted! Stunned for a moment.")
-						local who = t.player
-						task.delay(e.secs, function()
-							if r.Parent then
-								r.Anchored = was
-								r:SetAttribute("Stunned", nil)
-								-- (anchoring dropped the body's network owner: back to its player)
-								pcall(function()
-									if not r.Anchored and typeof(who) == "Instance" then
-										r:SetNetworkOwner(who :: Player)
-									end
-								end)
-							end
-						end)
 					end
 				else
 					local world = rt and rt.world
