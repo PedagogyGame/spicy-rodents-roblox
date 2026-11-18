@@ -58,6 +58,7 @@ export type ClientWorld = {
 	blockedCore: (x: number, z: number, y: number) -> boolean,
 	blockedHalf: (x: number, z: number, y: number, half: number) -> boolean,
 	blockedRadius: (x: number, z: number, y: number, r: number) -> boolean,
+	wallsFrom: (x: number, z: number, y: number) -> (), -- where a motor's wall sweep starts (a car over the body lets it out)
 	waterAt: (x: number, z: number) -> number?,
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number },
 	rail: () -> any?,
@@ -274,6 +275,7 @@ function ClientWorld.get(): ClientWorld
 		end,
 		blockedCore = cored,
 		blockedHalf = body,
+		wallsFrom = function(_x: number, _z: number, _y: number) end,
 		blockedRadius = function(x: number, z: number, y: number, r: number): boolean
 			return #workspace:GetPartBoundsInRadius(Vector3.new(x, y + 0.3, z), r, overlap) > 0
 		end,
@@ -297,8 +299,8 @@ function ClientWorld.get(): ClientWorld
 	}
 	-- the cars, as walls and roofs, in the motor's own tests
 	local withCars = Solid.squirrelWorld(self, self.cars)
-	self.groundAt, self.blocked, self.blockedCore, self.blockedHalf =
-		withCars.groundAt, withCars.blocked, withCars.blockedCore, withCars.blockedHalf
+	self.groundAt, self.blocked, self.blockedCore, self.blockedHalf, self.wallsFrom =
+		withCars.groundAt, withCars.blocked, withCars.blockedCore, withCars.blockedHalf, withCars.wallsFrom
 	task.spawn(function()
 		local ok, result = pcall(function()
 			return RailWorld.get(Data.default(), Height.at)

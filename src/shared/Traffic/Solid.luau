@@ -17,9 +17,11 @@
 -- walks out, and is never judged to have gone through.
 -- Interface: hull(kind, x, base, z, yaw, trail?) -> Hull; box(width, length, height, x, base, z, yaw, trail?) -> Hull;
 --   inside(h, x, z); overlaps(h, x, z, half, y0, y1); enters(h, ox, oy, oz, dx, dy, dz) -> t?;
---   newSet() -> Set; clear(set); add(set, h); blocked(set, x, z, half, y0, y1); roof(set, x, z, from) -> top?;
---   ray(set, ox, oy, oz, dx, dy, dz) -> boolean; body(set, x, z, y, half); core(set, x, z, y);
---   squirrelWorld(world, set) -> world (a copy whose groundAt, blocked, blockedCore and blockedHalf meet the set);
+--   newSet() -> Set; clear(set); add(set, h); blocked(set, x, z, half, y0, y1, skip?); roof(set, x, z, from) -> top?;
+--   ray(set, ox, oy, oz, dx, dy, dz) -> boolean; body(set, x, z, y, half, skip?); core(set, x, z, y, skip?);
+--   caught(set, x, z, y, into) (the cars the body's core is already inside);
+--   squirrelWorld(world, set) -> world (a copy whose groundAt, blocked, blockedCore and blockedHalf meet the set, and
+--   whose wallsFrom(x, z, y) lets a body out of a car it is already inside);
 --   BODY (the squirrel motor's body: Client/World/ClientWorld's numbers)
 -- Pure: no engine calls, no side effects on require. Studs, HTML yaw (a car faces (sin yaw, cos yaw)).
 
@@ -167,14 +169,22 @@ function Solid.add(set: Set, h: Hull)
 	set.hulls[set.n] = h
 end
 
--- blocked(set, x, z, half, y0, y1): does the upright box overlap any box of the set?
-function Solid.blocked(set: Set, x: number, z: number, half: number, y0: number, y1: number): boolean
+-- blocked(set, x, z, half, y0, y1, skip?): does the upright box overlap any box of the set (but those in `skip`)?
+function Solid.blocked(
+	set: Set,
+	x: number,
+	z: number,
+	half: number,
+	y0: number,
+	y1: number,
+	skip: { [Hull]: boolean }?
+): boolean
 	local hulls = set.hulls
 	for i = 1, set.n do
 		local h = hulls[i]
 		local r = h.reach + half * 1.415
 		local dx, dz = x - h.x, z - h.z
-		if dx * dx + dz * dz < r * r and Solid.overlaps(h, x, z, half, y0, y1) then
+		if dx * dx + dz * dz < r * r and not (skip and skip[h]) and Solid.overlaps(h, x, z, half, y0, y1) then
 			return true
 		end
 	end
@@ -213,20 +223,51 @@ end
 
 local BODY = Solid.BODY
 
--- body(set, x, z, y, half): the squirrel's body box at half-width `half` over feet y meets a car (ClientWorld.blockedHalf).
-function Solid.body(set: Set, x: number, z: number, y: number, half: number): boolean
-	return set.n > 0 and Solid.blocked(set, x, z, half, y + BODY.STEP, y + BODY.TOP)
+-- body(set, x, z, y, half, skip?): the squirrel's body box at half-width `half` over feet y meets a car
+-- (ClientWorld.blockedHalf).
+function Solid.body(set: Set, x: number, z: number, y: number, half: number, skip: { [Hull]: boolean }?): boolean
+	return set.n > 0 and Solid.blocked(set, x, z, half, y + BODY.STEP, y + BODY.TOP, skip)
 end
 
--- core(set, x, z, y): the body's narrow core over feet y meets a car (ClientWorld.blockedCore).
-function Solid.core(set: Set, x: number, z: number, y: number): boolean
-	return set.n > 0 and Solid.blocked(set, x, z, BODY.CORE, y + BODY.STEP, y + BODY.STEP + 2 * BODY.CORE)
+-- core(set, x, z, y, skip?): the body's narrow core over feet y meets a car (ClientWorld.blockedCore).
+function Solid.core(set: Set, x: number, z: number, y: number, skip: { [Hull]: boolean }?): boolean
+	return set.n > 0 and Solid.blocked(set, x, z, BODY.CORE, y + BODY.STEP, y + BODY.STEP + 2 * BODY.CORE, skip)
+end
+
+-- caught(set, x, z, y, into): fills `into` (cleared first) with the cars whose box the body's core over feet y already
+-- overlaps (a car that came over the body: it pulled up or appeared on it, the body was handed over or put back under
+-- it). The motor's walls leave those out for the step that starts there, so the body walks out of a car the way the
+-- validator's rays do (a ray that starts inside a box does not meet it); once the core is out the car is a wall again.
+function Solid.caught(set: Set, x: number, z: number, y: number, into: { [Hull]: boolean })
+	table.clear(into)
+	local y0, y1 = y + BODY.STEP, y + BODY.STEP + 2 * BODY.CORE
+	local hulls = set.hulls
+	for i = 1, set.n do
+		local h = hulls[i]
+		if Solid.overlaps(h, x, z, BODY.CORE, y0, y1) then
+			into[h] = true
+		end
+	end
 end
 
 -- squirrelWorld(world, set): a copy of a squirrel motor world whose ground and walls also meet the set's cars (read
--- each time they are asked: the set may be refilled every frame). The rest of the world is shared.
+-- each time they are asked: the set may be refilled every frame). The rest of the world is shared. Its `wallsFrom`
+-- (the motors call it where each wall sweep starts) leaves out, for that sweep, every car the body's core is already
+-- inside (Solid.caught): a car that came over a squirrel never holds it; it walks out by any side.
 function Solid.squirrelWorld(world: any, set: Set): any
 	local out = table.clone(world)
+	local skip: { [Hull]: boolean } = {}
+	local wallsFrom = world.wallsFrom
+	out.wallsFrom = function(x: number, z: number, y: number)
+		if set.n > 0 then
+			Solid.caught(set, x, z, y, skip)
+		elseif next(skip) ~= nil then
+			table.clear(skip)
+		end
+		if wallsFrom then
+			wallsFrom(x, z, y)
+		end
+	end
 	local groundAt, blocked, blockedCore, blockedHalf =
 		world.groundAt, world.blocked, world.blockedCore, world.blockedHalf
 	out.groundAt = function(x: number, z: number, refY: number): number
@@ -238,7 +279,7 @@ function Solid.squirrelWorld(world: any, set: Set): any
 		return if r and r > g then r else g
 	end
 	out.blocked = function(x: number, z: number, y: number): boolean
-		return Solid.body(set, x, z, y, BODY.HALF) or (blocked ~= nil and blocked(x, z, y))
+		return Solid.body(set, x, z, y, BODY.HALF, skip) or (blocked ~= nil and blocked(x, z, y))
 	end
 	-- (a world without the narrow tests keeps its whole wall test for its own walls: only a car is left at the core)
 	local baseCore = blockedCore or blocked
@@ -249,10 +290,10 @@ function Solid.squirrelWorld(world: any, set: Set): any
 			end
 			else nil
 	out.blockedCore = function(x: number, z: number, y: number): boolean
-		return Solid.core(set, x, z, y) or (baseCore ~= nil and baseCore(x, z, y))
+		return Solid.core(set, x, z, y, skip) or (baseCore ~= nil and baseCore(x, z, y))
 	end
 	out.blockedHalf = function(x: number, z: number, y: number, half: number): boolean
-		return Solid.body(set, x, z, y, half) or (baseHalf ~= nil and baseHalf(x, z, y, half))
+		return Solid.body(set, x, z, y, half, skip) or (baseHalf ~= nil and baseHalf(x, z, y, half))
 	end
 	return out
 end

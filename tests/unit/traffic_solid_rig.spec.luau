@@ -334,6 +334,80 @@ return function(t)
 		t.eq(o.result.snaps, 0)
 	end)
 
+	t.test(
+		"a squirrel a drawn car came over walks out of it by any side (sedan, van, RV, trolley, dump truck)",
+		function()
+			-- review 2026-11-18 (P1): the car pulled up or appeared over the body on its client, or the body was handed over
+			-- or put back under it; the walls the body is already inside are left out (Solid.caught), as the validator's
+			-- rays do; once out the car is a wall again
+			local road = ground - Units.st(0.18)
+			for _, kind in { "sedan", "ice_cream_van", "rv", "trolley", "dump_truck" } do
+				local box = Boxes.get(kind)
+				for _, at in { { box.width / 2 - 0.5, 0 }, { 0, box.length / 2 - 0.3 }, { 0, 0 } } do
+					for _, dir in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+						local drawn = Solid.newSet()
+						Solid.add(drawn, Solid.hull(kind, MX, road, MZ, 0))
+						local cw = Solid.squirrelWorld(town.world, drawn)
+						local s = SquirrelMotor.new(MX + at[1], ground, MZ + at[2])
+						local wasInside = Solid.core(drawn, s.x, s.z, s.y)
+						for _ = 1, 180 do
+							local input = SquirrelMotor.idleInput(yawToward(dir[1], dir[2]))
+							input.fw = 1
+							SquirrelMotor.step(s, input, 1 / 60, cw)
+						end
+						local where = `{kind} at ({at[1]}, {at[2]}) running ({dir[1]}, {dir[2]})`
+						t.truthy(wasInside, `{where}: starts inside`)
+						t.falsy(Solid.core(drawn, s.x, s.z, s.y), `{where}: got out`)
+						t.falsy(Solid.inside(drawn.hulls[1], s.x, s.z), `{where}: left the footprint`)
+					end
+				end
+			end
+			-- and out, the car is a wall again: back at its side, the body is held there
+			local drawn = Solid.newSet()
+			Solid.add(drawn, Solid.hull("sedan", MX, road, MZ, 0))
+			local cw = Solid.squirrelWorld(town.world, drawn)
+			local s = SquirrelMotor.new(MX + sedan.width / 2 - 0.5, ground, MZ)
+			for i = 1, 360 do
+				local input = SquirrelMotor.idleInput(yawToward(if i <= 120 then 1 else -1, 0))
+				input.fw = 1
+				SquirrelMotor.step(s, input, 1 / 60, cw)
+			end
+			t.truthy(s.x > MX + sedan.width / 2, `held at the side once out (x {s.x - MX})`)
+			t.falsy(Solid.core(drawn, s.x, s.z, s.y), "not back inside")
+		end
+	)
+
+	t.test("a car pulls up over a squirrel crossing its stop (80 ms): it walks out and crosses, 0 snaps", function()
+		-- review 2026-11-18 (P4): the server's car stops first (no run-over); the drawn car arrives 0.26 s later over
+		-- the body. Before: frozen inside the drawn car for 232 of 357 frames
+		local zLine = MZ + 5.0
+		for _, tgo in { 1.78, 1.83, 1.88 } do
+			local car = driving(1, "sedan", MX, MZ - 16, 8, 2)
+			local o = play(town, {
+				cars = { car },
+				start = SquirrelMotor.new(MX - 7, ground, zLine),
+				keys = function(tt: number, state: State): SquirrelMotor.Input
+					local goal = if tt < tgo then MX - 7 else MX + 9
+					local input = SquirrelMotor.idleInput(yawToward(goal - state.x, zLine - state.z))
+					if math.abs(goal - state.x) > 0.5 then
+						input.fw = 1
+						input.sprint = true
+					end
+					return input
+				end,
+				seconds = 6,
+				lag = LINKS[1].lag,
+				link = { latency = 0.08, jitter = 0.05, loss = 0 },
+				seed = 7,
+			})
+			report(`pulls up over it, go {tgo}`, o)
+			t.truthy(o.inside <= 15, `inside a drawn car at most a quarter second ({o.inside} frames)`)
+			local last = o.trace[#o.trace]
+			t.truthy(last[1] > MX + 8, `crossed (x {last[1] - MX})`)
+			t.eq(o.result.snaps, 0, "snaps")
+		end
+	end)
+
 	-- the server's fatal test on the squirrel's reported moves against the server's car, the client's motor meeting the
 	-- car drawn `lag` behind: true when the car ran it over, and when
 	local function runOver(
