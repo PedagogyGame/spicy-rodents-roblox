@@ -526,7 +526,8 @@ return function(t)
 			t.eq(counts["air_hockey.lose"] or 0, if sim.winner == 0 then 0 else 1)
 			for cue, id in MinigameSounds.CUES do
 				if string.sub(cue, 1, 11) == "air_hockey." then
-					t.eq(id, "", cue)
+					-- none yet, or a licensed library sound (chosen 18 November; never uploaded)
+					t.truthy(id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, cue)
 				end
 			end
 			-- Leave: the camera and the legs come back

@@ -151,10 +151,18 @@ local function newPart(name: string, size: Vector3, cf: CFrame, parent: any): an
 	return p
 end
 
+-- cue name -> a licensed library sound (Roblox's verified partner ProSoundEffects; chosen 18 November, never uploaded)
+LoungeService.SOUND_IDS = table.freeze({
+	["Lounge.GuardSwat"] = "rbxassetid://9113842150", -- Cloth Whooshes Soft Whooshing Pass Bys 1
+	["Lounge.Door"] = "rbxassetid://9114745537", -- Half Glass Door 1
+	["Lounge.Pour"] = "rbxassetid://9117865590", -- Pour Tea From Pot Into Cup 3
+	["Lounge.CounterBell"] = "rbxassetid://9125485591", -- Desk Bell Counter Service
+}) :: { [string]: string }
+
 local function cue(parent: any, name: string): any
 	local s = Instance.new("Sound")
 	s.Name = name
-	s.SoundId = "" -- a cue point: the lead fills it from the library (docs/AUDIO_BUDGET.md); never uploaded here
+	s.SoundId = LoungeService.SOUND_IDS[name] or "" -- (docs/AUDIO_BUDGET.md); never uploaded here
 	s.Parent = parent
 	return s
 end

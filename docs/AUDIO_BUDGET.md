@@ -152,3 +152,17 @@ Twenty effects and six tracks; all from the library, so none counts against the 
 | Cue | When it fires | Wanted |
 |---|---|---|
 | `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | a friendly medium dog's "woof woof", not a growl |
+
+## Sound effects chosen 18 November (licensed library, nothing uploaded)
+Picked from Roblox's Creator Store by name and length, only from Roblox's verified licensed partners (ProSoundEffects for effects, APMOfficial for stings); not yet heard in the game. Each is one line to swap, in the table named.
+
+| Where | Cue | Library sound (id) |
+|---|---|---|
+| Store (`Server/Items/CornerStore`) | `CornerStore.Till` | Cash Register 2 (9113728049) |
+| Store items (`Server/Items/ItemWorld` `SOUNDS`) | water gun, harmonica, bike horn, air horn, bubbles, camera, tape, whoopee cushion, wrapper, newspaper, lawn chair, flashlight click, umbrella, throw, chalk, crunch, kite wind | see the comments beside each id in the table |
+| Lounge (`Server/Attractions/LoungeService` `SOUND_IDS`) | guard swat, door, pour, counter bell | Cloth Whoosh (9113842150), Half Glass Door (9114745537), Pour Tea Into Cup (9117865590), Desk Bell (9125485591) |
+| Bowling (`Client/Minigames/Games/Bowling`) | release, pin, pit, strike, spare | Wood Beam Clunk, Wood Shaft Clanking, Body Pat Muted, Through the Roof (sting), The Little Things (hit) |
+| Air hockey (`Client/Minigames/Games/AirHockey`) | strike, rail, post, goal for, goal against, win, lose | Knock Slap Plastic 15 and 1, Metal Lid Small, four short APM stings |
+| Paintball (`Client/Minigames/Games/Paintball`) | tagged, reload, over | Thwack Sharp (replaces the groan placeholder), Plastic Rattle, Referee Whistle; the other nine keep their built-in placeholders |
+
+**Left silent, no fitting licensed sound found:** the soda's fizz and the seeds' scatter (store), bowling's roll, gutter and pinsetter sweep, air hockey's serve and the goal drop for watchers, paintball's footstep.
