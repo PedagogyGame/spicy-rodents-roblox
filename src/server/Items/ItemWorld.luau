@@ -23,13 +23,17 @@
 --              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
 --              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
+--   calm_dog   a dog treat: the yard dog near (opts.dogs, Wildlife/YardHazards) sits and wags and ignores squirrels
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
 --   read, askText, screenshot   a message to the owner's client (Client/Items/ItemClient)
---   kite       up on its string downwind of its flier, swaying; reeled in on the next use or out of the zone
+--   kite       up on its string downwind of its flier, swaying; steered (Shared/Items/KiteFlight: A/D lean it
+--              across the wind, W/S let the string out or reel it in; steer(player, x, y) from the flier's client,
+--              clamped and rate-limited here); reeled in on the next use or out of the zone. While it is up the
+--              flier (Player) carries KITE_ATTRIBUTE (Client/UI/KiteSteer plants the feet and reads the keys)
 -- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
---   body change: toggles off, kite reeled in), stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night)
---   -> (brightness, range); relight(lit, night) -> count; chairs() -> ChairLedger; CHAIR; SOUNDS;
---   KITE (the flight's numbers)
+--   body change: toggles off, kite reeled in), steer(player, x, y) -> boolean (taken), kiteOf(player) -> Flight?,
+--   stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night) -> (brightness, range); relight(lit,
+--   night) -> count; chairs() -> ChairLedger; CHAIR; SOUNDS; KITE_ATTRIBUTE
 -- Engine only inside the functions; no side effects on require.
 
 local Import = require("../Import")
@@ -37,7 +41,11 @@ local ItemRules = Import.shared("Items/ItemRules") :: typeof(require("../../shar
 local Clock = Import.shared("Time/Clock") :: typeof(require("../../shared/Time/Clock"))
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
+local KiteFlight = Import.shared("Items/KiteFlight") :: typeof(require("../../shared/Items/KiteFlight"))
 local ItemService = require("./ItemService")
+-- (KiteFlight's exported types do not cross the Import cast)
+type Flight = typeof(KiteFlight.new())
+type Bucket = typeof(KiteFlight.bucket())
 
 local ItemWorld = {}
 
@@ -45,25 +53,25 @@ local ItemWorld = {}
 -- library (no uploads; docs/AUDIO_BUDGET.md "Corner store"). Every cue of ItemRules.CUES and
 -- ItemRules.RADIO_PLAYLIST has a row (tests/unit/corner_store_items.spec.luau).
 local SOUNDS: { [string]: string } = {
-	["Items.WaterGun"] = "",
-	["Items.Harmonica"] = "",
-	["Items.BikeHorn"] = "",
-	["Items.AirHorn"] = "",
-	["Items.Bubbles"] = "",
-	["Items.CameraClick"] = "",
-	["Items.TapeRip"] = "",
-	["Items.Whoopee"] = "",
+	["Items.WaterGun"] = "rbxassetid://9125995935", -- Squirt Bottle (ProSoundEffects)
+	["Items.Harmonica"] = "rbxassetid://1846183142", -- Harmonica Stings D (APM)
+	["Items.BikeHorn"] = "rbxassetid://9114822511", -- Horn Blow Long Bursts 7 (ProSoundEffects)
+	["Items.AirHorn"] = "rbxassetid://9114075665", -- Diesel Truck Air Horn 1 (ProSoundEffects)
+	["Items.Bubbles"] = "rbxassetid://9112872239", -- Small Bubbles Float Up Pop 5 (ProSoundEffects)
+	["Items.CameraClick"] = "rbxassetid://9113678227", -- Camera Shutter 1 (ProSoundEffects)
+	["Items.TapeRip"] = "rbxassetid://9114886755", -- Denim Or Canvas Tears 8 (ProSoundEffects)
+	["Items.Whoopee"] = "rbxassetid://9114372701", -- Airy deflate 13 (ProSoundEffects)
 	["Items.SodaFizz"] = "",
-	["Items.Wrapper"] = "",
-	["Items.PaperRustle"] = "",
-	["Items.ChairUnfold"] = "",
-	["Items.Click"] = "",
-	["Items.UmbrellaOpen"] = "",
-	["Items.Throw"] = "",
-	["Items.Chalk"] = "",
+	["Items.Wrapper"] = "rbxassetid://9117409740", -- Crunchy Cellophane 6 (ProSoundEffects)
+	["Items.PaperRustle"] = "rbxassetid://9118835414", -- Open And Turn Pages 2 (ProSoundEffects)
+	["Items.ChairUnfold"] = "rbxassetid://9114514975", -- Folding Chairs 18 (ProSoundEffects)
+	["Items.Click"] = "rbxassetid://9114481274", -- Flashlight Switch 13 (ProSoundEffects)
+	["Items.UmbrellaOpen"] = "rbxassetid://9114884567", -- Heavy Cloth Flap 6 (ProSoundEffects)
+	["Items.Throw"] = "rbxassetid://9120742716", -- Whoosh Thick Quick 2 (ProSoundEffects)
+	["Items.Chalk"] = "rbxassetid://9113781594", -- Chalkboard 9 (ProSoundEffects)
 	["Items.Scatter"] = "",
-	["Items.Crunch"] = "",
-	["Items.KiteWind"] = "",
+	["Items.Crunch"] = "rbxassetid://9113734636", -- Celery Break 6 (ProSoundEffects)
+	["Items.KiteWind"] = "rbxassetid://9114461211", -- Flag Flap 3 (ProSoundEffects)
 	["Radio.Oldies1"] = "rbxassetid://1837066444", -- Sunny Side Up (Alan Hawkshaw), 70's Easy FM
 	["Radio.Oldies2"] = "rbxassetid://1837066718", -- Songbird (Brian Bennett), 70's Easy FM
 	["Radio.SoftRock"] = "rbxassetid://1847299654", -- Out Of Sight (David Hamer), AOR of the 70s
@@ -73,15 +81,7 @@ local SOUNDS: { [string]: string } = {
 }
 ItemWorld.SOUNDS = SOUNDS
 
-ItemWorld.KITE = table.freeze({
-	launchSecs = 3, -- from the hand to its height
-	height = 34, -- studs above its flier
-	back = 22, -- studs downwind
-	sway = 4, -- studs side to side
-	swayHz = 0.15,
-	reelSecs = 2.5,
-	wind = { 0.6, 0.8 }, -- the town's wind (XZ, unit)
-})
+ItemWorld.KITE_ATTRIBUTE = "KiteUp" -- the flier's (Player) attribute while its kite is up and steerable
 
 export type StartOpts = {
 	inventory: any, -- Items/Inventory
@@ -89,6 +89,8 @@ export type StartOpts = {
 	runtime: any, -- Actors/ActorsRuntime (world, byTownId)
 	fire: (player: any, payload: { [string]: any }) -> (),
 	zones: { any }?, -- generated/Expansion.zones (the kite's)
+	-- the town's yard dogs (Wildlife/YardHazards): near(x, z, r) -> targets of kind "dog"; calm(id, secs)
+	dogs: { near: (x: number, z: number, r: number) -> { any }, calm: (id: any, secs: number) -> boolean }?,
 	heartbeat: boolean?,
 }
 
@@ -97,6 +99,8 @@ export type World = {
 	use: (player: any, itemId: string, payload: { [string]: any }?) -> (boolean, string?),
 	step: () -> (),
 	putAway: (player: any) -> (),
+	steer: (player: any, x: any, y: any) -> boolean,
+	kiteOf: (player: any) -> Flight?,
 	stop: () -> (),
 }
 
@@ -370,11 +374,8 @@ function ItemWorld.start(opts: StartOpts): World
 	local function nearby(x: number, z: number, r: number): { ItemService.Target }
 		local out: { ItemService.Target } = {}
 		local world = rt and rt.world
-		if world == nil then
-			return out
-		end
 		local r2 = r * r
-		for _, a in world.actors do
+		for _, a in (if world then world.actors else {}) :: { any } do
 			local dx, dz = a.x - x, a.z - z
 			if dx * dx + dz * dz <= r2 then
 				local kind = a.species
@@ -390,6 +391,12 @@ function ItemWorld.start(opts: StartOpts): World
 					end
 				end
 				table.insert(out, { kind = kind, id = a.id, x = px, y = py, z = pz, player = p })
+			end
+		end
+		-- and the yard dogs (Wildlife/YardHazards: not town actors, so asked on their own)
+		if opts.dogs then
+			for _, d in opts.dogs.near(x, z, r) do
+				table.insert(out, d)
 			end
 		end
 		return out
@@ -510,9 +517,24 @@ function ItemWorld.start(opts: StartOpts): World
 		return true
 	end
 
-	-- kites in the air: flier, model, string ends, phase
-	type Kite = { player: any, model: Model, a0: Attachment, a1: Attachment, t: number, reel: number? }
+	-- kites in the air: flier, model, string ends, phase, the steering (Shared/Items/KiteFlight)
+	type Kite = {
+		player: any,
+		model: Model,
+		a0: Attachment,
+		a1: Attachment,
+		t: number,
+		reel: number?,
+		flight: Flight,
+	}
 	local kites: { Kite } = {}
+	-- each flier's steer packets (the bucket outlives a flight: a new kite is no way round the rate)
+	local buckets: { [any]: Bucket } = {}
+	local function flierAttr(player: any, on: boolean)
+		if typeof(player) == "Instance" then
+			(player :: Player):SetAttribute(ItemWorld.KITE_ATTRIBUTE, if on then true else nil)
+		end
+	end
 	-- whoopee cushions waiting for a sitter
 	type Cushion = { part: BasePart, owner: any, armed: boolean }
 	local cushions: { Cushion } = {}
@@ -523,6 +545,7 @@ function ItemWorld.start(opts: StartOpts): World
 	local function kiteDown(k: Kite)
 		if k.reel == nil then
 			k.reel = 0
+			flierAttr(k.player, false)
 		end
 	end
 
@@ -597,7 +620,7 @@ function ItemWorld.start(opts: StartOpts): World
 				elseif t.player == nil and root then
 					local b = brainOf(t.id)
 					if b and (t.kind == "squirrel" or t.kind == "rodent") then
-						b:onEvent({ type = "startle" })
+						b:onEvent({ type = "startle", x = root.Position.X, z = root.Position.Z })
 					elseif b and t.kind == "human" then
 						b:onEvent({
 							type = "witness",
@@ -883,6 +906,18 @@ function ItemWorld.start(opts: StartOpts): World
 				table.insert(birds, bird)
 			end
 			table.insert(baits, { part = p :: BasePart, birds = birds, untilT = os.clock() + e.secs, t = 0 } :: Bait)
+		elseif kind == "calm_dog" then
+			-- a dog treat: the nearest dog (ItemService picked it) sits and wags, deaf to squirrels for a while
+			local calmed = false
+			for _, t in (targets or {}) :: { ItemService.Target } do
+				if t.kind == "dog" and opts.dogs and opts.dogs.calm(t.id, e.secs) then
+					calmed = true
+				end
+			end
+			if not calmed then
+				return false
+			end
+			notify(player, "The dog sits and wags its tail. It will leave the squirrels alone for a while.")
 		elseif kind == "treat" then
 			local a = actorOf(player)
 			local body = a and a.body
@@ -939,8 +974,9 @@ function ItemWorld.start(opts: StartOpts): World
 					c.Transparency = 1
 				end
 			end
-			table.insert(kites, { player = player, model = m, a0 = a0, a1 = a1, t = 0 })
-			notify(player, "Up she goes! Use it again to reel it in.")
+			table.insert(kites, { player = player, model = m, a0 = a0, a1 = a1, t = 0, flight = KiteFlight.new() })
+			flierAttr(player, true)
+			notify(player, "Up she goes! A and D steer, W and S let out and reel in. Use it again to bring it down.")
 		end
 		return true
 	end
@@ -1021,8 +1057,9 @@ function ItemWorld.start(opts: StartOpts): World
 			relightIn = 10
 			ItemWorld.relight(lit, isNight())
 		end
-		-- kites: up on the string, swaying downwind; reeled in on a second use, out of the zone or without a flier
-		local K = ItemWorld.KITE
+		-- kites: up on the string downwind, steered by its flier, swaying; reeled in on a second use, out of the
+		-- zone or without a flier
+		local now = os.clock()
 		for i = #kites, 1, -1 do
 			local k = kites[i]
 			local root = rootOf(k.player)
@@ -1037,26 +1074,23 @@ function ItemWorld.start(opts: StartOpts): World
 				kiteDown(k)
 			end
 			k.t += 0.1
-			local up = math.min(1, k.t / K.launchSecs)
+			local up = math.min(1, k.t / KiteFlight.LAUNCH_SECS)
 			if k.reel then
 				k.reel += 0.1
-				up = math.max(0, 1 - k.reel / K.reelSecs) * math.min(1, k.t / K.launchSecs)
+				up = math.max(0, 1 - k.reel / KiteFlight.REEL_SECS) * up
+			else
+				KiteFlight.step(k.flight, 0.1, now)
 			end
 			if root then
-				local sway = math.sin(k.t * math.pi * 2 * K.swayHz) * K.sway
-				local wx, wz = K.wind[1], K.wind[2]
-				local pos = root.Position
-					+ Vector3.new(
-						wx * K.back * up - wz * sway * up,
-						K.height * up + 2,
-						wz * K.back * up + wx * sway * up
-					)
+				local dx, dy, dz = KiteFlight.offset(k.flight, k.t)
+				local pos = root.Position + Vector3.new(dx * up, (dy - KiteFlight.HAND) * up + KiteFlight.HAND, dz * up)
 				local face = CFrame.lookAt(pos, root.Position) * CFrame.Angles(0, 0, math.sin(k.t * 1.3) * 0.25)
 				k.model:PivotTo(face)
 			end
-			if (k.reel and k.reel >= K.reelSecs) or root == nil then
+			if (k.reel and k.reel >= KiteFlight.REEL_SECS) or root == nil then
 				k.model:Destroy()
 				k.a0:Destroy()
+				flierAttr(k.player, false)
 				local tool = toolOf(k.player, "kite")
 				for _, c in (if tool then tool:GetChildren() else {}) :: { Instance } do
 					if c:IsA("BasePart") then
@@ -1064,6 +1098,11 @@ function ItemWorld.start(opts: StartOpts): World
 					end
 				end
 				table.remove(kites, i)
+			end
+		end
+		for p in buckets do
+			if typeof(p) == "Instance" and p.Parent ~= Players then
+				buckets[p] = nil
 			end
 		end
 		-- lawn chairs: an owner who left takes theirs along; one left empty long enough folds itself up
@@ -1110,7 +1149,6 @@ function ItemWorld.start(opts: StartOpts): World
 			end
 		end
 		-- baits: the birds hop about the pile; it is gone when its time is up
-		local now = os.clock()
 		for i = #baits, 1, -1 do
 			local b = baits[i]
 			b.t += 0.1
@@ -1152,9 +1190,39 @@ function ItemWorld.start(opts: StartOpts): World
 		end,
 		step = step,
 		putAway = putAway,
+		-- the flier's keys (Client/UI/KiteSteer over Items/CornerStore's remote): clamped, rate-limited, and only
+		-- for a kite that is up (not one coming down)
+		steer = function(player: any, x: any, y: any): boolean
+			for _, k in kites do
+				if k.player == player and k.reel == nil then
+					local b = buckets[player]
+					if b == nil then
+						b = KiteFlight.bucket()
+						buckets[player] = b
+					end
+					if not KiteFlight.accept(b, os.clock()) then
+						return false
+					end
+					KiteFlight.steer(k.flight, x, y, os.clock())
+					return true
+				end
+			end
+			return false
+		end,
+		kiteOf = function(player: any): Flight?
+			for _, k in kites do
+				if k.player == player and k.reel == nil then
+					return k.flight
+				end
+			end
+			return nil
+		end,
 		stop = function()
 			for _, c in conns do
 				c:Disconnect()
+			end
+			for _, k in kites do
+				flierAttr(k.player, false) -- (the flier's controls come back)
 			end
 			folder:Destroy()
 		end,

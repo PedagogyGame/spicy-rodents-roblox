@@ -1782,13 +1782,18 @@ return function(t)
 	)
 
 	t.test(
-		"the cues: every sound the client asks for is one the game declares, each a placeholder or none yet",
+		"the cues: every sound the client asks for is one the game declares, each a placeholder, a library sound or none yet",
 		function()
 			local declared = require("@client/Minigames/Games/Paintball").sounds
 			local names = {}
 			for cue, id in declared do
 				-- (placeholders shipped with the client until the owner's licensed set: docs/AUDIO_BUDGET.md)
-				t.truthy(id == "" or string.sub(id, 1, 18) == "rbxasset://sounds/", `{cue}: {id}`)
+				t.truthy(
+					id == ""
+						or string.sub(id, 1, 18) == "rbxasset://sounds/"
+						or string.match(id, "^rbxassetid://%d+$") ~= nil,
+					`{cue}: {id}`
+				)
 				t.truthy(string.sub(cue, 1, 10) == "paintball.", cue)
 				table.insert(names, cue)
 			end

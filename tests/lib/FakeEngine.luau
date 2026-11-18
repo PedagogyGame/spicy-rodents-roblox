@@ -170,6 +170,15 @@ function methods.FindFirstChildOfClass(self: any, class: string): any
 	return nil
 end
 
+function methods.FindFirstChildWhichIsA(self: any, class: string): any
+	for _, c in rawget(self, "_children") do
+		if c:IsA(class) then
+			return c
+		end
+	end
+	return nil
+end
+
 function methods.GetChildren(self: any): { any }
 	return table.clone(rawget(self, "_children"))
 end

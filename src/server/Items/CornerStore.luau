@@ -22,7 +22,7 @@
 --   start(opts) -> Store? (finds the bake, carves its inside, wires the prompts, steps on Heartbeat; nil without
 --   the bake);
 --   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; WORDS; CUES; SOUNDS; STORE (the model's
---   name); REMOTE
+--   name); REMOTE; STEER_REMOTE
 -- Engine only inside start/zoneOf/makeTool; no side effects on require.
 
 local Import = require("../Import")
@@ -39,6 +39,9 @@ type Baskets = { byKey: { [any]: { string } } }
 
 CornerStore.STORE = "f1_corner_store"
 CornerStore.REMOTE = "CornerStoreItemText" -- ReplicatedStorage: the client's words for the chalk
+-- ReplicatedStorage: the kite's steer keys from its flier's client (Client/UI/KiteSteer): two numbers, clamped and
+-- rate-limited by Items/ItemWorld.steer (Shared/Items/KiteFlight)
+CornerStore.STEER_REMOTE = "KiteSteer"
 
 CornerStore.WORDS = table.freeze({
 	animal = "Only people shop here.",
@@ -52,7 +55,7 @@ CornerStore.WORDS = table.freeze({
 CornerStore.CUES = table.freeze({
 	till = "CornerStore.Till", -- the register's drawer and bell, on a sale
 })
-CornerStore.SOUNDS = { ["CornerStore.Till"] = "" } :: { [string]: string }
+CornerStore.SOUNDS = { ["CornerStore.Till"] = "rbxassetid://9113728049" } :: { [string]: string } -- Cash Register 2 (ProSoundEffects)
 
 export type Deps = {
 	wallet: { buy: (player: any, what: string | { string }, deliver: (() -> (boolean?, string?))?) -> (boolean, string) },
@@ -362,6 +365,7 @@ export type StartOpts = {
 	expansion: Instance?, -- Workspace.Expansion
 	runtime: any?, -- Actors/ActorsRuntime (the town's brains, for the items' effects)
 	zones: { any }?, -- generated/Expansion.zones (where a kite flies)
+	dogs: any?, -- Wildlife/YardHazards (the dog treats' dogs)
 	wallet: any, -- Economy/Credits.Wallet (Game.start's)
 	possession: any, -- Actors/Possession (actorOf(player) -> actor { species, body })
 	fire: (player: any, payload: { [string]: any }) -> (), -- Game's notice/refused channel
@@ -500,6 +504,7 @@ function CornerStore.start(opts: StartOpts): Store?
 		runtime = opts.runtime,
 		fire = opts.fire,
 		zones = opts.zones,
+		dogs = opts.dogs,
 		heartbeat = opts.heartbeat,
 	})
 	-- the chalk's words come back from the owner's client (Client/Items/ItemClient): text only, checked and
@@ -512,6 +517,17 @@ function CornerStore.start(opts: StartOpts): Store?
 		net.OnServerEvent:Connect(function(player: Player, itemId: any, text: any)
 			if items and type(itemId) == "string" and type(text) == "string" and #text <= 200 then
 				items.use(player, itemId, { text = text })
+			end
+		end)
+	)
+	local steer = Instance.new("RemoteEvent")
+	steer.Name = CornerStore.STEER_REMOTE
+	steer.Parent = game:GetService("ReplicatedStorage")
+	table.insert(
+		conns,
+		steer.OnServerEvent:Connect(function(player: Player, x: any, y: any)
+			if items then
+				items.steer(player, x, y)
 			end
 		end)
 	)
@@ -604,6 +620,7 @@ function CornerStore.start(opts: StartOpts): Store?
 			items.stop()
 		end
 		net:Destroy()
+		steer:Destroy()
 	end
 	return store
 end

@@ -119,8 +119,8 @@ local Game: ClientGame.ClientGame = {
 		["paintball.fire_far"] = "rbxasset://sounds/paintball.wav", -- another marker, placed in space (quieter, muffled by floors)
 		["paintball.splat"] = "rbxasset://sounds/splat.wav", -- a ball bursting on a wall, a floor or a body
 		["paintball.tag"] = "rbxasset://sounds/electronicpingshort.wav", -- YOU tagged someone
-		["paintball.tagged"] = "rbxasset://sounds/uuhhh.mp3", -- you were tagged
-		["paintball.reload"] = "rbxasset://sounds/switch.wav", -- the rattle
+		["paintball.tagged"] = "rbxassetid://9120032247", -- Thwack Sharp 1 (library); you were tagged
+		["paintball.reload"] = "rbxassetid://9125746771", -- Plastic Rattle (library); the rattle
 		["paintball.dry"] = "rbxasset://sounds/clickfast.wav", -- a click with nothing to fire
 		-- (no single footstep ships with the client: the stock ones are loops. The body's own stock footsteps are
 		-- heard meanwhile; the owner's set brings the loud sprint and the silent crouch)
@@ -128,7 +128,7 @@ local Game: ClientGame.ClientGame = {
 		["paintball.ready"] = "rbxasset://sounds/button.wav", -- the reload is done: the magazine is full again
 		["paintball.go"] = "rbxasset://sounds/electronicpingshort.wav", -- the briefing is over: the match is live
 		["paintball.back"] = "rbxasset://sounds/action_get_up.mp3", -- you are back from being tagged out
-		["paintball.over"] = "rbxasset://sounds/victory.wav", -- full time: the match is over
+		["paintball.over"] = "rbxassetid://9118113825", -- Referee Whistle 2 (library); full time: the match is over
 	},
 	words = { finished = "The match is over. Press E at the arena door to play again." },
 }

@@ -26,6 +26,13 @@
 --     the drink is held in the right hand (a cup or a paper cone welded to the body's root) and sipped SIPS times,
 --     one every SIP_EVERY seconds (the cup goes up to the face for SIP_HOLD), then "All gone." One at a time.
 --     People have no stamina in this game: a drink is for the look. It goes with its holder at the door.
+--   * The seats (LoungeClassic.SEATS: the bar stools, the booths, the club chairs, the armchairs): an invisible
+--     Seat on each, sat on through its prompt ("Sit", on its own key: SEAT_KEY, SEAT_PAD) by a person the door let in
+--     (Seat:Sit, the game's own sitting; never by walking into it: CanTouch off). Its own key, because a prompt
+--     shows only the nearest of those sharing a key, and in front of the bar the stools are nearer than the drinks. First person stays (the body's CameraZone is untouched), a
+--     drink stays in the hand and is sipped; jump or a move gets up (Client/World/SeatGetUp). A taken seat's prompt
+--     is off. A seated person is in the room whatever the pivot says (inRoom), and is got up before the door or a
+--     release moves the body.
 -- Sounds: named cue points only (Sound instances with empty ids, never synthesised): CUES. The jazz is the client's.
 -- Engine only inside the functions; no side effects on require. Steppable: step() reads the clock it was given.
 -- The joiner's lines in Boot/Game.start: lounge = LoungeService.start({ town = LoungeService.gameTown({ ... }),
@@ -34,8 +41,9 @@
 --   Service:enter(player) -> (ok, why?); Service:buyPass(player) -> (ok, words); Service:leave(player) -> ok;
 --   Service:order(player, id) -> (ok, words); Service:step() (the guards, the room, the sweep); Service:gone(player);
 --   Service:isInside(player) ->
---   boolean; Service:inRoom(body) -> boolean; Service:counts() -> { inside, drinks, knockedOut, strikes }; Service:stop(); constants TICK, STRIKE,
---   SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, STAND, CUES, FOLDER
+--   boolean; Service:inRoom(body) -> boolean; Service:sit(player, index) -> (ok, why?); Service:seatOf(body) ->
+--   index?; Service:counts() -> { inside, drinks, knockedOut, strikes, seated }; Service:stop(); constants TICK,
+--   STRIKE, SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, SEAT_DISTANCE, SEAT_KEY, SEAT_PAD, STAND, CUES, FOLDER
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
@@ -57,6 +65,11 @@ LoungeService.NEAR = 60 -- studs from the venue's centre the guards and the swee
 LoungeService.SIP_HOLD = 1.2 -- seconds the cup is at the face
 LoungeService.SERVE_LOOK = 3 -- seconds the bartender looks at the customer
 LoungeService.PROMPT_DISTANCE = 6
+LoungeService.SEAT_DISTANCE = 5 -- a seat's prompt (the nearest one shows: ProximityPrompt's one per key)
+-- the seats' own keys (the drinks and the doors are E and the gamepad's default X): standing at the bar, the
+-- nearest drink and the nearest stool both show. R and Y: F and X are a person's kick (Client/Input/InputMap).
+LoungeService.SEAT_KEY = "R" -- (Enum.KeyCode names)
+LoungeService.SEAT_PAD = "ButtonY"
 LoungeService.STAND = 3 -- a standing body's pivot over the floor (SkyLiftService's default standOffset)
 LoungeService.CUES = table.freeze({
 	swat = "Lounge.GuardSwat", -- a guard's strike (a whoosh and a thump; library)
@@ -143,10 +156,18 @@ local function newPart(name: string, size: Vector3, cf: CFrame, parent: any): an
 	return p
 end
 
+-- cue name -> a licensed library sound (Roblox's verified partner ProSoundEffects; chosen 18 November, never uploaded)
+LoungeService.SOUND_IDS = table.freeze({
+	["Lounge.GuardSwat"] = "rbxassetid://9113842150", -- Cloth Whooshes Soft Whooshing Pass Bys 1
+	["Lounge.Door"] = "rbxassetid://9114745537", -- Half Glass Door 1
+	["Lounge.Pour"] = "rbxassetid://9117865590", -- Pour Tea From Pot Into Cup 3
+	["Lounge.CounterBell"] = "rbxassetid://9125485591", -- Desk Bell Counter Service
+}) :: { [string]: string }
+
 local function cue(parent: any, name: string): any
 	local s = Instance.new("Sound")
 	s.Name = name
-	s.SoundId = "" -- a cue point: the lead fills it from the library (docs/AUDIO_BUDGET.md); never uploaded here
+	s.SoundId = LoungeService.SOUND_IDS[name] or "" -- (docs/AUDIO_BUDGET.md); never uploaded here
 	s.Parent = parent
 	return s
 end
@@ -241,6 +262,27 @@ function LoungeService.new(opts: Opts): any
 		self.counterPosts[i] =
 			newPart(`Order_{d.id}`, Vector3.new(1, 1, 1), at(x, 3.9, LoungeClassic.COUNTER.d - 0.4), folder)
 	end
+	-- the seats: an invisible Seat on each sitting place, sat on only through its prompt
+	self.seats = {} :: { any }
+	self.seatIndex = {} :: { [any]: number } -- Seat part -> its index in SEATS
+	self.seatPrompts = {} :: { any } -- each seat's prompt, by index (none with prompts = false)
+	for i, st in LoungeClassic.SEATS do
+		local p = self:world(st.x, st.y - 0.1, st.d)
+		local ahead = self:world(st.x + st.fx, st.y - 0.1, st.d + st.fd)
+		local seat = Instance.new("Seat")
+		seat.Name = `Seat_{st.id}`
+		seat.Size = Vector3.new(1.8, 0.2, 1.8)
+		seat.CFrame = CFrame.lookAt(p, ahead)
+		seat.Anchored = true
+		seat.CanCollide = false
+		seat.CanTouch = false -- (never sat on by walking into it: the prompt only)
+		seat.CanQuery = false
+		seat.Transparency = 1
+		seat:SetAttribute(LoungeClassic.SEAT_ATTRIBUTE, st.id)
+		seat.Parent = folder
+		self.seats[i] = seat
+		self.seatIndex[seat] = i
+	end
 	self.sounds = {
 		swat = cue(self.outsidePost, LoungeService.CUES.swat),
 		door = cue(self.outsidePost, LoungeService.CUES.door),
@@ -316,6 +358,18 @@ function LoungeService._prompts(self: any)
 	on(prompt(self.podiumPost, W.buyAction, `{cents}c for {days} in-game days`, "pass", true), "pass", function(player)
 		self:buyPass(player)
 	end)
+	for i, seat in self.seats do
+		local st = LoungeClassic.SEATS[i]
+		local p =
+			prompt(seat, LoungeClassic.SEAT_WORDS.action, (LoungeClassic.SEAT_WORDS :: any)[st.kind] or "Seat", "sit")
+		p.MaxActivationDistance = LoungeService.SEAT_DISTANCE
+		p.KeyboardKeyCode = (Enum.KeyCode :: any)[LoungeService.SEAT_KEY]
+		p.GamepadKeyCode = (Enum.KeyCode :: any)[LoungeService.SEAT_PAD]
+		self.seatPrompts[i] = p
+		on(p, "sit", function(player)
+			self:sit(player, i)
+		end)
+	end
 	for i, d in LoungeClassic.DRINKS do
 		local price = EconomyRules.price(d.id) or 0
 		on(prompt(self.counterPosts[i], `{d.label} ({price}c)`, W.orderObject, d.id), "order", function(player)
@@ -326,6 +380,55 @@ end
 
 function LoungeService.isInside(self: any, player: any): boolean
 	return self.inside[player] ~= nil
+end
+
+local function humanoidOf(body: any): any?
+	local ok, hum = pcall(function()
+		return body:FindFirstChildOfClass("Humanoid")
+	end)
+	return if ok then hum else nil
+end
+
+-- Which of the lounge's seats this body sits on (its index in SEATS), if any.
+function LoungeService.seatOf(self: any, body: any): number?
+	local hum = body and humanoidOf(body)
+	local part = hum and hum.SeatPart
+	return if part then self.seatIndex[part] else nil
+end
+
+-- A seat's prompt (R, gamepad Y) sits a person the door let in on a free seat (Seat:Sit; a seated one moves seats).
+function LoungeService.sit(self: any, player: any, index: number): (boolean, string?)
+	local seat = self.seats[index]
+	local body = self.inside[player]
+	if seat == nil or body == nil or self.town.speciesOf(player) ~= "human" or self.town.bodyOf(player) ~= body then
+		return false, "notInside"
+	end
+	if seat.Occupant ~= nil then
+		return false, "taken"
+	end
+	local hum = humanoidOf(body)
+	if hum == nil then
+		return false, "noHumanoid"
+	end
+	local ok = pcall(function()
+		seat:Sit(hum)
+	end)
+	return ok, if ok then nil else "sit"
+end
+
+-- Get a seated body up (before the door or a release moves it: a body welded to an anchored seat stays put).
+local function unseat(self: any, body: any)
+	if self:seatOf(body) == nil then
+		return
+	end
+	local hum: any = humanoidOf(body)
+	pcall(function()
+		local weld = hum.SeatPart and hum.SeatPart:FindFirstChild("SeatWeld")
+		hum.Sit = false
+		if weld then
+			weld:Destroy()
+		end
+	end)
 end
 
 local function setZone(body: any, on: boolean)
@@ -408,6 +511,7 @@ function LoungeService.leave(self: any, player: any): boolean
 	self.inside[player] = nil
 	self.misses[player] = nil
 	setZone(body, false)
+	unseat(self, body)
 	self.town.moveTo(player, self:spot(LoungeClassic.DOOR_OUTSIDE))
 	play(self.sounds.door)
 	self.town.tell(player, LoungeClassic.WORDS.goodbye)
@@ -621,6 +725,13 @@ function LoungeService.step(self: any, _dt: number?)
 		end
 	end
 	self:_sweep()
+	-- a taken seat's prompt is off (nobody is offered a seat somebody sits on)
+	for i, p in self.seatPrompts do
+		local free = self.seats[i].Occupant == nil
+		if p.Enabled ~= free then
+			p.Enabled = free
+		end
+	end
 end
 
 -- Every other body in the room: a person with the pass is let in where they stand, any other person and any
@@ -635,6 +746,7 @@ function LoungeService._sweep(self: any)
 		if self:inRoom(o.body) and (o.player == nil or self.inside[o.player] ~= o.body) then
 			local player = o.player
 			if player == nil then
+				unseat(self, o.body)
 				self.town.evict(o.body, self:spot(LoungeClassic.DOOR_OUTSIDE))
 			elseif self.town.speciesOf(player) == "human" and self.town.pass.has(player) then
 				self.inside[player] = o.body
@@ -642,6 +754,7 @@ function LoungeService._sweep(self: any)
 				setZone(o.body, true)
 			else
 				setZone(o.body, false)
+				unseat(self, o.body)
 				self.town.moveTo(player, self:spot(LoungeClassic.DOOR_OUTSIDE))
 				self.town.tell(player, LoungeClassic.WORDS.membersOnly)
 			end
@@ -649,8 +762,11 @@ function LoungeService._sweep(self: any)
 	end
 end
 
--- Is this body's pivot (standing) in the room?
+-- Is this body in the room: on one of its seats, or its pivot (standing) inside the walls?
 function LoungeService.inRoom(self: any, body: any): boolean
+	if self:seatOf(body) ~= nil then
+		return true -- seated on one of the room's own seats: inside, whatever the pivot says
+	end
 	local p = pivotOf(body)
 	if p == nil then
 		return false
@@ -666,6 +782,7 @@ function LoungeService._release(self: any, player: any, body: any, here: boolean
 	setZone(body, false)
 	dropDrink(self, player)
 	if here then
+		unseat(self, body)
 		self.town.evict(body, self:spot(LoungeClassic.DOOR_OUTSIDE))
 	end
 end
@@ -680,7 +797,12 @@ function LoungeService.gone(self: any, player: any)
 end
 
 function LoungeService.counts(self: any): { [string]: number }
-	local inside, drinks, strikes = 0, 0, 0
+	local inside, drinks, strikes, seated = 0, 0, 0, 0
+	for _, seat in self.seats do
+		if seat.Occupant ~= nil then
+			seated += 1
+		end
+	end
 	for _ in self.inside do
 		inside += 1
 	end
@@ -690,7 +812,7 @@ function LoungeService.counts(self: any): { [string]: number }
 	for _ in self.strikes do
 		strikes += 1
 	end
-	return { inside = inside, drinks = drinks, knockedOut = self.knockedOut, strikes = strikes }
+	return { inside = inside, drinks = drinks, knockedOut = self.knockedOut, strikes = strikes, seated = seated }
 end
 
 function LoungeService.stop(self: any)
