@@ -51,7 +51,8 @@
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
---   not start), rafters (Attractions/RafterService; nil when it could not start), townIdOf(actorId), stop() };
+--   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
+--   nil without its bake), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
 --   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
@@ -85,6 +86,7 @@ local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
+local CornerStore = require("../Items/CornerStore")
 local WhackArt = require("../Assets/WhackArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
@@ -1351,6 +1353,23 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
 	end
 
+	-- 6c. Pepper's Corner Store (Workspace.Expansion.F1): pick up off the shelves, pay once at the till through the
+	-- town's wallet, nothing out unpaid (Items/CornerStore)
+	local cornerStore: any = nil
+	local okC, errC = pcall(function()
+		cornerStore = CornerStore.start({
+			expansion = workspace:FindFirstChild("Expansion"),
+			wallet = wallet,
+			possession = possession,
+			fire = fire,
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okC then
+		warn(`[SpicyRodents] the corner store failed to open: {errC}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1405,6 +1424,9 @@ function Game.start(opts: Opts?): any
 			if skylift and o.heartbeat == false then
 				skylift:step(dt)
 			end
+			if cornerStore and o.heartbeat == false then
+				cornerStore:step()
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
@@ -1414,6 +1436,7 @@ function Game.start(opts: Opts?): any
 		sewers = sewers,
 		skylift = skylift,
 		rafters = rafters,
+		cornerStore = cornerStore,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1430,6 +1453,9 @@ function Game.start(opts: Opts?): any
 			end
 			if rafters then
 				rafters:stop()
+			end
+			if cornerStore and cornerStore.stop then
+				cornerStore.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

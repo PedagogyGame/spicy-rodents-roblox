@@ -203,7 +203,7 @@ function Store.build(kit: Kit.Kit, parent: any, venue: any, groundAt: (number, n
 	local T = 4
 	for i = 0, math.floor(2 * IX / T) - 1 do
 		for j = 0, math.floor(2 * ID / T) - 1 do
-			if (i + j) % 2 == 0 and (i % 3 == 0 or j % 3 == 0) then
+			if (i + j) % 2 == 0 then
 				local x0, d0 = -IX + 1 + i * T, -ID + 1 + j * T
 				kit:box(inside, "Check", x0, x0 + T, 0, 0.02, d0, d0 + T, LINO_DARK, "SmoothPlastic", {
 					collide = false,
@@ -263,8 +263,12 @@ function Store.build(kit: Kit.Kit, parent: any, venue: any, groundAt: (number, n
 	local items = Fixtures.build(kit, root, prices, EconomyRules.NAMES :: any)
 	root:SetAttribute("Items", items)
 
-	-- the inside of the shell, carved to air at boot (no terrain pokes through the floor)
 	local hidden = { collide = false, query = false, transparency = 1, shadow = false }
+	-- the store's inside as one box: a shopper whose body leaves it puts back what they have not paid for
+	-- (Server/Items/CornerStore reads it)
+	kit:box(root, "Zone", -IX, IX, -0.5, Store.CEIL, -ID, ID, { 255, 255, 0 }, "SmoothPlastic", hidden)
+
+	-- the inside of the shell, carved to air at boot (no terrain pokes through the floor)
 	local carve = kit:folder(root, "TerrainCarve")
 	kit:box(carve, "Inside", -IX, IX, -0.4, Store.CEIL, -ID, ID, { 255, 0, 0 }, "SmoothPlastic", hidden)
 

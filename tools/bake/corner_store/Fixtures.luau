@@ -166,6 +166,48 @@ local function counter(kit: Kit.Kit, parent: any)
 	local sale =
 		kit:box(m, "TillWindow", -15.2, -14.0, c.top + 0.9, c.top + 1.3, -13.8, -13.6, DARK, "SmoothPlastic", VISUAL)
 	sale:SetAttribute("Till", true)
+	-- the till's prompts, on an invisible part over the counter in front of the till: Pay (E) and Put back (R,
+	-- gamepad Y, a short hold)
+	local pay = kit:box(
+		m,
+		"PayPoint",
+		-16.2,
+		-13.0,
+		c.top,
+		c.top + 1.6,
+		-15.2,
+		-13.8,
+		{ 255, 255, 255 },
+		"SmoothPlastic",
+		{
+			collide = false,
+			query = false,
+			shadow = false,
+			transparency = 1,
+		}
+	)
+	local r = kit.roblox
+	local p = r.Instance.new("ProximityPrompt")
+	p.Name = "Pay"
+	p.ActionText = "Pay"
+	p.ObjectText = "Checkout"
+	p.HoldDuration = 0
+	p.RequiresLineOfSight = false
+	p.MaxActivationDistance = Fixtures.REACH
+	p:SetAttribute("Till", "pay")
+	p.Parent = pay
+	local q = r.Instance.new("ProximityPrompt")
+	q.Name = "PutBack"
+	q.ActionText = "Put it all back"
+	q.ObjectText = "Checkout"
+	q.HoldDuration = 0.5
+	q.KeyboardKeyCode = r.Enum.KeyCode.R
+	q.GamepadKeyCode = r.Enum.KeyCode.ButtonY
+	q.RequiresLineOfSight = false
+	q.MaxActivationDistance = Fixtures.REACH
+	q.UIOffset = r.Vector2.new(0, 72)
+	q:SetAttribute("Till", "put_back")
+	q.Parent = pay
 	-- the bell to ring for service, and the gum rack on the customers' side
 	kit:cyl(m, "BellBase", -17.6, c.top + 0.03, -14.3, 0.06, 0.5, "Y", DARK, "Metal", VISUAL)
 	kit:ball(m, "Bell", -17.6, c.top + 0.2, -14.3, 0.4, BRASS, "Metal", VISUAL)
