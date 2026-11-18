@@ -1,9 +1,9 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Main
 -- Client entry of the first playable build (owner directive 2026-11-09; BUILD_PLAN §1.3, §4.4 #5):
--- the day cycle (World/Sky) and the loading screen first (UI/PlayMenu: server boot progress, then the climbing
--- routes prepared on this computer), then the AnimationDriver over every body (D3), the traffic ghosts
--- (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
+-- the day cycle (World/Sky), what spins (World/Spinners) and the loading screen first (UI/PlayMenu: server boot
+-- progress, then the climbing routes prepared on this computer), then the AnimationDriver over every body (D3), the
+-- traffic ghosts (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
@@ -38,9 +38,11 @@ local WalletHud = require("./UI/WalletHud")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
+local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
+local SneakMeter = require("./UI/SneakMeter")
 local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
@@ -67,6 +69,8 @@ local skyOk, skyErr = pcall(Sky.start)
 if not skyOk then
 	warn(`Client: the sky did not start: {skyErr}`)
 end
+-- what spins on this computer only: the alley's rooftop fan (World/Spinners)
+Spinners.start()
 
 local pickRemote: RemoteEvent? = nil
 local menu = PlayMenu.start(function(choice: string)
@@ -108,6 +112,11 @@ local walletOk, walletErr = pcall(WalletHud.start)
 if not walletOk then
 	warn(`Client: WalletHud failed: {walletErr}`)
 	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
+end
+-- the squirrel's eye over the alley's lanes while people below might see it (the server's RafterService fills it)
+local sneakOk, sneakErr = pcall(SneakMeter.start)
+if not sneakOk then
+	warn(`Client: SneakMeter failed: {sneakErr}`)
 end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()

@@ -4,7 +4,8 @@
 -- server moves by script: pinfall is decided by Shared/Minigames/Bowling/PinModel, never by physics, so the
 -- pins collide with nothing), pits with cushions, kickbacks, the masking units with lane numbers, the sweep
 -- bars, a ball per lane, the ball-return hoods and racks between each pair's approaches,
--- settees and scorer consoles, overhead score monitors (SurfaceGui the server rewrites) and the lights.
+-- settees and scorer consoles, overhead score monitors (SurfaceGui the server rewrites; hung on rods from the raised
+-- roof's deck). The lights over the lanes are the raised roof's (tools/bake/alley/Roof).
 -- Names the server relies on (Server/Minigames/BowlingLane): Lanes.Lane<i>.{Ball, Pins.Pin<n> (PrimaryPart
 -- Body), Sweep}; Scoreboards.Lane<i>.Screen (SurfaceGui "Score").
 -- The stand-in pinsetter behind each masking unit is built here (Lanes.machine) but belongs to the back module
@@ -14,6 +15,7 @@
 -- Interface: build(kit, root) -> nothing; machine(kit, parent, lane) -> Model; PIN_PROFILE; BALL_COLORS
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
+local AlleyRoof = require("../../../src/shared/Attractions/AlleyRoof")
 
 local Lanes = {}
 local L = AlleyLayout
@@ -1000,7 +1002,7 @@ local function scoreboards(kit: any, root: any)
 				x + side * 2 - 0.05,
 				x + side * 2 + 0.05,
 				cy + 1.5,
-				L.CEILING_Y,
+				AlleyRoof.HALL_ROOF.deckY0,
 				cd,
 				cd + 0.1,
 				{ 70, 70, 74 },
@@ -1010,98 +1012,6 @@ local function scoreboards(kit: any, root: any)
 				}
 			)
 		end
-	end
-end
-
-local function ceilingLights(kit: any, root: any)
-	-- (the lights in the hall's ceiling are part of HallRoof: AlleyLayout.HALL_ROOF)
-	local hall = root:FindFirstChild(L.HALL_ROOF.model) or kit:model(root, L.HALL_ROOF.model)
-	local m = kit:model(hall, "LaneLights")
-	-- fluorescent troffers over the approaches and settees, a few real lights among them
-	for _, d in { -6, -13, -20 } do
-		for p = 1, L.PAIRS do
-			local x = L.pairX(p)
-			local f = kit:box(
-				m,
-				"Troffer",
-				x - 3.6,
-				x + 3.6,
-				L.CEILING_Y - 0.12,
-				L.CEILING_Y,
-				d - 0.5,
-				d + 0.5,
-				{ 250, 248, 238 },
-				"Neon",
-				{
-					collide = false,
-				}
-			)
-			if d == -13 then
-				-- (no shadows: there are nine of these now, and the pin lights keep theirs)
-				kit:light(
-					f,
-					"PointLight",
-					{ Range = 22, Brightness = 1.15, Color = { 255, 244, 226 }, Shadows = false }
-				)
-			end
-		end
-	end
-	-- dimmer cans down the lanes (cosmic feel), every 12 studs
-	for d = 8, 44, 12 do
-		for p = 1, L.PAIRS do
-			kit:cyl(
-				m,
-				"Can",
-				L.pairX(p),
-				L.CEILING_Y - 0.1,
-				d,
-				0.2,
-				0.9,
-				"Y",
-				{ 200, 210, 255 },
-				"Neon",
-				{ collide = false }
-			)
-		end
-	end
-	-- a soft wash down the lanes (two lights per pair: the heads and the middle)
-	for p = 1, L.PAIRS do
-		for _, d in { 12, 30 } do
-			local wash = kit:cyl(
-				m,
-				"LaneWash",
-				L.pairX(p),
-				L.CEILING_Y - 0.12,
-				d,
-				0.1,
-				1.4,
-				"Y",
-				{ 200, 210, 255 },
-				"Neon",
-				{
-					collide = false,
-				}
-			)
-			kit:light(wash, "PointLight", { Range = 20, Brightness = 0.85, Color = { 214, 222, 255 }, Shadows = false })
-		end
-	end
-	-- ceiling tiles grid over the lane block
-	for d = -15, 52, 8 do
-		kit:box(
-			m,
-			"CeilingRib",
-			L.LANE_BLOCK_X0,
-			L.LANE_BLOCK_X1,
-			L.CEILING_Y - 0.06,
-			L.CEILING_Y,
-			d - 0.05,
-			d + 0.05,
-			{ 70, 70, 82 },
-			"Metal",
-			{
-				collide = false,
-			}
-		)
 	end
 end
 
@@ -1126,7 +1036,6 @@ function Lanes.build(kit: any, root: any)
 	approaches(kit, root)
 	settees(kit, root)
 	scoreboards(kit, root)
-	ceilingLights(kit, root)
 end
 
 return Lanes

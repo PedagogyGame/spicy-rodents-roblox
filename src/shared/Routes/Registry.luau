@@ -45,6 +45,8 @@ export type RouteRecord = {
 	flags: RouteFlags?,
 	-- kind "tunnel" only: the enclosed run this route belongs to (Routes/Enclosure; world coordinates)
 	enclosure: Enclosure.Record?,
+	hint: string?, -- told the player on stopping at the far end (Client/Controllers/Squirrel)
+	onwardHint: string?, -- told the player on going on from the far end by itself
 }
 
 export type RouteFlags = {
@@ -72,6 +74,8 @@ export type Route = {
 	flags: RouteFlags,
 	patched: string?, -- the harvest_patches action applied (Routes/Patches), nil when as harvested
 	enclosure: Enclosure.Spec?, -- kind "tunnel" only (Routes/Enclosure); nil on every other route
+	hint: string?, -- told the player on stopping at the far end (Client/Controllers/Squirrel)
+	onwardHint: string?, -- told the player on going on from the far end by itself
 	_curve: Curve.Curve?,
 	_samples: { Vec3 }?,
 }
@@ -151,6 +155,8 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 		flags = rec.flags or Registry.deriveFlags(rec.name, rec.kind),
 		patched = nil,
 		enclosure = enclosure,
+		hint = rec.hint,
+		onwardHint = rec.onwardHint,
 		_curve = nil,
 		_samples = nil,
 	}

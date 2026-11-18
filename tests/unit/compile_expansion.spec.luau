@@ -95,6 +95,24 @@ return function(t)
 		end
 	)
 
+	case("the alley's yard annex is kept like its footprint: a venue moved onto it is caught", function()
+		local alley = world.attractions[1] :: any
+		t.eq(#alley.annexes, 1, "the yard (Shared/Attractions/AlleyRoof.ANNEX)")
+		local an = alley.annexes[1]
+		local cx, _, cz = AlleyLayout.toWorld(alley.place, (an.x0 + an.x1) / 2, 0, (an.d0 + an.d1) / 2)
+		local bad = table.clone(mod)
+		bad.venues = table.clone(mod.venues)
+		for i, v in bad.venues do
+			if v.id == "f1_diner" then
+				local moved = table.clone(v)
+				moved.position = { x = cx, z = cz }
+				bad.venues[i] = moved
+			end
+		end
+		local text = table.concat(Expansion.check(bad, world), "\n")
+		t.truthy(string.find(text, "f1_diner overlaps the attraction bowling_alley (annex: ", 1, true) ~= nil, text)
+	end)
+
 	case("the checker catches overlaps, an unreachable door, a floating floor and a missing pickup", function()
 		local bad = table.clone(mod)
 		bad.venues = table.clone(mod.venues)

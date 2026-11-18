@@ -21,13 +21,16 @@
 -- rescue) shows up as a root that is not where the last frame left it; the motor restarts from there
 -- instead of writing the old position back over it.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
--- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
+-- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast, and so does
+-- what a route's own record says to do at its far end (its `hint`: the alley roof's ridge and bough say jump or drop)
+-- or on going on from there by itself (its `onwardHint`: out of the alley's vent into the rafters).
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
---   feedback(frame, events, onRoute) -> string? (pure); cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
+--   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
+--   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
 --   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
 -- No side effects on require.
@@ -55,6 +58,15 @@ local HINTS: { [string]: string } = {
 	noRoom = "No room to jump in here: run on to an opening",
 }
 
+-- The hint for arriving at the far end of `route` at `t` (pure; nil: nothing to say there): the route record's own
+-- `hint`. Only the far end (t = 1) has one: the other end leads on.
+function Squirrel.routeHint(route: { hint: string? }?, t: number?): string?
+	if route == nil or t == nil or t < 0.5 then
+		return nil
+	end
+	return route.hint
+end
+
 -- The camera zone for the route the body is on (pure): "tunnel" on any enclosed run (Shared/Routes/Enclosure.zone:
 -- the ball return, a hollow tree's inside, whatever its origin), so CameraPolicy puts the camera inside with it; nil
 -- elsewhere.
@@ -63,11 +75,34 @@ function Squirrel.cameraZone(route: any?): string?
 end
 
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
--- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now.
-function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any } }, onRoute: boolean): string?
+-- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now, `railT` where
+-- along it, `routeOf(id)` the route record of an id (a route with something to do at its far end says so on
+-- arriving there: routeHint; one whose far end carries on by itself says its onwardHint on the way out).
+function Squirrel.feedback(
+	frame: { [string]: any },
+	events: { { [string]: any } },
+	onRoute: boolean,
+	railT: number?,
+	routeOf: ((id: number) -> any)?
+): string?
+	local function route(id: number?): any
+		return if id ~= nil and routeOf then routeOf(id) else nil
+	end
 	for _, e in events do
 		if e.kind == "hint" and e.reason and HINTS[e.reason] then
 			return HINTS[e.reason]
+		end
+		if e.kind == "railEnd" then
+			local said = Squirrel.routeHint(route(e.routeId), railT)
+			if said then
+				return said
+			end
+		end
+		if e.kind == "autoSwitch" then
+			local from = route(e.fromRouteId)
+			if from and from.onwardHint then
+				return from.onwardHint
+			end
 		end
 		if e.kind == "winded" then
 			return "Out of fumes: sprint comes back in a few seconds"
@@ -168,6 +203,9 @@ function Squirrel.start(
 		blockedHalf = world.blockedHalf,
 		clamp = world.clamp,
 	}
+	local function routeOf(id: number): any
+		return motorWorld.registry:get(id)
+	end
 	local pos = root.Position
 	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
 	-- the root's height above the soles is the body's own HipHeight (PuppetSpec), not the gap to the
@@ -276,7 +314,9 @@ function Squirrel.start(
 				metrics.lastEvent = "riverRecover"
 			end
 		end
-		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute) else nil
+		local say = if ctx.toast
+			then Squirrel.feedback(f :: any, events :: any, wasOnRoute, state.railT, routeOf)
+			else nil
 		local t = os.clock()
 		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
 			lastSaid, lastText = t, say

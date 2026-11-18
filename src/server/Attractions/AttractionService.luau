@@ -4,8 +4,9 @@
 -- data/attractions.json; brief v2 §13a; BUILD_PLAN §1.1 rule 13): carves the boot terrain out of the bowling
 -- alley's nine ball-return ducts (and from under its alley, over its entrance ramp and out of the front-west
 -- corner, where the ground stands above the floor) so the squirrel tunnels are open air, registers
--- the collision groups (LaneGuard keeps people off the lanes; BowlingPhysics is the baked group of the ball and
--- pins, which are scripted and collide with nothing), swings the steel push-bar exit doors on E (from inside only, like the real thing:
+-- the collision groups (Shared/World/CollisionGroups: LaneGuard keeps people off the lanes; BowlingPhysics is the
+-- baked group of the ball and pins, which are scripted and collide with nothing; PeopleFence and SquirrelFence keep
+-- people on the alley roof's guard platform and squirrels off its stair), swings the steel push-bar exit doors on E (from inside only, like the real thing:
 -- the prompt needs line of sight), and starts the MinigameService with its Heartbeat step. Every model under
 -- Workspace.Attractions that carries the bake's Origin attributes is a SITE for minigames (the bowling alley, and
 -- each expansion venue a game has baked: Shared/Minigames/Games explains sites); the service is handed them all
@@ -16,6 +17,7 @@
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
 local MinigameService = require("../Minigames/MinigameService")
 
 local AttractionService = {}
@@ -54,16 +56,18 @@ end
 
 local function collisionGroups()
 	local PhysicsService = game:GetService("PhysicsService")
-	for _, g in { "BowlingPhysics", "LaneGuard" } do
+	for _, g in CollisionGroups.GROUPS do
 		pcall(function()
 			if not PhysicsService:IsCollisionGroupRegistered(g) then
 				PhysicsService:RegisterCollisionGroup(g)
 			end
 		end)
 	end
-	pcall(function()
-		PhysicsService:CollisionGroupSetCollidable("LaneGuard", "BowlingPhysics", false)
-	end)
+	for _, pair in CollisionGroups.APART do
+		pcall(function()
+			PhysicsService:CollisionGroupSetCollidable(pair[1], pair[2], false)
+		end)
+	end
 end
 
 -- The push-bar doors: both leaves swing out together on E, close after a while.
@@ -186,11 +190,13 @@ function AttractionService.start(opts: Opts?): any?
 	if ok and type(mod) == "table" and type((mod :: any).routes) == "table" then
 		for _, r in (mod :: any).routes do
 			if r.kind == "tunnel" or (r.kind == "bridge" and string.find(r.name, "tunnel", 1, true)) then
-				-- the pair is the route's own field (data/attractions.json); an older record names its first lane
-				local pair = if type(r.pair) == "number"
-					then r.pair
-					else ((tonumber(string.match(r.name, "lanes (%d+)")) or 0) + 1) // 2
-				tunnels[pair] = r.points
+				-- the pair is the route's own field (data/attractions.json); an older record names its first lane. A
+				-- tunnel of neither kind is not a ball return (the roof vent's duct, Shared/Attractions/AlleyRoof).
+				local lane = tonumber(string.match(r.name, "lanes (%d+)"))
+				local pair = if type(r.pair) == "number" then r.pair elseif lane then (lane + 1) // 2 else nil
+				if pair then
+					tunnels[pair] = r.points
+				end
 			end
 		end
 	end

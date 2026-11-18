@@ -972,12 +972,12 @@ do
 end
 
 -- THE HALL'S ROOF (brief addendum D9, D10: rafters over the lanes where a sneaking squirrel can be spotted) -------
--- Over the lanes the hall has a flat hung ceiling at CEILING_Y under a roof deck; the alley roof run
--- (feat/alley-roof, Shared/Attractions/AlleyRoof) raises it to a trussed roof. Everything that belongs to the roof
--- over this rectangle is one model, `model`, which that lane replaces whole (as the backstage replaces the back
--- module): the roof deck and its plant, the hung ceiling, and the lights in it (the lanes' troffers, cans and
--- washes, the aisles' troffers). `hung` names what hangs from that ceiling elsewhere in the bake and must be hung
--- again from the new roof (tests/unit/attractions_alley_bake.spec.luau holds both lists to the bake).
+-- Over the lanes the roof is the alley roof run's raised, trussed roof (Shared/Attractions/AlleyRoof.HALL_ROOF, built
+-- by tools/bake/alley/Roof): everything that belongs to the roof over this rectangle is one model, `model` (the strip
+-- of flat roof and hung ceiling from d0 to the clerestory, the clerestory walls, the deck and its plant, the trusses,
+-- braces and light rails, and the lights: the lanes' troffers, cans and washes, the aisles' troffers). `hung` names
+-- what hangs from that roof elsewhere in the bake (tests/unit/attractions_alley_bake.spec.luau holds both lists to
+-- the bake).
 AlleyLayout.HALL_ROOF = {
 	model = "HallRoof",
 	owner = "the alley roof run (addendum D9, D10; feat/alley-roof)",
@@ -985,7 +985,7 @@ AlleyLayout.HALL_ROOF = {
 	x1 = AlleyLayout.HALL_X1,
 	d0 = -24, -- the concourse's back edge: the settees, the approaches, the lanes and both aisles
 	d1 = AlleyLayout.MACHINE_D1,
-	holds = { "Roof", "RoofUnit*", "CeilingLanes", "LaneLights", "AisleLights" },
+	holds = { "Roof", "RoofUnit*", "CeilingLanes", "Trusses", "Braces", "LightRails", "LaneLights", "AisleLights" },
 	hung = { "Masking.MaskFace", "Scoreboards.Lane<n>.Hanger" } :: { string },
 }
 

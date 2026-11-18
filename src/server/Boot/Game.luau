@@ -50,7 +50,7 @@
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could not
---   start), townIdOf(actorId), stop() };
+--   start), rafters (Attractions/RafterService; nil when it could not start), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
 --   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
@@ -75,6 +75,7 @@ local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local SkyLiftService = require("../Rides/SkyLiftService")
+local RafterService = require("../Attractions/RafterService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
@@ -399,6 +400,7 @@ function Game.start(opts: Opts?): any
 	local possession = rt.possession
 	local devices = rt.devices
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
+	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
 		for _, model in devices.models do
@@ -1057,6 +1059,14 @@ function Game.start(opts: Opts?): any
 			end
 			fadeAcc = 0
 		end
+		if rafters then
+			local okR, errR = pcall(rafters.step, rafters, dt)
+			if not okR then
+				warn(`[SpicyRodents] the rafter watch stopped: {errR}`)
+				pcall(rafters.stop, rafters)
+				rafters = nil
+			end
+		end
 	end
 
 	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
@@ -1251,6 +1261,15 @@ function Game.start(opts: Opts?): any
 		end)
 	end
 
+	-- 6b. the people under the alley's rafters spot a squirrel that does not creep (Attractions/RafterService:
+	-- addendum D9), and a guard's kick does not reach into the roof vent
+	local okR, errR = pcall(function()
+		rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire, attractions = attractions })
+	end)
+	if not okR then
+		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1312,6 +1331,7 @@ function Game.start(opts: Opts?): any
 		attractions = attractions,
 		infection = infection,
 		skylift = skylift,
+		rafters = rafters,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1322,6 +1342,9 @@ function Game.start(opts: Opts?): any
 			end
 			if skylift then
 				skylift:stop()
+			end
+			if rafters then
+				rafters:stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

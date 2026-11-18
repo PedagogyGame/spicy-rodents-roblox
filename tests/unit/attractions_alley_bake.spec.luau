@@ -2,8 +2,9 @@
 -- The eighteen-lane bowling alley as it is baked (tools/bake/alley/Alley, the code that writes
 -- build/Attractions.rbxm), built in memory at its real place and measured against the floor plan
 -- (Shared/Attractions/AlleyLayout; brief addendum D4, D5):
---   * everything baked lies inside the footprint data/attractions.json declares (the expansion planner keeps the
---     neighbours out of that box), and the part count stays inside its budget;
+--   * everything baked lies inside the footprint data/attractions.json declares, or the annex it declares beside it
+--     (the roof run's yard; the expansion planner keeps the neighbours out of both), and the part count stays
+--     inside its budget;
 --   * A WALK TEST: a body 2 studs wide and 5.2 tall is flood-filled over the baked parts from the foot of the
 --     entrance ramp, standing on the plan's floors (AlleyLayout.floorAt). It reaches every staff post, the back of
 --     every approach, the spot behind every pinsetter and every minigame station; it can walk every leg of every
@@ -15,6 +16,7 @@
 --     owner's backstage is where the plan says.
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local AlleyRoof = require("@shared/Attractions/AlleyRoof")
 local Data = require("@shared/Data")
 local Games = require("@shared/Minigames/Games")
 local Alley = require("../../tools/bake/alley/Alley")
@@ -30,6 +32,10 @@ return function(t)
 	local alley = mod.attractions[1]
 	local place: AlleyLayout.Place = alley.place
 	local fp = alley.footprint
+	local grounds = { fp }
+	for _, an in alley.annexes or {} do
+		table.insert(grounds, an)
+	end
 	local kit = Kit.new(roblox, place)
 	local root = roblox.Instance.new("Model")
 	root.Name = "BowlingAlley"
@@ -67,20 +73,35 @@ return function(t)
 		for _, b in boxes do
 			perTop[b.top] = (perTop[b.top] or 0) + 1
 			if b.top ~= "TerrainCarve" then
-				local inside = b.X - b.hx >= fp.x0 - 0.01
-					and b.X + b.hx <= fp.x1 + 0.01
-					and b.D - b.hd >= fp.d0 - 0.01
-					and b.D + b.hd <= fp.d1 + 0.01
-				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint`)
+				-- (the footprint, or the annex the attraction declares beside it: the roof run's yard; a part may
+				-- straddle the seam, so its outline's corners and edge midpoints are each on one or the other)
+				local inside = true
+				for _, u in { -1, 0, 1 } do
+					for _, v in { -1, 0, 1 } do
+						local X, D = b.X + u * (b.hx - 0.01), b.D + v * (b.hd - 0.01)
+						local on = false
+						for _, g in grounds do
+							on = on or (X >= g.x0 and X <= g.x1 and D >= g.d0 and D <= g.d1)
+						end
+						inside = inside and on
+					end
+				end
+				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint and the annex`)
 			end
 		end
 		-- the budget: the building with the games' furniture (the shop rooms are still empty). It was set at 6,200
 		-- over 5,598 parts with the pool tables as stand-ins (48 parts each, 24 for bumper pool); the real tables
 		-- (tools/bake/games/Pool, BumperPool: a cut bed, six round leather pockets with their wells, jawed
 		-- cushions, sights, sixteen numbered and striped balls, a three-shade lamp, a score board and a cue stand:
-		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The bound keeps the ~600 parts the shop rooms
-		-- were given over that.
-		t.truthy(#boxes > 4500 and #boxes < 6950, `{#boxes} parts`)
+		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The roof run's raised roof, vent, stairs and yard
+		-- (tools/bake/alley/Roof 673, RoofVent 101, RoofStairs 113, Yard 285 with the owner's ridge perches and
+		-- gutter brackets) add 1,172 less the 108 of the flat roof, its ceiling and lights they take over from Shell
+		-- and Lanes: 7,415. The bound keeps the ~600 parts the shop rooms were given over that.
+		t.truthy(#boxes > 4500 and #boxes < 8000, `{#boxes} parts`)
+		t.truthy(perTop.HallRoof <= 700, `the raised hall roof is {perTop.HallRoof} parts`)
+		t.truthy(perTop.Yard <= 300, `the yard is {perTop.Yard} parts`)
+		t.truthy(perTop.RoofVent <= 140, `the rooftop vent is {perTop.RoofVent} parts`)
+		t.truthy(perTop.RoofStairs <= 160, `the stair and the guard platform are {perTop.RoofStairs} parts`)
 		t.truthy(perTop.Lanes <= L.LANES * 132, `the lanes are {perTop.Lanes} parts`)
 		t.truthy(perTop.BackModule < 450, `the back module is {perTop.BackModule} parts`)
 		t.eq(
@@ -530,18 +551,21 @@ return function(t)
 				overlap[k] = true
 			end
 			if b.top == hr.model then
-				-- the roof model stays over its rectangle, at the ceiling and above
+				-- the roof model (the raised roof, tools/bake/alley/Roof) stays over its rectangle and its walls, no lower
+				-- than the lamps under its light rails
+				local raised = AlleyRoof.HALL_ROOF
 				t.truthy(
-					b.X - b.hx >= hr.x0 - 0.01
-						and b.X + b.hx <= hr.x1 + 0.01
+					b.X - b.hx >= raised.outerX0 - 0.11
+						and b.X + b.hx <= raised.outerX1 + 0.11
 						and b.D - b.hd >= hr.d0 - 0.01
-						and b.D + b.hd <= hr.d1 + 0.01,
+						and b.D + b.hd <= hr.d1 + 0.11,
 					`{k} is outside the hall roof's rectangle`
 				)
-				t.truthy(b.Y - b.hy >= L.CEILING_Y - 0.3, `{k} hangs below the ceiling`)
+				t.truthy(b.Y - b.hy >= AlleyRoof.LIGHT_RAIL.lampY - 0.7, `{k} hangs below the lamps`)
 			elseif
 				not swap
 				and b.top ~= "Walls"
+				and b.top ~= "RoofVent" -- (the vent's drop stands on a truss's plate inside the hall: tools/bake/alley/RoofVent)
 				and b.X + b.hx > hr.x0 + 0.01
 				and b.X - b.hx < hr.x1 - 0.01
 				and b.D + b.hd > hr.d0 + 0.01
@@ -555,7 +579,7 @@ return function(t)
 		sameSet(hung, hr.hung, "parts that hang from the hall's ceiling")
 		local hall = root:FindFirstChild(hr.model) :: any
 		t.truthy(hall ~= nil, "the HallRoof model")
-		for _, name in { "Roof", "CeilingLanes", "LaneLights", "AisleLights" } do
+		for _, name in { "Roof", "CeilingLanes", "Trusses", "Braces", "LightRails", "LaneLights", "AisleLights" } do
 			t.truthy(hall:FindFirstChild(name), `HallRoof.{name}`)
 		end
 		t.eq(root:FindFirstChild("LaneLights"), nil, "the lane lights are the roof's")
