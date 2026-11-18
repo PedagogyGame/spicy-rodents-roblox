@@ -29,6 +29,7 @@ ItemService.WORDS = table.freeze({
 	wet = "Splash!",
 	chalkTooLong = "Chalk writes up to %d letters.",
 	chalkNothing = "Nothing to write.",
+	chalkBusy = "Still writing the last words.",
 })
 
 export type Target = { kind: string, id: any, x: number, y: number, z: number, player: any? }
@@ -53,7 +54,8 @@ export type Deps = {
 	act: (player: any, effect: { [string]: any }, targets: { Target }?) -> boolean?,
 }
 
-export type State = { uses: number, on: boolean, read: boolean, last: number }
+-- (writing: the chalk's words are with the filter, which yields: a second send meanwhile is refused)
+export type State = { uses: number, on: boolean, read: boolean, last: number, writing: boolean }
 
 export type Service = {
 	use: (self: Service, player: any, itemId: string, payload: { [string]: any }?) -> (boolean, string?),
@@ -98,7 +100,7 @@ function Methods.state(self: Service, player: any, itemId: string): State
 	end
 	local s = mine[itemId]
 	if s == nil then
-		s = { uses = 0, on = false, read = false, last = -math.huge }
+		s = { uses = 0, on = false, read = false, last = -math.huge, writing = false }
 		mine[itemId] = s
 	end
 	return s
@@ -182,7 +184,12 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 	local s = self:state(player, itemId)
 	local now = d.now()
 	local cool = ItemRules.COOLDOWN[itemId] or 0.5
+	-- the chalk's words typed in its box (asking for the box starts no cooldown: the words are the use)
+	local words = itemId == "chalk" and payload ~= nil and type(payload.text) == "string"
 	if now - s.last < cool then
+		if words then
+			return no(ItemService.WORDS.wait) -- (typed words are never dropped without a word)
+		end
 		return false, ItemService.WORDS.wait -- (quietly: a held trigger is not a mistake)
 	end
 	-- the context: the world as the server sees it
@@ -201,8 +208,8 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 		ctx.targetKind = if target then target.kind else nil
 		ctx.stunUsed = self.stunUsed[keyOf(player)] == true
 	end
-	if itemId == "chalk" and payload and type(payload.text) == "string" then
-		local raw = string.gsub(payload.text, "^%s+", "")
+	if words then
+		local raw = string.gsub((payload :: { [string]: any }).text, "^%s+", "")
 		raw = string.gsub(raw, "%s+$", "")
 		if raw == "" then
 			return no(ItemService.WORDS.chalkNothing)
@@ -210,14 +217,26 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 		if utf8.len(raw) == nil or (utf8.len(raw) :: number) > def.letters then
 			return no(string.format(ItemService.WORDS.chalkTooLong, def.letters))
 		end
-		local clean = d.filter(player, raw)
-		if clean == nil or clean == "" then
+		-- the filter yields (TextService): the stick is spoken for until it answers, and still owned after
+		if s.writing then
+			return no(ItemService.WORDS.chalkBusy)
+		end
+		s.writing = true
+		local ok, clean = pcall(d.filter, player, raw)
+		s.writing = false
+		if d.inventory.count(player, itemId) <= 0 then
+			return no(ItemService.WORDS.notOwned)
+		end
+		if not ok or clean == nil or clean == "" then
 			return no(ItemService.WORDS.chalkNothing)
 		end
 		ctx.text = clean
+		now = d.now()
 	end
 	local effects = ItemRules.use(def, ctx)
-	s.last = now
+	if not (effects[1] and effects[1].kind == "askText") then
+		s.last = now
+	end
 	local consumed = false
 	for _, e in effects do
 		local k = e.kind

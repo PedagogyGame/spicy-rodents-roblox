@@ -608,4 +608,59 @@ return function(t)
 			t.truthy(a.intent.speed > 0 or a.intent.tx ~= a.x, "off again once the stun is over")
 		end
 	)
+	t.test(
+		"chalk: words typed straight after the ask are written; two sends while the filter works write once",
+		function()
+			local r = rig()
+			r.inv.add(r.player, "chalk")
+			r.clock += 10
+			t.truthy(r.svc:use(r.player, "chalk"), "the box asked for")
+			r.clock += 1.5 -- "hi" and Enter in a second and a half (the chalk's cooldown is 2 s)
+			t.truthy(r.svc:use(r.player, "chalk", { text = "hi" }), "written, not dropped")
+			t.eq(r.acts[#r.acts - 1].kind, "write")
+			-- a second stick: two sends at once while TextService yields
+			local r2 = rig()
+			r2.inv.add(r2.player, "chalk")
+			local waiting: { thread } = {}
+			r2.svc.deps.filter = function(_p: any, text: string): string?
+				table.insert(waiting, coroutine.running())
+				coroutine.yield()
+				return text
+			end
+			r2.clock += 10
+			local c1 = coroutine.create(function()
+				return r2.svc:use(r2.player, "chalk", { text = "one" })
+			end)
+			local c2 = coroutine.create(function()
+				return r2.svc:use(r2.player, "chalk", { text = "two" })
+			end)
+			coroutine.resume(c1)
+			local _, ok2 = coroutine.resume(c2)
+			t.eq(ok2, false, "the second send is refused at once")
+			t.eq(r2.refused[#r2.refused], ItemService.WORDS.chalkBusy, "with words")
+			for _, co in waiting do
+				coroutine.resume(co)
+			end
+			local writes = 0
+			for _, a in r2.acts do
+				if a.kind == "write" then
+					writes += 1
+				end
+			end
+			t.eq(writes, 1, "one stick, one writing")
+			t.eq(r2.inv.count(r2.player, "chalk"), 0)
+		end
+	)
+
+	t.test("chalk cuts by letters, never through one: ItemRules.cut", function()
+		t.eq(ItemRules.cut("hello", 3), "hel")
+		t.eq(ItemRules.cut("hi", 20), "hi")
+		local accented = string.rep("\u{E9}", 25) -- two bytes each
+		local cut = ItemRules.cut(accented, 20)
+		t.eq(utf8.len(cut), 20)
+		t.eq(#cut, 40, "whole letters")
+		t.eq(ItemRules.cut("\xff\xfe", 5), "", "not UTF-8: nothing")
+		local fx = ItemRules.use(ItemRules.def("chalk") :: any, { userId = 1, text = accented })
+		t.eq(utf8.len(fx[1].text), 20, "the writing is valid text of 20 letters")
+	end)
 end

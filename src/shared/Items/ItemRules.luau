@@ -24,7 +24,7 @@
 --   lawn chair  set down and sat in, anywhere; folded back up with E
 --   radio       on and off: plays the stock-library playlist (RADIO_PLAYLIST: cue names)
 --   kite        flown in the park or on the beach (KITE_ZONES), nowhere else
--- Interface: CATALOG; def(itemId) -> Def?; use(def, ctx) -> { Effect }; validate(def) -> (ok, err?);
+-- Interface: CATALOG; def(itemId) -> Def?; use(def, ctx) -> { Effect }; validate(def) -> (ok, err?); cut(text, n);
 --   USES (uses to one bought, nil: it lasts); COOLDOWN (seconds between uses); CUES; RADIO_PLAYLIST; HEADLINES;
 --   KITE_ZONES; FORBIDDEN_EFFECTS
 -- Pure; no side effects on require.
@@ -153,6 +153,19 @@ function ItemRules.validate(d: Def): (boolean, string?)
 	return true
 end
 
+-- The first `n` letters of `text` (code points, so a letter of several bytes is never cut in half; invalid UTF-8
+-- gives "").
+function ItemRules.cut(text: string, n: number): string
+	local len = utf8.len(text)
+	if len == nil then
+		return ""
+	end
+	if len <= n then
+		return text
+	end
+	return string.sub(text, 1, (utf8.offset(text, n + 1) :: number) - 1)
+end
+
 local function cue(d: Def): Effect
 	return { kind = "sound", cue = ItemRules.CUES[d.id] }
 end
@@ -190,7 +203,7 @@ function ItemRules.use(d: Def, ctx: Ctx): { Effect }
 		if ctx.text == nil or ctx.text == "" then
 			return { { kind = "askText", item = id, max = d.letters } }
 		end
-		return { { kind = "write", text = string.sub(ctx.text, 1, d.letters) }, cue(d) }
+		return { { kind = "write", text = ItemRules.cut(ctx.text, d.letters) }, cue(d) }
 	elseif id == "flashlight" then
 		local on = not ctx.on
 		return {
