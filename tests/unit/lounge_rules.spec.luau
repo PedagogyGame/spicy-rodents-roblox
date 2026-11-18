@@ -85,8 +85,8 @@ return function(t)
 			local spec: any = EconomyRules.pass(EconomyRules.PASS)
 			t.truthy(spec ~= nil)
 			t.truthy(string.find(spec.offer, "both lounges", 1, true) ~= nil, spec.offer)
-		t.eq(spec.cents, 20)
-		t.eq(spec.days, 5)
+			t.eq(spec.cents, 20)
+			t.eq(spec.days, 5)
 		end
 	)
 
