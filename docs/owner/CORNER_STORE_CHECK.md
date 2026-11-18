@@ -48,10 +48,10 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 | Chalk | A box asks what to write (up to 20 letters); it appears on the ground in front of you, checked by Roblox's filter like any chat |
 | Disposable camera | Takes a screenshot: the white flash, then Roblox's own "save to captures" offer (24 shots) |
 | Water gun | Squirts ahead: people get wet and hurry off. The first time you hit the Spicy Rodent it is frozen for 1.3 seconds (once per player) |
-| Kite | Only in the park (Sycamore Park) or on the beach: it rises on its string downwind of you and sways; use again to reel it in. Walk out of the park or beach and it comes down |
+| Kite | Only in the park (Sycamore Park) or on the beach: it rises on its string downwind of you and sways. While it is up you stand still and steer it: **A / D** (or the left stick, or the arrows on a touch screen) lean it left or right across the wind, as far as about 55 degrees; let go and it drifts back to the middle. **W / S** let the string out or reel it in (20 to 60 studs; it stays where you leave it). Use it again to bring it down and walk again. Put it away and it comes down too |
 
 ## What is not finished
-- **The kite** flies (up, sways, reeled in) but has no tricks yet: no steering, no dives or loops, no wind that changes, no string that can tangle or snap. Its string is a straight line drawn from your hand.
+- **The kite** flies and steers the basic way (left, right, string out and in), as you asked: no dives or loops, no wind that changes, no string that can tangle or snap. Its string is a line drawn from your hand. You stand still while it is up (the keys steer it instead of walking).
 - **Sounds** are all named and wired but silent until the lead picks library sounds (no uploads).
 - **Dogs** do not exist in the town yet, so the dog treats are kept off the shelf and out of sale until they do (one line in the item list puts them back). The pictures in `docs/renders/corner_store/` were taken before, so they still show the box on the third gondola.
 - Nothing is saved between servers (like the wallet): what you bought lasts while the server runs.

@@ -42,6 +42,9 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local KiteFlight = Import.shared("Items/KiteFlight") :: typeof(require("../../shared/Items/KiteFlight"))
 local ItemService = require("./ItemService")
+-- (KiteFlight's exported types do not cross the Import cast)
+type Flight = typeof(KiteFlight.new())
+type Bucket = typeof(KiteFlight.bucket())
 
 local ItemWorld = {}
 
@@ -94,7 +97,7 @@ export type World = {
 	step: () -> (),
 	putAway: (player: any) -> (),
 	steer: (player: any, x: any, y: any) -> boolean,
-	kiteOf: (player: any) -> KiteFlight.Flight?,
+	kiteOf: (player: any) -> Flight?,
 	stop: () -> (),
 }
 
@@ -516,11 +519,11 @@ function ItemWorld.start(opts: StartOpts): World
 		a1: Attachment,
 		t: number,
 		reel: number?,
-		flight: KiteFlight.Flight,
+		flight: Flight,
 	}
 	local kites: { Kite } = {}
 	-- each flier's steer packets (the bucket outlives a flight: a new kite is no way round the rate)
-	local buckets: { [any]: KiteFlight.Bucket } = {}
+	local buckets: { [any]: Bucket } = {}
 	local function flierAttr(player: any, on: boolean)
 		if typeof(player) == "Instance" then
 			(player :: Player):SetAttribute(ItemWorld.KITE_ATTRIBUTE, if on then true else nil)
@@ -1188,7 +1191,7 @@ function ItemWorld.start(opts: StartOpts): World
 			end
 			return false
 		end,
-		kiteOf = function(player: any): KiteFlight.Flight?
+		kiteOf = function(player: any): Flight?
 			for _, k in kites do
 				if k.player == player and k.reel == nil then
 					return k.flight

@@ -104,7 +104,7 @@ function KiteSteer.start(): Handle
 	local gui: ScreenGui? = nil
 	local ctl: any? = nil
 	local touch: Touch = { left = false, right = false, up = false, down = false }
-	local last: KiteFlight.Sent = { x = 0, y = 0, at = -math.huge }
+	local last: { x: number, y: number, at: number } = { x = 0, y = 0, at = -math.huge }
 
 	local function remote(): RemoteEvent?
 		local r = game:GetService("ReplicatedStorage"):FindFirstChild(KiteSteer.REMOTE)
