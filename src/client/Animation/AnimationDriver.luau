@@ -142,6 +142,9 @@ type Entry = {
 	hero: { [string]: HeroClip }?, -- a sculpted hero rig playing its authored clips
 	biteSeen: number?, -- the body's BiteAt attribute as last seen (biteDue)
 	biteTrack: AnimationTrack?, -- the Bite clip, played over whatever the body is doing
+	windSeen: number?, -- the body's PounceAt attribute as last seen (the pounce's wind-up)
+	windTrack: AnimationTrack?, -- the start of the Pounce clip: the rodent gathering itself
+	windStop: number?, -- os.clock() when the wind-up's crouch is let go
 	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
 	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
 	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
@@ -576,6 +579,10 @@ end
 -- the Bite clip once, at Action priority over the gait, sped up so the lunge and snap take about a
 -- second. A body first seen with a stamp already on it has bitten in the past: nothing is played.
 AnimationDriver.BITE = { rate = 2.2, fade = 0.08 }
+-- The pounce's wind-up (brief v2 §8; Server/Combat/CombatService stamps PounceAt at the click, or at a feint): every
+-- client plays the start of the Pounce clip, the gather before the spring, slowed, for `secs`, so a person sees it
+-- coming. The same stamp rule as the bite (biteDue).
+AnimationDriver.WINDUP = { rate = 0.6, fade = 0.05, secs = 0.25 }
 function AnimationDriver.biteDue(seen: number?, at: any, first: boolean): (boolean, number?)
 	if type(at) ~= "number" then
 		return false, seen
@@ -1152,6 +1159,31 @@ function AnimationDriver.start(opts: Opts): Driver
 					if bt then
 						bt:Play(AnimationDriver.BITE.fade, 1, AnimationDriver.BITE.rate)
 					end
+				end
+				-- the pounce's wind-up (or a feint), over whatever the body is doing
+				local windNow, windAt =
+					AnimationDriver.biteDue(e.windSeen, body and body:GetAttribute("PounceAt"), e.current == nil)
+				e.windSeen = windAt
+				if windNow and heroSet.Pounce then
+					local wt = e.windTrack
+					if wt == nil then
+						wt = track(e, "Pounce")
+						if wt then
+							(e.tracks :: { [string]: AnimationTrack? }).Pounce = nil
+							wt.Priority = Enum.AnimationPriority.Action
+							wt.Looped = false
+							e.windTrack = wt
+						end
+					end
+					if wt then
+						wt:Play(AnimationDriver.WINDUP.fade, 1, AnimationDriver.WINDUP.rate)
+						e.windStop = os.clock() + AnimationDriver.WINDUP.secs
+					end
+				end
+				local windStop = e.windStop
+				if e.windTrack and windStop and os.clock() >= windStop then
+					e.windTrack:Stop(AnimationDriver.WINDUP.fade)
+					e.windStop = nil
 				end
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil

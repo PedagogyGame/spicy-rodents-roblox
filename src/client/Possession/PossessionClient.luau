@@ -26,7 +26,7 @@
 -- ("ride_end", "ride_left") gives the legs and the usual camera back on the platform. While the Lookout's telescope
 -- is up (Client/Rides/Telescope) E and Q are its keys.
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
---   Client.flushInput(), Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
+--   Client.flushInput(), Client.state() -> { species, variant, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing); rideTarget(mode, cabin, seat, view) -> Model?;
 --   rideWords(to) -> string (pure); resetWords(hasBody, device, to) -> string? (pure)
 
@@ -339,6 +339,14 @@ function PossessionClient.start(opts: Opts): Client
 			toast = toast,
 			meter = if hud then hud.meter else nil,
 			link = link,
+			-- the rodent's click goes to the duel first (Server/Combat/CombatService: the pounce's tell)
+			duel = function(verb: string)
+				local pn = ReplicatedStorage:FindFirstChild("PlayNet")
+				local r = if pn then pn:FindFirstChild("Duel") else nil
+				if r and r:IsA("RemoteEvent") then
+					r:FireServer(verb)
+				end
+			end,
 		}
 		-- a key pressed in the menu or in another body is not this body's: without this an N pressed
 		-- minutes ago switched the rodent's night vision on at the handoff (and a Space made it leap)
@@ -613,6 +621,7 @@ function PossessionClient.start(opts: Opts): Client
 		state = function(): { [string]: any }
 			return {
 				species = if payloadNow then payloadNow.species else nil,
+				variant = if payloadNow then payloadNow.variant else nil,
 				device = if device then device.device else nil,
 				decision = decision,
 			}
