@@ -90,6 +90,7 @@ type ClockSample = { server: number, offset: number, ping: number }
 type Marks = {
 	-- the lowest offset in each CLOCK_BUCKET of server time (`server` is the bucket) and the highest ping in it
 	offsets: { ClockSample },
+	runs: { ClockSample }, -- the lowest offset in each C.CLOCK_RUN_BUCKET of server time, for C.CLOCK_RUN_KEEP
 	gaps: { number }, -- server times of the recent gaps too long to judge move by move
 	wallGaps: { number }, -- server times of the recent gaps whose straight line went through a wall
 	stamina: number, -- the server's own sprint meter (stamina()): 1 full, below 0 the client sprints on credit
@@ -145,6 +146,11 @@ MoveValidator.C = table.freeze({
 	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
 	-- leaving the tallest trunk is within this of it
 	RAIL_REACH_MAX = 90,
+	CLOCK_PING_SHARE = 0.6, -- of the median round trip: what a one-way latency that drops can lower the offset by
+	CLOCK_RUN_BUCKET = 5, -- seconds of server time per long-run clock bucket ...
+	CLOCK_RUN_KEEP = 120, -- ... kept this long ...
+	CLOCK_RUN_AGE = 60, -- ... the mark: the lowest of those at least this old (a 1.02 x clock is 1.2 s ahead of it) ...
+	CLOCK_RUN_MAX = 1.1, -- ... which the offset may never fall below by more (seconds: more than any latency drops)
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -233,7 +239,7 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 	local now = serverTime or 0
 	local marks = self._marks[actorId]
 	if marks == nil then
-		marks = { offsets = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = now }
+		marks = { offsets = {}, runs = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = now }
 		self._marks[actorId] = marks
 	end
 	local m = marks :: Marks
@@ -339,8 +345,12 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	-- handover from cellular to wifi) lowers it once, by at most the latency it had. Two marks: the lowest offset of
 	-- the buckets at least clockLag old (a fast hack shows within a second; a hack's own packets never lower the mark
 	-- they are held to) and of those at least clockSeconds - 2 old (a slow one adds up: a 1.12 x clock shows within
-	-- three seconds on a quick link, eight on the slowest). The swing allowed: the slack, or the highest round trip the engine measured in the window
-	-- when larger (the latency that dropped was at most that), never more than clockStepMax.
+	-- three seconds on a quick link, eight on the slowest). The swing allowed below each bucket: the slack, or
+	-- C.CLOCK_PING_SHARE of the round trip the engine measured in that bucket when larger (the one-way latency that
+	-- dropped since was at most that; a lag spike widens the swing below its own bucket only), never more than
+	-- clockStepMax. And over the long run
+	-- (C.CLOCK_RUN_AGE to C.CLOCK_RUN_KEEP seconds back) the offset may never fall more than C.CLOCK_RUN_MAX, the most
+	-- any latency can drop: a clock a little fast (1.02 x) adds up past it in a minute or so.
 	local offset = serverTime - next.clock
 	local marks = actor.marks
 	local buckets = marks.offsets
@@ -357,27 +367,56 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	while #buckets > 1 and (key - buckets[1].server) * CLOCK_BUCKET > self.clockSeconds do
 		table.remove(buckets, 1)
 	end
-	local mark, longMark, pingMax = math.huge, math.huge, 0
+	local mark = math.huge
+	local worst, worstAhead, worstSwing, swing = -math.huge, 0, 0, self.clockSlack
+	local function judge(b: ClockSample)
+		local swingB = math.min(math.max(self.clockSlack, b.ping * MoveValidator.C.CLOCK_PING_SHARE), self.clockStepMax)
+		swing = math.max(swing, swingB)
+		local aheadB = b.offset - offset
+		if aheadB - swingB > worst then
+			worst, worstAhead, worstSwing = aheadB - swingB, aheadB, swingB
+		end
+	end
 	for _, b in buckets do
-		local age = (key - b.server) * CLOCK_BUCKET
-		if age >= self.clockLag then
+		if (key - b.server) * CLOCK_BUCKET >= self.clockLag then
 			mark = math.min(mark, b.offset)
+			judge(b)
 		end
-		if age >= self.clockSeconds - 2 then
-			longMark = math.min(longMark, b.offset)
-		end
-		pingMax = math.max(pingMax, b.ping)
 	end
 	if mark == math.huge then
 		mark = buckets[1].offset -- (newer than the lag: the first bucket since the baseline)
+		judge(buckets[1])
 	end
-	local swing = math.min(math.max(self.clockSlack, pingMax), self.clockStepMax)
-	local ahead = math.max(mark - offset, if longMark < math.huge then longMark - offset else 0)
-	if ahead > swing then
+	if worst > 0 then
 		table.insert(violations, {
 			code = "clock",
-			severity = if ahead > self.clockStepMax then 1 else 0.5,
-			detail = `client clock {ahead} s ahead of its arrivals (swing {swing} s)`,
+			severity = if worstAhead > self.clockStepMax then 1 else 0.5,
+			detail = `client clock {worstAhead} s ahead of its arrivals (swing {worstSwing} s)`,
+		})
+	end
+	-- the long run: the lowest offset of each C.CLOCK_RUN_BUCKET seconds, kept C.CLOCK_RUN_KEEP
+	local runs = marks.runs
+	local runKey = math.floor(serverTime / MoveValidator.C.CLOCK_RUN_BUCKET)
+	local lastRun = runs[#runs]
+	if lastRun and lastRun.server == runKey then
+		lastRun.offset = math.min(lastRun.offset, offset)
+	else
+		table.insert(runs, { server = runKey, offset = offset, ping = 0 })
+	end
+	while #runs > 1 and (runKey - runs[1].server) * MoveValidator.C.CLOCK_RUN_BUCKET > MoveValidator.C.CLOCK_RUN_KEEP do
+		table.remove(runs, 1)
+	end
+	local runMark = math.huge
+	for _, b in runs do
+		if (runKey - b.server) * MoveValidator.C.CLOCK_RUN_BUCKET >= MoveValidator.C.CLOCK_RUN_AGE then
+			runMark = math.min(runMark, b.offset)
+		end
+	end
+	if runMark < math.huge and runMark - offset > MoveValidator.C.CLOCK_RUN_MAX then
+		table.insert(violations, {
+			code = "clock",
+			severity = 1,
+			detail = `client clock {runMark - offset} s ahead of its arrivals of a minute ago`,
 		})
 	end
 
@@ -522,7 +561,7 @@ end
 local function marksOf(self: MoveValidator, actorId: any): Marks
 	local marks = self._marks[actorId]
 	if marks == nil then
-		marks = { offsets = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = 0 }
+		marks = { offsets = {}, runs = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = 0 }
 		self._marks[actorId] = marks
 	end
 	return marks :: Marks

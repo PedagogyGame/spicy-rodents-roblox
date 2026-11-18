@@ -451,6 +451,79 @@ return function(t)
 		end)
 	end
 
+	-- 8. A CLOCK A LITTLE FAST ---------------------------------------------------------------------------------------------
+	for _, c in
+		{
+			{ name = "1.08 x at 450 ms one way", lat = 0.45, rate = 1.08, within = 12 },
+			{
+				name = "1.08 x at 80 ms, the engine saying 0.9 s round trip",
+				lat = 0.08,
+				rate = 1.08,
+				ping = 0.9,
+				within = 12,
+			},
+			{
+				name = "1.08 x at 80 ms, one lag spike (2 s round trip for half a second) just before",
+				lat = 0.08,
+				rate = 1.08,
+				spike = true,
+				within = 12,
+			},
+			{ name = "1.03 x at 80 ms", lat = 0.08, rate = 1.03, within = 70 },
+			{ name = "1.02 x at 80 ms", lat = 0.08, rate = 1.02, within = 70 },
+		}
+	do
+		t.test(`cheat: a clock {c.name}: snapped for the clock within {c.within} s`, function()
+			local Rng = require("@tests/cheat/Rng")
+			local rng = Rng.new(15)
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = { latency = c.lat, jitter = 0.05, loss = 0.02 },
+				seed = 15,
+				-- (the hack from 3 s on: the first seconds set the marks)
+				pingOf = if c.ping or c.spike
+					then function(now: number): number
+						if c.spike and now > 2.5 and now < 3 then
+							return 2
+						end
+						return c.ping or (2 * c.lat + 0.05)
+					end
+					else nil,
+			})
+			rig:possess(town.startAt(rng), town.driven(rng))
+			rig:run(3)
+			rig.opts.clockRate = c.rate
+			rig:run(c.within)
+			local r = rig:result()
+			print(`      {LiveRig.describe(c.name, r)}; first snap at {r.firstSnap}`)
+			t.truthy((r.reasons.clock or 0) + (r.reasons["clock+clock"] or 0) >= 1, "snapped for the clock")
+		end)
+	end
+	t.test("honest: two minutes at 450 ms one way, and at 80 ms with lag spikes every 20 s: 0 snaps", function()
+		local Rng = require("@tests/cheat/Rng")
+		for _, c in { { lat = 0.45, spikes = false }, { lat = 0.08, spikes = true } } do
+			local rng = Rng.new(16)
+			local rig = LiveRig.new({
+				world = town.world,
+				vworld = town.vworld,
+				link = {
+					latencyAt = function(now: number): number
+						return if c.spikes and now % 20 > 19 then 0.8 else c.lat
+					end,
+					jitter = 0.05,
+					loss = 0.02,
+				},
+				seed = 16,
+			})
+			rig:possess(town.startAt(rng), town.driven(rng))
+			rig:run(120)
+			local r = rig:result()
+			print(`      {LiveRig.describe(`{c.lat} s{if c.spikes then " with spikes" else ""}`, r)}`)
+			t.eq(r.snaps, 0, "no snap")
+		end
+	end)
+
 	-- 5. JOINING ON A BIG TRUNK WHILE THE TOWN STREAMS IN ----------------------------------------------------------------
 	t.test(
 		"honest: a body taken high on any big trunk, 8 s of streaming, then on the bark: 0 snaps on every trunk",
