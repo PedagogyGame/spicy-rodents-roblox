@@ -73,7 +73,7 @@ SewerAmbience.C = {
 	lampRadius = 40, -- studs from the body: the space's lamps on within it, off beyond (moving with the body)
 	maxLit = 8, -- at most this many of the space's lights on at once (the nearest)
 	ease = 6, -- per second: how fast the look comes in and goes
-	near = 3.5, -- studs (level) from a mouth point within which the way in is explained
+	near = 2.5, -- studs (level) off a grate's opening within which the way in is explained
 	climbWindow = 6, -- studs under the street: the top of a shaft, where "W: climb out" shows
 	descending = -1.0, -- studs/s: going down a shaft faster than this is not climbing out
 	rungStep = 1.0, -- studs of shaft per rung
@@ -257,8 +257,8 @@ function SewerAmbience.litLamps(points: { Vector3 }, at: Vector3, radius: number
 end
 
 -- What the keys do here (nil: nothing to say). On a grate: E goes down, exactly where the motor takes it in (a hatch
--- mouth, Enclosure rule 1: a body standing within the mouth's reach and C.rise of its height, not more than C.behind
--- past it, any facing); near one, how to get in (stand on it, press E). Nothing of that for C.promptHold after
+-- mouth with the opening as its area, Enclosure rule 1: a body on the opening or within C.hatchMargin of its edge, and
+-- within C.rise of its height, any facing); near one, how to get in (stand on it, press E). Nothing of that for C.promptHold after
 -- coming up. In the top C.climbWindow studs of a shaft and not dropping: W climbs out; in drain 1
 -- running at the crossing: its A / D.
 function SewerAmbience.prompt(layout: Layout, view: View): string?
@@ -276,13 +276,21 @@ function SewerAmbience.prompt(layout: Layout, view: View): string?
 	if view.since ~= nil and view.since < SewerAmbience.C.promptHold then
 		return nil -- just come up: running away from the grate, nothing to say about going back down
 	end
-	local m, level = layout.nearestMouth(view.x, view.z, SewerAmbience.C.near)
+	local m: Mouth? = nil
+	local off = SewerAmbience.C.near
+	for _, mouth in layout.mouths do
+		local o = mouth.opening
+		local dx = math.max(o.x0 - view.x, 0, view.x - o.x1)
+		local dz = math.max(o.z0 - view.z, 0, view.z - o.z1)
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d <= off then
+			m, off = mouth, d
+		end
+	end
 	if m == nil or math.abs(view.y - m.y) > EC.rise + 0.5 then
 		return nil
 	end
-	local dx, dz = view.x - m.x, view.z - m.z
-	local past = dx * m.out.x + dz * m.out.z < -EC.behind
-	if level > m.reach or past or math.abs(view.y - m.y) > EC.rise then
+	if off > EC.hatchMargin or math.abs(view.y - m.y) > EC.rise then
 		return string.format(PROMPT.step, m.kind)
 	end
 	return PROMPT.down

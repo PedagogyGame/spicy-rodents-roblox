@@ -66,8 +66,12 @@
 --   hop     st/s? Space and a click out of this mouth are a short hop at this horizontal speed (vertical `hopUp`,
 --           default C.hopUp) instead of a full leap or pounce: the pop out at the rack lands by it.
 --   hatch   boolean? (default false) E only (a storm drain's grate): in only when E is pressed by a body standing at
---           the mouth (within `reach` and `rise`, not more than C.behind past it; any facing); walking, falling,
---           leaping or pouncing onto it never goes in. Not on a "link" mouth. The way out is as `opens` says.
+--           the mouth (on its `area` when it has one, else within `reach` and `rise`, not more than C.behind past it;
+--           any facing); walking, falling, leaping or pouncing onto it never goes in. Not on a "link" mouth. The way
+--           out is as `opens` says.
+--   area    {x0, x1, z0, z1}? a hatch's lid, level, in world studs (the grate's opening): E takes a body standing
+--           anywhere on it or within C.hatchMargin of its edge, and within `rise` of the mouth point's height (Enclosure.
+--           offHatch). Only on a hatch.
 --   links   { {route, t, dir} }? for "link" (allowed on the others too: the routes that meet it outside)
 --   name    string? ("grille", "rack", "knothole 2")
 --
@@ -79,7 +83,7 @@
 --      flight's swept path counts, and going in ends the attack). No pull from a distance: the walk-in grab, E's
 --      off-rail search and the air-catch never take an enclosed route. The body is eased onto the mouth like a
 --      rail transfer (never a jump). E at a mouth with the body facing in goes in the same way. A `hatch` mouth
---      takes only E, from a body standing at it (any facing): never a walk, a fall, a leap or a pounce; the server
+--      takes only E, from a body standing on it (any facing): never a walk, a fall, a leap or a pounce; the server
 --      allows its way in only at ground pace and from the mouth's height (no flight). From a rail, only through
 --      a "link" (rule 5).
 --   2. Inside and away from a mouth there is no launching and no grabbing in or out: Space, a click and Q do
@@ -102,8 +106,8 @@
 -- Interface: KIND, BODY, C, validate(rec, kind), validateSet(records, known?), fromRecord(rec), windowOf(mouth),
 --   mouthAt(spec, length, t), mouthNear(spec, length, t, slack), endMouth(spec, length, atStart),
 --   endLink(spec, atStart), inside(route, t), hidden(route, t), zone(route), headroom(spec, t), upAt(spec, t),
---   names(mouth, routeId), connects(a, aT, b, bT, slackA?, slackB?), allows(from, fromT, to, toT, slackFrom?,
---   slackTo?), linked(a, b), neighbours(route), exits(spec, length)
+--   offHatch(mouth, x, z), names(mouth, routeId), connects(a, aT, b, bT, slackA?, slackB?), allows(from, fromT, to,
+--   toT, slackFrom?, slackTo?), linked(a, b), neighbours(route), exits(spec, length)
 
 local Curve = require("./Curve")
 
@@ -125,6 +129,7 @@ export type MouthRecord = {
 	hop: number?,
 	hopUp: number?,
 	hatch: boolean?,
+	area: { number }?,
 	links: { LinkRecord }?,
 	name: string?,
 }
@@ -159,9 +164,11 @@ export type Mouth = {
 	hop: number?,
 	hopUp: number,
 	hatch: boolean,
+	area: Rect?,
 	links: { Link },
 	name: string?,
 }
+export type Rect = { x0: number, x1: number, z0: number, z1: number }
 export type Crawl = { t0: number, t1: number, height: number }
 export type UpKey = { t: number, up: Vec3 }
 export type Cavity = { x: number, z: number, radius: number, bottom: number?, top: number? }
@@ -211,6 +218,7 @@ Enclosure.C = {
 	width = 1.7, -- default section width
 	height = 1.8, -- default section headroom
 	unitTol = 0.02, -- |out| within 1 +- this
+	hatchMargin = 0.4, -- a body this far (level) off a hatch's `area` still stands on it: half its capsule radius
 }
 
 local function link(rec: LinkRecord): Link
@@ -244,6 +252,10 @@ function Enclosure.fromRecord(rec: Record): Spec
 			out = Curve.vec3(m.out[1], m.out[2], m.out[3])
 		end
 		local reach = m.reach or Enclosure.C.reach
+		local area: Rect? = nil
+		if m.area then
+			area = { x0 = m.area[1], x1 = m.area[2], z0 = m.area[3], z1 = m.area[4] }
+		end
 		table.insert(mouths, {
 			t = m.t,
 			opens = m.opens,
@@ -255,6 +267,7 @@ function Enclosure.fromRecord(rec: Record): Spec
 			hop = m.hop,
 			hopUp = m.hopUp or Enclosure.C.hopUp,
 			hatch = m.hatch == true,
+			area = area,
 			links = links,
 			name = m.name,
 		})
@@ -475,6 +488,20 @@ function Enclosure.validate(rec: any, kind: string): { string }
 		elseif m.hatch == true and m.opens == "link" then
 			table.insert(errs, `{where}: a link mouth cannot be a hatch (nothing walks into it)`)
 		end
+		if m.area ~= nil then
+			local a = m.area
+			if
+				type(a) ~= "table"
+				or #a ~= 4
+				or not (isNumber(a[1]) and isNumber(a[2]) and isNumber(a[3]) and isNumber(a[4]))
+				or a[1] >= a[2]
+				or a[3] >= a[4]
+			then
+				table.insert(errs, `{where}.area must be [x0, x1, z0, z1] with x0 < x1 and z0 < z1`)
+			elseif m.hatch ~= true then
+				table.insert(errs, `{where}.area is only for a hatch`)
+			end
+		end
 		for j, l in m.links or {} do
 			checkLink(errs, `{where}.links[{j}]`, l)
 		end
@@ -593,6 +620,18 @@ function Enclosure.mouthNear(spec: Spec, length: number, t: number, slack: numbe
 		end
 	end
 	return best
+end
+
+-- offHatch(mouth, x, z): how far (level, studs) the point is off the hatch's `area` (0 on it); nil when the mouth has
+-- no area. A body within C.hatchMargin of it stands on the hatch.
+function Enclosure.offHatch(m: Mouth, x: number, z: number): number?
+	local a = m.area
+	if a == nil then
+		return nil
+	end
+	local dx = math.max(a.x0 - x, 0, x - a.x1)
+	local dz = math.max(a.z0 - z, 0, z - a.z1)
+	return math.sqrt(dx * dx + dz * dz)
 end
 
 -- windowOf(mouth): the studs along the route the body counts as at it.

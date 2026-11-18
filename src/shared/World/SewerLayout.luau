@@ -508,6 +508,21 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 	local slabBottom = carveDoc.slabBottom
 	local reachDefault = doc.mouth.reach
 	local riseDefault = doc.mouth.rise
+	-- a mouth's shaft centre (the route runs `rungGap` off the rung wall; the shaft is `inside` square from that wall)
+	-- and its opening (the hole the frame leaves: authored, or the shaft's inside)
+	local function shaftCentre(m: any): (number, number)
+		local rg = AXES[m.rungs]
+		local back = shaftDoc.inside / 2 - shaftDoc.rungGap
+		return m.at[1] - rg.x * back, m.at[2] - rg.z * back
+	end
+	local function openingOf(m: any): Rect
+		if m.opening then
+			return { x0 = m.opening[1], x1 = m.opening[2], z0 = m.opening[3], z1 = m.opening[4] }
+		end
+		local cx, cz = shaftCentre(m)
+		local h = shaftDoc.inside / 2
+		return { x0 = r4(cx - h), x1 = r4(cx + h), z0 = r4(cz - h), z1 = r4(cz + h) }
+	end
 
 	local sections: { [string]: Section } = {}
 	for kind in doc.sections do
@@ -734,10 +749,12 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 			local mouths = {}
 			local function mouthRec(m: any, t: number): { [string]: any }
 				local rg = AXES[m.rungs]
+				local lid = openingOf(m)
 				return {
 					t = t,
 					opens = "ground",
 					hatch = true,
+					area = { lid.x0, lid.x1, lid.z0, lid.z1 },
 					out = { rg.x, 0, rg.z },
 					reach = m.reach or reachDefault,
 					rise = m.rise or riseDefault,
@@ -844,10 +861,8 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 					w = r.wTo
 				end
 			end
-			local inside, wall, gap = shaftDoc.inside, shaftDoc.wall, shaftDoc.rungGap
-			-- the route runs `gap` off the rung wall; the shaft is `inside` square from that wall
-			local cx = m.at[1] - rg.x * (inside / 2 - gap)
-			local cz = m.at[2] - rg.z * (inside / 2 - gap)
+			local inside, wall = shaftDoc.inside, shaftDoc.wall
+			local cx, cz = shaftCentre(m)
 			local half = inside / 2 + wall
 			local column: Box = {
 				x0 = floorTo(cx - half, voxel),
@@ -868,17 +883,7 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 				end
 				x += voxel
 			end
-			local opening: Rect
-			if m.opening then
-				opening = { x0 = m.opening[1], x1 = m.opening[2], z0 = m.opening[3], z1 = m.opening[4] }
-			else
-				opening = {
-					x0 = r4(cx - inside / 2),
-					x1 = r4(cx + inside / 2),
-					z0 = r4(cz - inside / 2),
-					z1 = r4(cz + inside / 2),
-				}
-			end
+			local opening = openingOf(m)
 			local mouth: Mouth = {
 				id = m.id,
 				pipe = p.id,

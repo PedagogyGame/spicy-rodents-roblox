@@ -2,8 +2,9 @@
 -- The storm drains felt from inside, on the client (Client/World/SewerAmbience; lane S3 of the sewer plan). Here, the
 -- pure part against the real motor on the pipes' stand-in (tests/lib/SewerStandIn on tests/lib/BakedWorld):
 --   the words on a grate tell the truth: "E: down the drain" exactly where E takes the body down (every mouth, a
---   ring of places and facings: any facing on the grate), and there W never goes down (a hatch mouth, Enclosure rule
---   1); near one, how to get in; never a compass word (the game's map has east at -x)
+--   ring of places and facings: any facing on the grate; anywhere on its opening, and the server agrees), and there W
+--   never goes down (a hatch mouth, Enclosure rule 1); a body's width off it, nothing; near one, how to get in; never
+--   a compass word (the game's map has east at -x)
 --   drain 1's crossing: A / D announced running at it along the arm (the motor keeps a pick made anywhere on it), the
 --   arm picked named; which arm was taken
 --   "W: climb out" shows in the top of a shaft on the way out of every run, never on the way down or in a passage
@@ -117,6 +118,53 @@ return function(t)
 			t.truthy(said > went, "near a mouth but not on it, the way in is explained")
 		end
 	)
+
+	t.test("the whole grate takes E and says so; a body's width off it neither goes down nor is told to", function()
+		local n, off = 0, 0
+		for _, m in layout.mouths do
+			local o = m.opening
+			-- a 7 x 7 grid over the opening, 0.3 in from its edges, every facing: E goes down, the words say so and the
+			-- server accepts the step
+			for i = 0, 6 do
+				for j = 0, 6 do
+					local x = o.x0 + 0.3 + (o.x1 - o.x0 - 0.6) * i / 6
+					local z = o.z0 + 0.3 + (o.z1 - o.z0 - 0.6) * j / 6
+					local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
+					s.yaw = (i * 7 + j) * math.pi / 4 + 0.1
+					local where = `{m.id} at ({x}, {z})`
+					t.eq(SewerAmbience.prompt(layout, viewOf(s)), P.down, where)
+					local before = SquirrelMotor.clone(s)
+					SquirrelMotor.step(s, BakedWorld.keys(0, { grab = true }), 1 / 60, w)
+					t.eq(s.routeId, m.route, `{where}: E goes down`)
+					t.eq(#SquirrelMotor.envelope(before, s, 1 / 60, w, false), 0, `{where}: the server agrees`)
+					n += 1
+				end
+			end
+			-- 0.5 studs past the margin off each edge and corner (the rung-side frame included): nothing
+			local d = Enclosure.C.hatchMargin + 0.5
+			local cx, cz = (o.x0 + o.x1) / 2, (o.z0 + o.z1) / 2
+			for _, q in
+				{
+					{ o.x0 - d, cz },
+					{ o.x1 + d, cz },
+					{ cx, o.z0 - d },
+					{ cx, o.z1 + d },
+					{ o.x0 - d * 0.71, o.z0 - d * 0.71 },
+					{ o.x1 + d * 0.71, o.z1 + d * 0.71 },
+				}
+			do
+				local s = SquirrelMotor.new(q[1], baked.groundAt(q[1], q[2], m.y + 3), q[2])
+				s.yaw = math.atan2(cx - q[1], cz - q[2])
+				local where = `{m.id} off at ({q[1]}, {q[2]})`
+				t.truthy(SewerAmbience.prompt(layout, viewOf(s)) ~= P.down, where)
+				SquirrelMotor.step(s, BakedWorld.keys(0, { grab = true }), 1 / 60, w)
+				t.truthy(s.routeId == nil or layout.spaceOf(s.routeId) ~= m.space, `{where}: E does not go down`)
+				off += 1
+			end
+		end
+		t.eq(n, 8 * 49)
+		t.eq(off, 8 * 6)
+	end)
 
 	t.test("a person, the fox or a deer is never told to go down a drain", function()
 		for _, m in layout.mouths do

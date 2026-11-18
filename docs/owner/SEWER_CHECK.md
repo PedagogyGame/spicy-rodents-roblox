@@ -22,7 +22,7 @@ The game's map has east on the left of the x axis, so the drains are named by wh
 | | Main Street north verge grate | (1350, 37.4) | the boulevard |
 
 ## What to press
-1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate. Near it the screen says **Stand on the grate and press E to go down the drain** (on the quays: **the cover**). Standing on it, facing any way, it says **E: down the drain**.
+1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate. Near it the screen says **Stand on the grate and press E to go down the drain** (on the quays: **the cover**). Standing anywhere on it, facing any way, it says **E: down the drain**; a step off it onto the frame or the pavement, it does not.
 2. Press **E**. The squirrel goes down the ladder shaft. Walking, running, jumping or pouncing over a grate never takes you down.
 3. Hold **W**. The squirrel runs the way the camera looks, as on a branch.
 4. In drain 1, as you run along an arm toward the crossing the screen says **The crossing ahead: A or D picks a side arm (W: straight on)**. Press A or D anywhere along the arm (from the foot of the ladder on): the pick is kept until the crossing, and the screen names it, for example **Side arm picked: out at the corner grate by the blue cottage (the same key again: straight on)**. The other key picks the other side arm. Once past the crossing it tells you which way you went and where you will come out, for example **Straight on: out at the corner grate by the bungalow**.

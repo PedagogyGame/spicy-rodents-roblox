@@ -973,7 +973,7 @@ end
 
 -- does a body at (x, y, z) moving along (moveX, moveZ) get in at this mouth (Enclosure rule 1)? Returns the level
 -- distance to the mouth point, or nil. `standingE`: E pressed by a body standing on the ground, the only way into a
--- hatch (which then takes any facing); without it a hatch takes nothing.
+-- hatch (which then takes any facing, from anywhere on its `area` when it has one); without it a hatch takes nothing.
 local function intoMouth(
 	ref: MouthRef,
 	x: number,
@@ -989,6 +989,14 @@ local function intoMouth(
 	end
 	local dx, dz = x - ref.x, z - ref.z
 	local level = math.sqrt(dx * dx + dz * dz)
+	local off = Enclosure.offHatch(m, x, z)
+	if off then
+		-- a hatch with a lid: anywhere on it (or within the margin of its edge), any facing
+		if off > Enclosure.C.hatchMargin or math.abs(y - ref.y) > m.rise then
+			return nil
+		end
+		return level
+	end
 	if level > m.reach or math.abs(y - ref.y) > m.rise then
 		return nil
 	end
@@ -1018,7 +1026,7 @@ end
 -- mouthEntry(world, x, y, z, moveX, moveZ, standingE?): the way in for a body off the rails at (x, y, z) moving along
 -- (moveX, moveZ) (Enclosure rule 1): the nearest mouth that opens ground, ledge or air, with the body within its
 -- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. A hatch mouth only
--- with `standingE` (E pressed by a body on the ground; any facing). nil when none.
+-- with `standingE` (E pressed by a body on the ground; any facing; on its `area` when it has one). nil when none.
 function Motion.mouthEntry(
 	world: World,
 	x: number,

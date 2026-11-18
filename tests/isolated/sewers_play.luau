@@ -242,10 +242,12 @@ return function(t)
 				(said[string.format(SewerAmbience.PROMPT.step, nw.kind)] or 0) >= 1,
 				"near it: stand on the grate and press E"
 			)
-			-- back onto it, then a second standing there with its back to the opening's side: the prompt, and the
-			-- people see it there
+			-- back onto it (the middle of the grate), then a second standing there: the prompt, and the people see it
+			-- there
+			local lid = nw.opening
+			local midX, midZ = (lid.x0 + lid.x1) / 2, (lid.z0 + lid.z1) / 2
 			local back = BakedWorld.drive(motorWorld, s, 60 * 4, function(): SquirrelMotor.Input?
-				local dx, dz = nw.x - s.x, nw.z - s.z
+				local dx, dz = midX - s.x, midZ - s.z
 				if dx * dx + dz * dz < 0.3 * 0.3 then
 					return nil
 				end
@@ -262,8 +264,10 @@ return function(t)
 				SquirrelMotor.step(s, SquirrelMotor.idleInput(overCam), DT, motorWorld)
 				frame()
 			end
-			local onIt = math.sqrt((s.x - nw.x) ^ 2 + (s.z - nw.z) ^ 2)
-			t.truthy(onIt < nw.reach, `standing on the grate ({onIt} st from its point)`)
+			t.truthy(
+				s.x > lid.x0 and s.x < lid.x1 and s.z > lid.z0 and s.z < lid.z1,
+				`standing on the grate ({s.x}, {s.z}), not its frame`
+			)
 			t.truthy((said[SewerAmbience.PROMPT.down] or 0) >= 30, "on the grate: E: down the drain")
 			t.eq(svc:underground(rodent.id), nil, "on the grate it is still in the street")
 			-- meanwhile the people walked on: the policeman and the four are put by the grate again, looking at it as it

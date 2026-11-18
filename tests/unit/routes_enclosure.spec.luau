@@ -260,6 +260,19 @@ return function(t)
 		)
 		t.eq(spec.mouths[1].hatch, false)
 		t.eq(spec.mouths[2].hatch, true)
+		-- a hatch's lid (`area`): four numbers in order, only on a hatch; offHatch is the level distance off it
+		t.eq(#errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2, 0, 3 } } } }), 0)
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 2, 0, 0, 3 } } } }), "area"))
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2 } } } }), "area"))
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", area = { 0, 2, 0, 3 } } } }), "only for a hatch"))
+		local lid = Enclosure.fromRecord(
+			rec({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2, 0, 3 } } } }) :: any
+		).mouths[1]
+		t.eq(Enclosure.offHatch(lid, 1, 1.5), 0)
+		t.eq(Enclosure.offHatch(lid, 2, 3), 0)
+		t.near(Enclosure.offHatch(lid, 3, 1) :: number, 1, 1e-9)
+		t.near(Enclosure.offHatch(lid, -3, 7) :: number, 5, 1e-9)
+		t.eq(Enclosure.offHatch(spec.mouths[2], 0, 0), nil)
 		-- a fork's own A/D window: positive studs; the default is C.forkAhead, a part-way link mouth always has it
 		t.truthy(has(errs({ forks = { { t = 1, route = 2, toT = 1, dir = -1, window = 0 } } }), "window"))
 		local wide = Enclosure.fromRecord(rec({

@@ -1539,8 +1539,12 @@ function SquirrelMotor.envelope(
 				end
 				local p = reg:pointAt(nextRoute, m.t)
 				local ox, oz = Motion.outLevel(world, nextRoute, m)
-				local tOff = offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach)
-					/ (if m.hatch then hatchCap else offCap)
+				-- a hatch with a lid is reached anywhere on it (Motion.intoMouth)
+				local offLid = Enclosure.offHatch(m, prev.x, prev.z)
+				local need = if offLid
+					then math.max(0, offLid - Enclosure.C.hatchMargin - E.posSlack)
+					else offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach)
+				local tOff = need / (if m.hatch then hatchCap else offCap)
 				local tRail = railTime(nextRoute, m.t, next.railT, 0)
 				local rise = m.rise + (if m.hatch then hatchVertical else vertical)
 				if tOff + tRail <= budget and math.abs(p.y - prev.y) <= rise then
