@@ -56,7 +56,7 @@ HollowLayout.C = {
 	holeOut = 1.5, -- studs from the bark's outside to the ground hole's mouth point (the walk-in must not reach the
 	-- outside trunk first: Motion.C.walkInReach less Enclosure.C.reach is 3.8 from the axis of a 2.95 stud trunk)
 	holeMin = 4.4, -- studs: never nearer the axis than this
-	floorLift = 0.15, -- studs: a floor's top above the highest ground under its cavity
+	floorLift = 0.3, -- studs: a floor's top above the highest ground under its cavity (and a lawn's grass plate)
 	room = 2.8, -- studs: a chamber's height from its floor to its roof
 	liner = 0.25, -- studs: the thickness of a liner board
 	tier = 6, -- studs: the height of one ring of liner boards up a shaft or the spiral
@@ -528,7 +528,7 @@ VARIANTS.knothole = function(b: Build, design: any, inside: any)
 		})
 	)
 	chamberAt(hl.chambers, design.chambers[1], id, 1, pts[#pts])
-	tiers(b, floorH - 0.3, floorH + C.room, { { floorH, bearing } })
+	tiers(b, floorH - 0.05, floorH + C.room, { { floorH, bearing } })
 	caps(b, floorH, rc0, floorH + C.room, rc0)
 	holeKnot(b, bearing, floorH + 0.9)
 end
@@ -635,7 +635,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 		chamberAt(hl.chambers, chambers[2], shaftId, (midH - h0) / (top - h0), tr.toWorld(wallB, rho(midH), midH))
 		chamberAt(hl.chambers, chambers[3], hideId, 1, hide[#hide])
 	end
-	tiers(b, floorH - 0.3, top + C.room, { { floorH, bearing }, { knotH, knotB }, { top, wallB } })
+	tiers(b, floorH - 0.05, top + C.room, { { floorH, bearing }, { knotH, knotB }, { top, wallB } })
 	caps(b, floorH, rc0, top + C.room, rcTop)
 	holeKnot(b, bearing, floorH + 0.9)
 	holeKnot(b, knotB, knotH + 0.85)
@@ -758,7 +758,7 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 		local qc = { pc[1] + (pa[1] - pc[1]) * k, pc[2] + (pa[2] - pc[2]) * k, pc[3] + (pa[3] - pc[3]) * k }
 		slab(hl.parts, "tread", qa, qc, outer - postR, 0.3)
 	end
-	tiers(b, floorH - 0.3, topH + C.room, { { floorH, bearing }, { topH, endBearing } })
+	tiers(b, floorH - 0.05, topH + C.room, { { floorH, bearing }, { topH, endBearing } })
 	caps(b, floorH, rc0, topH + C.room, rcTop)
 	holeKnot(b, bearing, floorH + 0.9)
 	holeKnot(b, endBearing, topH + 0.85)

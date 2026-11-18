@@ -217,6 +217,11 @@ local function blockPart(
 			cy = seat + r / 2
 		elseif lot.type == "fence_run" then
 			material = "WoodPlanks"
+		elseif lot.type == "shelter" and string.sub((lot :: any).style or "", 1, 8) == "bark log" then
+			-- the fallen hollow log (brief v2 §3): Server/World/HollowShell draws it round its run-through
+			-- (Shared/World/HollowLayout), so the lot is only an invisible marker, nothing to stand in its way
+			transparency = 1
+			solid = false
 		end
 	elseif isChild then
 		color = Palette.forLot(lot, kit).wall

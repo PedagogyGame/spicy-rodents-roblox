@@ -198,9 +198,9 @@
       "id": "H4",
       "tier": "single",
       "variant": "knothole",
-      "tree": "Shop Oak B",
-      "x": 362,
-      "z": 24,
+      "tree": "Pump Elm",
+      "x": 468,
+      "z": 34,
       "chambers": [
         {
           "id": "c",
@@ -218,9 +218,9 @@
       ],
       "claimable": true,
       "src": "wildlife_foraging §6.5 alternates; moved 2026-11-18 (hollow trees build)",
-      "note": "Was the HIGHLAND ELM (now H1, the spiral); Shop Oak B was an alternate (hollows survey).",
+      "note": "Was the HIGHLAND ELM (now H1, the spiral). The alternates Shop Oak A and B stand in the commercial sidewalks' curbs in the baked town; the Pump Elm is the east side's next free shade tree.",
       "inside": {
-        "trunk": 805,
+        "trunk": 833,
         "hole": 180
       }
     },
@@ -344,9 +344,9 @@
       "id": "H9",
       "tier": "single",
       "variant": "knothole",
-      "tree": "Estate Oak South 1",
-      "x": 118,
-      "z": -356,
+      "tree": "Estate Oak South 2",
+      "x": 166,
+      "z": -327,
       "chambers": [
         {
           "id": "c",
@@ -365,9 +365,10 @@
       "claimable": true,
       "src": "wildlife_foraging §6.5 H9",
       "inside": {
-        "trunk": 845,
+        "trunk": 860,
         "hole": 0
-      }
+      },
+      "note": "Was Estate Oak South 1 (118,-356), which stands inside the estate mansion's walls in the baked town; Estate Oak South 2 is the next estate oak."
     },
     {
       "id": "H10",
@@ -479,14 +480,14 @@
     "claimable": false,
     "x": -19,
     "z": 376,
-    "lengthU": 9,
-    "yaw": 0.35,
+    "lengthU": 9.2,
+    "yaw": 1.5708,
     "exits": 2,
     "nook": {
       "t": 0.5
     },
     "routeKind": "tunnel",
-    "src": "wildlife_foraging §6.4 (v5.4 hollow log); BUILD_PLAN §5.5",
+    "src": "wildlife_foraging §6.4 (v5.4 hollow log); BUILD_PLAN §5.5; the north park lot north_hollow_log (v5.4 L3703, along X, 9.2 u): its greybox is now an invisible marker and HollowShell draws the log",
     "inside": {
       "radius": 1.5
     }

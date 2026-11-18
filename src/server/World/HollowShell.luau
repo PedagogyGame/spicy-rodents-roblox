@@ -6,8 +6,8 @@
 -- its wall, a floor and a roof, the spiral's treads and heartwood post, the shaft's hideout shelf; the dark oval of
 -- each knothole sits on the bark outside; the log is boards round its run and a floor. Built at boot by
 -- Foraging/HollowService (no bake: a few hundred plain parts), and by the specs (the same parts the motor is held to).
--- Nothing here collides or casts a shadow (the squirrel runs these on its rails; the bark collides already); a
--- knothole is not queried (sight and the camera look through it), the rest is. A dim warm light in each chamber.
+-- Nothing in a tree collides or casts a shadow (the squirrel runs these on its rails; the bark collides already);
+-- the log's boards collide (they are the log); a knothole is not queried (sight and the camera look through it). A dim warm light in each chamber.
 -- Interface: build(env, layout, parent?) -> (Folder, Report). `env` is anything with Instance, CFrame, Vector3,
 --   Color3 and Enum as the engine has them (the engine's globals, or @lune/roblox in the specs).
 --   Report = { parts, lights, per = { [hollowId]: parts } }.
@@ -51,7 +51,7 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 				Vector3.new(pc.yv[1], pc.yv[2], pc.yv[3])
 			)
 			p.Anchored = true
-			p.CanCollide = false
+			p.CanCollide = pc.role == "log" -- (the log's boards stand in people's way; nothing else is reachable)
 			p.CanTouch = false
 			p.CanQuery = pc.role ~= "knothole"
 			p.CastShadow = false
