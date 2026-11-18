@@ -365,7 +365,7 @@ COMPARE = [  # label, role, index, build, outfit, hair, look overrides, the old 
     ("Nurse", "nurse", 3, "slim", "scrubs", "bun", None, "stock"),
     ("Police officer", "officer", 4, "broad", "police", "short", None, "stock"),
     ("Paramedic", "orderly", 5, "slim", "jacket", "curly", {"shirt": "#e6782a"}, "stock"),
-    ("Lounge doorman", "guard", 1, "broad", "guard", "short", {"shirt": "#5c1c22", "pants": "#1e1c20", "cap": "#5c1c22"}, "doorman"),
+    ("Lounge doorman", "guard", 1, "broad", "police", "short", {"shirt": "#5c1c22", "pants": "#1e1c20", "cap": "#5c1c22"}, "doorman"),
 ]
 
 LINEUP = [  # role, palette index, build, outfit, hair, pose
@@ -489,7 +489,7 @@ def main(argv):
 
     if not want or "compare" in want:
         # now (left of each pair) and rounded (right), standing, three-quarter front
-        gap, pair = 2.6, 6.4
+        gap, pair = 3.3, 7.4
         labels = []
         for i, (label, role, idx, build, outfit, hair, over, old) in enumerate(COMPARE):
             x0 = (i - (len(COMPARE) - 1) / 2) * pair
@@ -504,7 +504,7 @@ def main(argv):
             labels.append(("now", (x0 - gap / 2, 0, 6.9)))
             labels.append(("rounded", (x0 + gap / 2, 0, 6.9)))
         aim_sun(sun, fill, -128)
-        place(cam, (0, 0, 3.0), 90, -90, 6, 100)
+        place(cam, (0, 0, 3.0), 102, -90, 6, 100)
         shoot("compare", (1800, 600), labels)
 
     if not want or "hair" in want:

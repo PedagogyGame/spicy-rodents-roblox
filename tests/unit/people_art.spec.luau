@@ -452,8 +452,10 @@ return function(t: any)
 		end
 		local guard = figure("Guard1", "guard", 1.08, 0.7)
 		local bartender = figure("Bartender", "bartender", 1.0, 0)
+		local other = figure("Juggler", "juggler", 1.0, 0)
 		t.eq(PeopleArt.start(venue, { lib = LIB, library = library }), 2)
 		t.eq(PeopleArt.start(venue, { lib = LIB, library = library }), 0, "dressed once")
+		t.truthy(other:FindFirstChild("Body") ~= nil, "a kind it does not know is left as it is")
 		for _, case in { { guard, 1.08, "doorman" }, { bartender, 1.0, "bartender" } } do
 			local m, s = case[1], case[2]
 			t.eq(m:GetAttribute("PeopleArt"), case[3])

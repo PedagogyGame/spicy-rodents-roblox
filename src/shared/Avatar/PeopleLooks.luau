@@ -7,7 +7,8 @@
 --   paramedic   the ambulance crew: the zipped jacket in the crew's orange, no hat
 --   shopkeeper  a shop's worker (Pepper's Corner Store's): the short-sleeved shirt
 --   attendant   an attraction's staff (the alley's, the sky lift's): the zipped jacket
---   doorman     THE GILDED ACORN's two guards: the guard's uniform and peaked cap in claret, always broad
+--   doorman     THE GILDED ACORN's two guards: the long-sleeved uniform (the police cut, tie and badge) and the peaked
+--               cap in claret, always broad
 --   bartender   THE GILDED ACORN's bartender: the zipped jacket in white over black trousers, hair combed back
 -- Everything is picked from the person's index, so a seeded town looks the same on every server and in Lune.
 -- Interface: ROLES; POSTS; roleOf(post, index) -> role; dress(role, index, colours?) -> Dress;
@@ -51,7 +52,14 @@ PeopleLooks.ROLES = table.freeze({
 	paramedic = { art = "orderly", outfit = "jacket", hat = false, shirt = "#e6782a" },
 	shopkeeper = { art = "townsperson", outfit = "shirt" },
 	attendant = { art = "townsperson", outfit = "jacket" },
-	doorman = { art = "guard", build = "broad", shirt = "#5c1c22", pants = "#1e1c20", cap = "#5c1c22" },
+	doorman = {
+		art = "guard",
+		outfit = "police",
+		build = "broad",
+		shirt = "#5c1c22",
+		pants = "#1e1c20",
+		cap = "#5c1c22",
+	},
 	bartender = {
 		art = "townsperson",
 		outfit = "jacket",

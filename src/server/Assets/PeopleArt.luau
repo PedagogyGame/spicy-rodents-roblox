@@ -21,8 +21,9 @@
 --                        standing in the rest pose: its parts other than the PrimaryPart give way to anchored art
 --                        parts, scaled to the figure's height, facing the way the figure faced (its Root's +Z, the
 --                        bake's -D); whatever moves the figure by its pivot moves them with it.
---   start(root?)         dresses every baked staff figure (a Model with a `Staff` attribute and no Humanoid) under
---                        root (default Workspace.Expansion); returns how many.
+--   start(root?)         dresses every baked staff figure (a Model with a `Staff` attribute of a kind in STAFF_ROLES
+--                        and no Humanoid) under root (default Workspace.Expansion); returns how many. (The town's
+--                        staff, the alley's employees among them, are R15 actors: Actors/BodyFactory dresses them.)
 -- Every dressed part carries attribute PeopleArt = true and PeopleTint = its tint key (skin, shirt, pants, hair, cap
 -- or "#rrggbb"): its colour is the part's Color under an Overlay SurfaceAppearance, so the avatar blend
 -- (Server/Avatar/AvatarBlendService) tints the part, and only where it is skin (a sleeve stays a sleeve); a dressed body or figure
@@ -520,10 +521,12 @@ function PeopleArt.start(root: any?, opts: StatueOpts?): number
 			and d:FindFirstChildOfClass("Humanoid") == nil
 			and d:GetAttribute("PeopleArt") == nil
 		then
-			local role = PeopleArt.STAFF_ROLES[kind] or "attendant"
-			index[role] = (index[role] or 0) + 1
-			if PeopleArt.statue(d, PeopleLooks.dress(role, index[role]), opts) then
-				n += 1
+			local role = PeopleArt.STAFF_ROLES[kind]
+			if role then
+				index[role] = (index[role] or 0) + 1
+				if PeopleArt.statue(d, PeopleLooks.dress(role, index[role]), opts) then
+					n += 1
+				end
 			end
 		end
 	end
