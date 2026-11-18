@@ -120,6 +120,8 @@ return function(t)
 				t.eq(kinds.enter.RequiresLineOfSight, true)
 				t.eq(kinds.leave.RequiresLineOfSight, true)
 				t.eq(kinds.coffee.RequiresLineOfSight, false)
+				-- the podium's too: from just inside the door wall it is within reach (3.9 studs), through the wall
+				t.eq(kinds.pass.RequiresLineOfSight, true)
 				t.eq(kinds.pass.ActionText, "Buy a pass")
 				t.eq(kinds.pass.ObjectText, "20c for 5 in-game days")
 				t.eq(kinds.hot_cocoa.ActionText, "Hot cocoa (10c)")

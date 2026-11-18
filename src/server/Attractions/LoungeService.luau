@@ -271,7 +271,8 @@ function LoungeService.spot(self: any, s: { x: number, d: number, faceD: number 
 	return CFrame.lookAt(p, ahead)
 end
 
--- (sight: the door's two prompts need a line of sight, so the solid leaves keep each to its own side)
+-- (sight: the door's two prompts and the podium's need a line of sight, so the solid leaves and the door wall keep
+-- each to its own side: the podium is within reach of the room just inside the wall)
 local function prompt(post: any, action: string, object: string, kind: string, sight: boolean?): any
 	local att = Instance.new("Attachment")
 	att.Name = "PromptPoint"
@@ -312,7 +313,7 @@ function LoungeService._prompts(self: any)
 		self:leave(player)
 	end)
 	local cents, days = self.town.pass.offer()
-	on(prompt(self.podiumPost, W.buyAction, `{cents}c for {days} in-game days`, "pass"), "pass", function(player)
+	on(prompt(self.podiumPost, W.buyAction, `{cents}c for {days} in-game days`, "pass", true), "pass", function(player)
 		self:buyPass(player)
 	end)
 	for i, d in LoungeClassic.DRINKS do
