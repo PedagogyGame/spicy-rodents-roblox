@@ -1,0 +1,29 @@
+PASS Pinball_Flipper.glb | 516/600 triangles, 3 objects
+PASS Pinball_PopBumper.glb | 964/1500 triangles, 3 objects
+PASS Pinball_Plunger.glb | 312/400 triangles, 2 objects
+PASS Pinball_Gate.glb | 112/200 triangles, 1 objects
+PASS Pinball_Cabinet.glb | 3560/5000 triangles, 27 objects
+PASS Acorn_Playfield.glb | 56/300 triangles, 2 objects
+PASS Acorn_Guides.glb | 5732/6000 triangles, 7 objects
+PASS Acorn_Slingshots.glb | 536/800 triangles, 5 objects
+PASS Acorn_Targets.glb | 884/1200 triangles, 7 objects
+PASS Rodent_Playfield.glb | 56/300 triangles, 2 objects
+PASS Rodent_Guides.glb | 4288/6000 triangles, 7 objects
+PASS Rodent_Slingshots.glb | 536/800 triangles, 5 objects
+PASS Rodent_Targets.glb | 676/1200 triangles, 5 objects
+PASS Space_Playfield.glb | 56/300 triangles, 2 objects
+PASS Space_Guides.glb | 5324/6000 triangles, 7 objects
+PASS Space_Slingshots.glb | 536/800 triangles, 5 objects
+PASS Space_Targets.glb | 440/1200 triangles, 4 objects
+PASS Acorn_Spinner.glb | 188/300 triangles, 2 objects
+PASS Rodent_Wire.glb | 730/3000 triangles, 3 objects
+PASS Space_Ramps.glb | 1040/5000 triangles, 4 objects
+PASS Space_PodHoods.glb | 392/600 triangles, 2 objects
+PASS Acorn_Backglass.png
+PASS Rodent_Backglass.png
+PASS Space_Backglass.png
+
+Supplemental audit: 24 of 24 files pass
+acorn: 15,304 triangles per assembled machine
+rodent: 14,194 triangles per assembled machine
+space: 15,696 triangles per assembled machine

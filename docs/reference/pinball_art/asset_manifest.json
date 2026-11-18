@@ -1,0 +1,126 @@
+{
+  "format": "Spicy Rodent pinball visual assets",
+  "asset_count": 24,
+  "assets": [
+    {
+      "file": "Acorn_Backglass.png",
+      "bytes": 358801,
+      "sha256": "e81862f0ad396467e4f0bff3a246c3c66324fa3c244a99e6679bc28360cb608e"
+    },
+    {
+      "file": "Acorn_Guides.glb",
+      "bytes": 187528,
+      "sha256": "354602cd04e8d1a2d1ae0a0e122f00a1eeabedf64123396f8d0f53af39c3c38f"
+    },
+    {
+      "file": "Acorn_Playfield.glb",
+      "bytes": 204004,
+      "sha256": "e4d242d7f2f3b54f4981b4af6b13c1d3b95819b0fb047ba5780aba38b65585cb"
+    },
+    {
+      "file": "Acorn_Slingshots.glb",
+      "bytes": 33272,
+      "sha256": "b0dad6fc1cf415474bf067daef7a2f4c7e82ca6fcb78b6789cb1a78eb2532d7c"
+    },
+    {
+      "file": "Acorn_Spinner.glb",
+      "bytes": 8764,
+      "sha256": "d2bb27036bb248a9064e31b28bf5686f110c52ac201762f6d1b09398bed176cb"
+    },
+    {
+      "file": "Acorn_Targets.glb",
+      "bytes": 54452,
+      "sha256": "aaf57284d9c774d540c6cd6320a7b6a8f3000dd1b5e194bcd039574024ac2890"
+    },
+    {
+      "file": "Pinball_Cabinet.glb",
+      "bytes": 125440,
+      "sha256": "b7fd0d98925d4929d109c45cd4ef43af2a02acfe62fc4cca1e20021b2d517b4a"
+    },
+    {
+      "file": "Pinball_Flipper.glb",
+      "bytes": 25252,
+      "sha256": "709bb716a7596d4ad22f387bbba4c74b3574ef7d1772b1ca1619082a2c534064"
+    },
+    {
+      "file": "Pinball_Gate.glb",
+      "bytes": 3344,
+      "sha256": "20796766f3733e4fd83a971ad3ed932601621db2e547bd51d0552a58f39ff12c"
+    },
+    {
+      "file": "Pinball_Plunger.glb",
+      "bytes": 7728,
+      "sha256": "063a9f3d93c57dae3570131996b92773b72b8bed7fab2b28271c9d499e7bcf91"
+    },
+    {
+      "file": "Pinball_PopBumper.glb",
+      "bytes": 20376,
+      "sha256": "dc14a0a726b86868014b946bbcbec297495d8a5a457e72a77a2e29ceffdbf75d"
+    },
+    {
+      "file": "Rodent_Backglass.png",
+      "bytes": 268242,
+      "sha256": "1dcf33f1b6b564f12e21bbf4254690a3840e9929292ab4c9928ff9d14417b59e"
+    },
+    {
+      "file": "Rodent_Guides.glb",
+      "bytes": 139064,
+      "sha256": "56df4a9c0781bfce95162601e1ddfdc6597c082dc11b4be4ddf0404a9ae4d0a1"
+    },
+    {
+      "file": "Rodent_Playfield.glb",
+      "bytes": 186580,
+      "sha256": "29e916b99c0debac58c1d98aec3cf8309efae69096e85d52a68c9b8aa9115b8d"
+    },
+    {
+      "file": "Rodent_Slingshots.glb",
+      "bytes": 33268,
+      "sha256": "d7e4edf2a618c1afc25a0743a853b87a25acc012b6f1a17e8e518e213867afdd"
+    },
+    {
+      "file": "Rodent_Targets.glb",
+      "bytes": 41440,
+      "sha256": "8cfeba057a0558729fcdbab127b55f44bfa9f1198e50d135bb1256a4668164f6"
+    },
+    {
+      "file": "Rodent_Wire.glb",
+      "bytes": 28584,
+      "sha256": "1f5d6526ebc09ed4ce1a217ddb5a9dbf4340a3098f52bd98fd5d16876e79f54c"
+    },
+    {
+      "file": "Space_Backglass.png",
+      "bytes": 248280,
+      "sha256": "d4aa52461f7343fb84acaf670a1dfe06b31bb446e0baf4f20bd23b3c11686395"
+    },
+    {
+      "file": "Space_Guides.glb",
+      "bytes": 163964,
+      "sha256": "221db71f0a247863b8284747d5d4f41805d4f556782da6b451095703912e2986"
+    },
+    {
+      "file": "Space_Playfield.glb",
+      "bytes": 194568,
+      "sha256": "826bd8f1a4dbc3b41ad59d80eabbf69deb46eee8881743045453401f3c6c6cf0"
+    },
+    {
+      "file": "Space_PodHoods.glb",
+      "bytes": 19396,
+      "sha256": "d1546d402ccb0d36e8d45a097e511385cae734bc3517ac4d6e06a18de7accf5e"
+    },
+    {
+      "file": "Space_Ramps.glb",
+      "bytes": 40972,
+      "sha256": "4e2c991be3ba0134c6f69344ecc834efaed905fc0c9be9133454a7a4ee04bcbc"
+    },
+    {
+      "file": "Space_Slingshots.glb",
+      "bytes": 33268,
+      "sha256": "002f9d3b11c3b422c2555aa1464abb5e4b2458ca109f80d28fe0096fa086dc13"
+    },
+    {
+      "file": "Space_Targets.glb",
+      "bytes": 27804,
+      "sha256": "8c1b663790d5c865bc2fb0fa5cb04516b996a3d5f70b346a95c0069fe933c45d"
+    }
+  ]
+}

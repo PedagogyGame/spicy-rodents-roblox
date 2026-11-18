@@ -1,0 +1,26 @@
+PASS Pinball_Flipper.glb
+PASS Pinball_PopBumper.glb
+PASS Pinball_Plunger.glb
+PASS Pinball_Gate.glb
+PASS Pinball_Cabinet.glb
+PASS Acorn_Playfield.glb
+PASS Acorn_Guides.glb
+PASS Acorn_Slingshots.glb
+PASS Acorn_Targets.glb
+PASS Rodent_Playfield.glb
+PASS Rodent_Guides.glb
+PASS Rodent_Slingshots.glb
+PASS Rodent_Targets.glb
+PASS Space_Playfield.glb
+PASS Space_Guides.glb
+PASS Space_Slingshots.glb
+PASS Space_Targets.glb
+PASS Acorn_Spinner.glb
+PASS Rodent_Wire.glb
+PASS Space_Ramps.glb
+PASS Space_PodHoods.glb
+PASS Acorn_Backglass.png
+PASS Rodent_Backglass.png
+PASS Space_Backglass.png
+
+24 of 24 files pass
