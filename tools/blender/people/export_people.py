@@ -8,11 +8,12 @@ Reads <out>/people.blend and <out>/manifest.json (build_people.py) and writes <o
   body_broad.fbx   the broad build, the same eighteen meshes
   head.fbx         one Head
   headwear.fbx     Hair_<style> and Hat_<name>, on their two atlases
-  looks.fbx        one small square per texture set: Outfit_<outfit> (seven) and Face_<face>_<expression> (six)
+  outfits.fbx      one small square per outfit texture set: Outfit_<outfit> (seven)
+  faces.fbx        one small square per face texture: Face_<face>_<expression> (six)
   upload.json      what each file holds (objects, triangles) and a digest of its content
 Every mesh in the body, head and headwear files wears ONE texture set (the shirt, the calm plain face); the game
-dresses a person in another outfit or face by cloning the SurfaceAppearance off the matching looks square
-(Server/Assets/PeopleArt). Both builds share every UV layout, so seven outfits cost seven texture sets and one
+dresses a person in another outfit or face by cloning the SurfaceAppearance off the matching square
+(Server/Assets/PeopleArt; the squares are in two files to keep each under the Assets API's 20 MB). Both builds share every UV layout, so seven outfits cost seven texture sets and one
 mesh per part, where an FBX per outfit and build would upload (and make every phone hold) each mesh fourteen times.
 """
 import argparse
@@ -35,7 +36,7 @@ import spec  # noqa: E402
 BODY_NAMES = [n for n in spec.PARTS if n != "Head"]
 EXTRA_NAMES = list(spec.EXTRAS)
 SQUARE = 0.5  # studs: the side of a looks square
-FILES = ["body_slim", "body_broad", "head", "headwear", "looks"]
+FILES = ["body_slim", "body_broad", "head", "headwear", "outfits", "faces"]
 
 
 def sha_file(path):
@@ -88,14 +89,17 @@ def main(argv):
     record("head", [(head, "Head")], {"Head": int(head["tris"])})
     wear = [(objs[n], n) for n in manifest["headwear"]["hair"] + manifest["headwear"]["hats"]]
     record("headwear", wear, {n: int(o["tris"]) for o, n in wear})
-    squares = []
-    keys = [("Outfit_" + o, "body_" + o) for o in spec.OUTFIT_ORDER]
-    keys += [(f"Face_{f}_{e}", f"head_{f}_{e}") for f in spec.FACES for e in spec.EXPRESSIONS]
-    for i, (name, mat) in enumerate(keys):
-        o = square(name, i * SQUARE * 1.5)
-        bp.set_material(o, mats[mat])
-        squares.append((o, name))
-    record("looks", squares, {n: 2 for _o, n in squares})
+    keys = {
+        "outfits": [("Outfit_" + o, "body_" + o) for o in spec.OUTFIT_ORDER],
+        "faces": [(f"Face_{f}_{e}", f"head_{f}_{e}") for f in spec.FACES for e in spec.EXPRESSIONS],
+    }
+    for key, pairs in keys.items():
+        squares = []
+        for i, (name, mat) in enumerate(pairs):
+            o = square(name, i * SQUARE * 1.5)
+            bp.set_material(o, mats[mat])
+            squares.append((o, name))
+        record(key, squares, {n: 2 for _o, n in squares})
 
     # what each upload holds: the manifest's geometry for its meshes and the bytes of every texture it carries
     textures = {}
@@ -110,15 +114,18 @@ def main(argv):
         "body_broad": manifest["builds"]["broad"]["parts"] | manifest["builds"]["broad"]["extras"],
         "head": {"Head": manifest["builds"]["slim"]["parts"]["Head"]},
         "headwear": {k: {kk: vv for kk, vv in v.items() if kk != "textures"} for k, v in manifest["headwear"]["items"].items()},
-        "looks": {"square": SQUARE, "names": [n for n, _m in keys]},
+        "outfits": {"square": SQUARE, "names": [n for n, _m in keys["outfits"]]},
+        "faces": {"square": SQUARE, "names": [n for n, _m in keys["faces"]]},
     }
     uses = {
         "body_slim": ["body_shirt"], "body_broad": ["body_shirt"], "head": ["head_plain_calm", "head_normal", "head_roughness"],
-        "headwear": ["headwear_a", "headwear_b"], "looks": [m for _n, m in keys] + ["head_normal", "head_roughness"],
+        "headwear": ["headwear_a", "headwear_b"], "outfits": [m for _n, m in keys["outfits"]],
+        "faces": [m for _n, m in keys["faces"]] + ["head_normal", "head_roughness"],
     }
     for key in FILES:
         blob = {"geometry": geometry[key], "objects": files[key]["objects"],
                 "textures": {n: s for n, s in tex_sha.items() if any(n.startswith(u) for u in uses[key])}}
+        assert files[key]["bytes"] < 19 * 1024 * 1024, f"{key}.fbx is over 19 MB (the Assets API takes 20)"
         files[key]["content"] = hashlib.sha256(json.dumps(blob, sort_keys=True).encode()).hexdigest()[:16]
     doc = {"format": "spicy-people-upload/1", "manifest": "manifest.json", "files": files}
     with open(os.path.join(up, "upload.json"), "w") as fh:
