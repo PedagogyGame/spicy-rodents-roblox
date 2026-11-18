@@ -9,15 +9,20 @@
 --     close the roof space; a drop from a plate between the rails lands on the hall's floor (Q10: a squirrel can drop
 --     onto a lane or an approach);
 --   * a lamp stands at every point RafterWatch lights from (AlleyRoof.lamps), the score monitors and the masking face
---     keep their places and nothing of the roof runs into them.
+--     keep their places and nothing of the roof runs into them;
+--   * the cost on a phone: HallRoof stays within PARTS parts, and nothing under the deck casts a shadow (only the
+--     walls, the copings, the deck, the strip and the rooftop units do).
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
 local Registry = require("@shared/Routes/Registry")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("../lib/BakedWorld")
+local Roof = (require :: any)("../../tools/bake/alley/Roof")
 
 local R = AlleyRoof
 local HR = R.HALL_ROOF
+local PARTS = 500 -- HallRoof's part budget (it was 673 with a lattice rod every half lane pair)
+local SHADOWS = { "Wall", "Coping", "Roof", "RoofDeckSteel", "RoofStrip", "RoofUnit" } -- what may cast a shadow
 
 return function(t)
 	local world, place, root = BakedWorld.bakeAlley()
@@ -176,5 +181,28 @@ return function(t)
 		local face = (root:FindFirstChild("Masking") :: any):FindFirstChild("MaskFace")
 		local _, top = toLocal(0, face.CFrame.Position.Y + face.Size.Y / 2, 0)
 		t.near(top, AlleyLayout.CEILING_Y, 1e-3, "the masking face's top")
+	end)
+
+	t.test("the hall's roof on a phone: a part budget, and no shadows under the deck", function()
+		local hall = root:FindFirstChild(AlleyLayout.HALL_ROOF.model) :: any
+		local parts, casting, webs = 0, 0, 0
+		for _, d in hall:GetDescendants() do
+			if not d:IsA("BasePart") then
+				continue
+			end
+			parts += 1
+			webs += if d.Name == "Web" then 1 else 0
+			if d.CastShadow then
+				casting += 1
+				local allowed = false
+				for _, prefix in SHADOWS do
+					allowed = allowed or string.sub(d.Name, 1, #prefix) == prefix
+				end
+				t.truthy(allowed, `{d:GetFullName()} casts a shadow under the deck`)
+			end
+		end
+		t.truthy(parts <= PARTS, `HallRoof is {parts} parts (budget {PARTS})`)
+		t.eq(webs, #R.TRUSS_D * 2 * (#Roof.trussNodes() - 1), "the lattice rods")
+		print(`      HallRoof: {parts} parts, {casting} casting shadows, {webs} lattice rods`)
 	end)
 end

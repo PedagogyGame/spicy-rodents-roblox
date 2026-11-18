@@ -10,8 +10,9 @@
 --     deck (the pinsetters' attic behind it is the backstage's);
 --   the deck (Roof: corrugated steel underneath, slate on top) and the four rooftop units re-seated on it;
 --   nine steel box trusses (AlleyRoof.TRUSS_D): a 2.4-wide bottom plate (the rafter routes 9120..9127 run on its
---     top), two Warren lattice planes either side of the body's path with a node at every lane pair's edge and
---     middle, two top chords, end posts at the walls; purlins between the top chords and the deck;
+--     top), two Warren lattice planes either side of the body's path with a node at every lane pair's edge, bottom
+--     and top in turn (ten rods a plane), two top chords, end posts at the walls; purlins between the top chords and
+--     the deck;
 --   the two aisle braces across the plates (routes 9139, 9140) with the aisle troffers under them;
 --   nine light rails over the lane pairs (routes 9130..9138), each hung from three trusses by a yoke and two rods
 --     outside the body's path, and under them the lane lights (LaneLights: cans and washes at AlleyRoof.lamps(), the
@@ -19,10 +20,13 @@
 -- Only the plates, the braces, the rails, the walls, the deck, the strip and the units collide; the lattice, the top
 -- chords, the purlins, the hangers and the lights neither collide nor take queries, and stand clear of every
 -- rafter route's body (tests/unit/alley_roof_bake.spec.luau sweeps them).
+-- Nothing under the deck casts a shadow (the trusses, purlins, braces, rails and lights: the deck and the brick
+-- clerestory keep the sun out of the hall, and the hall's lamps cast none), so a phone's shadow pass draws only the
+-- walls, the deck, the strip and the units. HallRoof is 493 parts, 22 of them casting shadows.
 -- No meshes: the owner's roof and rafter kit (docs/reference/store_roofs/roof_rafter_kit) is a timber gable bay
 -- 11.1 m wide and 3.9 m tall; a flat-decked steel hall 127 studs across does not take it at one scale.
 -- Interface: build(kit, root) -> Model; C (the palette); trussNodes() -> { { X, Y } } (one lattice plane's nodes,
---   west to east)
+--   west to east); INSIDE (the parts under the deck: no shadow)
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 local AlleyRoof = require("../../../src/shared/Attractions/AlleyRoof")
@@ -53,20 +57,22 @@ local C = {
 }
 Roof.C = C
 
-local VISUAL = { collide = false, query = false }
+local INSIDE = { shadow = false } -- what collides under the deck
+local VISUAL = { collide = false, query = false, shadow = false }
 local LIGHT = { collide = false, query = false, shadow = false }
+Roof.INSIDE = INSIDE
 
--- One lattice plane's nodes, west to east: the top at the west wall, then a bottom node at every lane pair's edge and
--- a top node over every pair's middle, and the top at the east wall.
+-- One lattice plane's nodes, west to east: the top at the west wall, then a node every webPitch from the lane
+-- block's west edge to its east edge, bottom and top in turn, and the top at the east wall if the last was a bottom.
 function Roof.trussNodes(): { { number } }
 	local nodes = { { HR.x0, CH.topY0 } }
-	local edge0 = L.LANE_BLOCK_X0
-	for p = 1, L.PAIRS do
-		table.insert(nodes, { edge0 + (p - 1) * 2 * L.PITCH, CH.y1 })
-		table.insert(nodes, { L.pairX(p), CH.topY0 })
+	local n = math.floor((L.LANE_BLOCK_X1 - L.LANE_BLOCK_X0) / CH.webPitch + 0.5)
+	for k = 0, n do
+		table.insert(nodes, { L.LANE_BLOCK_X0 + k * CH.webPitch, if k % 2 == 0 then CH.y1 else CH.topY0 })
 	end
-	table.insert(nodes, { L.LANE_BLOCK_X1, CH.y1 })
-	table.insert(nodes, { HR.x1, CH.topY0 })
+	if n % 2 == 0 then
+		table.insert(nodes, { HR.x1, CH.topY0 })
+	end
 	return nodes
 end
 
@@ -104,7 +110,8 @@ local function walls(kit: any, m: any)
 		mf - 0.4,
 		mf,
 		C.mask,
-		"SmoothPlastic"
+		"SmoothPlastic",
+		INSIDE
 	)
 end
 
@@ -131,7 +138,7 @@ local function truss(kit: any, parent: any, i: number, d: number)
 	local m = kit:model(parent, `Truss{i}`)
 	m:SetAttribute("D", d)
 	local half = CH.width / 2
-	kit:box(m, "Plate", HR.x0, HR.x1, CH.y0, CH.y1, d - half, d + half, C.steel, "Metal")
+	kit:box(m, "Plate", HR.x0, HR.x1, CH.y0, CH.y1, d - half, d + half, C.steel, "Metal", INSIDE)
 	local nodes = Roof.trussNodes()
 	for _, side in { -1, 1 } do
 		local wd = d + side * CH.web
@@ -182,7 +189,7 @@ local function braces(kit: any, m: any)
 	local f = kit:model(m, "Braces")
 	local aisles = kit:model(m, "AisleLights")
 	for i, x in R.BRACE_X do
-		kit:box(f, `Brace{i}`, x - 0.25, x + 0.25, CH.y0, CH.y1, R.BRACE_D.d0, R.BRACE_D.d1, C.steel, "Metal")
+		kit:box(f, `Brace{i}`, x - 0.25, x + 0.25, CH.y0, CH.y1, R.BRACE_D.d0, R.BRACE_D.d1, C.steel, "Metal", INSIDE)
 		-- the aisle's troffers, fixed under the brace
 		for _, d in { 2, 26, 50 } do
 			local t = kit:box(
@@ -210,7 +217,7 @@ local function lights(kit: any, m: any)
 	for p = 1, L.PAIRS do
 		local x = L.pairX(p)
 		local r = kit:model(rails, `Rail{p}`)
-		kit:box(r, "Rail", x - hw, x + hw, RAIL.y - 0.3, RAIL.y, RAIL.d0, L.MACHINE_D0 - 0.4, C.rail, "Metal")
+		kit:box(r, "Rail", x - hw, x + hw, RAIL.y - 0.3, RAIL.y, RAIL.d0, L.MACHINE_D0 - 0.4, C.rail, "Metal", INSIDE)
 		-- hung from the trusses: a yoke under the rail and a rod each side, outside the body's path (0.8)
 		for _, d in RAIL.hangD do
 			kit:box(r, "Yoke", x - 1.0, x + 1.0, RAIL.y - 0.45, RAIL.y - 0.3, d - 0.1, d + 0.1, C.rail, "Metal", VISUAL)

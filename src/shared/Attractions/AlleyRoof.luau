@@ -113,8 +113,8 @@ AlleyRoof.HALL_ROOF = {
 	clerestoryY0 = 13.6,
 }
 -- Nine steel box trusses across the hall, each a 2.4-wide bottom plate (its top, y1, is the rafter routes' line), two
--- Warren lattice planes `web` either side of its centre line (rods `webT` thick, a bottom node at every lane pair's
--- edge and a top node over every pair's middle: webPitch 6.2) and two top chords under the deck: the body (1.6 wide)
+-- Warren lattice planes `web` either side of its centre line (rods `webT` thick, nodes at the lane pairs' edges
+-- webPitch 12.4 apart, bottom and top in turn) and two top chords under the deck: the body (1.6 wide)
 -- walks the plate between the planes, and the vent's duct (2.0 wide) drops between them onto the D 16.5 truss.
 AlleyRoof.TRUSS_D = { -10.5, -1.5, 7.5, 16.5, 25.5, 34.5, 43.5, 52.5, 61.5 }
 AlleyRoof.CHORD = {
@@ -126,7 +126,7 @@ AlleyRoof.CHORD = {
 	topY0 = 20.2,
 	topY1 = 20.5,
 	topW = 0.3,
-	webPitch = 6.2,
+	webPitch = 12.4,
 	x0 = -25.4,
 }
 -- The light rails over the lane pairs (the lit, risky level): 1.9 under the plates, so a body on a rail clears them
