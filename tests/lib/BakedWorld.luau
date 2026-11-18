@@ -29,7 +29,7 @@
 -- per part, in route order. The section stands on the route line (the feet), from `lift` (0.15) up along its up
 -- (the record's `up` / `upAt` where written, else Motion.section's default: world up squared to the line, carried
 -- up a vertical stretch). What lies lower than `lift` above the line is walked over. A route of kind trunk or a
--- climb is swept as a square column round the line. BakedWorld.mouthClearance(world, registry, route) lists what
+-- climb without an authored up is swept as a square column round the line (a climb with one stands off its wall). BakedWorld.mouthClearance(world, registry, route) lists what
 -- stands where each mouth's launch starts (Motion.launchPoint: the body's box there must be clear).
 -- Driving. BakedWorld.drive(world, state, frames, keys, opts?) -> Trace runs SquirrelMotor.step at 1/60 s with the
 -- input `keys(frame, state)` returns (nil stops), recording every frame's position, route, t and events, the
@@ -761,7 +761,9 @@ function BakedWorld.clearance(
 	local filter = o.filter or solidOrSeen
 	local ta, tb = o.t0 or 0, o.t1 or 1
 	local spec = route.enclosure
-	local column = route.kind == "trunk" or (spec ~= nil and spec.climb)
+	-- a trunk's body is round its line; an enclosed climb's body stands off its wall along the authored `up` (its
+	-- belly on the line, Enclosure: up), as a level run's does
+	local column = route.kind == "trunk" or (spec ~= nil and spec.climb and spec.up == nil and #spec.upAt == 0)
 	local n = math.max(1, math.ceil((tb - ta) * route.length / step))
 	local byPart: { [Part]: Blockage } = {}
 	local order: { Part } = {}

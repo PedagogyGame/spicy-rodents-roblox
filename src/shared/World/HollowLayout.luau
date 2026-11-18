@@ -63,9 +63,12 @@ HollowLayout.C = {
 	ringMin = 9, -- boards in a ring (more on a wide cavity: one each C.ringArc studs of the circumference)
 	ringArc = 2.2,
 	gap = 1.9, -- studs: the chord a passage cuts through a ring (the body is 1.6 wide)
-	shaftIn = 0.2, -- studs: a climb's line inside its cavity's wall (the belly's edges stay off the curved wall)
+	shaftIn = 0.4, -- studs: a climb's line inside its cavity's wall (the belly's edges stay off the curved wall, and
+	-- off a ring centred on the leaning axis half a tier away)
 	boughOut = 0.6, -- studs past the bark where a bough's link is taken (its route comes out of the trunk's axis)
 	treadStep = 30, -- degrees of the spiral per tread
+	treadDrop = 0.08, -- studs: a tread's top under the run's line
+	treadLength = 0.92, -- of the chord between its ends
 	post = 0.55, -- studs: the spiral's heartwood post's clearance inside the ramp's inner edge
 	shelf = 1.5, -- studs: a hideout shelf's length across the shaft
 	logWall = 0.3,
@@ -542,7 +545,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 		return tr.bark(math.min(h + C.tier, top + C.room)) - C.wall - C.shaftIn
 	end
 	local h0 = floorH + 0.5
-	table.insert(pts, tr.toWorld(wallB, rho(floorH) - 0.3, floorH))
+	table.insert(pts, tr.toWorld(wallB, rho(floorH) - 0.7, floorH))
 	local floorId, shaftId, hideId = b.base + 1, b.base + 2, b.base + 3
 	local shaft = {}
 	local h = h0
@@ -610,7 +613,8 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 	local chambers = design.chambers
 	chamberAt(hl.chambers, chambers[1], floorId, 1, pts[#pts])
 	if hideout then
-		local hideB = inside.hideoutBearing or (knotB + 180)
+		-- across the cavity from the wall it climbs (the climbing body's back stays clear of the shelf)
+		local hideB = inside.hideoutBearing or (wallB + 180)
 		local rcHide = tr.bark(hideH + C.tier) - C.wall
 		local hide = {
 			tr.toWorld(wallB, rho(hideH), hideH),
@@ -626,7 +630,9 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 			})
 		)
 		slab(hl.parts, "shelf", tr.toWorld(hideB, 0.6, hideH + 0.1), tr.toWorld(hideB, rcHide, hideH + 0.2), 1.9, 0.3)
-		chamberAt(hl.chambers, chambers[2], shaftId, knotTs, knotP)
+		-- the middle store: on the shaft half way up to the hideout (a knothole is a mouth: never a hiding place)
+		local midH = (h0 + hideH) / 2
+		chamberAt(hl.chambers, chambers[2], shaftId, (midH - h0) / (top - h0), tr.toWorld(wallB, rho(midH), midH))
 		chamberAt(hl.chambers, chambers[3], hideId, 1, hide[#hide])
 	end
 	tiers(b, floorH - 0.3, top + C.room, { { floorH, bearing }, { knotH, knotB }, { top, wallB } })
@@ -736,14 +742,21 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 		ph = top
 	end
 	local every = C.treadStep // step
-	for i = 1, #ramp - every, every do
+	-- (the first two spans run off the floor itself: no tread under them)
+	for i = 1 + 2 * every, #ramp - every, every do
 		local a, c = ramp[i], ramp[i + every]
 		local ha, hc = a[2] - tr.foot.y, c[2] - tr.foot.y
 		local outer = tr.bark(math.max(ha, hc) + C.tier) - C.wall - 0.02
 		local mid = (postR + outer) / 2
 		local ba = tr.bearingOf(a[1], a[3], ha)
 		local bc = tr.bearingOf(c[1], c[3], hc)
-		slab(hl.parts, "tread", tr.toWorld(ba, mid, ha), tr.toWorld(bc, mid, hc), outer - postR, 0.3)
+		-- a little under the run and a little short of its ends (a straight board under a curving run: its corners
+		-- would stand proud of the line where the next one starts)
+		local pa, pc = tr.toWorld(ba, mid, ha - C.treadDrop), tr.toWorld(bc, mid, hc - C.treadDrop)
+		local k = (1 - C.treadLength) / 2
+		local qa = { pa[1] + (pc[1] - pa[1]) * k, pa[2] + (pc[2] - pa[2]) * k, pa[3] + (pc[3] - pa[3]) * k }
+		local qc = { pc[1] + (pa[1] - pc[1]) * k, pc[2] + (pa[2] - pc[2]) * k, pc[3] + (pa[3] - pc[3]) * k }
+		slab(hl.parts, "tread", qa, qc, outer - postR, 0.3)
 	end
 	tiers(b, floorH - 0.3, topH + C.room, { { floorH, bearing }, { topH, endBearing } })
 	caps(b, floorH, rc0, topH + C.room, rcTop)
