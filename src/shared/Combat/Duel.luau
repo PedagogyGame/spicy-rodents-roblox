@@ -184,8 +184,12 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 	local now = view.now
 	local out: Out = { move = "none", speed = 0, strike = nil, reacted = nil, read = false, stance = nil }
 	-- noticing, and letting go
+	-- (a vigilante takes the rodent on from as far as it sees it: "on sighting ... they move to kick it")
+	local far = if g.temper == "tough"
+		then math.max(params.engage, params.spotRange * params.notice.tough) + Duel.FLEE_CLEAR
+		else params.engage + Duel.FLEE_CLEAR
 	if not g.aware then
-		if view.seen and view.dist <= params.engage then
+		if view.seen and (view.dist <= params.engage or g.temper == "tough") then
 			g.aware = true
 			g.awareAt = now
 			ready(g)
@@ -200,7 +204,7 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 		else
 			return out
 		end
-	elseif view.dist > params.engage + Duel.FLEE_CLEAR and g.phase ~= "windup" then
+	elseif view.dist > far and g.phase ~= "windup" then
 		-- the rodent has gone: back to the day
 		g.aware = false
 		g.phase = "idle"
@@ -263,7 +267,7 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 	elseif (g.phase == "flinch" or g.phase == "back" or g.phase == "recover") and now >= g.untilT then
 		ready(g)
 	elseif g.phase == "flee" then
-		if now - g.fleeFrom >= Duel.FLEE_SECS or view.dist > params.engage + Duel.FLEE_CLEAR then
+		if now - g.fleeFrom >= Duel.FLEE_SECS or view.dist > far then
 			if g.temper == "tough" then
 				ready(g)
 			else

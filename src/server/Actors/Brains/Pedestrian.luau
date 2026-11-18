@@ -15,6 +15,10 @@
 -- cross coordinate at lambda 8, which used to slide a person across the block in half a second).
 -- resume() also stops the motor (Common.halt) so the stale lane-locked intent cannot do that slide
 -- in the frames before the brain's next think.
+-- The duel (Server/Combat/CombatService, Combat/Duel): the event "duel" (mode stand | approach | back, the rodent's x
+-- and z, speed, untilTime; or mode "end") has the person face the rodent, close in on it or back away from it until
+-- untilTime, then walk back to the lane; a medical order or a gathering is never interrupted by it. A flight in the
+-- duel is the ordinary flee ("witness").
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -48,16 +52,21 @@ type Brain = Common.Brain & {
 	lane: Lane,
 	goal: number, -- coordinate along the lane axis
 	walkSpeed: number,
-	state: string, -- walk | flee | gather | rejoin
+	state: string, -- walk | flee | gather | rejoin | duel
 	directive: Directive.State,
 	gatherX: number,
 	gatherZ: number,
 	gatherUntil: number,
+	duel: Duel?, -- an order from Combat/CombatService while the person faces the rodent
 	threat: Common.Actor?,
 	observer: Perception.Observer,
 	target: Perception.Target,
 	pctx: Perception.Ctx,
 }
+
+-- What Server/Combat/CombatService has the person do while they face the rodent (Combat/Duel's move): stand facing it,
+-- close in, or back away from it, at `speed`, until `untilTime` (the service renews it every tick it still holds).
+type Duel = { mode: string, x: number, z: number, speed: number, untilTime: number }
 
 local Pedestrian = {}
 
@@ -261,6 +270,34 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		end
 	end
 
+	if self.state == "duel" then
+		local o = self.duel
+		if o == nil or ctx.now >= o.untilTime then
+			self.duel = nil
+			reseat(self) -- the duel is over: back to the lane on foot
+		else
+			local intent = actor.intent
+			local dx, dz = o.x - actor.x, o.z - actor.z
+			intent.laneAxis, intent.laneCoord = nil, nil
+			intent.turnRate = 10
+			intent.damp = DAMP_FLEE
+			if o.mode == "approach" and o.speed > 0 then
+				intent.mode = "walk"
+				intent.tx, intent.tz = o.x, o.z
+				intent.speed = o.speed
+			elseif o.mode == "back" and o.speed > 0 then
+				local d = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+				intent.mode = "walk"
+				intent.tx, intent.tz = actor.x - dx / d * 4, actor.z - dz / d * 4
+				intent.speed = o.speed
+			else
+				intent.mode = "stand"
+				intent.heading = Common.yawOf(dx, dz)
+			end
+			return
+		end
+	end
+
 	if self.state == "rejoin" then
 		local d, x, z = offLane(self)
 		if d <= REJOIN_NEAR then
@@ -321,7 +358,7 @@ function Methods.suspend(self: Brain): Common.Snapshot
 		laneIndex = table.find(self.params.lanes, self.lane) or 1,
 		goal = self.goal,
 		walkSpeed = self.walkSpeed,
-		state = self.state,
+		state = if self.state == "duel" then "walk" else self.state,
 		alert = self.actor.alert,
 		gatherX = self.gatherX,
 		gatherZ = self.gatherZ,
@@ -350,6 +387,22 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
+	if evt.type == "duel" then
+		-- (an order from the medical sequence comes first: a patient, a bystander or someone walking home is left be)
+		if Directive.active(self.directive) or self.state == "gather" then
+			return
+		end
+		if evt.mode == "end" then
+			if self.state == "duel" then
+				self.duel = nil
+				reseat(self)
+			end
+			return
+		end
+		self.state = "duel"
+		self.duel = { mode = evt.mode, x = evt.x, z = evt.z, speed = evt.speed or 0, untilTime = evt.untilTime }
+		return
+	end
 	if evt.type == "gather" then
 		self.state = "gather"
 		self.gatherX, self.gatherZ = evt.x, evt.z
@@ -406,6 +459,7 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		gatherX = 0,
 		gatherZ = 0,
 		gatherUntil = 0,
+		duel = nil,
 		threat = nil,
 		observer = { x = 0, y = 0, z = 0, facing = 0, witnessUntil = 0 },
 		target = { x = 0, y = 0, z = 0, groundY = 0, moveSpeed = 0, focus = false, inInterior = false },

@@ -8,8 +8,10 @@
 -- The Spicy Rodent is the town's own rodent actor. `holdRodent()` makes it a player's (its brain stops, the test
 -- moves it), as Boot/Game's possession does; `hold(id)` does the same for a townsperson (a player-held victim).
 -- Interface: new(opts?) -> Rig; Rig.step(secs, each?); Rig.runUntil(limit, done, each?) -> boolean;
---   Rig.hold(id); Rig.let(id); Rig.put(id, x, z, yaw?); Rig.near(x, z, post?, skip?) -> actor; Rig.responders() -> { vehicle };
---   Rig.saidBy(situation) -> { said }; Rig.dice(list) (the sequence's next dice); fields world, traffic, infection, combat, attrs, medLog, toasts, said, time
+--   Rig.hold(id); Rig.let(id); Rig.put(id, x, z, yaw?); Rig.near(x, z, post?, skip?) -> actor; Rig.calmNear(x, z, skip?) -> actor; Rig.responders() -> { vehicle };
+--   Rig.saidBy(situation) -> { said }; Rig.dice(list) (the sequence's next dice); Rig.lunge(victimId, from?) ->
+--   boolean (a player's pounce through the duel); Rig.now(); fields world, traffic, infection, combat (Combat/
+--   CombatService, unless opts.duel is false), health, blows, duelNews, motor, attrs, medLog, toasts, said, time
 -- Studs throughout.
 local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")
@@ -19,6 +21,7 @@ local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
 local TrafficService = require("@server/Traffic/TrafficService")
 local InfectionService = require("@server/Infection/InfectionService")
+local CombatService = require("@server/Combat/CombatService")
 
 local BiteRig = {}
 
@@ -31,7 +34,9 @@ export type Options = {
 	first: { number }?, -- the sequence's first dice (InfectionService's rand): the bite's path and timers
 	tune: ((params: any) -> ())?, -- InfectionRules params
 	dt: number?,
-	combat: ((rig: any) -> any)?, -- builds the duel for this rig (nil: no duel; bites go through rig.biteNow)
+	duel: boolean?, -- run Combat/CombatService (default true)
+	duelRand: (() -> number)?, -- the duel's dice (default: seeded)
+	motorCheck: boolean?, -- the duel asks for the rodent's motor state (rig.motor[id]) before a bite
 }
 
 local data: any = nil
@@ -130,8 +135,44 @@ function BiteRig.new(opts: Options?): any
 			table.insert(rig.said, { id = id, line = value, situation = situationOf(value), t = rig.time })
 		end
 	end
-	if o.combat then
-		rig.combat = o.combat(rig)
+	-- the duel, wired as Boot/Game wires it: the held rodent fights; a bite starts the sequence; a blow costs health
+	rig.health = {}
+	rig.duelNews = {}
+	rig.blows = {}
+	rig.motor = {}
+	if o.duel ~= false then
+		local drng = Rng.new((o.seed or 1) + 101)
+		rig.combat = CombatService.new({
+			world = world,
+			infection = rig.infection,
+			rand = o.duelRand or function(): number
+				return drng.next()
+			end,
+			controllerOf = function(id: number): string
+				return if rig.players[id] then "player" else "ai"
+			end,
+			rodents = function(): { number }
+				return if rig.players[rig.rodent] then { rig.rodent } else {}
+			end,
+			motorOf = if o.motorCheck
+				then function(id: number): { [string]: any }?
+					return rig.motor[id]
+				end
+				else nil,
+			setAttr = function(id: number, name: string, value: any)
+				rig.setAttr(id, name, value)
+			end,
+			notify = function(id: number, payload: { [string]: any })
+				table.insert(rig.duelNews, { id = id, what = payload.what, t = rig.time, payload = payload })
+			end,
+			hurt = function(id: number, amount: number, cause: string, by: number)
+				rig.health[id] = math.max(0, (rig.health[id] or 100) - amount)
+				table.insert(rig.blows, { id = id, amount = amount, cause = cause, by = by, t = rig.time })
+			end,
+			bitten = function(victim: number, biter: number)
+				rig.infection:bite(victim, biter, "rodentPlayer")
+			end,
+		})
 	end
 	local people = {}
 	local function trafficWorld()
@@ -167,7 +208,7 @@ function BiteRig.new(opts: Options?): any
 				duelAcc += dt
 				while duelAcc >= 0.1 - 1e-9 do
 					duelAcc -= 0.1
-					rig.combat:step(0.1, 5000 + rig.time)
+					rig.combat:step(0.1, rig.now())
 				end
 			end
 			if each then
@@ -228,6 +269,17 @@ function BiteRig.new(opts: Options?): any
 		end
 		return best
 	end
+	-- the nearest calm townsperson (no vigilante, nobody wary): the person an ordinary bite is on
+	rig.calmNear = function(x: number, z: number, skip: { [number]: boolean }?): any
+		local s = table.clone(skip or {})
+		while true do
+			local a = rig.near(x, z, nil, s)
+			if a == nil or rig.combat == nil or rig.combat:temperOf(a.id) == "calm" then
+				return a
+			end
+			s[a.id] = true
+		end
+	end
 	rig.responders = function(): { any }
 		local out = {}
 		for _, v in traffic.vehicles do
@@ -245,6 +297,64 @@ function BiteRig.new(opts: Options?): any
 			end
 		end
 		return out
+	end
+	rig.now = function(): number
+		return 5000 + rig.time
+	end
+	-- A player's pounce at a person: the rodent `from` studs off on the line it stands on (default 8), facing them; the
+	-- click (the tell), then the motor's lunge at 31 studs/s after the wind-up, onto them; stepped (a tenth at a time) until the
+	-- pounce is over. True when a bite landed.
+	rig.lunge = function(victimId: number, from: number?): boolean
+		local v = world.actorsById[victimId]
+		local r = world.actorsById[rig.rodent]
+		rig.holdRodent()
+		local dx, dz = r.x - v.x, r.z - v.z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < 1e-3 then
+			dx, dz, d = 1, 0, 1
+		end
+		local ux, uz = dx / d, dz / d
+		local f = from or 8
+		rig.put(rig.rodent, v.x + ux * f, v.z + uz * f, math.atan2(-ux, -uz))
+		local bites = rig.combat:stats().bites
+		-- (still recovering from the last pounce: the player clicks again a moment later)
+		local ok = rig.combat:rodentAct(rig.rodent, "pounce", rig.now())
+		local waitUntil = rig.time + 1.5
+		while not ok and rig.time < waitUntil do
+			rig.step(0.1)
+			rig.put(rig.rodent, v.x + ux * f, v.z + uz * f, math.atan2(-ux, -uz))
+			ok = rig.combat:rodentAct(rig.rodent, "pounce", rig.now())
+		end
+		if not ok then
+			return false
+		end
+		local t0 = rig.time
+		local P = rig.combat.P
+		rig.motor[rig.rodent] = { attackWindow = 0, attack = 0 }
+		local stop = t0 + P.pounceWindup + P.pounceWindow + 0.4
+		-- (in steps of a tenth, the duel's own: a runner moves 2 studs a step, inside the bite's reach)
+		local dt0 = rig.dt
+		rig.dt = math.min(dt0, 0.1)
+		local bitten = false
+		while rig.time < stop and not bitten do
+			rig.step(rig.dt, function()
+				local into = rig.time - t0 - P.pounceWindup
+				if into >= 0 and into <= P.pounceWindow then
+					rig.motor[rig.rodent] = { attackWindow = P.pounceWindow - into, attack = 0 }
+					local tx, tz = v.x - r.x, v.z - r.z
+					local td = math.sqrt(tx * tx + tz * tz)
+					if td > 0.5 then
+						local step = math.min(td - 0.5, 31 * rig.dt)
+						rig.put(rig.rodent, r.x + tx / td * step, r.z + tz / td * step)
+					end
+				else
+					rig.motor[rig.rodent] = { attackWindow = 0, attack = 0 }
+				end
+			end)
+			bitten = rig.combat:stats().bites > bites
+		end
+		rig.dt = dt0
+		return bitten
 	end
 	-- Boot/Game's bite as it is before the duel: the rodent bites the person it touches, then the sequence starts
 	rig.biteNow = function(victimId: number): boolean

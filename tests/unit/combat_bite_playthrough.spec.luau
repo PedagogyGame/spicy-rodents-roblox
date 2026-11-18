@@ -10,10 +10,15 @@
 --   3. the victim is a player's: told on screen what happened and what to do, never moved, cured by walking into
 --      the hospital and staying for the treatment;
 --   4. two bites seconds apart, and one at the far edge of town: every patient is collected and cured.
+-- Every bite here is a player's pounce through the duel (Combat/CombatService), as the game makes it.
 local HospitalLayout = require("@shared/Infection/HospitalLayout")
 local Lines = require("@shared/Speech/Lines")
 local MedicalRoute = require("@shared/Infection/MedicalRoute")
 local BiteRig = require("@tests/lib/BiteRig")
+
+local function zero(): number
+	return 0
+end
 
 return function(t)
 	local function timeline(rig: any, id: number, what: string)
@@ -21,11 +26,10 @@ return function(t)
 		print(`      {what}: Med {table.concat(log, " > ")}`)
 	end
 
-	-- the rodent (a player's) right beside the person, facing them: then the bite
+	-- a player's Spicy Rodent pounces at the person through the duel (Combat/CombatService: the click, the wind-up, the
+	-- lunge, the contact in the window); the duel's dice are all 0 here, so a bite that can land does
 	local function biteBeside(rig: any, victim: any): boolean
-		rig.holdRodent()
-		rig.put(rig.rodent, victim.x + 2, victim.z, math.atan2(-1, 0))
-		return rig.biteNow(victim.id)
+		return rig.lunge(victim.id)
 	end
 
 	local function nearestFreeResponderDist(rig: any, x: number, z: number): number
@@ -41,10 +45,10 @@ return function(t)
 	t.test(
 		"1. bitten in the street: the shout, the collapse, the crowd, the call, the ambulance, the crew, the bed, the cure",
 		function()
-			local rig = BiteRig.new({ seed = 11, first = { 0, 0 } })
+			local rig = BiteRig.new({ duelRand = zero, seed = 11, first = { 0, 0 } })
 			rig.infection.tun.crowdChance = 1
 			rig.step(20)
-			local victim = rig.near(0, 0)
+			local victim = rig.calmNear(0, 0)
 			local id = victim.id
 			t.truthy(biteBeside(rig, victim), "the bite starts a case")
 			-- the shout, at once
@@ -129,6 +133,7 @@ return function(t)
 
 	t.test("2. symptoms later: nothing to see for 40 s or more, then red eyes, the walk in and the cure", function()
 		local rig = BiteRig.new({
+			duelRand = zero,
 			seed = 5,
 			first = { 0.99, 0 },
 			tune = function(p: any)
@@ -137,7 +142,7 @@ return function(t)
 		})
 		rig.step(20)
 		local layout = rig.infection.layout
-		local victim = rig.near(layout.entrance[1], layout.entrance[2])
+		local victim = rig.calmNear(layout.entrance[1], layout.entrance[2])
 		local id = victim.id
 		t.truthy(biteBeside(rig, victim))
 		local bitAt = rig.time
@@ -163,9 +168,9 @@ return function(t)
 	t.test(
 		"3. a player's townsperson bitten: told what happened and what to do, never moved, cured by staying in the hospital",
 		function()
-			local rig = BiteRig.new({ seed = 3, first = { 0, 0 } })
+			local rig = BiteRig.new({ duelRand = zero, seed = 3, first = { 0, 0 } })
 			rig.step(20)
-			local victim = rig.near(0, 0)
+			local victim = rig.calmNear(0, 0)
 			local id = victim.id
 			rig.hold(id)
 			t.truthy(biteBeside(rig, victim))
@@ -208,20 +213,25 @@ return function(t)
 	t.test(
 		"4. two bites seconds apart, and one at the far edge of town: every patient is collected and cured",
 		function()
-			local rig = BiteRig.new({ seed = 21 })
+			local rig = BiteRig.new({ duelRand = zero, seed = 21 })
 			rig.step(20)
-			local a = rig.near(0, 0)
+			local a = rig.calmNear(0, 0)
 			rig.dice({ 0, 0 }) -- each of the three collapses at once: three scenes, three calls
 			t.truthy(biteBeside(rig, a))
 			rig.step(2)
-			local b = rig.near(a.x, a.z, nil, { [a.id] = true })
+			local b = rig.calmNear(a.x, a.z, { [a.id] = true })
 			rig.dice({ 0, 0 })
 			t.truthy(biteBeside(rig, b), "a second person bitten two seconds later")
 			-- the far one: the townsperson furthest from the hospital
 			local layout = rig.infection.layout
 			local far, farD = nil, -1
 			for _, p in rig.world.actors do
-				if p.species == "human" and p.post == "townsperson" and not p.infected then
+				if
+					p.species == "human"
+					and p.post == "townsperson"
+					and not p.infected
+					and rig.combat:temperOf(p.id) == "calm"
+				then
 					local d = (p.x - layout.entrance[1]) ^ 2 + (p.z - layout.entrance[2]) ^ 2
 					if d > farD then
 						far, farD = p, d
