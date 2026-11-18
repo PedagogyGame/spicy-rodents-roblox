@@ -69,6 +69,77 @@ local function solids(root: any): { any }
 	return out
 end
 
+-- A part's bounds in the venue frame (X, Y, D), from its eight corners.
+local function localBounds(v: any, p: any): ({ number }, { number })
+	local lo, hi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+	local h = p.Size / 2
+	for _, sx in { -1, 1 } do
+		for _, sy in { -1, 1 } do
+			for _, sz in { -1, 1 } do
+				local w = p.CFrame * Vector3.new(sx * h.X, sy * h.Y, sz * h.Z)
+				local x, y, d = AlleyLayout.toLocal(v.place, w.X, w.Y, w.Z)
+				for k, c in { x, y, d } do
+					lo[k] = math.min(lo[k], c)
+					hi[k] = math.max(hi[k], c)
+				end
+			end
+		end
+	end
+	return lo, hi
+end
+
+-- Where a person (radius r, body from 0.7 to 5.2 above the floor) can walk on the floor, flooded from just inside
+-- the door: every colliding part that reaches into the body's height blocks the cells within r of its bounds.
+local STEP = 0.25
+local GRID = { x0 = -24, x1 = 24, d0 = -21, d1 = 27 }
+local function flood(root: any, v: any, r: number): (number, number) -> boolean
+	local nx = math.floor((GRID.x1 - GRID.x0) / STEP)
+	local nd = math.floor((GRID.d1 - GRID.d0) / STEP)
+	local blocked: { [number]: boolean } = {}
+	for _, p in parts(root) do
+		if p.CanCollide then
+			local lo, hi = localBounds(v, p)
+			if hi[2] > 0.7 and lo[2] < 5.2 then
+				for i = math.max(0, math.floor((lo[1] - r - GRID.x0) / STEP)), math.min(nx, math.ceil((hi[1] + r - GRID.x0) / STEP)) do
+					for j = math.max(0, math.floor((lo[3] - r - GRID.d0) / STEP)), math.min(nd, math.ceil((hi[3] + r - GRID.d0) / STEP)) do
+						local x, d = GRID.x0 + i * STEP, GRID.d0 + j * STEP
+						local dx = math.max(lo[1] - x, 0, x - hi[1])
+						local dd = math.max(lo[3] - d, 0, d - hi[3])
+						if dx * dx + dd * dd < r * r then
+							blocked[i * (nd + 1) + j] = true
+						end
+					end
+				end
+			end
+		end
+	end
+	local function key(x: number, d: number): (number, number)
+		return math.floor((x - GRID.x0) / STEP + 0.5), math.floor((d - GRID.d0) / STEP + 0.5)
+	end
+	local reached: { [number]: boolean } = {}
+	local si, sj = key(0, Style.DOOR_D + Style.WALL + 1.5)
+	assert(not blocked[si * (nd + 1) + sj], "the door's inside is blocked")
+	local queue = { { si, sj } }
+	reached[si * (nd + 1) + sj] = true
+	local head = 1
+	while head <= #queue do
+		local c = queue[head]
+		head += 1
+		for _, o in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local i, j = c[1] + o[1], c[2] + o[2]
+			local k = i * (nd + 1) + j
+			if i >= 0 and i <= nx and j >= 0 and j <= nd and not reached[k] and not blocked[k] then
+				reached[k] = true
+				table.insert(queue, { i, j })
+			end
+		end
+	end
+	return function(x: number, d: number): boolean
+		local i, j = key(x, d)
+		return reached[i * (nd + 1) + j] == true
+	end
+end
+
 return function(t)
 	t.test("its place: the leisure quarter, facing +Z onto Bowl Lane, the floor above the ground", function()
 		local v = venue()
@@ -150,5 +221,43 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test(
+		"a person walks from the door to the bar, every booth, the tables, the stage, the fire and behind the bar",
+		function()
+			local root, v = bake()
+			local at = flood(root, v, 1.0)
+			local places: { [string]: { number } } = {
+				bar = { Style.STOOL_GAP / 2, Style.BAR_D0 - 1.6 },
+				bartender = Style.BARTENDER,
+				stage = { -18, Style.STAGE.d0 - 1.6 },
+				fire = { Style.INNER_X - 4, Style.FIRE_D },
+			}
+			for i, b in Style.BOOTHS do
+				-- the open end of each booth, between its benches
+				places[`booth{i}`] = { (if b[1] < 0 then -1 else 1) * (Style.BOOTH_X0 - 1.2), b[2] }
+			end
+			for i, tb in Style.TABLES do
+				places[`table{i}`] = { tb[1], tb[2] - 2.6 }
+			end
+			for name, p in places do
+				t.truthy(at(p[1], p[2]), `{name} at X {p[1]} D {p[2]} is not reached from the door`)
+			end
+		end
+	)
+
+	t.test("mild: hot drinks and snow cones only; no bottles, taps or cocktail glasses anywhere", function()
+		local root = bake()
+		for _, d in root:GetDescendants() do
+			local n = string.lower(d.Name)
+			for _, bad in { "bottle", "tap%f[%a]", "beer", "wine", "whisk", "cocktail", "martini", "liquor", "keg" } do
+				t.truthy(string.find(n, bad) == nil, d:GetFullName())
+			end
+			if d:IsA("TextLabel") then
+				t.truthy(d.Text == Style.SIGN or d.Text == Style.MENU, d.Text)
+			end
+		end
+		t.eq(Style.MENU, "HOT COCOA  ·  COFFEE  ·  GREEN TEA  ·  SNOW CONES")
 	end)
 end

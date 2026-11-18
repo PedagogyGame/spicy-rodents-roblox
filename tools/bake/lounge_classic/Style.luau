@@ -31,6 +31,27 @@ Style.FORECOURT_X = 11
 Style.FORECOURT_Y = -2.4 -- its top: the ground at the door is 2.47 below the floor
 
 Style.SIGN = "THE GILDED ACORN"
+Style.MENU = "HOT COCOA  ·  COFFEE  ·  GREEN TEA  ·  SNOW CONES"
+
+-- the room (the venue's anchors: the bar at D 16, the bartender at D 20, the booths at X +-18, D -10 and 4)
+Style.WAINSCOT = 4 -- the walnut panelling's top
+Style.CROWN = 12.2 -- the crown moulding's foot
+Style.BAR_X = 12 -- the bar counter's half length
+Style.BAR_D0, Style.BAR_D1 = 15, 17 -- its front and back faces
+Style.BAR_TOP = 3.35 -- the polished top's top
+Style.BACKBAR_D = 24.5 -- the back bar's front face
+Style.BARTENDER = { 0, 20 } -- where the bartender stands (X, D)
+Style.STOOLS_D = 13.2
+Style.STOOL_GAP = 3.4 -- a person (2 studs wide) fits between two stools
+Style.BOOTHS = { { -18, -10 }, { 18, -10 }, { -18, 4 }, { 18, 4 } } -- each booth's centre (X, D)
+Style.BOOTH_X0, Style.BOOTH_X1 = 13.2, 23.75 -- a booth's reach from the middle (|X|)
+Style.TABLES = { { -6, -12 }, { 6, -12 }, { -6, -1 }, { 6, -1 } } -- the club chairs' small tables (X, D)
+Style.STAGE = { x0 = -24, x1 = -14, d0 = 14, d1 = 27, top = 1.2 } -- the stage (back left)
+Style.PIANO = { -19, 20 } -- the grand piano's centre (X, D)
+Style.FIRE_D = 20 -- the fireplace's centre on the east wall
+Style.CHANDELIERS = { { 0, -12 }, { 0, 2 } }
+Style.PENDANTS = { -8, 0, 8 } -- over the bar (X)
+Style.SCONCES = { -17, -3, 11 } -- on both side walls (D)
 
 -- palette
 Style.BRICK = { 112, 58, 48 }
