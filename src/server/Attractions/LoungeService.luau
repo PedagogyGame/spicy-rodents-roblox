@@ -10,9 +10,12 @@
 --     the guards; a fox or a deer is turned away. Inside, E at the door puts the person back on the landing.
 --   * First person: a body the service lets in carries CameraZone = "lockFirstPerson" (Client/Camera/CameraPolicy
 --     locks the camera) and Lounge = the venue id (Client/World/LoungeMusic plays the jazz); both are cleared at
---     the door, and whenever the body is found outside the room (a knock-out elsewhere). A body its player lets go
---     of inside (a new body picked, the player gone) is put out on the landing, so no computer brain is ever shut
---     in the sealed room.
+--     the door, and when the body is found outside the room MISSES checks running (a knock-out elsewhere; one
+--     stale reading just after the door's move is not enough). A body its player lets go of inside (a new body
+--     picked, the player gone) is put out on the landing, so no computer brain is ever shut in the sealed room.
+--   * The room's sweep (every check): any other body in the room (town.occupants) is sorted out: a person with
+--     the pass is let in where they stand (first person on); any other person is put out on the landing with the
+--     door's words; a computer's body is put out on the landing. Leave works for anyone in the room.
 --   * The guards (the bake's Staff.Guard1, Guard2): every TICK seconds any squirrel-family body, a player's or a
 --     computer's, on the forecourt, in the entry or (should one ever be) in the room is knocked out by the nearest
 --     guard: town.knockOut(actor), Boot/Game's kill with cause "guard" (its player back to the menu with "THE
@@ -29,7 +32,8 @@
 --   heartbeat = o.heartbeat ~= false, terrain = o.terrain ~= false }); lounge:step() when heartbeat == false.
 -- Interface: start(opts) -> Service; new(opts) -> Service; gameTown(parts) -> Town; carve(root) -> count;
 --   Service:enter(player) -> (ok, why?); Service:buyPass(player) -> (ok, words); Service:leave(player) -> ok;
---   Service:order(player, id) -> (ok, words); Service:step(); Service:gone(player); Service:isInside(player) ->
+--   Service:order(player, id) -> (ok, words); Service:step() (the guards, the room, the sweep); Service:gone(player);
+--   Service:isInside(player) ->
 --   boolean; Service:inRoom(body) -> boolean; Service:counts() -> { inside, drinks, knockedOut, strikes }; Service:stop(); constants TICK, STRIKE,
 --   SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, STAND, CUES, FOLDER
 
@@ -48,6 +52,8 @@ LoungeService.TICK = 0.2 -- seconds between the guards' and the room's checks
 LoungeService.STRIKE = 0.6 -- seconds a guard spends stepping in and back
 LoungeService.LUNGE = 1.6 -- studs a guard steps toward the squirrel
 LoungeService.COOLDOWN = 2 -- seconds before the same body is struck again (it is gone by then)
+LoungeService.MISSES = 3 -- checks in a row a body let in must be found outside before it is let go
+LoungeService.NEAR = 60 -- studs from the venue's centre the guards and the sweep look
 LoungeService.SIP_HOLD = 1.2 -- seconds the cup is at the face
 LoungeService.SERVE_LOOK = 3 -- seconds the bartender looks at the customer
 LoungeService.PROMPT_DISTANCE = 6
@@ -73,6 +79,8 @@ export type Pass = {
 	offer: () -> (number, number, string),
 }
 export type Squirrel = { actor: any, x: number, y: number, z: number } -- feet, world
+-- a body near the venue that is not squirrel-family: its holder (nil for a computer's brain)
+export type Occupant = { body: any, player: any? }
 -- What the service asks of the rest of the game. gameTown builds it from Boot/Game's objects; specs pass stubs.
 export type Town = {
 	speciesOf: (player: any) -> string?,
@@ -84,6 +92,8 @@ export type Town = {
 	tell: (player: any, text: string) -> (), -- the notice toast
 	squirrels: () -> { Squirrel }, -- every squirrel-family body, players' and computers'
 	knockOut: (actor: any) -> (), -- Boot/Game's kill(actor, "guard")
+	-- every other body within radius studs of (x, z), world (nil: no sweep)
+	occupants: ((x: number, z: number, radius: number) -> { Occupant })?,
 }
 export type Opts = {
 	town: Town,
@@ -202,6 +212,7 @@ function LoungeService.new(opts: Opts): any
 	folder.Parent = opts.parent or workspace
 	self.folder = folder
 	self.inside = {} :: { [any]: any } -- player -> the body let in
+	self.misses = {} :: { [any]: number } -- player -> checks in a row its body let in was found outside
 	self.drinks = {} :: { [any]: Drink }
 	self.struck = {} :: { [any]: number } -- actor -> when
 	self.strikes = {} :: { [string]: Strike }
@@ -383,14 +394,18 @@ local function dropDrink(self: any, player: any)
 	end
 end
 
--- The door from inside: back on the landing, first person released.
+-- The door from inside: back on the landing, first person released. Anyone in the room leaves through it.
 function LoungeService.leave(self: any, player: any): boolean
 	local body = self.inside[player]
 	if body == nil then
-		return false -- (only someone the door let in leaves through it)
+		body = self.town.bodyOf(player)
+		if body == nil or not self:inRoom(body) then
+			return false -- (nobody outside leaves through it)
+		end
 	end
 	dropDrink(self, player)
 	self.inside[player] = nil
+	self.misses[player] = nil
 	setZone(body, false)
 	self.town.moveTo(player, self:spot(LoungeClassic.DOOR_OUTSIDE))
 	play(self.sounds.door)
@@ -563,9 +578,10 @@ function LoungeService.step(self: any, _dt: number?)
 	self.nextTick = t + LoungeService.TICK
 	-- the guards: any squirrel-family body on the forecourt, in the entry or in the room
 	local centre = self:world(0, 0, 0)
+	local near = LoungeService.NEAR
 	for _, s in self.town.squirrels() do
 		local dx, dz = s.x - centre.X, s.z - centre.Z
-		if dx * dx + dz * dz < 60 * 60 then
+		if dx * dx + dz * dz < near * near then
 			local x, y, d = AlleyLayout.toLocal(self.place, s.x, s.y, s.z)
 			if LoungeClassic.guarded(x, y, d) or LoungeClassic.inside(x, y, d) then
 				local last = self.struck[s.actor]
@@ -583,17 +599,51 @@ function LoungeService.step(self: any, _dt: number?)
 			self.struck[actor] = nil
 		end
 	end
-	-- the room: a body let in that is no longer there (a knock-out elsewhere) is let go; one its player has let
-	-- go of (a new body picked) is let go and, if it is still in the room, put out at the door, or its computer
-	-- brain would be shut in a sealed building
+	-- the room: a body let in that is no longer there (a knock-out elsewhere) is let go after MISSES checks; one
+	-- its player has let go of (a new body picked) is let go and, if it is still in the room, put out at the
+	-- door, or its computer brain would be shut in a sealed building
 	for player, body in self.inside do
 		local here = self:inRoom(body)
 		if self.town.bodyOf(player) ~= body then
 			self:_release(player, body, here)
-		elseif not here then
-			self.inside[player] = nil
-			setZone(body, false)
-			dropDrink(self, player)
+		elseif here then
+			self.misses[player] = nil
+		else
+			local n = (self.misses[player] or 0) + 1
+			self.misses[player] = n
+			if n >= LoungeService.MISSES then
+				self.misses[player] = nil
+				self.inside[player] = nil
+				setZone(body, false)
+				dropDrink(self, player)
+			end
+		end
+	end
+	self:_sweep()
+end
+
+-- Every other body in the room: a person with the pass is let in where they stand, any other person and any
+-- computer's body put out on the landing (a body picked up in the room, a leaver's body its brain took back).
+function LoungeService._sweep(self: any)
+	local occupants = self.town.occupants
+	if occupants == nil then
+		return
+	end
+	local centre = self:world(0, 0, 0)
+	for _, o in occupants(centre.X, centre.Z, LoungeService.NEAR) do
+		if self:inRoom(o.body) and (o.player == nil or self.inside[o.player] ~= o.body) then
+			local player = o.player
+			if player == nil then
+				self.town.evict(o.body, self:spot(LoungeClassic.DOOR_OUTSIDE))
+			elseif self.town.speciesOf(player) == "human" and self.town.pass.has(player) then
+				self.inside[player] = o.body
+				self.misses[player] = nil
+				setZone(o.body, true)
+			else
+				setZone(o.body, false)
+				self.town.moveTo(player, self:spot(LoungeClassic.DOOR_OUTSIDE))
+				self.town.tell(player, LoungeClassic.WORDS.membersOnly)
+			end
 		end
 	end
 end
@@ -611,6 +661,7 @@ end
 -- Let a body go that its player no longer holds: first person off, the drink gone, out at the door if inside.
 function LoungeService._release(self: any, player: any, body: any, here: boolean)
 	self.inside[player] = nil
+	self.misses[player] = nil
 	setZone(body, false)
 	dropDrink(self, player)
 	if here then
@@ -708,7 +759,9 @@ function LoungeService.gameTown(parts: GameParts): Town
 			end
 		end,
 		evict = function(body: any, cf: CFrame)
-			-- a computer-held body is drawn from its world record (ActorsRuntime: feet = a.y - a.hip)
+			-- the body itself (a player may still hold it: a leaver's body before its release) and, for a
+			-- computer-held body drawn from its world record each frame, the record too (feet = a.y - a.hip)
+			(body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
 			local rt = parts.runtime
 			if rt then
 				for id, actor in rt.byTownId do
@@ -718,12 +771,11 @@ function LoungeService.gameTown(parts: GameParts): Town
 							local p = cf.Position
 							a.x, a.z = p.X, p.Z
 							a.y = p.Y + a.hip
-							return
 						end
+						return
 					end
 				end
 			end
-			(body :: Model):PivotTo(cf + Vector3.new(0, LoungeService.STAND, 0))
 		end,
 		pass = wallet.pass,
 		buy = function(player: any, id: string, deliver: () -> (boolean?, string?)): (boolean, string)
@@ -735,6 +787,24 @@ function LoungeService.gameTown(parts: GameParts): Town
 		squirrels = parts.squirrels,
 		knockOut = function(actor: any)
 			parts.kill(actor, "guard")
+		end,
+		occupants = function(x: number, z: number, radius: number): { Occupant }
+			local out: { Occupant } = {}
+			local rt = parts.runtime
+			if rt == nil then
+				return out
+			end
+			for _, a in rt.world.actors do
+				local dx, dz = a.x - x, a.z - z
+				if dx * dx + dz * dz < radius * radius then
+					local actor = rt.byTownId[a.id]
+					if actor and actor.body and not LoungeClassic.SQUIRRELS[actor.species] then
+						local holder = possession:controllerOf(actor)
+						table.insert(out, { body = actor.body, player = if holder == "ai" then nil else holder })
+					end
+				end
+			end
+			return out
 		end,
 	}
 end

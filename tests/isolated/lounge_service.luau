@@ -200,12 +200,35 @@ return function(t)
 					tell = function() end,
 				}
 				local held = makeModel("Held", roblox.CFrame.new(0, 0, 0), nil)
-				local record = { x = 0, y = 0, z = 0, hip = 2 }
+				local record = { id = 7, x = 0, y = 0, z = 0, hip = 2 }
+				local nut = makeModel("Nut", roblox.CFrame.new(0, 0, 0), nil)
+				local far = makeModel("Far", roblox.CFrame.new(0, 0, 0), nil)
+				local brain = { species = "human", body = held }
+				local runtime = {
+					byTownId = {
+						[7] = brain,
+						[8] = actor,
+						[9] = { species = "squirrel", body = nut },
+						[10] = { species = "human", body = far },
+					},
+					world = {
+						actorsById = { [7] = record },
+						actors = {
+							record,
+							{ id = 8, x = 3, y = 0, z = 0, hip = 2 },
+							{ id = 9, x = 1, y = 0, z = 1, hip = 1 },
+							{ id = 10, x = 100, y = 0, z = 0, hip = 2 },
+						},
+					},
+				}
 				local town = LoungeService.gameTown({
-					runtime = { byTownId = { [7] = { body = held } }, world = { actorsById = { [7] = record } } },
+					runtime = runtime,
 					possession = {
 						actorOf = function(_self: any, p: any): any
 							return if p == "P" then actor else nil
+						end,
+						controllerOf = function(_self: any, a: any): any
+							return if a == actor then "P" else "ai"
 						end,
 					},
 					wallet = wallet,
@@ -236,14 +259,87 @@ return function(t)
 				t.eq(killed[1][1], "s")
 				t.eq(killed[1][2], "guard")
 				t.eq(#town.squirrels(), 1)
-				-- a body its player let go of is moved through its world record (feet = y - hip)
+				-- the bodies near a point that are not squirrel-family, with their holders (nil: a computer's)
+				local near = town.occupants(0, 0, 10)
+				t.eq(#near, 2)
+				local holders: { [any]: any } = {}
+				for _, o in near do
+					holders[o.body] = o.player or "computer"
+				end
+				t.eq(holders[held], "computer")
+				t.eq(holders[body], "P")
+				-- a body is moved itself, standing, and through its world record too (feet = y - hip): a computer
+				-- brain draws it from the record, a player still holding it (a leaver) from the body
 				town.evict(held, roblox.CFrame.new(5, 6, 7))
 				t.eq(record.x, 5)
 				t.eq(record.y, 8)
 				t.eq(record.z, 7)
+				t.near(held:GetPivot().Position.Y, 6 + LoungeService.STAND, 1e-6)
+				t.near(held:GetPivot().Position.X, 5, 1e-6)
 				-- one with no record is moved itself, standing
 				town.evict(body, roblox.CFrame.new(1, 2, 3))
 				t.near(body:GetPivot().Position.Y, 2 + LoungeService.STAND, 1e-6)
+			end)
+		end
+	)
+
+	t.test(
+		"a leaver whose body its player still holds when the lounge hears of it: the body is out, not shut in",
+		function()
+			FakeEngine.with(function()
+				local svc0 =
+					LoungeService.new({ town = stubTown({}), prompts = false, root = FakeEngine.new("Folder", "R") })
+				local inRoom = roblox.CFrame.new(svc0:world(5, LoungeService.STAND, 0))
+				svc0:stop()
+				local x = makeModel("X", inRoom, nil)
+				local actor = { species = "human", body = x }
+				local record = { id = 7, x = 0, y = 0, z = 0, hip = 2 }
+				local held = true
+				local town = LoungeService.gameTown({
+					runtime = { byTownId = { [7] = actor }, world = { actorsById = { [7] = record }, actors = {} } },
+					possession = {
+						actorOf = function(_self: any, p: any): any
+							return if held and p == "P" then actor else nil
+						end,
+						controllerOf = function(_self: any, _a: any): any
+							return if held then "P" else "ai"
+						end,
+					},
+					wallet = {
+						pass = {
+							has = function()
+								return true
+							end,
+							buy = function()
+								return true, ""
+							end,
+							offer = function()
+								return 20, 5, ""
+							end,
+						},
+						buy = function()
+							return true, ""
+						end,
+						tell = function() end,
+					},
+					squirrels = function(): { any }
+						return {}
+					end,
+					kill = function() end,
+				})
+				local svc = LoungeService.new({ town = town, prompts = false, root = FakeEngine.new("Folder", "R") })
+				t.truthy(svc:enter("P"))
+				t.truthy(svc:inRoom(x))
+				svc:gone("P") -- PlayerRemoving reaches the lounge before the runtime lets the body go
+				t.truthy(not svc:inRoom(x), "the leaver's body is still in the room")
+				-- the runtime then lets it go: its brain resumes from the body's own pose
+				held = false
+				local p = x:GetPivot().Position
+				record.x, record.y, record.z = p.X, p.Y, p.Z
+				svc:step(0.1)
+				t.truthy(not svc:inRoom(x))
+				t.eq(svc:counts().inside, 0)
+				svc:stop()
 			end)
 		end
 	)

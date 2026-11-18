@@ -16,6 +16,11 @@
 --             order from outside, are refused with words and take nothing
 --   leave     the door from inside: back on the landing facing the street, first person released, the drink gone
 --   swap      a body let in whose player picks a new one loses first person and is put out on the landing
+--   stale     a reading or two outside just after a move does not let a person go (first person stays on); a
+--             body found outside MISSES checks running is let go, and let in again where it stands
+--   sweep     a person holding a body in the room without the pass is put out on the landing with words; one with
+--             it is let in where they stand (first person on); a computer's body there is put out; Leave works
+--             for anyone in the room
 --   leaver    a player who leaves the game while inside with a drink: nothing left behind, the body put out
 -- play() takes its parts as arguments, so the Lune suite runs this same flow on the fake engine
 -- (tests/isolated/lounge_service.luau): the check is itself checked before a cloud run is spent on it.
@@ -49,10 +54,13 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	-- the venue's frame, from the service (it reads generated/Expansion itself)
 	local squirrels: { any } = {}
 	local knocked: { any } = {}
+	local people: { any } = {} -- every PlayerLike made here
+	local computers: { any } = {} -- bodies a computer brain holds
 
 	local function newPlayer(name: string, species: string, cents: number, pass: boolean, cf: CFrame): any
 		local p =
 			{ Name = name, species = species, cents = cents, pass = pass, events = {}, body = deps.makeBody(name, cf) }
+		table.insert(people, p)
 		return p
 	end
 	local function told(p: any): string
@@ -114,6 +122,18 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 		end,
 		knockOut = function(actor: any)
 			table.insert(knocked, actor)
+		end,
+		occupants = function(_x: number, _z: number, _radius: number): { any }
+			local out = {}
+			for _, p in people do
+				if not p.gone and p.species ~= "squirrel" then
+					table.insert(out, { body = p.body, player = p })
+				end
+			end
+			for _, body in computers do
+				table.insert(out, { body = body })
+			end
+			return out
 		end,
 	}
 	-- a stand-in for the bake's staff: two guards on their posts and the bartender
@@ -315,6 +335,48 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	check(not svc:inRoom(old), "swap: the old body is shut in the room")
 	x, _, d = localOf(old)
 	check(math.abs(d - LC.DOOR_OUTSIDE.d) < 0.01, `swap: the old body put at {x}, {d}`)
+	table.insert(computers, old)
+
+	-- stale: a reading or two outside (a move's snap-back) keeps the person in; MISSES checks let them go
+	local room = CFrame.new(world(5, Service.STAND, 0))
+	local g = newPlayer("Stale", "human", 0, true, street)
+	svc:enter(g)
+	local inCf = g.body:GetPivot()
+	g.body:PivotTo(street)
+	step((Service.MISSES - 1) * Service.TICK - 0.05)
+	check(svc:isInside(g), "stale: let go after one reading outside")
+	check(g.body:GetAttribute("CameraZone") == LC.ZONE, "stale: first person off after one reading outside")
+	g.body:PivotTo(inCf)
+	step(1.0)
+	check(svc:isInside(g) and g.body:GetAttribute("CameraZone") == LC.ZONE, "stale: not inside after it")
+	g.body:PivotTo(street)
+	step(Service.MISSES * Service.TICK + 0.3)
+	check(not svc:isInside(g) and g.body:GetAttribute("CameraZone") == nil, "stale: found outside, still held in")
+	g.body:PivotTo(room)
+	step(0.3)
+	check(svc:isInside(g) and g.body:GetAttribute("CameraZone") == LC.ZONE, "stale: in the room again, not let in")
+
+	-- sweep: a body in the room nobody let in
+	local h = newPlayer("Picker", "human", 0, false, room)
+	check(not svc:isInside(h), "sweep: let in without the door")
+	step(0.3)
+	x, _, d = localOf(h.body)
+	check(not svc:inRoom(h.body) and math.abs(d - LC.DOOR_OUTSIDE.d) < 0.01, `sweep: no pass, left at {x}, {d}`)
+	check(told(h) == LC.WORDS.membersOnly, `sweep: no pass, told "{told(h)}"`)
+	check(h.body:GetAttribute("CameraZone") == nil, "sweep: no pass, first person")
+	local k = newPlayer("PickerPass", "human", 0, true, room)
+	step(0.3)
+	check(svc:isInside(k) and svc:inRoom(k.body), "sweep: with the pass, not let in where they stand")
+	check(k.body:GetAttribute("CameraZone") == LC.ZONE, "sweep: with the pass, no first person")
+	check(svc:leave(k) and not svc:inRoom(k.body), "sweep: the one let in where they stand cannot leave")
+	local m = newPlayer("Unlisted", "human", 0, false, room)
+	check(svc:leave(m) and not svc:inRoom(m.body), "sweep: Leave refused to a person in the room")
+	check(told(m) == LC.WORDS.goodbye, `sweep: Leave from the room, told "{told(m)}"`)
+	local brain = deps.makeBody("Brain", room)
+	table.insert(computers, brain)
+	step(0.3)
+	x, _, d = localOf(brain)
+	check(not svc:inRoom(brain) and math.abs(d - LC.DOOR_OUTSIDE.d) < 0.01, `sweep: a computer's body at {x}, {d}`)
 
 	-- leaver
 	local f = newPlayer("Leaver", "human", 30, true, street)
