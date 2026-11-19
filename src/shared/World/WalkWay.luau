@@ -26,7 +26,7 @@
 --   x, z) -> Box? (a box with no ways inside that holds the point); roomAt(way, x, z) -> Room?; putBack(way, x, z)
 --   -> (x, z, nx, nz) (where a body left at (x, z) can walk from, and the way out of the wall it was moved past);
 --   splitLane(way, lane) -> { Lane } (the pieces of a straight lane that miss every obstacle); addFences(colliders,
---   data) -> n; LOW, MARGIN, KEEP, LANE_MIN, DECK_MAX, BAKED_VENUES, RAMP_RUN, PORCH
+--   data) -> n; LOW, MARGIN, KEEP, LANE_MIN, DECK_MAX, BAKED_VENUES, VENUE_YARD, RAMP_RUN, PORCH
 -- Pure; studs. No side effects on require.
 
 local Colliders = require("./Colliders")
@@ -71,6 +71,9 @@ WalkWay.DECK_MAX = 4 -- studs: a slab lot (a footbridge's deck) this tall or les
 -- the venues baked by their own bakes that World/Colliders does not hold (it is also the squirrels' world, and the
 -- TV station's arena is walked into for paintball): solid to walkers
 WalkWay.BAKED_VENUES = table.freeze({ "f3_tv_station", "f4_lift_base", "f3_hilltop" })
+-- studs a baked venue's box reaches past its footprint: the TV station's yard (its plinth, steps and the paintball
+-- arena's yard fence stand up to 16 studs out)
+WalkWay.VENUE_YARD = table.freeze({ f3_tv_station = 18 })
 
 local FENCE_HALF = 0.5 -- studs: half a panel's thickness and a little more
 local FENCE_PIECE = 3 -- studs: a slanted fence is boxed in pieces this long
@@ -173,7 +176,7 @@ local function addAlleyBox(c: Colliders.Colliders, alley: any, id: string, r: { 
 	})
 end
 
--- The bowling alley's neighbours in its own bake, outside its box: the rear alley (AlleyLayout zone "rear_alley":
+-- The bowling alley's neighbours in its own bake, outside its box: the guard's stair up the games wing, the rear alley (AlleyLayout zone "rear_alley":
 -- raised paving behind the hall, a kerb and a fence, a ramp down at each end, RAMP_RUN long) and the yard's house
 -- (AlleyRoof.HOUSE, its porch PORCH out), both higher than the computer's ground or solid.
 WalkWay.RAMP_RUN = 20
@@ -183,6 +186,10 @@ local function addAlleyNeighbours(c: Colliders.Colliders, alley: any)
 	local y = alley.floorY + (zone.y or 0)
 	local run = WalkWay.RAMP_RUN
 	addAlleyBox(c, alley, "bowling_alley_rear", { zone.x0 - run, zone.x1 + run, zone.d0, zone.d1 }, y - 4, y + 4)
+	-- the guard's stair against the games wing's back wall (AlleyRoof.STAIR: its flights and the ramp past its foot)
+	local st = AlleyRoof.STAIR
+	local foot = alley.floorY + st.footY
+	addAlleyBox(c, alley, "bowling_alley_stair", { 101.8, st.footX + 4, st.d0 - 0.5, st.d1 + 0.5 }, foot, foot + 22)
 	local h = AlleyRoof.HOUSE
 	local p = WalkWay.PORCH
 	local floor = alley.floorY + h.floorY
@@ -240,6 +247,8 @@ local function addCountry(c: Colliders.Colliders): number
 		local x, z = SkyLiftCountry.at(b.u, b.v)
 		box("lift_country", x, z, x, z, math.max(b.w, b.d) / 2 * math.sqrt(2))
 	end
+	local sh = SkyLiftCountry.SHELTER
+	box("lift_shelter", sh.x, sh.z, sh.x, sh.z, sh.half)
 	return n
 end
 
@@ -258,12 +267,13 @@ local function addBakedVenues(c: Colliders.Colliders, data: any): number
 			minZ, maxZ = math.min(minZ, p[2]), math.max(maxZ, p[2])
 		end
 		local y0 = if v.ground then v.ground.min else v.floorY
+		local yard = WalkWay.VENUE_YARD[v.id] or 0
 		Colliders.add(c, {
 			id = v.id,
 			cx = (minX + maxX) / 2,
 			cz = (minZ + maxZ) / 2,
-			hw = (maxX - minX) / 2,
-			hd = (maxZ - minZ) / 2,
+			hw = (maxX - minX) / 2 + yard,
+			hd = (maxZ - minZ) / 2 + yard,
 			y0 = y0,
 			eave = math.max(v.floorY + (v.height or 10), y0 + WalkWay.LOW),
 			peak = math.max(v.floorY + (v.height or 10), y0 + WalkWay.LOW),

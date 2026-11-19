@@ -1,7 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Rides.SkyLiftCountry
 -- What stands on the farmland under the sky lift's line that a walker cannot pass (tools/bake/skylift/Countryside
--- draws it; World/WalkWay keeps the town's people off it): the hedgerows round the fields, the two dry-stone walls
+-- draws it; World/WalkWay keeps the town's people off it), and the shelter on Lift Road (SHELTER): the hedgerows round the fields, the two dry-stone walls
 -- across the line, the paddock's rails, and the farm's barn, silo, farmhouse and hay bales, and the lift's
 -- maintenance hut. All in the line's own frame (frame(): u studs along the centre line from the base station's
 -- mouth toward the summit, v studs to the right of a cabin going up) as the bake lays them out; the bake reads the
@@ -36,6 +36,9 @@ SkyLiftCountry.SILO = table.freeze({ u = 372, v = -128, r = 3.5 })
 SkyLiftCountry.FARMHOUSE = table.freeze({ u = 436, v = -150, yaw = math.pi / 2, w = 14, d = 11 })
 SkyLiftCountry.HAY = table.freeze({ u0 = 420, du = 9, n = 4, v = -128, dv = -4, r = 1.4 })
 SkyLiftCountry.HUT = table.freeze({ du = 27, v = -18, w = 8, d = 6 }) -- du: along the line past tower 3
+-- the roofed bench with the map board on Lift Road's east verge (world studs; tools/bake/skylift/Signs builds it):
+-- a box `half` studs each way round its spot
+SkyLiftCountry.SHELTER = table.freeze({ x = -690.6, z = -712, half = 4.5 })
 
 export type Line = { u0: number, v0: number, u1: number, v1: number, w: number, h: number?, lift: number? }
 export type Block = { u: number, v: number, yaw: number, w: number, d: number }
