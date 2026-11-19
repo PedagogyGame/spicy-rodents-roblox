@@ -312,6 +312,7 @@ export type RunOpts = {
 	combat: boolean?, -- run Combat/CombatService (the duel: people square up, close in, back away) round the rodent,
 	-- which feints every few seconds while it lingers at a scene
 	chase: boolean?, -- after each bite the two nearest officers chase the rodent (a new "respond" every 0.5 s, 40 s)
+	budgetMs: number?, -- (review) the brain scheduler's think budget per frame (BrainScheduler: 4 ms of os.clock)
 	soft: boolean?, -- also count steps through trees and props (report.soft) and shoulder clips (report.shoulder:
 	-- the centre line clear but a line SHOULDER to either side hits a wall)
 }
@@ -381,6 +382,11 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	local dt = opts.dt or 0.2
 	local rng = Rng.new(opts.seed)
 	local world = TownAI.build({ data = data, seed = opts.seed, rail = opts.rail })
+	if opts.budgetMs then
+		-- (review: the scheduler's think budget is wall-clock time, so a run under load defers other brains and
+		-- walks differently; a huge budget makes a run repeatable)
+		(world.scheduler :: any).params.budgetMs = opts.budgetMs
+	end
 	local traffic = TrafficService.new({
 		lanes = data:lanes(),
 		roads = data:roads(),

@@ -27,6 +27,12 @@
 --             3.5+ studs tall) to that set: a rodent standing on a fence rail is inside a fence box, so inSight is
 --             false for everyone: nobody squares up to it, and no blow lands on it (at 2343c1c a tough person 4
 --             studs off fence_11 squares up to it on the rail)
+--   alleyfront the CI spec's first run (seed 1, near) fails about 1 run in 6 on the merged tree: BrainScheduler's
+--             4 ms think budget is wall-clock time, so the runs are not repeatable under load; the crossing it then
+--             shows is real: an ambulance crew member bitten at the alley's front runs "along the first clear
+--             line" (InfectionService.runWay, WalkWay.clear) from (1322, -334.5) to (1346.8, -351.4) into
+--             BowlingAlley.Walls.FrontBase, then walks out through StreetFront.Bench2's back: the alley's box in
+--             World/Colliders stops short of its baked front base and street-front furniture
 --   rounds    (holds on the merged tree; kept as a guard) every Staff brain's round, the shop workers' new pavement
 --             rounds included, misses every baked wall
 --   audit     tools/sim/wall_audit --seeds 1,2 --minutes 30 crossed 3 walls on the merged tree: a shop worker walking
@@ -441,4 +447,40 @@ return function(t)
 		local g = rig.combat.guards[tough.id]
 		t.truthy(g ~= nil, "the tough person squares up to the rodent on the rail")
 	end)
+
+	t.test("alleyfront: WalkWay.clear never calls clear a line into the bowling alley's baked front", function()
+		local tw = baked()
+		local way = WalkWay.new({ data = data })
+		local bad = {}
+		-- the crew member's run at t 249 (seed 1, near) and its walk back, and the same line moved along the front
+		for _, seg in
+			{
+				{ 1322, -334.5, 1346.8, -351.4 },
+				{ 1346.8, -351.4, 1337.3, -347.0 },
+				{ 1312, -334.5, 1336.8, -351.4 },
+				{ 1332, -334.5, 1356.8, -351.4 },
+			}
+		do
+			local ax, az, bx, bz = seg[1], seg[2], seg[3], seg[4]
+			local part = WallAudit.crossing(tw, ax, Height.at(ax, az), az, bx, Height.at(bx, bz), bz)
+			if part and WalkWay.clear(way, ax, az, bx, bz) then
+				table.insert(
+					bad,
+					string.format("(%.1f, %.1f) -> (%.1f, %.1f): clear, but %s", ax, az, bx, bz, part.path)
+				)
+			end
+		end
+		t.eq(#bad, 0, table.concat(bad, "\n"))
+	end)
+
+	t.test(
+		"repeatable: the CI audit's run gives the same report twice (the scheduler's budget is wall-clock)",
+		function()
+			local tw = baked()
+			local a = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
+			local b = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
+			-- (WallAudit.run's budgetMs = 1e9 makes them equal; the real 4 ms budget does not)
+			t.eq(a.steps, b.steps, "the same steps")
+		end
+	)
 end
