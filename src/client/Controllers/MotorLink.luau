@@ -11,9 +11,12 @@
 --     here first and the motor restarted there);
 --   * echo(): the server also moves the root; when that move reaches this client after the correction did, it is no
 --     news (within ECHO_RADIUS of the corrected place, for ECHO_SECONDS) and the controller does not restart over it;
---   * the motor clock never runs back between controllers (resumeClock: a new body, the end of a ride).
+--   * the motor clock never runs back between controllers (resumeClock: a new body, the end of a ride);
+--   * the rodent's click rides in every packet for SquirrelWire.CLICK_COPY seconds after it (click(): its number and
+--     how long before the packet's clock it was made), a copy of the Duel remote's: a lost packet or a remote resent
+--     after a loss no longer loses the pounce (the server takes the first to arrive).
 -- Interface: new(send) -> Link; Link:setEpoch(n); Link:offer(msg); Link:apply(state, now) -> msg?;
---   Link:tick(state) -> boolean (sent); Link:urgent() (the next tick sends: the river recovery's own frame); Link:echo(x, y, z, hip, now) -> boolean; Link:resumeClock() -> number;
+--   Link:tick(state) -> boolean (sent); Link:click(clock) -> number (the click's number); Link:urgent() (the next tick sends: the river recovery's own frame); Link:echo(x, y, z, hip, now) -> boolean; Link:resumeClock() -> number;
 --   NEAR, ECHO_RADIUS, ECHO_SECONDS
 -- Pure but for `send` (the caller's remote). No side effects on require.
 
@@ -49,6 +52,8 @@ export type Link = typeof(setmetatable(
 		applied: Correction?,
 		appliedAt: number,
 		sent: number,
+		clickSeq: number, -- the last click's number (0: none yet), 1 to 255 round
+		clickClock: number, -- its motor clock
 	},
 	MotorLink
 ))
@@ -64,6 +69,8 @@ function MotorLink.new(send: (b: buffer) -> ()): Link
 		applied = nil,
 		appliedAt = -math.huge,
 		sent = 0,
+		clickSeq = 0,
+		clickClock = -math.huge,
 	}, MotorLink)
 end
 
@@ -133,6 +140,14 @@ function MotorLink.urgent(self: Link)
 	self.sentClock = -math.huge
 end
 
+-- A click (the rodent's pounce's tell) made at motor clock `clock`: its number, for the Duel remote; the packets carry a
+-- copy of it from now on (tick).
+function MotorLink.click(self: Link, clock: number): number
+	self.clickSeq = (self.clickSeq % 255) + 1
+	self.clickClock = clock
+	return self.clickSeq
+end
+
 -- After the motor stepped: send when the clock has moved SEND_EVERY since the last packet.
 function MotorLink.tick(self: Link, state: any): boolean
 	self.lastClock = state.clock
@@ -141,7 +156,12 @@ function MotorLink.tick(self: Link, state: any): boolean
 	end
 	self.sentClock = state.clock
 	self.seq += 1
-	self.send(SquirrelWire.encode(self.seq, self.epoch, SquirrelMotor.serialize(state)))
+	local snapshot = SquirrelMotor.serialize(state)
+	local ago = state.clock - self.clickClock
+	if self.clickSeq ~= 0 and ago >= 0 and ago <= SquirrelWire.CLICK_COPY then
+		snapshot.clickSeq, snapshot.clickAgo = self.clickSeq, ago
+	end
+	self.send(SquirrelWire.encode(self.seq, self.epoch, snapshot))
 	self.sent += 1
 	return true
 end
