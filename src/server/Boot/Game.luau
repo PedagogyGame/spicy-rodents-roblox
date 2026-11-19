@@ -1425,6 +1425,10 @@ function Game.start(opts: Opts?): any
 		local ok, why = combat:rodentAct(tid, verb, now)
 		if not ok and verb == "feint" and why == "winded" then
 			fire(player, { kind = "duel", what = "winded" })
+		elseif not ok and verb == "pounce" then
+			-- (the client clicks on the motor's own cooldown, so this is a click the link bunched up: its lunge bites
+			-- nobody, and the player is told)
+			fire(player, { kind = "duel", what = "notyet" })
 		end
 	end
 

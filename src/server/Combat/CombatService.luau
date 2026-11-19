@@ -302,9 +302,16 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 	local r = rodent(self, id)
 	local busy = now < r.windowUntil or now < r.commitAt or now < r.recoverUntil
 	if verb == "pounce" then
-		if busy or now < r.cooldownUntil or now < r.feintUntil then
+		-- (the motor's own rule: a pounce once its cooldown is over, whatever became of the last one; the client clicks
+		-- on the motor's cooldown, so a quick retry after a miss is a real pounce, not a lunge the duel ignores)
+		if now < r.commitAt or now < r.cooldownUntil or now < r.feintUntil then
 			self._stats.refused += 1
 			return false, "not yet"
+		end
+		if not r.landed then
+			-- the last pounce is still in its window: this one replaces it, a miss
+			self._stats.missed += 1
+			notify(self, id, { kind = "duel", what = "missed" })
 		end
 		r.tell = now
 		r.tellFeint = false

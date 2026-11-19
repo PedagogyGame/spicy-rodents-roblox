@@ -42,6 +42,31 @@ return function(t)
 		t.truthy(v.infected, "the bite-to-hospital sequence has them")
 	end)
 
+	t.test(
+		"a quick retry after a miss is a real pounce: the server takes a click when the motor would (review finding 7)",
+		function()
+			local rig = BiteRig.new({ seed = 3, duelRand = dice(0.99) })
+			rig.step(5)
+			rig.holdRodent()
+			rig.put(rig.rodent, 900, 900)
+			local P = rig.combat.P
+			local t0 = rig.now()
+			t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", t0))
+			-- the client lets the motor pounce again pounce.windup + pounce.cooldown after the click (Controllers/Squirrel)
+			local again = t0 + P.pounceWindup + P.pounceCooldown
+			local ok, why = rig.combat:rodentAct(rig.rodent, "pounce", again - 0.3)
+			t.falsy(ok, "not mid-cooldown")
+			t.eq(why, "not yet")
+			while rig.now() < again - 1e-6 do
+				rig.step(0.1)
+			end
+			t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()), "the retry the motor allows is taken")
+			t.truthy(rig.combat:stats().missed >= 1, "the first one counted as a miss")
+			-- and a refused click is told to the player
+			t.truthy(require("@client/UI/DuelWords").news("notyet", false) ~= nil)
+		end
+	)
+
 	t.test("a click with no pounce in the motor bites nobody; the motor's pounce with the click does", function()
 		local rig = BiteRig.new({ seed = 4, duelRand = dice(0), motorCheck = true })
 		rig.step(20)

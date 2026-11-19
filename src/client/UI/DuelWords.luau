@@ -13,6 +13,7 @@ DuelWords.NEWS = table.freeze({
 	missed = "Missed. Get closer before you pounce.",
 	dodged = "Dodged it!",
 	winded = "Too winded to feint: let the meter fill.",
+	notyet = "Too soon: that lunge could not bite. Give each pounce a beat.",
 }) :: { [string]: string }
 
 function DuelWords.news(what: any, zone: boolean): string?
