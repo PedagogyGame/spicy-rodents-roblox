@@ -5,6 +5,11 @@
 --            body there, and a retake carries the governor's history to wherever that is (MoveValidator.takeOver /
 --            relocate: "the body was put there"). A root written far off between two watches, a swap to another
 --            body and the same body taken back: a teleport no rule judges.
+--   slab     a fall straight down through a roof (the hospital's, the police station's) into the sealed storey under it:
+--            no rule judges a move through a horizontal slab (needs build/Town.rbxm: bake first).
+--   knock    the minigames' list of animals (Boot/Game `animals`) reads the root too: a root written inside the
+--            paintball station is put out on its street by the server, and the jump is never judged.
+-- About 5 s: `lune run tests/run.luau validator_rev7`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local MoveValidator = require("@server/Movement/MoveValidator")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
