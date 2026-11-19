@@ -41,6 +41,9 @@ export type Room = {
 	-- the way between two points inside (the start left out, the goal last)
 	within: (x0: number, z0: number, x1: number, z1: number) -> { { number } },
 	door: { number }, -- the spot in front of its door, outside: every walk in or out goes by it
+	-- where a body left at (x, z) inside is let go to the computer: a point its ways join without crossing what
+	-- stands in the room (nil: anywhere inside joins them)
+	settle: ((x: number, z: number) -> (number, number))?,
 }
 
 export type Way = {
@@ -56,6 +59,7 @@ local WalkWay = {}
 
 WalkWay.LOW = 1.5 -- studs: anything this tall stops a walker (lower is stepped over)
 WalkWay.MARGIN = 0.2 -- studs a point must be inside a box's walls to be in it
+WalkWay.KEEP = 2.5 -- studs from a building's own ways (a lane, a round) a body may be let go and join them straight
 WalkWay.LANE_MIN = 6 -- studs: a piece of lane shorter than this is not walked
 -- the venues baked by their own bakes that World/Colliders does not hold (it is also the squirrels' world, and the
 -- TV station's arena is walked into for paintball): solid to walkers
@@ -139,6 +143,33 @@ local function addBakedVenues(c: Colliders.Colliders, data: any): number
 	return n
 end
 
+-- the nearest point to (x, z) on a set of legs { x1, z1, x2, z2 }, and how far it is
+local function nearestOnLegs(legs: { { number } }, x: number, z: number): (number, number, number)
+	local best, bx, bz = math.huge, x, z
+	for _, l in legs do
+		local ex, ez = l[3] - l[1], l[4] - l[2]
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((x - l[1]) * ex + (z - l[2]) * ez) / l2, 0, 1) else 0
+		local px, pz = l[1] + ex * t, l[2] + ez * t
+		local d = math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
+		if d < best then
+			best, bx, bz = d, px, pz
+		end
+	end
+	return bx, bz, best
+end
+
+-- settle onto a set of legs: kept within KEEP of them, else moved onto the nearest
+local function settleOn(legs: { { number } }): (number, number) -> (number, number)
+	return function(x: number, z: number): (number, number)
+		local px, pz, d = nearestOnLegs(legs, x, z)
+		if d <= WalkWay.KEEP then
+			return x, z
+		end
+		return px, pz
+	end
+end
+
 -- the way along a chain of points (the deepest first, the door's outside spot last) between two points inside
 local function chainWithin(chain: { { number } }): (number, number, number, number) -> { { number } }
 	local function nearest(x: number, z: number): number
@@ -163,7 +194,19 @@ local function chainWithin(chain: { { number } }): (number, number, number, numb
 	end
 end
 
-local function boxRoom(id: string, box: Colliders.Box, chain: { { number } }): Room
+-- a building whose only way is a chain (its post's way out) and the rounds worked at its end (`rounds`: closed
+-- loops of points)
+local function boxRoom(id: string, box: Colliders.Box, chain: { { number } }, rounds: { { { number } } }?): Room
+	local legs: { { number } } = {}
+	for i = 1, #chain - 1 do
+		table.insert(legs, { chain[i][1], chain[i][2], chain[i + 1][1], chain[i + 1][2] })
+	end
+	for _, round in rounds or {} do
+		for i, p in round do
+			local q = round[i % #round + 1]
+			table.insert(legs, { p[1], p[2], q[1], q[2] })
+		end
+	end
 	return {
 		id = id,
 		inside = function(x: number, z: number): boolean
@@ -171,6 +214,7 @@ local function boxRoom(id: string, box: Colliders.Box, chain: { { number } }): R
 		end,
 		within = chainWithin(chain),
 		door = chain[#chain],
+		settle = settleOn(legs),
 	}
 end
 
@@ -252,6 +296,7 @@ function WalkWay.new(opts: Opts): Way
 				return out
 			end,
 			door = { outside[1], outside[2] },
+			settle = settleOn(layout.lanes),
 		})
 	end
 	-- the police station: the locker room's way out (StaffRounds.POLICE_EXIT, from the lot's centre)
@@ -263,7 +308,9 @@ function WalkWay.new(opts: Opts): Way
 				for _, p in StaffRounds.POLICE_EXIT do
 					table.insert(chain, { station.x + p[1], station.z + p[2] })
 				end
-				add(boxRoom(station.id, b, chain))
+				-- the locker room's rounds (both mirror images: Brains/Staff walks StaffRounds.points)
+				local sx, sz = station.x + StaffRounds.POLICE.x, station.z + StaffRounds.POLICE.z
+				add(boxRoom(station.id, b, chain, { StaffRounds.points(sx, sz, 1), StaffRounds.points(sx, sz, 2) }))
 				break
 			end
 		end
@@ -274,7 +321,11 @@ function WalkWay.new(opts: Opts): Way
 		if post and post.exit then
 			for _, b in c.boxes do
 				if b.id == v.id then
-					add(boxRoom(v.id, b, post.exit))
+					local round = {}
+					for _, r in post.round do
+						table.insert(round, { post.x + r[1], post.z + r[2] })
+					end
+					add(boxRoom(v.id, b, post.exit, { round }))
 					break
 				end
 			end
@@ -397,9 +448,18 @@ end
 
 -- putBack: where a body a player left at (x, z) is let go to the computer. Anywhere it can walk from, it stays;
 -- inside a box that has no ways inside (a solid lot: a house shell, a shop), it is the nearest spot outside that
--- box's walls (a walker's half width and a little more out), on open ground. The third and fourth results are the
+-- box's walls (a walker's half width and a little more out), on open ground; inside a building with ways, more than
+-- KEEP from them (behind the corner store's till, in the police station's lobby), the nearest point on them. The third and fourth results are the
 -- way out of the wall it was moved past (0, 0 when it stays).
 function WalkWay.putBack(way: Way, x: number, z: number): (number, number, number, number)
+	local room = WalkWay.roomAt(way, x, z)
+	if room then
+		if room.settle then
+			local sx, sz = room.settle(x, z)
+			return sx, sz, 0, 0
+		end
+		return x, z, 0, 0
+	end
 	local b = WalkWay.solidAt(way, x, z)
 	if b == nil then
 		return x, z, 0, 0

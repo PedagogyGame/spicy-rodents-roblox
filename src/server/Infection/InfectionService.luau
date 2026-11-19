@@ -1358,13 +1358,35 @@ end
 -- The walk from a bed to (hx, hz): out through the ward door and the front door, then the way a
 -- walk-in comes, backwards (the pavements), or across the open ground round the buildings. nil when
 -- there is no way on foot (beyond the river; a search over its budget).
-local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: number): ({ { number } }?, number)
+local function wayHome(
+	self: Service,
+	layout: any,
+	bed: any,
+	hx: number,
+	hz: number,
+	from: { number }?
+): ({ { number } }?, number)
+	-- (`from`: where the person stands when it is not their bed: discharged on the way to it, the walk starts there)
+	local fx, fz = bed.x, bed.z
+	local atBed = true
+	if
+		from
+		and (from[1] - bed.x) ^ 2 + (from[2] - bed.z) ^ 2 > 4
+		and HospitalLayout.contains(layout, from[1], from[2])
+	then
+		fx, fz, atBed = from[1], from[2], false
+	end
 	if HospitalLayout.contains(layout, hx, hz) then
 		-- the hospital's own people: back to their post along the lanes (the aisles, the ward doors)
-		local points = HospitalLayout.walk(layout, bed.x, bed.z, hx, hz)
+		local points = HospitalLayout.walk(layout, fx, fz, hx, hz)
 		return points, MedicalRoute.length(points)
 	end
-	local points = HospitalLayout.pathOut(layout, bed)
+	local points = if atBed
+		then HospitalLayout.pathOut(layout, bed)
+		else HospitalLayout.walk(layout, fx, fz, layout.entrance[1], layout.entrance[2])
+	if not atBed then
+		table.insert(points, { layout.outside[1], layout.outside[2] })
+	end
 	local out = layout.outside
 	local back = self:sidewalkRoute(hx, hz)
 	if back then
@@ -1546,7 +1568,17 @@ local function apply(self: Service, rec: Record, effect: any)
 				local a = actorOf(self, id)
 				local points = HospitalLayout.pathIn(layout, bed)
 				if a and HospitalLayout.contains(layout, a.x, a.z) then
-					table.remove(points, 1) -- already through the door
+					-- already through the door (one of the hospital's own people, or walked in): along the lanes from
+					-- where they stand to the bed's way, never straight across the rooms to it
+					table.remove(points, 1)
+					local first = points[1]
+					if first then
+						local lead = HospitalLayout.walk(layout, a.x, a.z, first[1], first[2])
+						for i = 2, #points do
+							table.insert(lead, points[i])
+						end
+						points = lead
+					end
 				end
 				order(self, id, { mode = "route", points = points, speed = self.tun.walkInSpeed, after = "stand" })
 			end
@@ -1567,7 +1599,8 @@ local function apply(self: Service, rec: Record, effect: any)
 		sink(self, id, false)
 		if layout and bed and isAI(self, id) then
 			local hx, hz = homeOf(self, rec)
-			local points, len = wayHome(self, layout, bed, hx, hz)
+			local a = actorOf(self, id)
+			local points, len = wayHome(self, layout, bed, hx, hz, if a then { a.x, a.z } else nil)
 			if points then
 				order(self, id, { mode = "route", points = points, speed = self.tun.dischargeSpeed, after = "stand" })
 				-- a walk that overruns (it never should) ends at home all the same

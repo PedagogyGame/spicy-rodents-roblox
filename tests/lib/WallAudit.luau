@@ -50,9 +50,11 @@ WallAudit.FILES = {
 	"build/Expansion_F4.rbxm",
 }
 WallAudit.HEIGHTS = { 2.0, 3.8 } -- studs over the feet (a townsperson is 5.2 tall, the hip 2.5)
-WallAudit.PROP = 2.5 -- studs: a part narrower than this both ways is a prop (a post, a sign), not a wall
+WallAudit.PROP = 3 -- studs: a part no wider than this both ways is a prop (a telephone pole, a post, a sign), not a wall
 WallAudit.JUMP = 8 -- studs in one step: a body placed somewhere, not walking
 WallAudit.EXAMPLES = 6 -- crossings kept per cause
+WallAudit.TRAILS = false -- format() prints each example's last steps
+WallAudit.TRAIL = 8 -- steps kept
 
 export type Town = { worlds: { BakedWorld.World }, missing: { string } }
 
@@ -67,6 +69,7 @@ export type Crossing = {
 	bx: number,
 	bz: number,
 	y: number,
+	trail: { string }?, -- the body's last steps before it (each: time, place, what moved it)
 }
 
 export type Report = {
@@ -101,7 +104,7 @@ function WallAudit.wall(p: BakedWorld.Part): boolean
 	if not p.collide or isTree(p) then
 		return false
 	end
-	return p.x1 - p.x0 >= WallAudit.PROP or p.z1 - p.z0 >= WallAudit.PROP
+	return p.x1 - p.x0 > WallAudit.PROP or p.z1 - p.z0 > WallAudit.PROP
 end
 
 local wall = WallAudit.wall
@@ -287,8 +290,17 @@ local function dropSpots(town: Town, data: any, world: any, rng: any): { { numbe
 		for _ = 1, 60 do
 			local lx = AlleyLayout.X0 + rng.next() * (AlleyLayout.X1 - AlleyLayout.X0)
 			local ld = AlleyLayout.FRONT_D + rng.next() * (AlleyLayout.REAR_WALL_D - AlleyLayout.FRONT_D)
+			-- (not on the lanes: a player cannot get past the LaneGuard)
+			local onLanes = false
+			for _, zone in AlleyLayout.ZONES do
+				if zone.id == "lanes" and lx >= zone.x0 and lx <= zone.x1 and ld >= zone.d0 and ld <= zone.d1 then
+					onLanes = true
+				end
+			end
 			local x, _, z = AlleyLayout.toWorld(alley, lx, 0, ld)
-			try(x, z)
+			if not onLanes then
+				try(x, z)
+			end
 		end
 	end
 	local b = world.ctx.bounds
@@ -317,6 +329,32 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 			return rng.next()
 		end,
 	})
+	-- which part of the service gave an order (for the report: the function names on the stack)
+	if WallAudit.TRAILS then
+		for _, brain in world.brains do
+			local b = brain :: any
+			local on = b.onEvent
+			b.onEvent = function(self: any, evt: any)
+				if evt.type == "medical" and evt.mode ~= nil then
+					local names = {}
+					for level = 2, 8 do
+						local name = debug.info(level, "n")
+						if name and name ~= "" then
+							table.insert(names, name)
+						end
+					end
+					local pts = {}
+					for i, q in evt.points or {} do
+						if i <= 3 then
+							table.insert(pts, string.format("%.0f,%.0f", q[1], q[2]))
+						end
+					end
+					self._auditTag = table.concat(names, "<") .. " " .. table.concat(pts, " ")
+				end
+				return on(self, evt)
+			end
+		end
+	end
 	-- the rodent is a player's
 	local rodent: any = nil
 	for _, a in world.actors do
@@ -362,8 +400,10 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	local stay = 0
 
 	local prev: { [number]: { number } } = {}
+	local trails: { [number]: { string } } = {}
 	for _, a in world.actors do
 		prev[a.id] = { a.x, a.y - a.hip, a.z }
+		trails[a.id] = {}
 	end
 
 	local steps = math.floor(opts.minutes * 60 / dt + 0.5)
@@ -460,6 +500,11 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 				continue
 			end
 			local mx, mz = fx - p[1], fz - p[3]
+			local trail = trails[a.id]
+			if #trail >= WallAudit.TRAIL then
+				table.remove(trail, 1)
+			end
+			table.insert(trail, string.format("%.1f (%.1f, %.1f) %s", world.now, fx, fz, causeOf(world, a)))
 			if mx * mx + mz * mz > WallAudit.JUMP * WallAudit.JUMP then
 				report.jumps += 1
 			elseif mx * mx + mz * mz > 1e-8 then
@@ -477,6 +522,7 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 						bx = fx,
 						bz = fz,
 						y = fy,
+						trail = table.clone(trail),
 					})
 				end
 			end
@@ -591,6 +637,11 @@ function WallAudit.format(report: Report): string
 					e.y
 				)
 			)
+			if WallAudit.TRAILS then
+				for _, line in e.trail or {} do
+					table.insert(lines, "          " .. line)
+				end
+			end
 		end
 	end
 	local parts = {}

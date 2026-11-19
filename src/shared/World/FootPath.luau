@@ -189,8 +189,14 @@ local function misses(b: Colliders.Box, r: number, x0: number, z0: number, x1: n
 	return false
 end
 
+local function inside(b: Colliders.Box, x: number, z: number): boolean
+	return math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd
+end
+
 -- clear(finder, x0, z0, x1, z1, skip?): can a walker go straight from one point to the other? No
--- building on the way (the boxes in `skip` do not count) and no closed ground.
+-- building on the way and no closed ground. A box in `skip` (one an end is in, grown by the walker's half
+-- width) does not count when an end is inside its walls (that end leaves or is reached through them); when
+-- the end is only beside a wall, the walk may go along that wall but never into it.
 function FootPath.clear(
 	f: Finder,
 	x0: number,
@@ -200,8 +206,17 @@ function FootPath.clear(
 	skip: { [Colliders.Box]: boolean }?
 ): boolean
 	local r = f.radius
+	local minX, maxX = math.min(x0, x1) - r, math.max(x0, x1) + r
+	local minZ, maxZ = math.min(z0, z1) - r, math.max(z0, z1) + r
 	for _, b in f.boxes do
-		if not (skip and skip[b]) and not misses(b, r, x0, z0, x1, z1) then
+		if b.cx + b.hw < minX or b.cx - b.hw > maxX or b.cz + b.hd < minZ or b.cz - b.hd > maxZ then
+			continue
+		end
+		if skip and skip[b] then
+			if not inside(b, x0, z0) and not inside(b, x1, z1) and not misses(b, 0, x0, z0, x1, z1) then
+				return false
+			end
+		elseif not misses(b, r, x0, z0, x1, z1) then
 			return false
 		end
 	end

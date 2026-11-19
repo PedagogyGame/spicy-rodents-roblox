@@ -424,7 +424,8 @@ function TownAI.build(opts: Opts): World
 							stationZ = sz,
 							index = k,
 							settle = function(x: number, z: number): (number, number)
-								return WalkWay.putBack(way, x, z)
+								local cx, cz = WalkWay.putBack(way, x, z)
+								return cx, cz
 							end,
 						})
 					)
@@ -621,7 +622,9 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	local actor = world.actorsById[id]
 	world.possessed[id] = nil
 	-- let go inside a building nobody walks in (a house shell, a shop: a player found a way in), the computer takes
-	-- the body at the nearest spot outside its walls, where its way on foot starts (World/WalkWay.putBack)
+	-- the body at the nearest spot outside its walls, where its way on foot starts; inside one with ways (the
+	-- hospital, the police station, the corner store) but away from them, at the nearest point on them
+	-- (World/WalkWay.putBack)
 	if actor.species == "human" then
 		local px, pz = WalkWay.putBack(world.way, x, z)
 		if px ~= x or pz ~= z then

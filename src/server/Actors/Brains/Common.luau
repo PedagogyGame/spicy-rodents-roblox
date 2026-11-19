@@ -78,6 +78,8 @@ export type Leg = {
 	points: { { number } }?,
 	at: number,
 	retry: number,
+	sx: number, -- where the body stood when the way was found (the first leg starts there)
+	sz: number,
 }
 
 export type Snapshot = { [string]: any }
@@ -155,40 +157,58 @@ function Common.halt(actor: Actor)
 end
 
 function Common.newLeg(): Leg
-	return { tx = math.huge, tz = math.huge, points = nil, at = 1, retry = 0 }
+	return { tx = math.huge, tz = math.huge, points = nil, at = 1, retry = 0, sx = 0, sz = 0 }
 end
 
 Common.LEG_REACH = 1.2 -- studs: a point of a way counts as reached
 Common.LEG_RETRY = 4 -- seconds before a spot with no way is asked for again
+Common.LEG_OFF = 3 -- studs off the way being walked: the body was taken off it (an order, a call): asked for again
 
 -- toward(leg, actor, ctx, tx, tz): the point to walk to now on the way to (tx, tz): the spot itself when the line
 -- is clear (or the world has no ways), else the next point of the town's way there (ctx.way), asked for once per
--- spot. nil when there is no way (the body stands; the spot is asked for again after LEG_RETRY).
+-- spot, and again when the body is found more than LEG_OFF off the way (something else walked it elsewhere in
+-- between: an order, a call). nil when there is no way (the body stands; asked for again after LEG_RETRY).
 function Common.toward(leg: Leg, actor: Actor, ctx: Ctx, tx: number, tz: number): (number?, number?)
 	local way, clear = ctx.way, ctx.clear
 	if way == nil or clear == nil then
 		return tx, tz
 	end
-	if math.abs(leg.tx - tx) + math.abs(leg.tz - tz) > 0.5 or (leg.points == nil and ctx.now >= leg.retry) then
-		leg.tx, leg.tz, leg.at = tx, tz, 1
-		if clear(actor.x, actor.z, tx, tz) then
-			leg.points = { { tx, tz } }
-		else
-			leg.points = way(actor.x, actor.z, tx, tz)
-			if leg.points == nil then
-				leg.retry = ctx.now + Common.LEG_RETRY
+	local fresh = math.abs(leg.tx - tx) + math.abs(leg.tz - tz) > 0.5 or (leg.points == nil and ctx.now >= leg.retry)
+	for _ = 1, 2 do
+		if fresh then
+			leg.tx, leg.tz, leg.at = tx, tz, 1
+			leg.sx, leg.sz = actor.x, actor.z
+			if clear(actor.x, actor.z, tx, tz) then
+				leg.points = { { tx, tz } }
+			else
+				leg.points = way(actor.x, actor.z, tx, tz)
+				if leg.points == nil then
+					leg.retry = ctx.now + Common.LEG_RETRY
+				end
 			end
 		end
+		local points = leg.points
+		if points == nil then
+			return nil, nil
+		end
+		while
+			leg.at < #points
+			and Common.dist2d(actor.x, actor.z, points[leg.at][1], points[leg.at][2]) < Common.LEG_REACH
+		do
+			leg.at += 1
+		end
+		-- still on the way? (the leg being walked runs from the point before to this one)
+		local a = if leg.at > 1 then points[leg.at - 1] else { leg.sx, leg.sz }
+		local p = points[leg.at]
+		local ex, ez = p[1] - a[1], p[2] - a[2]
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((actor.x - a[1]) * ex + (actor.z - a[2]) * ez) / l2, 0, 1) else 0
+		if fresh or Common.dist2d(actor.x, actor.z, a[1] + ex * t, a[2] + ez * t) <= Common.LEG_OFF then
+			return p[1], p[2]
+		end
+		fresh = true -- taken off it since: from here
 	end
-	local points = leg.points
-	if points == nil then
-		return nil, nil
-	end
-	while leg.at < #points and Common.dist2d(actor.x, actor.z, points[leg.at][1], points[leg.at][2]) < Common.LEG_REACH do
-		leg.at += 1
-	end
-	local p = points[leg.at]
-	return p[1], p[2]
+	return nil, nil
 end
 
 -- forget(leg): the next toward() asks for the way again (the body was moved: a hand-back)
