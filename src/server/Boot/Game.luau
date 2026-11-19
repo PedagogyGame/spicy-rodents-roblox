@@ -1815,7 +1815,7 @@ function Game.start(opts: Opts?): any
 			infection = infection,
 			combat = combat,
 			groundAt = Height.at,
-			-- the held rodent's route, from the validator's last clean packet (a stale one says nothing)
+			-- the held rodent's route and footing, from the validator's last clean packet (a stale one says nothing)
 			motorOf = function(id: number): any
 				local actor = rt.byTownId[id]
 				if actor == nil then
@@ -1825,7 +1825,7 @@ function Game.start(opts: Opts?): any
 				if snap == nil or at == nil or workspace:GetServerTimeNow() - at > 1 then
 					return nil
 				end
-				return { routeId = (snap :: any).routeId }
+				return { routeId = (snap :: any).routeId, grounded = (snap :: any).grounded == true }
 			end,
 			exclude = function(id: number): boolean
 				local actor = rt.byTownId[id]

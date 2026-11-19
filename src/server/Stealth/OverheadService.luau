@@ -6,11 +6,14 @@
 -- a squirrel that one watches (`exclude`) is left to it.
 -- Stepped from the game's step (Boot/Game) every frame; it works at TICK (5 Hz):
 --   * the squirrels: the Spicy Rodent (a player's or the AI's) and the infected squirrels (Infection/InfectionService
---     :feared(): not one down a drain or in a hollow) that are OVERHEAD: on an above-ground route (ABOVE: wires,
---     fences, branches, bridges, roofs, the lookouts) at least C.minHeight over the ground, or in the air off one for
---     up to C.airGrace (a leap between them; its first tick back on a route is a landing). The route is the motor's
---     (a held rodent: `motorOf`, the validator's last clean packet; the AI: its rail intent); with no word on the route
---     the height alone decides. A held body's speed is the fastest tenth of a second since the last tick (Stealth/Pace,
+--     :feared(): not one down a drain or in a hollow) that are OVERHEAD: at least C.minHeight over the ground on an
+--     above-ground route (ABOVE: wires, fences, branches, bridges, roofs, the lookouts) or standing on anything else up
+--     there (TOP: a truck's roof, a wall top: the motor stands on any colliding top, its packet names no route and says
+--     it is grounded), or in the air off one for up to C.airGrace (a leap between them; its first tick back on one is a
+--     landing). A leap from the ground (its top is about 7 studs) is neither. The route is the motor's (a held rodent:
+--     `motorOf`, the validator's last clean packet; the AI: its rail intent); with no word on it the height alone
+--     decides. So nothing over a person's head is left out: the duel leaves anything higher than duel.overheadY over a
+--     person's feet to this watch (Combat/Duel.notices). A held body's speed is the fastest tenth of a second since the last tick (Stealth/Pace,
 --     sampled every frame: tapping W is walking, as on the rafters); the AI's is its motor's. On a branch or a trunk the
 --     leaves cover it (OverheadWatch C.canopy).
 --   * the people: every AI townsperson, member of staff and officer (Pedestrian, Staff, Officer brains; not a patient,
@@ -43,7 +46,7 @@
 -- Costs: no work at all on a tick with no squirrel overhead (the people's grid is not even built); with one, the grid of
 -- the town's people (one set per person) and a few people near it rated, a building check each. stats().lastMs, peakMs
 -- and busyMs say what the ticks took (tests/unit/overhead_service.spec.luau holds them under a budget with 60+ people).
--- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; new(opts) -> Service; :step(dt); :spotted(personId, squirrelId) ->
+-- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; TOP; new(opts) -> Service; :step(dt); :spotted(personId, squirrelId) ->
 --   boolean; :stageOf(personId) -> string; :overhead() -> { [id]: Overhead } (last tick's); :stats(); :stop()
 -- Ids are TownAI actor ids. Positions in studs. No side effects on require.
 
@@ -73,6 +76,7 @@ OverheadService.ABOVE = table.freeze({
 	trunk = true,
 }) :: { [string]: boolean }
 OverheadService.CANOPY = table.freeze({ branch = true, trunk = true }) :: { [string]: boolean }
+OverheadService.TOP = "top" -- the kind of a squirrel standing up high on no route (a vehicle's roof, a wall top)
 
 OverheadService.C = {
 	minHeight = 6, -- studs, feet over the ground: lower than this is the ground's perception (Actors/Perception)
@@ -102,8 +106,9 @@ export type Opts = {
 	combat: any?, -- Combat/CombatService (temperOf, isVigilante)
 	colliders: any?, -- World/Colliders (default infection.colliders)
 	groundAt: ((x: number, z: number) -> number)?, -- default world.ctx.groundAt
-	-- the held squirrel's validated motor (Movement/MovementService:motorOf): its route; nil when it has sent nothing
-	motorOf: ((id: number) -> { routeId: number? }?)?,
+	-- the held squirrel's validated motor (Movement/MovementService:motorOf): its route and whether it stands on
+	-- something; nil when it has sent nothing
+	motorOf: ((id: number) -> { routeId: number?, grounded: boolean? }?)?,
 	exclude: ((id: number) -> boolean)?, -- a squirrel another watch has (the alley's rafters)
 	setAttr: ((id: number, name: string, value: any) -> ())?, -- Say, SayAt, Gesture on a person's body
 	gaze: ((id: number, x: number?, y: number?, z: number?) -> ())?, -- the point a person's head turns to (nil: none)
@@ -217,22 +222,23 @@ local function held(self: any, id: number): boolean
 	return self.world.possessed[id] == true
 end
 
--- the route a squirrel is on (nil: none, or no word), and whether anything was known about it
-local function routeOf(self: any, a: any): (number?, boolean)
+-- the route a squirrel is on (nil: none, or no word), whether anything was known about it, and whether it stands on
+-- something (a held squirrel's motor: grounded)
+local function routeOf(self: any, a: any): (number?, boolean, boolean)
 	if held(self, a.id) then
 		local f = self.opts.motorOf
 		local m = if f then f(a.id) else nil
 		if m == nil then
-			return nil, false
+			return nil, false, false
 		end
 		local r = m.routeId
-		return if type(r) == "number" and r >= 0 then r else nil, true
+		return if type(r) == "number" and r >= 0 then r else nil, true, m.grounded == true
 	end
 	local intent = a.intent
 	if intent and intent.mode == "rail" then
-		return intent.routeId, true
+		return intent.routeId, true, false
 	end
-	return nil, true
+	return nil, true, false
 end
 
 local function kindOf(self: any, routeId: number?): string?
@@ -268,11 +274,15 @@ local function gather(self: any, t: number): { Overhead }
 		end
 		local feet = a.y - a.hip
 		local h = feet - self.groundAt(a.x, a.z)
-		local routeId, known = routeOf(self, a)
+		local routeId, known, grounded = routeOf(self, a)
 		local kind = kindOf(self, routeId)
+		if routeId == nil and grounded then
+			kind = OverheadService.TOP -- (standing up high on no route)
+		end
 		local s = self.sense[a.id]
 		local high = h >= C.minHeight
-		local onRoute = high and (if known then kind ~= nil and OverheadService.ABOVE[kind] == true else true)
+		local onRoute = high
+			and (if known then kind == OverheadService.TOP or (kind ~= nil and OverheadService.ABOVE[kind] == true) else true)
 		local inAir = not onRoute and high and routeId == nil and s ~= nil and t - s.lastOn <= C.airGrace
 		local isHeld = held(self, a.id)
 		local peak = if isHeld then Pace.take(self.pace, a.id) else nil

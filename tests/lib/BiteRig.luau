@@ -194,7 +194,8 @@ function BiteRig.new(opts: Options?): any
 			combat = rig.combat,
 			motorOf = function(id: number): any
 				local r = rig.route[id]
-				return if r == nil then nil else { routeId = if r == false then nil else r }
+				-- (false: standing on a part's top, no route in its packets)
+				return if r == nil then nil else { routeId = if r == false then nil else r, grounded = r == false }
 			end,
 			setAttr = function(id: number, name: string, value: any)
 				rig.setAttr(id, name, value)

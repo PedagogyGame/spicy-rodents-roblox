@@ -160,6 +160,7 @@ export type Service = typeof(setmetatable(
 		opts: Opts,
 		rods: { [number]: Rodent },
 		guards: { [number]: Guard },
+		lapsed: { [number]: boolean },
 		fleeing: { [number]: boolean },
 		stances: { [number]: string? },
 		flags: { [any]: boolean },
@@ -185,6 +186,7 @@ function CombatService.new(opts: Opts): Service
 		opts = opts,
 		rods = {},
 		guards = {},
+		lapsed = {}, -- people who let the rodent go out of reach (Combat/Duel: kept across their Guard's churn)
 		fleeing = {},
 		stances = {},
 		flags = {},
@@ -731,14 +733,21 @@ local function rally(
 	return attackers
 end
 
-local function order(self: Service, a: any, rod: any, out: any)
+local function order(self: Service, a: any, rod: any, out: any, hold: boolean?)
 	local brain = self.world.brains[a.id] :: any
 	if brain.kind == "Officer" then
-		-- an officer closes in and stands over it (Officer "respond" stops a couple of studs short)
+		-- an officer closes in and stands over it (Officer "respond" stops a couple of studs short); one out of reach
+		-- of it (up a wire, on a wall top) stands where they are, facing it (a point just in front of them)
+		local x, z = rod.x, rod.z
+		if hold then
+			local dx, dz = rod.x - a.x, rod.z - a.z
+			local d = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+			x, z = a.x + dx / d * 0.5, a.z + dz / d * 0.5
+		end
 		brain:onEvent({
 			type = "respond",
-			x = rod.x,
-			z = rod.z,
+			x = x,
+			z = z,
 			untilTime = (self.world.now or 0) + CombatService.ORDER_SECS,
 		})
 		return
@@ -866,6 +875,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			if g then
 				release(self, a.id)
 			end
+			self.lapsed[a.id] = nil
 			continue
 		end
 		-- the nearest rodent in play
@@ -884,6 +894,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			if g then
 				release(self, a.id)
 			end
+			self.lapsed[a.id] = nil
 			continue
 		end
 		local temper = self:temperOf(a.id)
@@ -898,6 +909,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 				CombatRules.nerve(P, a.id, temper),
 				if a.post == "police" then "baton" else "kick"
 			)
+			g.lapsed = self.lapsed[a.id] == true
 			self.guards[a.id] = g
 		end
 		local guard = g :: Guard
@@ -937,6 +949,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			sneaking = pace ~= nil and pace <= P.quietSpeed,
 		}
 		local out = Duel.think(P, guard, view, self.rand)
+		self.lapsed[a.id] = if guard.lapsed then true else nil
 		if guard.phase == "idle" then
 			release(self, a.id)
 			continue
@@ -944,7 +957,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		if hidden and out.move == "approach" then
 			out.move = "stand" -- (lost sight of it: nobody walks into a wall after it)
 		end
-		order(self, a, best, out)
+		order(self, a, best, out, math.abs(dy) > P.contactHeight)
 		setStance(self, a.id, out.stance)
 		local strike = out.strike
 		if strike then

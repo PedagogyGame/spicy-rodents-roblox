@@ -25,6 +25,10 @@
 -- (params.tellHeard, one roll a tell), cries out and turns on it as a scene does (Duel.rally) and is ALARMED for the rest
 -- of the duel: blows as near a fresh bite (more swings, surer hits, never the bite penalty) and the arm always up when
 -- squared up; so does one an unaware bite failed on. A person who saw it coming from further off is not alarmed.
+-- OUT OF REACH (review of the overhead watch, H1): a rodent higher or lower than params.contactHeight off the person's
+-- feet cannot be struck: nobody closes in on it or strikes at it (they stand and watch it), and after LETGO_SECS of that,
+-- or at once once it is higher than params.overheadY (up there it is the town's overhead watch's), they let it go
+-- (`lapsed`): they do not take it up again until it comes back within reach of them. The alarm ends with the duel.
 -- A feint is a tell with no pounce after it: read (readFeint) the person counters at once, a quicker wind-up with a
 -- longer reach and counterHit (the brief's "free hit"); not read, they react to it as to a real pounce, and a swing at
 -- nothing leaves them open.
@@ -35,7 +39,8 @@
 -- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, sight) -> boolean;
 --   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase;
 --   bitePhaseAt(g, now, rewind, tell?) -> CombatRules.BitePhase; batted(g, now) (a bite failed on them: back to ready
---   unless striking); rally(params, g, now, mode) (the scene turns on the rodent); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
+--   unless striking); rally(params, g, now, mode) (the scene turns on the rodent); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS;
+--   LETGO_SECS
 -- Pure; studs and seconds. No side effects on require.
 
 local CombatRules = require("./CombatRules")
@@ -65,6 +70,8 @@ export type Guard = {
 	rallyUntil: number, -- turned on the rodent (a bite, a group set on) until then: closes in, strikes on reaching it
 	provoked: boolean, -- it has struck at the rodent or been set on by it: a vigilante's stance shows from then on
 	alarmed: boolean, -- caught it sneaking up on them: on edge for the rest of the duel (blows as near a fresh bite)
+	reachAt: number, -- the last think the rodent was within reach height of them (params.contactHeight)
+	lapsed: boolean, -- they let it go out of reach: not taken up again until it is within reach height of them
 	shown: boolean, -- a vigilante shown however it is (Server/Combat/CombatService: the town 40 % bitten)
 	strikes: number,
 	hits: number,
@@ -118,6 +125,7 @@ Duel.FLEE_SECS = 6 -- a flight lasts this long (Brains/Pedestrian: alert 8 falli
 Duel.TRAIL_SECS = 0.5 -- how far back a bite may be judged (the link's round trip, duel.lagMax, is less)
 Duel.FLEE_CLEAR = 15 -- studs beyond engage: far enough, the flight ends
 Duel.STARTLED_SECS = 0.8 -- a calm or wary person who noticed the rodent this recently is caught unready
+Duel.LETGO_SECS = 4 -- out of reach height this long, they let the rodent go (it is the overhead watch's to stare at)
 
 function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: number, weapon: string?): Guard
 	local _ = params
@@ -142,6 +150,8 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 		rallyUntil = 0,
 		provoked = false,
 		alarmed = false,
+		reachAt = 0,
+		lapsed = false,
 		shown = false,
 		strikes = 0,
 		hits = 0,
@@ -151,8 +161,10 @@ end
 
 -- Does the person notice the rodent (the town's perception, so a stalk is a real play; combat review 19 Nov: "a person
 -- notices the rodent within 17 studs whatever way they face"):
---   * it is pointed out overhead (Stealth/OverheadWatch: they have spotted it on a wire or a branch above them);
---   * higher over their feet than params.overheadY the duel does not see it at all (the overhead watch does);
+--   * higher over their feet than params.overheadY the duel does not see it at all (the overhead watch does, and
+--     counts anything up there: Server/Stealth/OverheadService);
+--   * it is pointed out overhead (Stealth/OverheadWatch: they have spotted it on a wire or a branch above them) and has
+--     come down within params.overheadY: they meet it aware;
 --   * seen: in their view cone and within the spot range times their temperament's notice;
 --   * heard: moving faster than a creep (params.quietSpeed) within params.hear times their notice, whatever the facing;
 --   * felt: within params.brush of a rodent that is not pouncing.
@@ -162,11 +174,11 @@ end
 -- last chance: a person who has not noticed it may hear the pounce's wind-up within params.threat and turn at the last
 -- moment, params.tellHeard by temperament, caught unready.)
 function Duel.notices(params: Params, g: Guard, sight: Sight): boolean
-	if sight.spottedOverhead then
-		return true
-	end
 	if (sight.dy or 0) > params.overheadY then
 		return false
+	end
+	if sight.spottedOverhead then
+		return true
 	end
 	local notice = params.notice[g.temper]
 	if sight.inView and sight.dist <= params.spotRange * notice then
@@ -260,10 +272,28 @@ local function record(g: Guard, now: number)
 	end
 end
 
+-- the duel is over for them: back to the day (and the alarm with it)
+local function letGo(g: Guard)
+	g.aware = false
+	g.phase = "idle"
+	g.lastTell = nil
+	g.alarmed = false
+	g.rallyUntil = 0
+end
+
 local function think(params: Params, g: Guard, view: View, rand: () -> number): Out
 	local now = view.now
-	local boosted = view.boosted or g.alarmed
 	local out: Out = { move = "none", speed = 0, strike = nil, reacted = nil, read = false, stance = nil }
+	-- out of reach: higher or lower than a blow reaches (a wire, a branch, a wall top)
+	local dy = view.dy or 0
+	local outOfReach = math.abs(dy) > params.contactHeight
+	if not outOfReach then
+		g.reachAt = now
+		g.lapsed = false
+	elseif g.lapsed and not g.aware then
+		return out -- (let go up there: not taken up again until it comes within reach)
+	end
+	local boosted = view.boosted or g.alarmed
 	-- noticing, and letting go
 	-- (a vigilante takes the rodent on from as far as it sees it: "on sighting ... they move to kick it")
 	local far = if g.temper == "tough"
@@ -273,6 +303,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		if view.seen and (view.dist <= params.engage or g.temper == "tough") then
 			g.aware = true
 			g.awareAt = now
+			g.reachAt = now
 			ready(g)
 			-- first sight: a calm or wary person may run at once; a tough one squares up
 			local w = CombatRules.weights(params, g.temper, g.nerve, boosted, true)
@@ -310,9 +341,18 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		and not (g.phase == "startle" and g.running)
 	then
 		-- the rodent has gone: back to the day
-		g.aware = false
-		g.phase = "idle"
-		g.lastTell = nil
+		letGo(g)
+		return out
+	elseif
+		outOfReach
+		and (dy > params.overheadY or now - g.reachAt >= Duel.LETGO_SECS)
+		and g.phase ~= "windup"
+		and g.phase ~= "flee"
+		and not (g.phase == "startle" and g.running)
+	then
+		-- out of reach up there (or below) a while, or out of the duel's sight overhead: they let it go
+		letGo(g)
+		g.lapsed = true
 		return out
 	end
 
@@ -378,8 +418,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 			if g.temper == "tough" or view.dist <= params.engage then
 				ready(g) -- (the rodent is still at their heels: they turn and face it)
 			else
-				g.aware = false
-				g.phase = "idle"
+				letGo(g)
 				return out
 			end
 		end
@@ -388,7 +427,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 	-- unprompted: a person squared up strikes at a rodent coming into reach (by the reach the step-in will give),
 	-- and now and then at one that stays there
 	local reachNow = params.kickReach + params.stepIn[g.temper] * params.windup[g.temper]
-	local inReach = view.dist <= reachNow
+	local inReach = view.dist <= reachNow and not outOfReach
 	local charging = g.phase == "ready" and now < g.rallyUntil
 	if g.rallyUntil > 0 and now >= g.rallyUntil then
 		g.rallyUntil = 0
@@ -417,6 +456,9 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		out.move, out.speed = "approach", params.approach
 	else
 		out.move = "stand"
+	end
+	if outOfReach and out.move == "approach" then
+		out.move, out.speed = "stand", 0 -- (nobody walks in under it: it is out of reach)
 	end
 	out.stance = stanceOf(g)
 	return out

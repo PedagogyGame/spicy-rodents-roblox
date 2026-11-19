@@ -265,8 +265,13 @@ return function(t)
 
 	t.test("the duel: whoever pointed it out overhead meets it aware when it comes down", function()
 		local spotter: number? = nil
+		-- (someone the duel runs for: a townsperson or an officer, not a cyclist)
+		local function fights(id: number): boolean
+			local post = walk.world.actorsById[id].post
+			return post == "townsperson" or post == "police"
+		end
 		for id in walkSpotters do
-			if walk.overhead:spotted(id, walk.rodent) and walk.combat:temperOf(id) == "calm" then
+			if fights(id) and walk.overhead:spotted(id, walk.rodent) and walk.combat:temperOf(id) == "calm" then
 				spotter = id
 				break
 			end
@@ -274,8 +279,10 @@ return function(t)
 		if spotter == nil then
 			-- (point it out by hand: the duel reads the same call)
 			for id in walkSpotters do
-				spotter = id
-				break
+				if fights(id) then
+					spotter = id
+					break
+				end
 			end
 		end
 		t.truthy(spotter ~= nil, "someone spotted it")

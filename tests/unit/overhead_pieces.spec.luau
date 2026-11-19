@@ -51,7 +51,14 @@ return function(t)
 		t.truthy(n({ dist = 3, inView = false, speed = 0 }), "a brush is felt")
 		t.falsy(n({ dist = 3, inView = false, speed = 0, lunging = true }), "but not a lunge's last stride")
 		t.falsy(n({ dist = 5, dy = 25, inView = true, speed = 18 }), "overhead is not the duel's to see")
-		t.truthy(n({ dist = 5, dy = 25, inView = false, speed = 0, spottedOverhead = true }), "unless pointed out")
+		t.falsy(
+			n({ dist = 5, dy = 25, inView = false, speed = 0, spottedOverhead = true }),
+			"not even pointed out, while it is still up there (out of reach: the watch's)"
+		)
+		t.truthy(
+			n({ dist = 9, dy = 0, inView = false, speed = 0, spottedOverhead = true }),
+			"pointed out, it is met aware once it comes down"
+		)
 		local tough = Duel.new(P, 2, "tough", 1)
 		t.truthy(Duel.notices(P, tough, { dist = 26, inView = false, speed = 18 }), "a vigilante hears further")
 	end)
