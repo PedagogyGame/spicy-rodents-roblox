@@ -14,6 +14,7 @@
 --   BUDGET
 
 local Approach = require("./Approach")
+local SkyLiftCountry = require("../../../src/shared/Rides/SkyLiftCountry")
 local Common = require("./Common")
 local Kit = require("../alley/Kit")
 
@@ -69,7 +70,7 @@ function Signs.spots(): { Spot }
 		-- where the westside street ends and Lift Road begins: the pylon on the west verge, past the sidewalk
 		{ name = "Pylon", kind = "pylon", x = -757.5, z = -632 },
 		-- the shelter on Lift Road's east verge, past the sidewalk (x -700.6..-694.4)
-		{ name = "Shelter", kind = "shelter", x = -690.6, z = -712 },
+		{ name = "Shelter", kind = "shelter", x = SkyLiftCountry.SHELTER.x, z = SkyLiftCountry.SHELTER.z },
 	}
 	for i, l in Approach.roadLamps() do
 		table.insert(out, { name = `Banner{i}`, kind = "banner", x = l.x, z = l.z })

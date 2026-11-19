@@ -78,10 +78,10 @@ local function bikeRack(kit: any, root: any)
 end
 
 local function benches(kit: any, root: any)
-	for i, x0 in { 2, 36 } do
+	for i, bench in L.STREET_BENCHES do
 		local m = kit:model(root, `Bench{i}`)
-		local x1 = x0 + 6
-		local d0, d1 = -74, -72.6 -- the seat (its back toward the building)
+		local x0, x1 = bench[1], bench[2]
+		local d0, d1 = L.STREET_BENCH_D[1], L.STREET_BENCH_D[2] -- the seat (its back toward the building)
 		local _, hi = span(kit, x0, x1, d0, d1)
 		local seat = hi + 1.5
 		for _, x in { x0 + 0.5, x1 - 0.5 } do
