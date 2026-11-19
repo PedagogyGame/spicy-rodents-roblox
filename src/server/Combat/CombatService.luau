@@ -167,7 +167,7 @@ export type Service = typeof(setmetatable(
 		opts: Opts,
 		rods: { [number]: Rodent },
 		guards: { [number]: Guard },
-		lapsed: { [number]: boolean },
+		lapsed: { [number]: boolean? },
 		fleeing: { [number]: boolean },
 		stances: { [number]: string? },
 		flags: { [any]: boolean },

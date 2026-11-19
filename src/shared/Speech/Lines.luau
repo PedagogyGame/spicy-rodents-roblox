@@ -13,7 +13,9 @@
 -- D8), stakeout (the officer standing over the grate the rodent went down); overhead (a person in town who looks up
 -- and sees a squirrel stalking above them on a wire, fence, branch or roof edge: Stealth/OverheadWatch, owner playtest
 -- 2026-11-19), overheadUneasy (a creep lingering over them: they feel watched), overheadReply (the neighbour they told answers), overheadWary (keeping an eye on it: stepping back,
--- calling others over), overheadLost (it has gone from sight).
+-- calling others over), overheadLost (it has gone from sight). The one who points it out names the place only when it
+-- is so (review of the overhead watch, L5): overheadWire, overheadFence, overheadTree, overheadRoof by what it is on
+-- (Server/Stealth/OverheadService.SURFACE), the plain "overhead" lines anywhere else; no line says how it moves.
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
 -- Pure. No side effects on require.
@@ -106,14 +108,37 @@ Lines.GROUPS = table.freeze({
 	-- town people who look up and see a squirrel stalking overhead (Stealth/OverheadWatch; owner 2026-11-19: "awareness
 	-- and discussion and chatter, if i ... am prowling and stalking from above on a powerline or branch")
 	overhead = table.freeze({
-		"Look! Up on the wire!",
-		"Wait, is that a squirrel on the power line?",
-		"Something's creeping along the power line.",
+		"Look! Up there!",
+		"Wait, is that a squirrel up there?",
 		"Don't look now, but there's a squirrel above us.",
-		"Up there! On the fence!",
 		"That squirrel is following us...",
 		"Why is that squirrel staring at me?",
+		"Hey, is that the red one? Up there!",
+	}),
+	-- ... the same, on what it is on
+	overheadWire = table.freeze({
+		"Look! Up on the wire!",
+		"Wait, is that a squirrel on the power line?",
+		"There's a squirrel on the power line!",
+		"Hey, is that the red one? On the wire!",
+	}),
+	overheadFence = table.freeze({
+		"Up there! On the fence!",
+		"There's a squirrel on that fence!",
+		"Hey, is that the red one? On the fence!",
+		"Look, on top of the fence!",
+	}),
+	overheadTree = table.freeze({
 		"Hey, is that the red one? Up in the tree!",
+		"There's a squirrel in that tree!",
+		"Look! Up in the branches!",
+		"Something's up in that tree...",
+	}),
+	overheadRoof = table.freeze({
+		"Look! Up on the roof!",
+		"There's a squirrel on that roof!",
+		"Hey, is that the red one? On the roof!",
+		"Up there, on the edge of the roof!",
 	}),
 	-- a creep lingering over them: they feel watched before they see anything
 	overheadUneasy = table.freeze({
@@ -136,7 +161,7 @@ Lines.GROUPS = table.freeze({
 	overheadWary = table.freeze({
 		"Everybody, look up! Squirrel!",
 		"Watch out below!",
-		"Step back from the wire, folks.",
+		"Step back, folks. Give it room.",
 		"I'm keeping my eye on you, squirrel.",
 		"Come on down, I dare you.",
 		"Stay out from under it!",
@@ -165,6 +190,10 @@ Lines.SITUATIONS = table.freeze({
 	"drain",
 	"stakeout",
 	"overhead",
+	"overheadWire",
+	"overheadFence",
+	"overheadTree",
+	"overheadRoof",
 	"overheadUneasy",
 	"overheadReply",
 	"overheadWary",

@@ -18,13 +18,32 @@ local BiteRig = require("@tests/lib/BiteRig")
 local OverheadService = require("@server/Stealth/OverheadService")
 local SpeechRules = require("@shared/Speech/SpeechRules")
 local AreaPace = require("@shared/Speech/AreaPace")
+local Lines = require("@shared/Speech/Lines")
 
 local WIRE = 163 -- an east-side utility wire over the town's busiest crossing (x 41, z -41 to 41; 42 studs up)
 local SECS = 60
-local OVERHEAD =
-	{ overhead = true, overheadUneasy = true, overheadReply = true, overheadWary = true, overheadLost = true }
+local OVERHEAD = {
+	overhead = true,
+	overheadWire = true,
+	overheadFence = true,
+	overheadTree = true,
+	overheadRoof = true,
+	overheadUneasy = true,
+	overheadReply = true,
+	overheadWary = true,
+	overheadLost = true,
+}
+-- the openers (an answer follows one of these)
+local OPENERS = {
+	overhead = true,
+	overheadWire = true,
+	overheadFence = true,
+	overheadTree = true,
+	overheadRoof = true,
+	overheadWary = true,
+}
 
-type Log = { t: number, id: number, what: string, value: any }
+type Log = { t: number, id: number, what: string, value: any, x: number?, z: number? }
 
 -- the rodent held by a player on the wire at `speed` studs/s for `secs`: back and forth along it, or (`prowl`) as a
 -- stalking player does, along it to over the nearest townsperson within PROWL studs of it, lingering over them
@@ -99,11 +118,43 @@ local function rigWithLog(seed: number): (any, { Log })
 		gaze(id, x, y, z)
 	end
 	svc.opts.setAttr = function(id: number, name: string, value: any)
-		table.insert(log, { t = rig.time, id = id, what = name, value = value })
+		local a = rig.world.actorsById[id]
+		table.insert(log, { t = rig.time, id = id, what = name, value = value, x = a and a.x, z = a and a.z })
 		setAttr(id, name, value)
 	end
 	rig.step(20)
 	return rig, log
+end
+
+-- the most lines inside AreaPace's radius and window at any opener (a line that is not a forced answer), counting it:
+-- every line where and when it was said (Say entries of a Log with positions)
+local function worstArea(log: { Log }): (number, number)
+	local P = AreaPace.DEFAULTS
+	local lines: { Log } = {}
+	for _, e in log do
+		if e.what == "Say" and e.x and e.z then
+			table.insert(lines, e)
+		end
+	end
+	local worst = 0
+	for _, s in lines do
+		if table.find(Lines.GROUPS.overheadReply, s.value) then
+			continue -- (forced: it was made room for by its opener)
+		end
+		local before = 0
+		for _, o in lines do
+			if
+				o ~= s
+				and o.t <= s.t
+				and s.t - o.t < P.window
+				and ((o.x :: number) - (s.x :: number)) ^ 2 + ((o.z :: number) - (s.z :: number)) ^ 2 <= P.radius * P.radius
+			then
+				before += 1
+			end
+		end
+		worst = math.max(worst, before + 1)
+	end
+	return worst, #lines
 end
 
 local function count(t: { [any]: any }): number
@@ -245,15 +296,11 @@ return function(t)
 					end
 				end
 				t.truthy(near <= AreaPace.DEFAULTS.max + 1, `{near} lines round {s.id} within the window`)
+				-- (strictly, where each was said: an opener found room for itself, and its answer, under the cap)
 				if s.situation == "overheadReply" then
 					local opener = false
 					for _, o in said do
-						if
-							o.id ~= s.id
-							and (o.situation == "overhead" or o.situation == "overheadWary")
-							and s.t - o.t > 0
-							and s.t - o.t <= 3
-						then
+						if o.id ~= s.id and OPENERS[o.situation or ""] and s.t - o.t > 0 and s.t - o.t <= 3 then
 							opener = true
 						end
 					end
@@ -262,6 +309,17 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("the area cap, where each line was said: no opener over AreaPace's max in its radius and window", function()
+		-- (review L7: a cap of 30 passed the test above; this one counts every line where and when it was said)
+		local P = AreaPace.DEFAULTS
+		local worst, n = worstArea(walkLog)
+		t.truthy(n >= 4, `{n} lines`)
+		print(
+			`      the area cap on the street: at most {worst} lines within {P.radius} studs in {P.window} s by an opener`
+		)
+		t.truthy(worst <= P.max, `{worst} lines in one area's window (cap {P.max})`)
+	end)
 
 	t.test("the duel: whoever pointed it out overhead meets it aware when it comes down", function()
 		local spotter: number? = nil
@@ -373,7 +431,14 @@ return function(t)
 	end)
 
 	t.test("the cost: a tick with 60 people crowded round the rodent on the wire", function()
-		local rig = BiteRig.new({ seed = 5, overhead = true })
+		-- (everyone who may speak does: the caps alone hold the chatter back)
+		local rig = BiteRig.new({
+			seed = 5,
+			overhead = true,
+			overheadRand = function(): number
+				return 0
+			end,
+		})
 		rig.step(10)
 		local crowd = {}
 		for _, a in rig.world.actors do
@@ -384,6 +449,13 @@ return function(t)
 		t.truthy(#crowd >= 60, `{#crowd} people`)
 		-- every Gaze write (an attribute that replicates to every player), by person
 		local writes: { [number]: number } = {}
+		local log: { Log } = {}
+		local setAttr = rig.overhead.opts.setAttr
+		rig.overhead.opts.setAttr = function(id: number, name: string, value: any)
+			local a = rig.world.actorsById[id]
+			table.insert(log, { t = rig.time, id = id, what = name, value = value, x = a and a.x, z = a and a.z })
+			setAttr(id, name, value)
+		end
 		local inner = rig.overhead.opts.gaze
 		rig.overhead.opts.gaze = function(id: number, x: number?, y: number?, z: number?)
 			writes[id] = (writes[id] or 0) + 1
@@ -435,6 +507,11 @@ return function(t)
 		t.truthy(most / secs <= 2.1, `no one's head is rewritten more than twice a second ({most / secs})`)
 		t.truthy(total / secs <= 2.1 * math.max(1, gazers), "nor the crowd's")
 		t.truthy(total / secs <= 90, `the crowd's Gaze writes stay under 90 a second ({total / secs}; was 186)`)
+		-- the area cap in a crowd (review L7: a cap of 30 passed the old test): every line where it was said
+		local worst, n = worstArea(log)
+		print(`      the area cap in the crowd: {n} lines, at most {worst} within one area's window by an opener`)
+		t.truthy(n >= 3, "the crowd talks")
+		t.truthy(worst <= AreaPace.DEFAULTS.max, `{worst} lines in one area's window (cap {AreaPace.DEFAULTS.max})`)
 		local _ = OverheadService
 	end)
 end

@@ -13,6 +13,9 @@
 --   5. Nobody is sent under a squirrel into the road or into the building it is on: the spot they are sent to is open
 --      ground off the asphalt with a clear straight way there (M1); an officer's own order comes first (L6).
 --   6. A calm person told to hurry on while walking back to the lane hurries on once there (L3).
+--   7. The town's chatter is paced as one (L4): the lines of the bite-to-hospital sequence, the drains and the rafters
+--      count in the overhead watch's cap by place, every service shares the per-person cooldown and the town window,
+--      on one clock.
 local BiteRig = require("@tests/lib/BiteRig")
 local CombatRules = require("@shared/Combat/CombatRules")
 local Duel = require("@shared/Combat/Duel")
@@ -22,6 +25,8 @@ local OverheadService = require("@server/Stealth/OverheadService")
 local Pedestrian = require("@server/Actors/Brains/Pedestrian")
 local Officer = require("@server/Actors/Brains/Officer")
 local Common = require("@server/Actors/Brains/Common")
+local SpeechRules = require("@shared/Speech/SpeechRules")
+local AreaPace = require("@shared/Speech/AreaPace")
 
 local WIRE = 163 -- the spec's wire over the busiest crossing (overhead_service.spec)
 
@@ -235,86 +240,89 @@ return function(t)
 		end
 	)
 
-	t.test("nobody is sent under a squirrel into the road or into the building it is on (wire 163, the roofs)", function()
-		local rig = BiteRig.new({ seed = 3, overhead = true })
-		rig.step(4)
-		local world = rig.world
-		local svc = rig.overhead
-		local colliders, roads = rig.infection.colliders, rig.infection.roads
-		local function open(x: number, z: number): boolean
-			return Colliders.pointIn(colliders, x, z, world.ctx.groundAt(x, z) + 3, 1) == nil
-				and not MedicalRoute.onRoad(roads, x, z)
-		end
-		-- someone standing on open ground 8 to 30 studs from (x, z)
-		local function standBy(x: number, z: number): any
-			local a = rig.near(x, z, "police")
-			for r = 8, 30, 2 do
-				for k = 0, 15 do
-					local px, pz = x + math.cos(k * 0.39) * r, z + math.sin(k * 0.39) * r
-					if open(px, pz) then
-						rig.put(a.id, px, pz)
-						return a
+	t.test(
+		"nobody is sent under a squirrel into the road or into the building it is on (wire 163, the roofs)",
+		function()
+			local rig = BiteRig.new({ seed = 3, overhead = true })
+			rig.step(4)
+			local world = rig.world
+			local svc = rig.overhead
+			local colliders, roads = rig.infection.colliders, rig.infection.roads
+			local function open(x: number, z: number): boolean
+				return Colliders.pointIn(colliders, x, z, world.ctx.groundAt(x, z) + 3, 1) == nil
+					and not MedicalRoute.onRoad(roads, x, z)
+			end
+			-- someone standing on open ground 8 to 30 studs from (x, z)
+			local function standBy(x: number, z: number): any
+				local a = rig.near(x, z, "police")
+				for r = 8, 30, 2 do
+					for k = 0, 15 do
+						local px, pz = x + math.cos(k * 0.39) * r, z + math.sin(k * 0.39) * r
+						if open(px, pz) then
+							rig.put(a.id, px, pz)
+							return a
+						end
+					end
+				end
+				return nil
+			end
+			local function check(kind: string, x: number, y: number, z: number): (boolean, boolean)
+				local a = standBy(x, z)
+				if a == nil then
+					return false, true
+				end
+				local s: any = { id = rig.rodent, x = x, y = y, z = z, speed = 0, held = true, kind = kind }
+				local ok = true
+				for _, mode in { "approach", "back" } do
+					local sx, sz = OverheadService.spotFor(svc, a, s, mode)
+					if sx and sz then
+						ok = ok
+							and open(sx, sz)
+							and not Colliders.blocked(colliders, a.x, a.z, sx, sz, 1, world.ctx.groundAt(a.x, a.z) + 3)
+					end
+					if mode == "approach" and sx == nil then
+						return false, ok -- (nowhere to wait by it: nobody is sent)
+					end
+				end
+				return true, ok
+			end
+			local found, bad = 0, 0
+			local pts = world.routes.byId(WIRE).points
+			for i = 1, #pts, 5 do
+				local p = pts[i]
+				local had, ok = check("wire", p[1], p[2] + 0.8, p[3])
+				if had then
+					found += 1
+				end
+				if not ok then
+					bad += 1
+				end
+			end
+			local roofs, roofFound, roofBad = 0, 0, 0
+			for id = 1, world.routes.count do
+				local r = world.routes.byId(id)
+				if r and r.kind == "roof" and roofs < 12 then
+					roofs += 1
+					local p = r.points[math.max(1, #r.points // 2)]
+					local had, ok = check("roof", p[1], p[2] + 0.8, p[3])
+					if had then
+						roofFound += 1
+					end
+					if not ok then
+						roofBad += 1
 					end
 				end
 			end
-			return nil
+			print(
+				`      wire 163: a spot to wait at for {found} of its points (none in the road or a building: {bad} bad); roofs: {roofFound} of {roofs} ({roofBad} bad)`
+			)
+			t.eq(bad, 0, "no spot by the wire is in the road, in a building or across either")
+			t.eq(roofBad, 0, "nor by a roof")
+			t.truthy(found >= 5, "there is somewhere to wait by the wire")
+			-- (a squirrel in the middle of a roof is out of sight from the ground, OverheadService's edgeSlack: nobody waits)
+			t.truthy(roofFound >= 1, "and by a roof whose squirrel shows from below")
 		end
-		local function check(kind: string, x: number, y: number, z: number): (boolean, boolean)
-			local a = standBy(x, z)
-			if a == nil then
-				return false, true
-			end
-			local s: any = { id = rig.rodent, x = x, y = y, z = z, speed = 0, held = true, kind = kind }
-			local ok = true
-			for _, mode in { "approach", "back" } do
-				local sx, sz = OverheadService.spotFor(svc, a, s, mode)
-				if sx and sz then
-					ok = ok
-						and open(sx, sz)
-						and not Colliders.blocked(colliders, a.x, a.z, sx, sz, 1, world.ctx.groundAt(a.x, a.z) + 3)
-				end
-				if mode == "approach" and sx == nil then
-					return false, ok -- (nowhere to wait by it: nobody is sent)
-				end
-			end
-			return true, ok
-		end
-		local found, bad = 0, 0
-		local pts = world.routes.byId(WIRE).points
-		for i = 1, #pts, 5 do
-			local p = pts[i]
-			local had, ok = check("wire", p[1], p[2] + 0.8, p[3])
-			if had then
-				found += 1
-			end
-			if not ok then
-				bad += 1
-			end
-		end
-		local roofs, roofFound, roofBad = 0, 0, 0
-		for id = 1, world.routes.count do
-			local r = world.routes.byId(id)
-			if r and r.kind == "roof" and roofs < 12 then
-				roofs += 1
-				local p = r.points[math.max(1, #r.points // 2)]
-				local had, ok = check("roof", p[1], p[2] + 0.8, p[3])
-				if had then
-					roofFound += 1
-				end
-				if not ok then
-					roofBad += 1
-				end
-			end
-		end
-		print(
-			`      wire 163: a spot to wait at for {found} of its points (none in the road or a building: {bad} bad); roofs: {roofFound} of {roofs} ({roofBad} bad)`
-		)
-		t.eq(bad, 0, "no spot by the wire is in the road, in a building or across either")
-		t.eq(roofBad, 0, "nor by a roof")
-		t.truthy(found >= 5, "there is somewhere to wait by the wire")
-		-- (a squirrel in the middle of a roof is out of sight from the ground, OverheadService's edgeSlack: nobody waits)
-		t.truthy(roofFound >= 1, "and by a roof whose squirrel shows from below")
-	end)
+	)
 
 	t.test("an officer's own order comes first: the overhead watch does not take over a chase or a stakeout", function()
 		local rig = BiteRig.new({ seed = 3, overhead = true })
@@ -357,9 +365,11 @@ return function(t)
 			groundAt = function(): number
 				return 0
 			end,
-			threats = { query = function(): number
-				return 0
-			end },
+			threats = {
+				query = function(): number
+					return 0
+				end,
+			},
 			actorsById = {},
 			queryBuffer = {},
 		}
@@ -375,4 +385,82 @@ return function(t)
 		t.truthy((brain.goal - u) * (u - away) > 0, `on along the lane away from it (goal {brain.goal}, at {u})`)
 		t.truthy(math.abs(brain.goal - u) > 20, "a good way on")
 	end)
+
+	t.test("the town's chatter is paced as one: one cooldown, one window, one cap by place, one clock", function()
+		local clock = 100
+		local town = SpeechRules.new(nil, {
+			area = AreaPace.DEFAULTS,
+			clock = function(): number
+				return clock
+			end,
+		})
+		local yes = function(): number
+			return 0
+		end
+		-- the sequence (its own clock says 7: the town's says 100) says three lines at a scene, never held back by place
+		for id = 1, 3 do
+			t.truthy(
+				SpeechRules.request(town, 7, id, "witness", yes, { x = 0, z = 0, unpaced = true, force = true }),
+				"a scene's line"
+			)
+		end
+		t.eq(town.lastByActor[1], 100, "timed on the town's clock")
+		t.falsy(SpeechRules.request(town, 100, 9, "overhead", yes, { x = 300, z = 0 }), "the town window is full")
+		-- (past the town window, inside the area's) the overhead watch, by the scene: no room there; another street has
+		clock = 106
+		t.falsy(SpeechRules.request(town, 106, 10, "overhead", yes, { x = 10, z = 5 }), "the scene's lines count")
+		t.truthy(SpeechRules.request(town, 106, 11, "overhead", yes, { x = 300, z = 0 }), "another street is its own")
+		-- the same person, from another service, inside the cooldown: refused
+		clock = 112
+		t.falsy(
+			SpeechRules.request(town, 112, 11, "rafters", yes, { x = 900, z = 900, unpaced = true }),
+			"one cooldown"
+		)
+		-- an opener needs room for its answer; the answer counts
+		clock = 200
+		t.truthy(SpeechRules.request(town, 200, 20, "overheadWary", yes, { x = 0, z = 0, need = 2 }))
+		t.truthy(SpeechRules.request(town, 200, 21, "overheadReply", yes, { x = 2, z = 0, force = true }))
+		t.eq(AreaPace.count(town.area :: any, 200, 0, 0), 2, "the forced answer is counted")
+		t.falsy(SpeechRules.request(town, 200, 22, "overhead", yes, { x = 0, z = 3, need = 2 }), "no room for two more")
+	end)
+
+	t.test(
+		"the overhead watch's lines keep the town's cap by place: 3 within 40 studs in 10 s, whoever says them",
+		function()
+			local rig = BiteRig.new({
+				seed = 6,
+				overhead = true,
+				overheadRand = function(): number
+					return 0 -- (everyone who may speak does)
+				end,
+			})
+			rig.step(1)
+			local svc = rig.overhead
+			local people = {}
+			local skip = {}
+			for i = 1, 6 do
+				local a = rig.near(0, 0, nil, skip)
+				skip[a.id] = true
+				people[i] = a
+			end
+			local function at(i: number, x: number, z: number)
+				local a = people[i]
+				a.x, a.z = x, z
+			end
+			-- five people at one corner, one every two seconds (inside the town window's 3 in 5 s each time)
+			local said = 0
+			for i = 1, 5 do
+				at(i, i * 3, 0)
+				if OverheadService.say(svc, people[i].id, "overheadLost") then
+					said += 1
+				end
+				at(i, 5000, 5000) -- (out of the way: the cap is where a line was said)
+				rig.step(2)
+			end
+			t.eq(said, AreaPace.DEFAULTS.max, `{said} lines at one corner within its window`)
+			-- another corner meanwhile
+			at(6, 400, 0)
+			t.truthy(OverheadService.say(svc, people[6].id, "overheadLost"), "another corner is its own")
+		end
+	)
 end

@@ -97,6 +97,8 @@ local HollowService = require("../Foraging/HollowService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
 local OverheadService = require("../Stealth/OverheadService")
+local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../../shared/Speech/SpeechRules"))
+local AreaPace = Import.shared("Speech/AreaPace") :: typeof(require("../../shared/Speech/AreaPace"))
 local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
@@ -582,12 +584,22 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- the town's one speech pacing (Speech/SpeechRules: the per-person cooldown, the town window and the cap by place,
+	-- on the town's clock), shared by every service that makes people talk: the sequence, the drains (through
+	-- infection.speech), the alley's rafters and the overhead watch
+	local townSpeech = SpeechRules.new(nil, {
+		area = AreaPace.DEFAULTS,
+		clock = function(): number
+			return world.now
+		end,
+	})
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
 	local infectionFault: (where: string, err: any) -> ()
 	local okI, errI = pcall(function()
 		infection = InfectionService.new({
 			world = world,
+			speech = townSpeech,
 			traffic = traffic,
 			data = data,
 			controllerOf = controllerOfTown,
@@ -1816,7 +1828,13 @@ function Game.start(opts: Opts?): any
 	-- 6b. the people under the alley's rafters spot a squirrel that does not creep (Attractions/RafterService:
 	-- addendum D9), and a guard's kick does not reach into the roof vent
 	local okR, errR = pcall(function()
-		rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire, attractions = attractions })
+		rafters = RafterService.start({
+			possession = possession,
+			runtime = rt,
+			fire = fire,
+			attractions = attractions,
+			speech = townSpeech,
+		})
 	end)
 	if not okR then
 		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
@@ -1828,6 +1846,7 @@ function Game.start(opts: Opts?): any
 	local okO, errO = pcall(function()
 		overhead = OverheadService.new({
 			world = world,
+			speech = townSpeech,
 			infection = infection,
 			combat = combat,
 			groundAt = Height.at,

@@ -315,7 +315,16 @@ function SewerService._say(self: Service, id: number, situation: string, force: 
 	if self.controllerOf(id) ~= "ai" then
 		return false
 	end
-	local line = SpeechRules.request(self.speech, self.clock(), id, situation, self.rand, { force = force })
+	-- (counted where it is said, in the town's area cap; never held back by it)
+	local a = self.world.actorsById[id]
+	local line = SpeechRules.request(
+		self.speech,
+		self.clock(),
+		id,
+		situation,
+		self.rand,
+		{ force = force, x = if a then a.x else nil, z = if a then a.z else nil, unpaced = true }
+	)
 	if line == nil then
 		return false
 	end

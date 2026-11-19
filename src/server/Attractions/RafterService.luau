@@ -100,7 +100,9 @@ export type Opts = {
 	place: Place?,
 	now: () -> number, -- server time (SayAt, the glow's end)
 	canSee: ((eye: Vector3, aim: Vector3) -> boolean)?, -- default: a ray in the workspace
-	speech: any?, -- a Speech/SpeechRules.State on the same clock as `now` (default: its own)
+	-- a Speech/SpeechRules.State on the same clock as `now`, or with its own clock: the town's one (Boot/Game: shared
+	-- with the bite-to-hospital sequence, the drains and the overhead watch); default its own
+	speech: any?,
 	rand: (() -> number)?,
 }
 
@@ -368,9 +370,19 @@ function RafterService._spotted(self: any, body: Body, e: Event, tick: TickView)
 		if spoken >= C.speakers then
 			break
 		end
-		local line = SpeechRules.request(self.speech, now, c.id, situation, self.rand)
+		-- (the town's person: their cooldown is one across the town's speech; counted where it is said, in the town's
+		-- area cap, never held back by it)
+		local model = people[c.id].model
+		local root = rootOf(model)
+		local line = SpeechRules.request(
+			self.speech,
+			now,
+			(people[c.id] :: any).townId or c.id,
+			situation,
+			self.rand,
+			{ x = if root then root.Position.X else nil, z = if root then root.Position.Z else nil, unpaced = true }
+		)
 		if line then
-			local model = people[c.id].model
 			setAttr(model, SpeechRules.ATTR.Say, line)
 			setAttr(model, SpeechRules.ATTR.SayAt, now)
 			spoken += 1
@@ -590,6 +602,7 @@ function RafterService.start(game: { [string]: any }): any
 		end,
 		canSee = canSee,
 		rand = game.rand,
+		speech = game.speech, -- the town's one (Boot/Game)
 	})
 end
 

@@ -3,7 +3,8 @@
 -- A cap on chatter by place, on top of Speech/SpeechRules' per-person cooldown and town-wide window: at most
 -- `max` lines inside `radius` studs of each other in any `window` seconds, so one street corner is not a wall of
 -- bubbles while the rest of town is quiet. A line that opens an exchange asks for room for its answer too (`need`).
--- Used by the overhead watch (Server/Stealth/OverheadService).
+-- Speech/SpeechRules keeps the town's one (a State built with `area`): every line said with a place counts, whoever
+-- says it; the overhead watch's lines (Server/Stealth/OverheadService) are held back by it.
 -- Interface: new(params?) -> State; allow(state, now, x, z, need?) -> boolean; note(state, now, x, z);
 --   count(state, now, x, z) -> number; DEFAULTS
 -- Pure: time is injected. No side effects on require.

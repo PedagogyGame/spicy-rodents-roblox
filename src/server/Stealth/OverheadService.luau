@@ -37,18 +37,21 @@
 --       lost    "where'd it go?" ("overheadLost"); away: the head turns back.
 --     Nobody starts a fight here: the duel (Combat/CombatService) does that when the rodent comes down, and a person who
 --     spotted it overhead meets it aware (`spotted`, CombatService opts.overhead).
---   * the chatter caps: one line a person every speech.actorCooldownS (12 s) and the town-wide window (3 lines in 5 s)
---     of its own Speech/SpeechRules state, and Speech/AreaPace: at most C.areaMax lines inside C.areaRadius studs in
---     any C.areaWindow seconds (an opener needs room for its answer too; the answer is forced so an exchange is never cut
---     in half). No line twice running (SpeechRules: not one of the last three said).
+--   * the chatter caps, the town's own (opts.speech: one Speech/SpeechRules state shared with the bite-to-hospital
+--     sequence, the drains and the rafters, Boot/Game): one line a person every speech.actorCooldownS (12 s), the
+--     town-wide window (3 lines in 5 s), and the town's one Speech/AreaPace: at most 3 lines inside 40 studs in any 10 s,
+--     whoever says them (an opener, the spot's and the wary's, needs room for its answer too; the answer is forced so an
+--     exchange is never cut in half, and counts). No line twice running (SpeechRules: not one of the last three said).
 --   * the rodent's own player sees an eye (Client/UI/SneakMeter, the rafters' meter): `cue(rodentId, meter, seen)`, the
 --     highest meter of anyone watching it and whether anyone has spotted it; (nil, nil) once it is not overhead.
 -- Costs: no work at all on a tick with no squirrel overhead (the people's grid is not even built); with one, the grid of
 -- the town's people (one set per person) and a few people near it rated, a building check each. stats().lastMs, peakMs
 -- and busyMs say what the ticks took (tests/unit/overhead_service.spec.luau holds them under a budget with 60+ people).
--- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; TOP; new(opts) -> Service; :step(dt); :spotted(personId, squirrelId) ->
---   boolean; :stageOf(personId) -> string; spotFor(self, person, squirrel, mode) -> (x, z)?; :spotUnder(personId,
---   squirrelId) -> (x, z)?; walkTo(self, id, x, z, faceX, faceZ, secs, speed) -> boolean (the one way it sends anyone); :overhead() -> { [id]: Overhead } (last tick's); :stats(); :stop()
+-- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; TOP; SURFACE; new(opts) -> Service; :step(dt);
+--   :spotted(personId, squirrelId) -> boolean; :stageOf(personId) -> string; :overhead() -> { [id]: Overhead } (last
+--   tick's); :stats(); :stop(); spotFor(self, person, squirrel, mode) -> (x, z)?; :spotUnder(personId, squirrelId) ->
+--   (x, z)?; say(self, id, situation, force?, need?) -> boolean (a line under the town's caps); walkTo(self, id, x, z,
+--   faceX, faceZ, secs, speed) -> boolean (the one way it sends anyone)
 -- Ids are TownAI actor ids. Positions in studs. No side effects on require.
 
 local Import = require("../Import")
@@ -79,6 +82,14 @@ OverheadService.ABOVE = table.freeze({
 }) :: { [string]: boolean }
 OverheadService.CANOPY = table.freeze({ branch = true, trunk = true }) :: { [string]: boolean }
 OverheadService.TOP = "top" -- the kind of a squirrel standing up high on no route (a vehicle's roof, a wall top)
+-- the line group of the one who points it out, by what it is on (Speech/Lines; anything else: the plain "overhead")
+OverheadService.SURFACE = table.freeze({
+	wire = "overheadWire",
+	fence = "overheadFence",
+	branch = "overheadTree",
+	trunk = "overheadTree",
+	roof = "overheadRoof",
+}) :: { [string]: string }
 
 OverheadService.C = {
 	minHeight = 6, -- studs, feet over the ground: lower than this is the ground's perception (Actors/Perception)
@@ -129,7 +140,9 @@ export type Opts = {
 	cue: ((id: number, meter: number?, seen: boolean?) -> ())?, -- the rodent's own eye (held rodents only)
 	serverTime: (() -> number)?, -- SayAt's clock (workspace:GetServerTimeNow)
 	rand: (() -> number)?,
-	speech: any?, -- a Speech/SpeechRules.State on the town's clock (default its own)
+	-- the town's Speech/SpeechRules.State (one for every service that makes people talk, built with its area cap and
+	-- clock); default its own. One with no area cap is given one (C.areaRadius, C.areaWindow, C.areaMax)
+	speech: any?,
 }
 
 -- A squirrel overhead this tick (Stealth/OverheadWatch's Squirrel, written out: types do not cross Import, and the
@@ -189,7 +202,6 @@ function OverheadService.new(opts: Opts): any
 		groundAt = opts.groundAt or world.ctx.groundAt,
 		rand = opts.rand or math.random,
 		speech = opts.speech or SpeechRules.new(),
-		area = AreaPace.new({ radius = C.areaRadius, window = C.areaWindow, max = C.areaMax }),
 		watch = OverheadWatch.new(),
 		pace = Pace.new(),
 		sense = {} :: { [number]: Sense },
@@ -223,6 +235,9 @@ function OverheadService.new(opts: Opts): any
 			busyMs = 0,
 		} :: Stats,
 	}, OverheadService)
+	if self.speech.area == nil then
+		self.speech.area = AreaPace.new({ radius = C.areaRadius, window = C.areaWindow, max = C.areaMax })
+	end
 	return self
 end
 
@@ -301,7 +316,11 @@ local function gather(self: any, t: number): { Overhead }
 		local s = self.sense[a.id]
 		local high = h >= C.minHeight
 		local onRoute = high
-			and (if known then kind == OverheadService.TOP or (kind ~= nil and OverheadService.ABOVE[kind] == true) else true)
+			and (
+				if known
+					then kind == OverheadService.TOP or (kind ~= nil and OverheadService.ABOVE[kind] == true)
+					else true
+			)
 		local inAir = not onRoute and high and routeId == nil and s ~= nil and t - s.lastOn <= C.airGrace
 		local isHeld = held(self, a.id)
 		local peak = if isHeld then Pace.take(self.pace, a.id) else nil
@@ -405,23 +424,19 @@ local function clear(self: any, a: any, s: Overhead): boolean
 	return not Colliders.blocked(c, a.x, a.z, a.x + dx * k, a.z + dz * k, C.sightPad, ey)
 end
 
--- a line from this person, under the caps; true when said
-local function say(self: any, id: number, situation: string, force: boolean?, need: number?): boolean
+-- OverheadService.say(self, id, situation, force?, need?): a line from this person, under the town's caps; true when said
+function OverheadService.say(self: any, id: number, situation: string, force: boolean?, need: number?): boolean
 	local a = self.world.actorsById[id]
 	if a == nil then
 		return false
 	end
 	local t = now(self)
-	if not force and not AreaPace.allow(self.area, t, a.x, a.z, need) then
-		self._stats.refused += 1
-		return false
-	end
-	local line = SpeechRules.request(self.speech, t, id, situation, self.rand, { force = force })
+	local line =
+		SpeechRules.request(self.speech, t, id, situation, self.rand, { force = force, x = a.x, z = a.z, need = need })
 	if line == nil then
 		self._stats.refused += 1
 		return false
 	end
-	AreaPace.note(self.area, t, a.x, a.z)
 	setAttr(self, id, SpeechRules.ATTR.Say, line)
 	local st = self.opts.serverTime
 	setAttr(self, id, SpeechRules.ATTR.SayAt, if st then st() else t)
@@ -643,7 +658,7 @@ end
 
 -- a creep that made them glance or look up: a murmur ("Did you hear something?"), under the caps
 local function uneasy(self: any, id: number, s: Overhead)
-	if s.speed <= OverheadWatch.C.stalkSpeed and say(self, id, "overheadUneasy") then
+	if s.speed <= OverheadWatch.C.stalkSpeed and OverheadService.say(self, id, "overheadUneasy") then
 		self._stats.uneasy += 1
 	end
 end
@@ -675,8 +690,9 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 		gaze(self, id, s)
 		point(self, id)
 		order(self, id, "stand", s, C.pointSecs)
-		-- the two-person exchange: room for the answer too
-		if say(self, id, "overhead", false, 2) then
+		-- the two-person exchange: room for the answer too; the line names what it is on, when that is known
+		local group = (s.kind and OverheadService.SURFACE[s.kind]) or "overhead"
+		if OverheadService.say(self, id, group, false, 2) then
 			local other = neighbour(self, id)
 			if other and OverheadWatch.tell(self.watch, now(self), id, other, s.id) then
 				st.exchanges += 1
@@ -686,7 +702,7 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 		end
 	elseif kind == "reply" then
 		st.replies += 1
-		say(self, id, "overheadReply", true)
+		OverheadService.say(self, id, "overheadReply", true)
 	elseif kind == "wary" then
 		st.wary += 1
 		if s == nil then
@@ -703,11 +719,12 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 			if x and z then
 				OverheadService.walkTo(self, id, x, z, s.x, s.z, C.waitSecs, C.closeSpeed)
 			end
-			say(self, id, "overheadWary")
+			OverheadService.say(self, id, "overheadWary")
 		elseif temper == "wary" then
 			-- keeps watching, and calls the others over
 			order(self, id, "stand", s, C.watchSecs)
-			if say(self, id, "overheadWary") then
+			-- (room for the answer too: the neighbour told answers, forced)
+			if OverheadService.say(self, id, "overheadWary", false, 2) then
 				local other = neighbour(self, id)
 				if other and OverheadWatch.tell(self.watch, now(self), id, other, s.id) then
 					st.exchanges += 1
@@ -729,7 +746,7 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 	elseif kind == "lost" then
 		st.lost += 1
 		gaze(self, id, nil)
-		say(self, id, "overheadLost")
+		OverheadService.say(self, id, "overheadLost")
 	elseif kind == "away" then
 		gaze(self, id, nil)
 	end

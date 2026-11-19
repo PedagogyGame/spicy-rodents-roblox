@@ -29,12 +29,48 @@ return function(t)
 		t.eq(AreaPace.count(a, 12.5, 0, 0), 0)
 	end)
 
-	t.test("the overhead line groups: 6 to 10 lines each", function()
-		for _, g in { "overhead", "overheadUneasy", "overheadReply", "overheadWary", "overheadLost" } do
-			local n = #Lines.of(g)
-			t.truthy(n >= 6 and n <= 10, `{g}: {n} lines`)
+	t.test(
+		"the overhead line groups: 6 to 10 lines each (4 for a place); a line names a place only in its group",
+		function()
+			for _, g in { "overhead", "overheadUneasy", "overheadReply", "overheadWary", "overheadLost" } do
+				local n = #Lines.of(g)
+				t.truthy(n >= 6 and n <= 10, `{g}: {n} lines`)
+			end
+			-- (review L5: "Up in the tree!" about a squirrel on a wire; "creeping" about one walking)
+			local places = {
+				overheadWire = { "wire", "power line" },
+				overheadFence = { "fence" },
+				overheadTree = { "tree", "branch" },
+				overheadRoof = { "roof" },
+			}
+			for g, words in places do
+				t.truthy(#Lines.of(g) >= 4, `{g}: {#Lines.of(g)} lines`)
+				for _, line in Lines.of(g) do
+					local named = false
+					for _, w in words do
+						named = named or string.find(string.lower(line), w, 1, true) ~= nil
+					end
+					t.truthy(named, `"{line}" names its place ({g})`)
+				end
+			end
+			for _, g in { "overhead", "overheadUneasy", "overheadReply", "overheadWary", "overheadLost" } do
+				for _, line in Lines.of(g) do
+					local l = string.lower(line)
+					for _, w in { "wire", "power line", "fence", "tree", "branch", "roof", "creep" } do
+						-- (whole words: "street" is no tree)
+						t.falsy(
+							string.find(l, "%f[%a]" .. w, 1),
+							`"{line}" ({g}) says nothing of where it is or how it moves`
+						)
+					end
+				end
+			end
+			local OverheadService = require("@server/Stealth/OverheadService")
+			for kind, g in OverheadService.SURFACE do
+				t.truthy(places[g] ~= nil, `{kind} -> {g}`)
+			end
 		end
-	end)
+	)
 
 	t.test("Duel.notices: the town's perception (view cone, a noise faster than a creep, a brush, overhead)", function()
 		local P = CombatRules.params()

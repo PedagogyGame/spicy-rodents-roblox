@@ -13,13 +13,15 @@
 -- Interface: new(opts?) -> Rig; Rig.step(secs, each?); Rig.runUntil(limit, done, each?) -> boolean;
 --   Rig.hold(id); Rig.let(id); Rig.put(id, x, z, yaw?); Rig.near(x, z, post?, skip?) -> actor; Rig.calmNear(x, z, skip?) -> actor; Rig.responders() -> { vehicle };
 --   Rig.saidBy(situation) -> { said }; Rig.dice(list) (the sequence's next dice); Rig.lunge(victimId, from?) ->
---   boolean (a player's pounce through the duel); Rig.now(); fields world, traffic, infection, combat (Combat/
---   CombatService, unless opts.duel is false), health, blows, duelNews, motor, attrs, medLog, toasts, said, time
+--   boolean (a player's pounce through the duel); Rig.now(); fields world, traffic, speech (the town's one
+--   Speech/SpeechRules state), infection, combat (Combat/CombatService, unless opts.duel is false), health, blows, duelNews, motor, attrs, medLog, toasts, said, time
 -- Studs throughout.
 local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")
 local InfectionRules = require("@shared/Infection/InfectionRules")
 local Lines = require("@shared/Speech/Lines")
+local SpeechRules = require("@shared/Speech/SpeechRules")
+local AreaPace = require("@shared/Speech/AreaPace")
 local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
 local TrafficService = require("@server/Traffic/TrafficService")
@@ -91,8 +93,16 @@ function BiteRig.new(opts: Options?): any
 			rig.rodent = a.id
 		end
 	end
+	-- the town's one speech pacing, as Boot/Game builds it (the sequence and the overhead watch share it)
+	rig.speech = SpeechRules.new(nil, {
+		area = AreaPace.DEFAULTS,
+		clock = function(): number
+			return world.now
+		end,
+	})
 	rig.infection = InfectionService.new({
 		world = world,
+		speech = rig.speech,
 		traffic = traffic,
 		data = data,
 		params = params,
@@ -190,6 +200,7 @@ function BiteRig.new(opts: Options?): any
 		local orng = Rng.new((o.seed or 1) + 202)
 		rig.overhead = OverheadService.new({
 			world = world,
+			speech = rig.speech,
 			infection = rig.infection,
 			combat = rig.combat,
 			motorOf = function(id: number): any

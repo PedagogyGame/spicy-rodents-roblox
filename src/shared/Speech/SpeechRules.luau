@@ -13,14 +13,23 @@
 --     up on one sighting in sixteen, and a short look at the game could pass without it.
 -- `force` (the bitten victim, the crew at the patient) skips the chance and the town window, never
 -- the one-line-per-actor-per-second floor, and still counts toward the window.
+-- ONE TOWN (review of the overhead watch, L4): every service that makes people talk (the bite-to-hospital sequence, the
+-- storm drains, the alley's rafters, the overhead watch) shares one State (Boot/Game builds it), so the per-person
+-- cooldown and the town window hold across them. Built with `area` it also keeps one Speech/AreaPace for the town: a
+-- line that says where it is said (opts.x, opts.z) counts toward the area's cap, and unless `unpaced` (the scenes that
+-- were never paced by place: the sequence, the drains, the rafters) or forced it is refused when the area has no room
+-- for it (opts.need lines: an opener asks room for its answer). Built with `clock`, every request is timed on it, not
+-- on the caller's `now` (the services keep different clocks).
 -- The server replicates a line as two attributes on the body, Say then SayAt (server time); the
 -- client (Client/UI/SpeechBubbles) reads Say when SayAt changes and shows it for `remaining` seconds.
 -- Interface: ATTR { Say, SayAt }; CHANCE; OWNER_SHARE; defaults() -> Params (from Config/Tunables);
---   new(params?) -> State; request(state, now, actorId, situation, rand, opts?) -> string?;
+--   new(params?, town?) -> State (town: { area: AreaPace.Params?, clock: (() -> number)? });
+--   request(state, now, actorId, situation, rand, opts?) -> string?;
 --   remaining(now, sayAt, showSecs) -> seconds (0 = do not show); stats(state)
 -- Pure: time and the random source are injected. No side effects on require.
 
 local Lines = require("./Lines")
+local AreaPace = require("./AreaPace")
 local Tunables = require("../Config/Tunables")
 
 export type Params = {
@@ -39,9 +48,15 @@ export type State = {
 	recent: { string }, -- the last lines town-wide (newest last)
 	spoken: number,
 	refused: number,
+	area: AreaPace.State?, -- the town's one cap by place (new's town.area)
+	clock: (() -> number)?, -- the town's one speech clock (new's town.clock)
 }
 
-export type Opts = { force: boolean? }
+-- force: see above; x, z: where it is said (the area cap); need: lines the area must have room for (default 1);
+-- unpaced: counted in the area, never held back by it
+export type Opts = { force: boolean?, x: number?, z: number?, need: number?, unpaced: boolean? }
+
+export type Town = { area: AreaPace.Params?, clock: (() -> number)? }
 
 local SpeechRules = {}
 
@@ -64,6 +79,10 @@ SpeechRules.CHANCE = table.freeze({
 	-- the overhead watch (Stealth/OverheadWatch): the one who points it out speaks most times, the neighbour they
 	-- told answers (a forced line, so the exchange is not cut in half), the wary and the lost now and then
 	overhead = 0.85,
+	overheadWire = 0.85,
+	overheadFence = 0.85,
+	overheadTree = 0.85,
+	overheadRoof = 0.85,
 	overheadUneasy = 0.8,
 	overheadReply = 1,
 	overheadWary = 0.6,
@@ -86,7 +105,7 @@ function SpeechRules.defaults(): Params
 	}
 end
 
-function SpeechRules.new(params: Params?): State
+function SpeechRules.new(params: Params?, town: Town?): State
 	return {
 		params = params or SpeechRules.defaults(),
 		lastByActor = {},
@@ -94,6 +113,8 @@ function SpeechRules.new(params: Params?): State
 		recent = {},
 		spoken = 0,
 		refused = 0,
+		area = if town and town.area then AreaPace.new(table.clone(town.area)) else nil,
+		clock = if town then town.clock else nil,
 	}
 end
 
@@ -118,6 +139,9 @@ function SpeechRules.request(
 	end
 	local p = state.params
 	local force = opts ~= nil and opts.force == true
+	if state.clock then
+		now = state.clock()
+	end
 	local last = state.lastByActor[actorId]
 	if last ~= nil and now - last < (if force then p.forceGap else p.actorCooldown) then
 		return refuse(state)
@@ -129,6 +153,11 @@ function SpeechRules.request(
 	end
 	if not force then
 		if #window >= p.townBurst then
+			return refuse(state)
+		end
+		local area = state.area
+		local o = opts :: Opts
+		if area and o and o.x and o.z and not o.unpaced and not AreaPace.allow(area, now, o.x, o.z, o.need) then
 			return refuse(state)
 		end
 		local chance = (p.chance and p.chance[situation]) or SpeechRules.CHANCE[situation] or 1
@@ -168,6 +197,9 @@ function SpeechRules.request(
 	end
 	state.lastByActor[actorId] = now
 	table.insert(window, now)
+	if state.area and opts and opts.x and opts.z then
+		AreaPace.note(state.area, now, opts.x, opts.z)
+	end
 	table.insert(state.recent, line)
 	while #state.recent > p.noRepeat do
 		table.remove(state.recent, 1)
