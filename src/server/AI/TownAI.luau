@@ -12,6 +12,13 @@
 -- from a v5.4 hide, the fox roaming and 6 deer grazing at their v5.4 origins. Ground is
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
 -- SimFull-style liveness test; Server/Actors/ActorsRuntime adds bodies and possession in the engine.
+-- NOBODY WALKS THROUGH A WALL (the owner's playtest, 19 November): the people are kinematic, so every walk that is
+-- not a lane or a round (both clear of every building) goes by the town's way on foot (World/WalkWay, `world.way`;
+-- the brains ask it through ctx.way and ctx.clear): round the buildings and fences, in and out of the hospital, the
+-- police station, the corner store and the bowling alley by their doors. The lanes are the sidewalk strips cut where
+-- a building, a shelter or a fence stands on them; a shop worker's round is on the pavement before the shop's front;
+-- a body a player lets go inside a shell is taken at the nearest spot outside it (resume: WalkWay.putBack).
+-- tests/unit/town_walls.spec (tests/lib/WallAudit) walks the whole town on the baked one with a budget of 0.
 -- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
 -- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them, and each
 -- one is also handed at once to every listener (listen), so a service that needs to hear them does not
@@ -327,6 +334,13 @@ function TownAI.build(opts: Opts): World
 			table.insert(lanes, piece)
 		end
 	end
+	table.sort(lanes, function(a, b) -- (as Nav.lanes: the core lanes, nearest the middle and longest, first)
+		local ca, cb = math.abs(a.fixed), math.abs(b.fixed)
+		if ca ~= cb then
+			return ca < cb
+		end
+		return a.max - a.min > b.max - b.min
+	end)
 	local pedParams: Pedestrian.Params = {
 		lanes = lanes,
 		coreLanes = math.min(4, #lanes),

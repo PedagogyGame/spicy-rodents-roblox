@@ -7,12 +7,11 @@
 -- this never hands back a way through a wall: when it knows none it says so (nil) and the caller does something
 -- else (stays, takes another lane, an ambulance, out of sight).
 --   * The obstacles are the building boxes of World/Colliders (every solid lot, the built venues, the bowling
---     alley) and, for walkers only, what else stands on the ground (`extras`): the fence and parapet lines (the
---     harvested fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own
---     bakes that Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks
---     (the park's footbridge), the bowling alley's raised rear alley and its yard's house, and anything at least
---     LOW tall (a fountain's rim is a wall to a walker). The river
---     is closed ground (World/FootPath).
+--     alley) and, for walkers only, what else stands on the ground: the fence and parapet lines (the harvested
+--     fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own bakes that
+--     Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks (the
+--     park's footbridge), the bowling alley's raised rear alley and its yard's house; any of them at least LOW
+--     tall (a fountain's rim is a wall to a walker). The river is closed ground (World/FootPath).
 --   * A building people work in has its own ways inside and a door (`rooms`): the bowling alley (Attractions/
 --     AlleyWalk, out by its main doors), the hospital (Infection/HospitalLayout's lanes, out by its entrance), the
 --     police station (the locker room's way out past the front desk: Actors/StaffRounds.POLICE_EXIT) and a built
@@ -24,8 +23,9 @@
 -- Interface: new(opts) -> Way; find(way, x0, z0, x1, z1, opts?) -> ({ {x, z} }?, length) (the points after the
 --   start, the goal last); clear(way, x0, z0, x1, z1) -> boolean (a straight walk passes nothing); solidAt(way,
 --   x, z) -> Box? (a box with no ways inside that holds the point); roomAt(way, x, z) -> Room?; putBack(way, x, z)
---   -> (x, z) (where a body left at (x, z) can walk from); splitLane(way, lane) -> { Lane } (the pieces of a
---   straight lane that miss every obstacle); addFences(colliders, data) -> n; LOW, MARGIN
+--   -> (x, z, nx, nz) (where a body left at (x, z) can walk from, and the way out of the wall it was moved past);
+--   splitLane(way, lane) -> { Lane } (the pieces of a straight lane that miss every obstacle); addFences(colliders,
+--   data) -> n; LOW, MARGIN, KEEP, LANE_MIN, DECK_MAX, BAKED_VENUES, RAMP_RUN, PORCH
 -- Pure; studs. No side effects on require.
 
 local Colliders = require("./Colliders")
@@ -65,7 +65,7 @@ WalkWay.LOW = 1.5 -- studs: anything this tall stops a walker (lower is stepped 
 WalkWay.MARGIN = 0.2 -- studs a point must be inside a box's walls to be in it
 WalkWay.KEEP = 2.5 -- studs from a building's own ways (a lane, a round) a body may be let go and join them straight
 WalkWay.LANE_MIN = 6 -- studs: a piece of lane shorter than this is not walked
-WalkWay.DECK_MAX = 4 -- studs: a slab lot (a footbridge's deck) up to this tall is a wall to a walker; higher is a canopy
+WalkWay.DECK_MAX = 4 -- studs: a slab lot (a footbridge's deck) this tall or less is a wall to a walker; higher: a canopy
 -- the venues baked by their own bakes that World/Colliders does not hold (it is also the squirrels' world, and the
 -- TV station's arena is walked into for paintball): solid to walkers
 WalkWay.BAKED_VENUES = table.freeze({ "f3_tv_station", "f4_lift_base", "f3_hilltop" })
@@ -536,8 +536,8 @@ end
 -- putBack: where a body a player left at (x, z) is let go to the computer. Anywhere it can walk from, it stays;
 -- inside a box that has no ways inside (a solid lot: a house shell, a shop), it is the nearest spot outside that
 -- box's walls (a walker's half width and a little more out), on open ground; inside a building with ways, more than
--- KEEP from them (behind the corner store's till, in the police station's lobby), the nearest point on them. The third and fourth results are the
--- way out of the wall it was moved past (0, 0 when it stays).
+-- KEEP from them (behind the corner store's till, in the police station's lobby), the nearest point on them. The
+-- third and fourth results are the way out of the wall it was moved past (0, 0 when it stays).
 function WalkWay.putBack(way: Way, x: number, z: number): (number, number, number, number)
 	local room = WalkWay.roomAt(way, x, z)
 	if room then

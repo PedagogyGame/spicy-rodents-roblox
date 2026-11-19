@@ -50,7 +50,7 @@ WallAudit.FILES = {
 	"build/Expansion_F4.rbxm",
 }
 WallAudit.HEIGHTS = { 2.0, 3.8 } -- studs over the feet (a townsperson is 5.2 tall, the hip 2.5)
-WallAudit.PROP = 3 -- studs: a part no wider than this both ways is a prop (a telephone pole, a post, a sign), not a wall
+WallAudit.PROP = 3 -- studs: no wider than this both ways is a prop (a telephone pole, a post, a sign), not a wall
 WallAudit.JUMP = 8 -- studs in one step: a body placed somewhere, not walking
 WallAudit.EXAMPLES = 6 -- crossings kept per cause
 WallAudit.TRAILS = false -- format() prints each example's last steps
@@ -213,7 +213,7 @@ local function newReport(): Report
 end
 
 local function topPath(path: string): string
-	-- the lot or model and the part's own name (Lots.core_house_1_bungalow.WallFront_1 -> core_house_1_bungalow.WallFront_1)
+	-- the lot or model and the part's own name: Lots.<lot>.<part> -> <lot>.<part>
 	local parts = string.split(path, ".")
 	if #parts >= 3 and (parts[1] == "Lots" or parts[1] == "Props" or parts[1] == "Roads") then
 		return parts[2] .. "." .. parts[#parts]
@@ -353,6 +353,19 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 				end
 				return on(self, evt)
 			end
+		end
+	end
+	-- what the brains' ways cost (a brain asks inside a server frame)
+	local ctx = world.ctx :: any
+	local way = ctx.way
+	local ways, worstMs = 0, 0
+	if way then
+		ctx.way = function(x0: number, z0: number, x1: number, z1: number): any
+			local t0 = os.clock()
+			local out = way(x0, z0, x1, z1)
+			ways += 1
+			worstMs = math.max(worstMs, (os.clock() - t0) * 1000)
+			return out
 		end
 	end
 	-- the rodent is a player's
@@ -557,6 +570,8 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	for k, v in stats do
 		report.events[k] = v
 	end
+	report.events.brainWays = ways
+	report.events.brainWayWorstMs = math.floor(worstMs * 10 + 0.5) / 10
 	return report
 end
 
