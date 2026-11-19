@@ -19,7 +19,8 @@
 --            A trip dispatched with `held` stays on scene until `release` (the medical sequence loads
 --            its patient first); without it the scene timer runs as in v5.4.
 --   event (§5.11): the 2400 s living-event glide (fatal even at a crawl).
--- Rebuild fixes (traffic.md §11-§13): squirrels are in every yielding class's hazard set with RELATIVE
+-- Rebuild fixes (traffic.md §11-§13): squirrels were in every yielding class's hazard set (now off by the owner's
+-- decision D15: cars brake for people only, squirrels dodge; AICarMotor.BRAKE_FOR_SQUIRRELS) with RELATIVE
 -- visibility (squirrel y - vehicle base y < 4.76 u, not the absolute 4.8); opposing vehicles are excluded
 -- from the same-lane tests (the trolley deadlock, §6.1); emergency classes keep at least the hard stop
 -- for people. A wrap, an appearance and a dispatch set `teleported` for that tick (SweptCollision skips it).
@@ -27,6 +28,7 @@
 -- the hospital drive held all three ambulances for as long as they stood there, and every patient in
 -- town waited out the timeout): after BLOCK_PATIENCE seconds stopped for a person the vehicle edges
 -- on at BLOCK_CRAWL. Vehicles never hurt people (only held squirrels are in the fatal sweep).
+-- A body standing on a vehicle's own roof is never that vehicle's hazard (onRoof: it drives off from under it).
 
 local Control = require("./Control")
 local Boxes = require("./Boxes")
@@ -333,14 +335,37 @@ local function playerCarAhead(v: Vehicle, ctx: Ctx, gap: number): boolean
 	return LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, v.box.length / 2 + gap, v.box.width / 2, cars)
 end
 
--- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels visible
--- relative to the vehicle base) and the vehicles it braces for (bracesFor).
+-- onRoof(v, p): is p (feet) standing on v's own roof: at or above its top, over its footprint? Cars became solid
+-- (owner's playtest 2026-11-18): a squirrel can stand on a roof (v5.4 allowed it) and a person on a sedan's. A body on
+-- a vehicle's own roof is in no vehicle's way but that one's, and that one does not wait for it: it drives off from
+-- under it (vehicles do not carry it) and the body is left on the road. Before, a squirrel on a sedan's roof was in
+-- its corridor (lateral 0, under VIS_HEIGHT over its base) and a person on it inside its hard stop, so the sedan and
+-- its queue waited for as long as they stood there (review 2026-11-18). Every other rule of who it brakes for stands.
+AICarMotor.ROOF_SLACK = st(0.2) -- how far under the roof's top the feet may be (a body settling on it)
+local function onRoof(v: Vehicle, p: Person): boolean
+	if p.y < v.y - BASE_LIFT + v.box.height - AICarMotor.ROOF_SLACK then
+		return false
+	end
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	local dx, dz = p.x - v.x, p.z - v.z
+	return math.abs(dx * fx + dz * fz) <= v.box.length / 2 + AICarMotor.ROOF_SLACK
+		and math.abs(dx * fz - dz * fx) <= v.box.width / 2 + AICarMotor.ROOF_SLACK
+end
+
+-- Cars brake for people only; squirrels must dodge (the owner's decision 2026-11-19, BRIEF_ADDENDUM D15, choice (b)
+-- of "should cars stop for squirrels?": after the playtest "I don't know why a car stopped for me"). The v5.4 rule
+-- (squirrels in every yielding class's hazard set, traffic.md §13) is kept behind this switch, off.
+AICarMotor.BRAKE_FOR_SQUIRRELS = false
+
+-- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels only with
+-- BRAKE_FOR_SQUIRRELS, visible relative to the vehicle base; none on its own roof: onRoof) and the vehicles it
+-- braces for (bracesFor).
 local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicles: boolean): { LaneMath.Hazard }
 	local out: { LaneMath.Hazard } = {}
 	for _, p in ctx.people do
-		if p.visible ~= false and not p.hospital and not p.injured then
+		if p.visible ~= false and not p.hospital and not p.injured and not onRoof(v, p) then
 			if p.kind == "squirrel" then
-				if p.y - v.y < AICarMotor.VIS_HEIGHT then
+				if AICarMotor.BRAKE_FOR_SQUIRRELS and p.y - v.y < AICarMotor.VIS_HEIGHT then
 					table.insert(out, { x = p.x, z = p.z, r = R_SQUIRREL })
 				end
 			else
@@ -372,10 +397,10 @@ local function sameWay(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath
 	return out
 end
 
--- Any visible person (humans; the sedan rule has no hospital filter) within r of (x, z)?
-local function personNear(ctx: Ctx, x: number, z: number, r: number, skipHospital: boolean): boolean
+-- Any visible person (humans; the sedan rule has no hospital filter; none on v's own roof: onRoof) within r of (x, z)?
+local function personNear(v: Vehicle, ctx: Ctx, x: number, z: number, r: number, skipHospital: boolean): boolean
 	for _, p in ctx.people do
-		if p.visible ~= false and p.kind ~= "squirrel" and not (skipHospital and p.hospital) then
+		if p.visible ~= false and p.kind ~= "squirrel" and not (skipHospital and p.hospital) and not onRoof(v, p) then
 			if (p.x - x) ^ 2 + (p.z - z) ^ 2 < r * r then
 				return true
 			end
@@ -391,7 +416,7 @@ local function junctionClear(v: Vehicle, ctx: Ctx, line: Control.StopLine?): boo
 	end
 	local cx, cz, r = line.at[1], line.at[2], line.radius
 	for _, p in ctx.people do
-		if p.visible ~= false and (p.x - cx) ^ 2 + (p.z - cz) ^ 2 < r * r then
+		if p.visible ~= false and (p.x - cx) ^ 2 + (p.z - cz) ^ 2 < r * r and not onRoof(v, p) then
 			return false
 		end
 	end
@@ -646,7 +671,7 @@ stepClass.sedan = function(v, ctx, dt, events)
 	end
 	-- hard stop: any visible human within 3.1 of the next position (no hospital filter, §5.1 step 4)
 	local nx, nz = v.x + fx * v.speed * dt, v.z + fz * v.speed * dt
-	if personNear(ctx, nx, nz, st(3.1), false) then
+	if personNear(v, ctx, nx, nz, st(3.1), false) then
 		v.speed = 0
 		if v.phase ~= "uturn" then
 			place(v, ctx, v.lane)
@@ -851,7 +876,7 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	if v.away and v.lane == home and v.phase ~= "uturn" and v.s <= v.spawnS then
 		toBay = v.spawnS - v.s
 	end
-	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) or playerCarAhead(v, ctx, st(2)) then
+	if personNear(v, ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) or playerCarAhead(v, ctx, st(2)) then
 		v.speed = 0
 	else
 		-- follows the vehicle ahead (v5.4's riders stopped only for people, so they rode straight through
@@ -1024,7 +1049,7 @@ local function drivePolyline(
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
 	local len = LaneMath.length(lane, v.dir)
 	local blocked = v.blocked or 0
-	local inWay = personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true)
+	local inWay = personNear(v, ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true)
 	if inWay then
 		blocked = math.min(blocked + dt, AICarMotor.BLOCK_PATIENCE + 2)
 	else

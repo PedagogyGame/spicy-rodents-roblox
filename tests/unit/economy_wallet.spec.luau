@@ -4,6 +4,7 @@
 local Wallet = require("@shared/Economy/Wallet")
 local Products = require("@shared/Economy/Products")
 local ReceiptLedger = require("@server/Economy/ReceiptLedger")
+local Receipts = require("@server/Economy/Receipts")
 local ProfileSchema = require("@server/Persistence/ProfileSchema")
 
 return function(t)
@@ -29,8 +30,9 @@ return function(t)
 	end)
 	t.test("default tiers are whole Robux and about 4 S$ per R$", function()
 		for _, tier in Products.defaults() do
-			t.eq(math.floor(tier.robux), tier.robux)
-			t.eq(tier.cents / 100 / tier.robux, 4)
+			local robux, cents = tier.robux :: number, tier.cents :: number
+			t.eq(math.floor(robux), robux)
+			t.eq(cents / 100 / robux, 4)
 			t.eq(tier.productId, nil)
 		end
 		local cat = Products.catalog(Products.defaults())
@@ -46,6 +48,65 @@ return function(t)
 				{ productId = 1, robux = 3, cents = 100, label = "y" },
 			})
 		end, "repeated")
+	end)
+	t.test("the owner's Spicy buck: 4 Spicy Dollars per Robux, from what the receipt says was paid (D15)", function()
+		local tier = Products.spicyBuck()
+		t.eq(tier.productId, 3730438620)
+		local cat = Products.catalog({ tier })
+		t.eq(Products.lookup(cat, 3730438620), tier)
+		-- whatever the product's price on the Creator Hub: 4 S$ (400 cents) for each Robux spent
+		t.eq(Products.grantFor(tier, { CurrencySpent = 1 }), 400)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 25 }), 10000)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 400, CurrencyType = "Enum.CurrencyType.Robux" }), 160000)
+		-- a receipt that does not say a believable whole Robux amount is never guessed at
+		t.eq(Products.grantFor(tier, {}), nil)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 0 }), nil)
+		t.eq(Products.grantFor(tier, { CurrencySpent = -5 }), nil)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 2.5 }), nil)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 1e9 }), nil)
+		t.eq(Products.grantFor(tier, { CurrencySpent = 10, CurrencyType = "Enum.CurrencyType.Tix" }), nil)
+		-- a fixed tier ignores the receipt
+		t.eq(Products.grantFor(Products.defaults()[1], { CurrencySpent = 999 }), 10000)
+		-- a tier cannot be both
+		t.fails(function()
+			Products.catalog({ { productId = 1, perRobux = 400, robux = 2, label = "x" } })
+		end, "rate tier")
+	end)
+	t.test("receipts: a Spicy buck purchase credits 4 S$ per Robux once; one with no amount is not granted", function()
+		local data = ProfileSchema.template()
+		local profile = {
+			data = data,
+			session = "s",
+			savedRevision = 0,
+			rev = 0,
+			isActive = function()
+				return true
+			end,
+			markDirty = function(self: any)
+				self.rev += 1
+				return self.rev
+			end,
+			save = function(self: any)
+				self.savedRevision = self.rev
+				return true
+			end,
+		}
+		local h = Receipts.new({
+			profileOf = function()
+				return profile :: any
+			end,
+			catalog = Products.catalog({ Products.spicyBuck() }),
+			now = function()
+				return 1
+			end,
+		})
+		local r = { PurchaseId = "b1", PlayerId = 7, ProductId = 3730438620, CurrencySpent = 50 }
+		t.eq(h:process(r), "PurchaseGranted")
+		t.eq(data.wallet.cents, 20000, "50 Robux -> 200 Spicy Dollars")
+		t.eq(h:process(r), "PurchaseGranted")
+		t.eq(data.wallet.cents, 20000, "a redelivery is not credited twice")
+		t.eq(h:process({ PurchaseId = "b2", PlayerId = 7, ProductId = 3730438620 }), "NotProcessedYet")
+		t.eq(data.wallet.cents, 20000)
 	end)
 	t.test("ledger credits once per PurchaseId and trims to KEEP", function()
 		local data = ProfileSchema.template()

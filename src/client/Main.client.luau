@@ -148,7 +148,8 @@ task.spawn(function()
 	end
 end)
 task.spawn(function()
-	VehicleView.start()
+	-- the cars it draws are solid to the squirrel's motor (ClientWorld.cars) and, as parts, to a person's body
+	VehicleView.start({ cars = world.cars })
 	local ghosts = VehicleView.folder()
 	if ghosts then
 		world.ignore({ ghosts })

@@ -155,16 +155,17 @@ export type MovementDeps = {
 	swept: any?, -- Traffic/SweptCollision (TrafficService): markTeleported on every hand-off
 	wall: ValidatorWorld.Ray?, -- the wall ray (ValidatorWorld.engineRays in the engine)
 	down: ValidatorWorld.Ray?, -- the floor ray
+	cars: ValidatorWorld.Cars?, -- the cars' boxes the rays meet as well (TrafficService.solids)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of a squirrel's chili rush
 }
 
 -- movement(deps): the movement service the game runs, with the squirrel validator switched on (spike S3: every
 -- squirrel packet is judged by Movement/MoveValidator against the town's rails and the baked town's walls and floors,
--- Movement/ValidatorWorld). start() builds it with the engine's rays; tests/unit/movement_live.spec.luau holds the
+-- and the town's cars, Movement/ValidatorWorld). start() builds it with the engine's rays; tests/unit/movement_live.spec.luau holds the
 -- wiring to it.
 function Game.movement(deps: MovementDeps): any
 	local rail = RailWorld.get(deps.data, Height.at)
-	local world = ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down })
+	local world = ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down, cars = deps.cars })
 	local validator = MoveValidator.new(world, { boostOf = deps.boostOf })
 	return MovementService.new({ swept = deps.swept, validator = validator })
 end
@@ -414,6 +415,8 @@ function Game.start(opts: Opts?): any
 	local movement = Game.movement({
 		data = data,
 		swept = traffic :: any,
+		-- the cars are solid to the squirrel's motor on each client (Traffic/Solid): the validator meets them too
+		cars = traffic:solids(),
 		wall = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 			return engineRays().wall(ox, oy, oz, dx, dy, dz)
 		end,

@@ -105,3 +105,12 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   3. a squirrel reaching the rafters from a ball return's hood is allowed (a second way in);
   4. sprinting in the storm drains' pipes is 4 % faster than the pipe pace (Tunables `sewer.sprintMult` = 1.04, in the motor and the server's caps; walking keeps 1.25x);
   5. next: the corner store, and the old-fashioned (1940s) lounge only; the futuristic lounge is not to be built.
+- **D15. Answers to the open questions (owner, 2026-11-19).** From the 50-item list of 18 Nov (numbers are that list's):
+  - **#3 Spicy buck price:** "4 Spicy Dollars per 1 Robux." Product 3730438620 is a rate tier (`Shared/Economy/Products.spicyBuck`, `PER_ROBUX` 400 cents): each purchase grants 4 S$ for every Robux its receipt says was spent (`CurrencySpent`), so it is right whatever price the product has on the Creator Hub; a receipt without a believable whole Robux amount is not granted (NotProcessedYet), never guessed. **Not live yet:** no ProcessReceipt is hooked, and it must not be until money is saved between visits (ProfileStore wired in), so Robux never buy money that is gone when the player leaves.
+  - **#4 API key:** restore the Luau Execution permission. The owner does this on the Creator Dashboard (the key is his); still 403 "Resources not authorized" on 2026-11-19.
+  - **#5 Paintball rewind:** keep 0.25 s.
+  - **#6 Cars and squirrels:** option (b): cars stop only for people; squirrels must dodge (`Traffic/AICarMotor.BRAKE_FOR_SQUIRRELS` = false; the v5.4 rule is kept behind it). A car never shoves anyone; a car driving into a squirrel still runs it over (the fatal sweep), and stopped cars stay solid.
+  - **#10 Vigilantes:** hidden until provoked; the exception: once 40 % of the town's people on the server have been bitten, a few vigilantes show their tell (back to hidden when the share falls under 40 %).
+  - **#11 Police range:** "Do not limit their pursuit radius; instead, require a distance of two average blocks for them to lose track of you." No reach limit on which officers respond and no leash round the bite; an officer chasing the rodent loses it only once it is more than 2 blocks (about 880 studs) from that officer.
+  - **#13 Real names on signs:** "Yes to renaming if it is a restaurant; no if it relates to the theme of your game." CHILI'S (a restaurant) is now **CHILI PEPPER GRILL**; WEST TOPEKA POLICE (the police, part of the game's theme) stays.
+  - Everything else on that list keeps its default until the owner says otherwise.

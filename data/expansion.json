@@ -5,7 +5,7 @@
   "frame": "Per venue: origin = footprint centre on the finished floor (floorY). Local X across the frontage, Y up, D into the building from the front (front face at D = -d/2). The front faces world (sin yaw, 0, cos yaw): facing +Z yaw 0, -Z pi, +X pi/2, -X -pi/2. World = Shared/Attractions/AlleyLayout.toWorld({x, z, floorY, yaw}, X, Y, D). footprint {w, d} is the building; site {x0, x1, d0, d1} (local) is everything the venue builds (yards, patios, courts, lots). floorY = highest ground under the footprint + 0.5 (lawns: the highest ground); ground {min, max} tells the builder how deep the plinth or skirt must go.",
   "families": { "F1": "food_shops", "F2": "civic", "F3": "leisure", "F4": "rides_minigame_props" },
   "foodBaseline": [
-    { "lot": "east_chilis_restaurant", "name": "CHILI'S", "food": "bar_and_grill", "enterable": false },
+    { "lot": "east_chilis_restaurant", "name": "CHILI PEPPER GRILL", "food": "bar_and_grill", "enterable": false },
     { "lot": "east_corner_shops", "name": "CORNER SHOPS (diner)", "food": "diner", "enterable": false },
     { "lot": "outer_icecream_standalone", "name": "ICE CREAM (standalone)", "food": "ice_cream", "enterable": false },
     { "lot": "outer_icecream_strip", "name": "ICE CREAM (strip)", "food": "ice_cream", "enterable": false },

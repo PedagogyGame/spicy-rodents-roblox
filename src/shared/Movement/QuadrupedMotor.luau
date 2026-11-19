@@ -50,6 +50,8 @@ export type Input = {
 export type World = {
 	groundAt: (x: number, z: number, refY: number) -> number,
 	blocked: ((x: number, z: number, y: number) -> boolean)?,
+	-- optional: told where each move starts (feet) before its wall tests (SquirrelMotor.World.wallsFrom)
+	wallsFrom: ((x: number, z: number, y: number) -> ())?,
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
 }
 
@@ -129,6 +131,9 @@ function QuadrupedMotor.step(state: State, input: Input, dt: number, world: Worl
 		-- world.blocked takes the height of the feet (its probe starts one step above them); state.y
 		-- is the root, a hip above: with the root a deer's probe passed over fences it should stop at
 		local feetY = state.y - params.hip
+		if blocked and world.wallsFrom then
+			world.wallsFrom(ox, oz, feetY)
+		end
 		if blocked and blocked(state.x, state.z, feetY) then
 			-- per-axis slide: keep the axis that is free
 			if not blocked(state.x, oz, feetY) then

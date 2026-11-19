@@ -1148,7 +1148,7 @@ return {
 		footprint = { d = 77.5, w = 130 },
 		hasInterior = false,
 		notes = 'facing: glazed front at local z=+15.62, comment "looks toward the main commercial road (+z)". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 9.35 (on a hill). Box 52x10.2x31 + brick band + cap to y=11.4; roof route at +11.62 (x 449..499). Signs "CHILI\'S" and "GRILL & BAR" at z=-65.3. 6 glass panes front (local x -20..20 step 8), door 5x6.8. Patio: 5 tables at (432+14i, -48 or -43), 3 parasols. Parking bays: 8 lines x=438..508 step 10 at z=-24; parked cars (462,-29) & (493,-29). commercialBounds collider w52 d31.',
-		params = { eaveU = 11.5, roof = "flat", sign = "CHILI'S" },
+		params = { eaveU = 11.5, roof = "flat", sign = "CHILI PEPPER GRILL" },
 		routes = { source = "harvest" },
 		src = "v5.4 L722",
 		style = "Chili's-style grill: tan stucco #b9a48f, brick band #844c42, red awnings #b23b33",

@@ -61,6 +61,9 @@ export type World = Motion.World & {
 	blockedHalf: ((x: number, z: number, y: number, half: number) -> boolean)?,
 	-- optional world clamp (studs); defaults to the v5.4 rectangle
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
+	-- optional: told where each wall sweep starts (feet), before the wall tests of that sweep; a world may then leave
+	-- out a moving wall the body is already inside (a car that came over it: Traffic/Solid.squirrelWorld)
+	wallsFrom: ((x: number, z: number, y: number) -> ())?,
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
 	-- a wall collider? (Colliders in W1). yHigh: the higher end's feet; rise: how far over it the arc could reach
 	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number, yHigh: number?, rise: number?) -> boolean)?,
@@ -959,6 +962,10 @@ local function resolveWalls(state: State, world: World, oldX: number, oldZ: numb
 	local sx, sz = dx / steps, dz / steps
 	local x, z = oldX, oldZ
 	local y = state.y
+	local from = world.wallsFrom
+	if from then
+		from(oldX, oldZ, y)
+	end
 	local core = world.blockedCore
 	if core and blocked(oldX, oldZ, y) then
 		blocked = core

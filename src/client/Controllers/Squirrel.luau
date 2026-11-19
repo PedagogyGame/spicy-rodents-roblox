@@ -246,6 +246,7 @@ function Squirrel.start(
 		blocked = world.blocked,
 		blockedCore = world.blockedCore,
 		blockedHalf = world.blockedHalf,
+		wallsFrom = world.wallsFrom,
 		clamp = world.clamp,
 	}
 	local function routeOf(id: number): any
