@@ -570,7 +570,10 @@ return function(t)
 			params.walkInChance = 0
 		end)
 		h.step(20)
-		local victim = nearest(townspeople(h), 300, 300)
+		-- (a townsperson by the old town's crossroads, where this case's patient stood before the lanes were cut
+		-- round the buildings; for one at (213, 30) the ambulance stood for minutes behind a lorry stopped at
+		-- (-437, 19): a traffic matter, not this case's)
+		local victim = nearest(townspeople(h), 30, 100)
 		local id = victim.id
 		h.svc:bite(id, h.rodent)
 		t.truthy(h.runUntil(75, function(): boolean

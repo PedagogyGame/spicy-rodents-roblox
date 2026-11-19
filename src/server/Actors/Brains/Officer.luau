@@ -14,6 +14,10 @@
 -- grate already being watched does not start the watch again (a rodent diving in and out of one grate never
 -- pins the officer there); onEvent({ type = "stakeoutEnd" }) ends it at once (the rodent came up in sight:
 -- SewerService follows it with a "respond"). A medical directive still comes first.
+-- Every walk (the beat's corners, a call, a stakeout, the way back from wherever a player left the officer) goes
+-- by the town's way (ctx.way: World/WalkWay through Common.toward), never in a straight line through a building;
+-- with no way there the officer waits where they are; back on the beat with no way to it (Common.stuck: none found
+-- twice, and no player to see the body), the officer is put on the beat's corner, out of sight.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -27,6 +31,8 @@ export type Params = {
 	index: number,
 	beatHalfX: number?, -- studs; default 30 u
 	beatHalfZ: number?,
+	-- where a beat corner that falls inside a building is moved to (World/WalkWay.putBack); nil leaves it
+	settle: ((x: number, z: number) -> (number, number))?,
 }
 
 type Brain = Common.Brain & {
@@ -40,6 +46,7 @@ type Brain = Common.Brain & {
 	respondUntil: number,
 	directive: Directive.State,
 	stakeout: Stakeout?,
+	leg: Common.Leg, -- the way to wherever the officer is walking (the town's way: never through a wall)
 }
 
 -- the grate an officer is watching: where to stand and what to face; holdLeft counts down from arrival
@@ -83,8 +90,17 @@ local function stakeout(self: Brain, dt: number, ctx: Common.Ctx): boolean
 			self.stakeout = nil
 			return false
 		else
+			local tx, tz = Common.toward(self.leg, actor, ctx, s.x, s.z)
+			if tx == nil or tz == nil then
+				intent.mode = "stand" -- no way there (yet): wait rather than go through a wall
+				if Common.stuck(self.leg, actor, ctx) then
+					self.stakeout = nil -- (no way to that grate at all: back to the beat)
+					return false
+				end
+				return true
+			end
 			intent.mode = "walk"
-			intent.tx, intent.tz = s.x, s.z
+			intent.tx, intent.tz = tx, tz
 			intent.laneAxis = nil
 			-- running, slowing over the last few studs so the officer stops on the spot
 			intent.speed = math.clamp(d * 3, WALK, CHASE)
@@ -122,8 +138,13 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 			intent.mode = "stand"
 			intent.heading = Common.yawOf(self.respondX - actor.x, self.respondZ - actor.z)
 		else
+			local tx, tz = Common.toward(self.leg, actor, ctx, self.respondX, self.respondZ)
+			if tx == nil or tz == nil then
+				intent.mode = "stand"
+				return
+			end
 			intent.mode = "walk"
-			intent.tx, intent.tz = self.respondX, self.respondZ
+			intent.tx, intent.tz = tx, tz
 			intent.laneAxis = nil
 			intent.speed = CHASE
 			intent.turnRate = 6
@@ -143,8 +164,16 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		intent.mode = "stand"
 		return
 	end
+	local tx, tz = Common.toward(self.leg, actor, ctx, p[1], p[2])
+	if tx == nil or tz == nil then
+		intent.mode = "stand"
+		if Common.stuck(self.leg, actor, ctx) then
+			Common.place(self.leg, actor, ctx, p[1], p[2]) -- (out of sight: on the beat)
+		end
+		return
+	end
 	intent.mode = "walk"
-	intent.tx, intent.tz = p[1], p[2]
+	intent.tx, intent.tz = tx, tz
 	intent.laneAxis = nil
 	intent.speed = WALK
 	intent.turnRate = 4
@@ -172,6 +201,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	Directive.restore(self.directive, snapshot.directive)
 	self.stakeout = if snapshot.stakeout then table.clone(snapshot.stakeout) else nil
 	Common.halt(self.actor) -- no walking on the old intent before the next think
+	Common.forget(self.leg) -- (handed back somewhere else: the way is asked for from there)
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
@@ -212,6 +242,12 @@ function Officer.new(actor: Common.Actor, params: Params): Common.Brain
 		{ sx + hx * k, sz + hz * k },
 		{ sx - hx * k, sz + hz * k },
 	}
+	local settle = params.settle
+	if settle then
+		for _, p in points do
+			p[1], p[2] = settle(p[1], p[2])
+		end
+	end
 	local start = (params.index % 4) + 1
 	local self = setmetatable({
 		kind = "Officer",
@@ -225,6 +261,7 @@ function Officer.new(actor: Common.Actor, params: Params): Common.Brain
 		respondUntil = 0,
 		directive = Directive.new(),
 		stakeout = nil,
+		leg = Common.newLeg(),
 	}, Methods)
 	local prev = points[(start - 2) % 4 + 1]
 	actor.x, actor.z = prev[1], prev[2]

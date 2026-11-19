@@ -15,12 +15,14 @@
 -- Nothing on the trail (except the footbridge's rails, either side of it), in either venue's site, on a tower's
 -- footing, on Lift Road or the car park, or in the cabins' swept volume. Low parts that a walker meets collide;
 -- the field strips, the water and the lane are surfaces (they collide; the brook does not).
+-- What a walker cannot pass (the hedges, the walls, the paddock, the farm, the hut) is laid out by Shared/Rides/
+-- SkyLiftCountry, which World/WalkWay reads to keep the town's people off it.
 -- Interface: build(roblox, parent) -> Model; frame() -> (bx, bz, ux, uz, rx, rz) (pure); BUDGET; FIELD_LIFT
 
 local Approach = require("./Approach")
 local Common = require("./Common")
 local Kit = require("../alley/Kit")
-local SkyLift = require("../../../src/shared/Rides/SkyLift")
+local SkyLiftCountry = require("../../../src/shared/Rides/SkyLiftCountry")
 
 local Countryside = {}
 
@@ -48,12 +50,7 @@ local REED = { 108, 128, 66 }
 
 -- The line's frame: the base mouth, the unit direction toward the summit's mouth and its right.
 function Countryside.frame(): (number, number, number, number, number, number)
-	local st = SkyLift.stations()
-	local bx, bz = st.base.mouth.x, st.base.mouth.z
-	local dx, dz = st.summit.mouth.x - bx, st.summit.mouth.z - bz
-	local l = math.sqrt(dx * dx + dz * dz)
-	local ux, uz = dx / l, dz / l
-	return bx, bz, ux, uz, -uz, ux
+	return SkyLiftCountry.frame()
 end
 
 local function at(u: number, v: number): (number, number)
@@ -192,27 +189,29 @@ function Countryside.build(roblox: any, parent: any): any
 	end
 	-- hedgerows round the fields (between them and the line, and at their two ends) and a few hedgerow oaks
 	local hedges = kit0:folder(m, "Hedges")
-	strip(hedges, "Hedge", 108, -32, 340, -32, 2.4, 3.2, 2.3, HEDGE, "Grass")
-	strip(hedges, "Hedge", 108, -34, 108, -154, 2.6, 3.2, 2.6, HEDGE, "Grass")
-	strip(hedges, "Hedge", 340, -34, 340, -154, 2.6, 3.2, 2.6, HEDGE, "Grass")
+	for _, l in SkyLiftCountry.HEDGES do
+		strip(hedges, "Hedge", l.u0, l.v0, l.u1, l.v1, l.w, l.h, l.lift, HEDGE, "Grass")
+	end
 	for _, p in { { 108, -32 }, { 193, -32 }, { 265, -32 }, { 340, -96 }, { 108, -150 } } do
 		tree(hedges, p[1], p[2], 18 + rnd() * 6, 12 + rnd() * 4, OAK)
 	end
 
 	-- the farm, on the left where the plain rises toward the hill
 	local farm = kit0:folder(m, "Farm")
-	local _, barnTop = block(farm, "Barn", 400, -120, 0, 26, 11, 15, BARN, "WoodPlanks")
-	roof(farm, 400, -120, 0, 26, 15, barnTop, 6)
-	block(farm, "BarnDoor", 400, -106.8, 0, 0.4, 8, 7, { 92, 34, 28 }, "WoodPlanks")
-	local sx, sz = at(372, -128)
+	local B, H, Si = SkyLiftCountry.BARN, SkyLiftCountry.FARMHOUSE, SkyLiftCountry.SILO
+	local _, barnTop = block(farm, "Barn", B.u, B.v, B.yaw, B.w, 11, B.d, BARN, "WoodPlanks")
+	roof(farm, B.u, B.v, B.yaw, B.w, B.d, barnTop, 6)
+	block(farm, "BarnDoor", B.u, -106.8, 0, 0.4, 8, 7, { 92, 34, 28 }, "WoodPlanks")
+	local sx, sz = at(Si.u, Si.v)
 	local sg = ground(sx, sz)
-	kit0:cyl(farm, "Silo", sx, sg + 11, -sz, 23, 7, "Y", { 176, 178, 172 }, "Metal")
-	kit0:ball(farm, "SiloDome", sx, sg + 22.4, -sz, 7, { 150, 152, 148 }, "Metal")
-	local _, houseTop = block(farm, "Farmhouse", 436, -150, math.pi / 2, 14, 8, 11, WHITE, "SmoothPlastic")
-	roof(farm, 436, -150, math.pi / 2, 14, 11, houseTop, 5)
-	block(farm, "Chimney", 432, -150, 0, 1.6, 15, 1.6, { 120, 70, 56 }, "Brick")
+	kit0:cyl(farm, "Silo", sx, sg + 11, -sz, 23, 2 * Si.r, "Y", { 176, 178, 172 }, "Metal")
+	kit0:ball(farm, "SiloDome", sx, sg + 22.4, -sz, 2 * Si.r, { 150, 152, 148 }, "Metal")
+	local _, houseTop = block(farm, "Farmhouse", H.u, H.v, H.yaw, H.w, 8, H.d, WHITE, "SmoothPlastic")
+	roof(farm, H.u, H.v, H.yaw, H.w, H.d, houseTop, 5)
+	block(farm, "Chimney", H.u - 4, H.v, 0, 1.6, 15, 1.6, { 120, 70, 56 }, "Brick")
 	-- the paddock: posts every 15 and two rails a side
-	local px0, px1, pv0, pv1 = 412, 470, -78, -112
+	local P = SkyLiftCountry.PADDOCK
+	local px0, px1, pv0, pv1 = P.u0, P.u1, P.v0, P.v1
 	local corners = { { px0, pv0 }, { px1, pv0 }, { px1, pv1 }, { px0, pv1 } }
 	for i = 1, 4 do
 		local a, b = corners[i], corners[i % 4 + 1]
@@ -226,8 +225,9 @@ function Countryside.build(roblox: any, parent: any): any
 			strip(farm, "Rail", a[1], a[2], b[1], b[2], 0.25, 0.3, y, TIMBER, "Wood")
 		end
 	end
-	for k = 0, 3 do
-		local u, v = 420 + k * 9, -128 - (k % 2) * 4
+	local Hay = SkyLiftCountry.HAY
+	for k = 0, Hay.n - 1 do
+		local u, v = Hay.u0 + k * Hay.du, Hay.v + (k % 2) * Hay.dv
 		local hx, hz = at(u, v)
 		local hg = ground(hx, hz)
 		kit0:cyl(farm, "HayBale", hx, hg + 1.3, -hz, 3.2, 2.8, "X", HAY, "Fabric", {
@@ -299,18 +299,19 @@ function Countryside.build(roblox: any, parent: any): any
 
 	-- the farm lane across the line under tower 3, up to the trail, and the lift's maintenance hut beside it
 	local lane = kit0:folder(m, "Lane")
-	local t3 = SkyLift.towers()[3]
-	local bx, bz = Countryside.frame()
-	local u3 = (t3.x - bx) * ux + (t3.z - bz) * uz
+	local hu, hv = SkyLiftCountry.hut()
+	local u3 = hu - SkyLiftCountry.HUT.du
+	local Hut = SkyLiftCountry.HUT
 	strip(lane, "Lane", u3 + 14, -200, u3 + 14, 76, 6, 1.2, 0.3, GRAVEL, "Pebble")
-	local _, hutTop = block(lane, "Hut", u3 + 27, -18, 0, 8, 6.5, 6, { 196, 188, 168 }, "Concrete")
-	roof(lane, u3 + 27, -18, 0, 8, 6, hutTop, 2.2)
-	block(lane, "HutDoor", u3 + 23.85, -18, math.pi / 2, 0.3, 5, 2.4, Common.RED, "Metal")
+	local _, hutTop = block(lane, "Hut", hu, hv, 0, Hut.w, 6.5, Hut.d, { 196, 188, 168 }, "Concrete")
+	roof(lane, hu, hv, 0, Hut.w, Hut.d, hutTop, 2.2)
+	block(lane, "HutDoor", u3 + 23.85, hv, math.pi / 2, 0.3, 5, 2.4, Common.RED, "Metal")
 
 	-- dry-stone walls across the line
 	local walls = kit0:folder(m, "Walls")
-	strip(walls, "Wall", 92, -30, 92, 66, 1.3, 2.2, 1.5, STONE, "Slate")
-	strip(walls, "Wall", 520, -96, 520, 50, 1.3, 2.2, 1.5, STONE, "Slate")
+	for _, l in SkyLiftCountry.WALLS do
+		strip(walls, "Wall", l.u0, l.v0, l.u1, l.v1, l.w, l.h, l.lift, STONE, "Slate")
+	end
 
 	m:SetAttribute("Strips", strips)
 	return m

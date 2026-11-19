@@ -102,6 +102,10 @@ AlleyLayout.X0 = -26 -- west wall (where it always was)
 AlleyLayout.X1 = 149 -- east wall: the games room's far wall (the dartboard hangs on it)
 AlleyLayout.HALL_X1 = 101 -- the hall's east face: the games-room partition, then the outer wall behind the wing
 AlleyLayout.FRONT_D = -68 -- front wall (20 nearer the street than the six-lane house: the front rooms)
+-- the two benches on the front lawn facing the street (tools/bake/alley/StreetFront; World/WalkWay keeps walkers off
+-- them): each one's X span, and the D span of their seats (the back toward the building)
+AlleyLayout.STREET_BENCHES = table.freeze({ table.freeze({ 2, 8 }), table.freeze({ 36, 42 }) })
+AlleyLayout.STREET_BENCH_D = table.freeze({ -74, -72.6 })
 AlleyLayout.CONCOURSE_D0 = -48 -- the concourse's front edge (the old front wall line): the front rooms are beyond
 AlleyLayout.CEILING_Y = 12
 AlleyLayout.ROOF_Y = 13.6

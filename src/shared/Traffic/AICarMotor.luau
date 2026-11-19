@@ -952,18 +952,21 @@ end
 -- driving, up to `reach`: to the first vehicle standing or driving on it the same way, or a player's
 -- vehicle (never a crossing emergency vehicle: fleetInWay decides which of the two waits). It follows the
 -- route round its corners: looking straight ahead, a responder coming round a corner drove into the one
--- that had just turned in front of it.
+-- that had just turned in front of it. A vehicle whose centre is behind v's (along v's heading) is never in
+-- front of it: the route's first points are only a stud ahead of v's centre, so mid-turn a wide lorry close
+-- behind came within reach of them, and the two stood for good (the ambulance standoff).
 local ROUTE_STEP = st(1)
 local function routeGap(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, reach: number): number
 	local half = v.box.width / 2
 	local nose = (v.box.length - v.box.width) / 2
 	local last = LaneMath.length(lane, v.dir)
+	local hx, hz = math.sin(v.yaw), math.cos(v.yaw)
 	local d = ROUTE_STEP
 	while d <= reach + nose and v.s + d <= last do
 		local p = LaneMath.pointAt(lane, v.s + d, v.dir)
 		local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
 		for _, b in ctx.bodies do
-			if b.visible ~= false and b.id ~= v.id then
+			if b.visible ~= false and b.id ~= v.id and (b.x - v.x) * hx + (b.z - v.z) * hz >= 0 then
 				local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
 				if b.player == true or ux * fx + uz * fz > 0.3 then
 					-- b as a capsule along its heading
