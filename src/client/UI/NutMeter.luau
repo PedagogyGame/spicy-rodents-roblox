@@ -2,14 +2,14 @@
 -- StarterPlayer.StarterPlayerScripts.Client.UI.NutMeter
 -- The nut meter (owner D16 #22; brief v2 §7), on screen while the player is a squirrel: a small pill in the HUD's own
 -- style (white Gotham on translucent black, as UI/PlayMenu's status line and UI/Hud) beside the squirrel's health
--- bar at the top centre:
+-- bar at the top centre (on a phone, the top-left corner):
 --   an acorn and "3/9"     the nuts its squirrel carries of the most it can (amber when its paws are full)
 --   "H4" and a bar         the hollow tree it holds and how full that is (a tick at 70 %, the claim line), or, while
 --                          it is inside a claimable hollow, that hollow's (grey when it is another squirrel's)
 --   a hint line            what to do next, in a few words (gone once there is nothing to say)
 --   "+1"                   beside the count for a moment at each nut picked up; "stored 9" when nuts go into a tree
 -- The server decides everything (Server/Boot/Game writes the Player attributes NutsCarried, NutsMax, NutTree,
--- NutTreeName, NutStore and NutInside "H4|0.45|free|yours|taken" from Foraging/ForageService and HollowService);
+-- NutTreeName, NutStore and NutInside, "H4|0.45|free" (or yours, taken), from Foraging/ForageService and HollowService);
 -- this only draws them, the moment one changes. Nothing here can be clicked.
 -- Where: right of the health bar (UI/PlayMenu's 300-wide bar at the top centre, 84 down) on a screen wide enough
 -- for both (WIDE, 752 pixels), else in the top-left corner just under Roblox's top bar, above the status line (52
@@ -18,7 +18,7 @@
 -- thumbstick and jump button (the bottom corners). Worked out from the modules' numbers, not yet seen on a device.
 -- Interface: look(attrs) -> Look (pure: attrs is a table of those attributes); flash(was, now, inside) -> string?
 --   (pure: what to show beside the count when the carried count moves); place(viewportWidth) -> (anchorX,
---   scaleX, offsetX, offsetY) (pure); WIDTH, HEIGHT, WIDE, CLAIM; start(opts?) -> Handle { gui, stop() }
+--   scaleX, offsetX, offsetY) (pure); WIDTH, HEIGHT, WIDE, CLAIM, PICK_SOUND; start(opts?) -> Handle { gui, stop() }
 -- No service access at require time.
 
 local NutMeter = {}
@@ -268,7 +268,7 @@ function NutMeter.start(opts: Opts?): Handle
 			flashToken += 1
 			local mine = flashToken
 			plus.Text = said
-			plus.Position = UDim2.fromOffset(30 + count.TextBounds.X + 6, 2)
+			plus.Position = UDim2.fromOffset(30 + #look.count * 9 + 6, 2) -- (16 px bold digits: about 9 wide)
 			plus.Visible = true
 			if string.sub(said, 1, 1) == "+" then
 				tickSound:Play()
@@ -284,7 +284,7 @@ function NutMeter.start(opts: Opts?): Handle
 	for _, k in ATTRS do
 		table.insert(conns, player:GetAttributeChangedSignal(k):Connect(draw))
 	end
-	if camera then
+	if camera and (camera :: any).GetPropertyChangedSignal then -- (a window resized, a phone turned)
 		table.insert(conns, camera:GetPropertyChangedSignal("ViewportSize"):Connect(placeIt))
 	end
 	draw()
