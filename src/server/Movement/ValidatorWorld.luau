@@ -26,7 +26,8 @@
 -- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray; opts.cars: { walls, floors },
 --   Traffic/Solid sets); withCars(wall?, down?, cars) -> (wall?, down?); crosses(wall) ->
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; crossesLong(wall) -> the same, chord by chord, for any
---   length; floor(down) -> (x, y, z) -> boolean; landable(down) ->
+--   length; floor(down, depth?) -> (x, y, z) -> boolean (the world's floorBelow, and floorNear at C.FLOOR_NEAR);
+--   maxChord (the world's: C.MAX_CHORD); landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
 -- Ray: (ox, oy, oz, dx, dy, dz) -> boolean, true when the segment origin -> origin + d meets a solid.
@@ -58,6 +59,10 @@ ValidatorWorld.C = table.freeze({
 	-- the floor ray: from this far over the feet to FLOOR_DEPTH under them
 	RAY_ABOVE = 1.5,
 	FLOOR_DEPTH = 3.5,
+	-- a grounded body that rose since the last packet stands on a floor this near under its feet (floorNear: the
+	-- client's ground plates are up to 0.3 over the colliding surface): it rose because the floor did (the round-3
+	-- review: a standing body crept up a posSlack a packet to FLOOR_DEPTH over the floor)
+	FLOOR_NEAR = 0.6,
 })
 local C = ValidatorWorld.C
 
@@ -138,13 +143,15 @@ function ValidatorWorld.crossesLong(wall: Ray): (number, number, number, number,
 	end
 end
 
--- floor(down)(x, y, z): is there something to stand on under feet at y (or the river's water)?
-function ValidatorWorld.floor(down: Ray): (number, number, number) -> boolean
+-- floor(down, depth?)(x, y, z): is there something to stand on under feet at y (or the river's water), within `depth`
+-- under them (default C.FLOOR_DEPTH)?
+function ValidatorWorld.floor(down: Ray, depth: number?): (number, number, number) -> boolean
+	local d = depth or C.FLOOR_DEPTH
 	return function(x: number, y: number, z: number): boolean
-		if Height.insideRiverWater(x, z) and y <= Height.WATER_Y + C.FLOOR_DEPTH then
+		if Height.insideRiverWater(x, z) and y <= Height.WATER_Y + d then
 			return true
 		end
-		return down(x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + C.FLOOR_DEPTH), 0)
+		return down(x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + d), 0)
 	end
 end
 
@@ -195,7 +202,9 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		crosses = if wall then ValidatorWorld.crosses(wall) else nil,
 		crossesLong = if wall then ValidatorWorld.crossesLong(wall) else nil,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
+		floorNear = if down then ValidatorWorld.floor(down, C.FLOOR_NEAR) else nil,
 		landable = if down then ValidatorWorld.landable(down) else nil,
+		maxChord = C.MAX_CHORD, -- (the longest line `crosses` judges; a longer one is crossesLong's)
 	}
 end
 

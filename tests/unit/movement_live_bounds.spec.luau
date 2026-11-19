@@ -497,7 +497,10 @@ return function(t)
 			rig:run(c.within)
 			local r = rig:result()
 			print(`      {LiveRig.describe(c.name, r)}; first snap at {r.firstSnap}`)
-			t.truthy((r.reasons.clock or 0) + (r.reasons["clock+clock"] or 0) >= 1, "snapped for the clock")
+			-- (or for the arcs a clock running ahead of its own motor cannot keep: since round 4 the validator keeps an
+			-- arc's height no higher than the arc, so the clock's few per cent show on a long fall before the minute's mark)
+			local caught = (r.reasons.clock or 0) + (r.reasons["clock+clock"] or 0) + (r.reasons.gravity or 0)
+			t.truthy(caught >= 1, "snapped for the clock")
 		end)
 	end
 	t.test("honest: two minutes at 450 ms one way, and at 80 ms with lag spikes every 20 s: 0 snaps", function()

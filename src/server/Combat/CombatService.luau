@@ -75,12 +75,12 @@ export type Opts = {
 	biteRand: (() -> number)?, -- the dice for the bite itself (default: rand; a spec can land bites and keep the rest)
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	rodents: () -> { number }, -- the player-held Spicy Rodents that can fight now
-	-- the rodent's motor as the validator saw it: seconds since its last clean packet, and since the last pounce launch
-	-- a clean packet showed (Movement/MovementService:motorOf); nil before any packet
+	-- the rodent's motor as the validator saw it: seconds since its last accepted packet and its last clean one, and
+	-- since the last pounce launch a clean packet showed (Movement/MovementService:motorOf); nil before any packet
 	motorOf: ((id: number) -> Motor?)?,
-	-- where the rodent is by its own validated motor state (feet; Movement/MovementService's last clean packet): bites
-	-- and blows are judged there, not at the root its client moves (which may run ahead of the packets by the drift the
-	-- server allows). Nil (or nil returned): the body's own position
+	-- where the rodent is by its own validated motor state (feet; Movement/MovementService's last accepted packet while
+	-- fresh): bites and blows are judged there, not at the root its client moves (which may run ahead of the packets by
+	-- the drift the server allows). Nil (or nil returned): the body's own position
 	poseOf: ((id: number) -> (number?, number?, number?))?,
 	-- the link's round trip of the player holding the rodent, seconds (Player:GetNetworkPing): a bite is judged against
 	-- the person as that player saw them, up to duel.lagMax back (Combat/Duel.bitePhaseAt); nil: no rewind
@@ -96,7 +96,9 @@ export type Opts = {
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
 }
 
-export type Motor = { age: number, launchAgo: number? }
+-- seconds since the last accepted packet, since the last clean one (nil: the same), and since the last pounce launch a
+-- clean packet showed
+export type Motor = { age: number, cleanAge: number?, launchAgo: number? }
 
 export type Zone = { x: number, z: number, at: number, untilT: number, biter: number }
 
@@ -962,12 +964,14 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		local motorOf = self.opts.motorOf
 		if motorOf then
 			-- the motor's own pounce, launched when the click said (within the link's slack), still in its window, and
-			-- a fresh packet: a click alone bites nobody, and neither does a lunge held back for a better moment
+			-- a fresh packet, clean (the round-3 review: packets each with a violation too small to flag are accepted,
+			-- never clean): a click alone bites nobody, and neither does a lunge held back for a better moment
 			local m = motorOf(id)
 			local launchAt = if m and m.launchAgo then now - m.launchAgo else nil
 			if
 				m == nil
 				or m.age > P.motorFresh
+				or (m.cleanAge or m.age) > P.motorFresh
 				or launchAt == nil
 				or not CombatService.tied(P, launchAt, r.launchDue)
 				or now > launchAt + P.pounceWindow + P.rewind

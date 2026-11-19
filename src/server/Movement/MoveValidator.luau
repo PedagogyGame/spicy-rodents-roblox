@@ -40,6 +40,12 @@
 --     (verdict.pounce, the client clock it launched at, and verdict.pounceGap, the gap it lies in); two closer than
 --     the cooldown are a flag at any gap. A plain arc's baseline takes the vertical speed gravity gives, not the one
 --     the packet claims within the slack (claimed a little slower each packet, the slack added up to a slow fall).
+--   * Round 3 (2026-11-19): the baseline keeps only what the envelope judged (SquirrelMotor.Judged: the vertical speed
+--     within the bounds it was checked against, the horizontal one within its cap, an arc's height no higher than the
+--     arc), so no later packet is judged by a number only the client claimed; a line too long for the short wall test
+--     that crosses a wall is weighed as a gap's (wallGap); a grounded packet higher than where the body last stood needs
+--     a floor just under its feet (world.floorNear: no creeping up posSlack a packet); a landing the gap hid counts as
+--     ground for the sprint meter.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -125,6 +131,8 @@ type Actor = {
 	drops: number,
 	resyncs: number,
 	lastAcceptedAt: number, -- server time of the last accepted packet
+	lastLanded: boolean, -- the last accepted packet came down on a floor inside its gap (the envelope's Judged.landed)
+	standY: number?, -- the height it last stood at off the rails (a grounded packet higher than this rose with its floor)
 	lastOffset: number, -- its arrival offset (server time - client clock)
 }
 
@@ -281,6 +289,8 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 		drops = 0,
 		resyncs = 0,
 		lastAcceptedAt = now,
+		lastLanded = false,
+		standY = if state.grounded and not state.routeId then state.y else nil,
 		lastOffset = now - state.clock,
 	}
 	record(actor.history, state.clock, state.x, state.y, state.z)
@@ -445,7 +455,14 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local resync = false
 	local launched = false
 	local pounceAt: number? = nil
-	local arcBaseline: number? = nil
+	-- what the validator keeps of the packet's speeds (the round-3 review: no later packet is judged by a speed only the
+	-- client claimed): the envelope's Judged, or, for a move it does not judge, the claim held to the motor's own bounds
+	local P = SquirrelMotor.params
+	local keepVy = if next.grounded or next.routeId
+		then 0
+		else math.clamp(next.vy, -P.terminalFall, P.leapUp * SquirrelMotor.envelopeParams.launchTol)
+	local keepXZ = if next.routeId then 0 else self:fastest(actorId)
+	local landed = false
 	local boosted = self.boostOf(actorId)
 	local fastest = self:fastest(actorId)
 	local riverLanding = not next.routeId
@@ -471,10 +488,24 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
-		local found, launchUsed, pounceAgo, arcVy = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
+		local found, launchUsed, pounceAgo, judged = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
 		launched = launchUsed
 		for _, v in found do
 			table.insert(violations, v)
+		end
+		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
+		if judged.y then
+			-- (a plain arc: the baseline no higher than the arc, whatever slack the packet took)
+			next.y = judged.y :: number
+		end
+		if judged.longWall then
+			-- a line too long for the short wall test went through a wall: weighed as a gap's (one may be a corner)
+			local n = self:wallGap(actorId, serverTime)
+			table.insert(violations, {
+				code = "wall",
+				severity = if n >= 2 then 1 else 0.34,
+				detail = `a {dt} s move's straight line goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
+			})
 		end
 		-- the pounce rate: the motor pounces only once its cooldown is over, wherever the body is and however long the gap
 		-- (the window dates each launch exactly)
@@ -490,10 +521,13 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			actor.lastPounce = at
 			pounceAt = at
 		end
-		if arcVy then
-			-- (a plain arc: the baseline falls as gravity says, not as the packet claims within the slack)
-			arcBaseline = arcVy
-		end
+	end
+	-- (the speeds kept: a plain arc's baseline falls as gravity says, not as the packet claims within the slack)
+	next.vy = keepVy
+	local hxz = math.sqrt(next.vx * next.vx + next.vz * next.vz)
+	if hxz > keepXZ then
+		local k = if hxz > 0 then keepXZ / hxz else 0
+		next.vx, next.vz = next.vx * k, next.vz * k
 	end
 
 	self:_stamina(
@@ -505,14 +539,37 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		serverTime,
 		resync or dt > SquirrelMotor.envelopeParams.maxDt,
 		boosted or riverLanding,
+		landed,
 		violations
 	)
 
-	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's)
+	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's).
+	-- One higher than where it last stood off the rails rose with the floor (up a slope, a kerb, onto a ledge it leapt
+	-- to): it stands on one just under its feet (world.floorNear), never on air a slack at a time (the round-3 review: a
+	-- standing body crept up posSlack a packet, on the ground or every other packet in the air, to FLOOR_DEPTH over the
+	-- floor and stood there): a whole flag
 	local floorBelow = self.world.floorBelow
-	if floorBelow and next.grounded and not next.routeId and not riverLanding then
-		local bed = Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y)
-		if not bed and not floorBelow(next.x, next.y, next.z) then
+	local standY = actor.standY
+	if next.routeId then
+		actor.standY = nil
+	elseif next.grounded then
+		actor.standY = next.y
+	end
+	local onBed = floorBelow ~= nil
+		and next.grounded
+		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
+	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
+		local floorNear = self.world.floorNear
+		local rose = not resync and standY ~= nil and next.y > (standY :: number) + 1e-3
+		if rose and floorNear then
+			if not floorNear(next.x, next.y, next.z) then
+				table.insert(violations, {
+					code = "climb",
+					severity = 1,
+					detail = `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`,
+				})
+			end
+		elseif not floorBelow(next.x, next.y, next.z) then
 			table.insert(violations, { code = "float", severity = 0.34, detail = "grounded with nothing underfoot" })
 		end
 	end
@@ -534,10 +591,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		-- accumulate a growing gap (the service decides whether to enforce)
 		correction = SquirrelMotor.serialize(prev)
 	end
-	if arcBaseline then
-		next.vy = arcBaseline
-	end
 	actor.last = next
+	actor.lastLanded = landed
 	actor.lastAcceptedAt = serverTime
 	actor.lastOffset = offset
 	record(actor.history, next.clock, next.x, next.y, next.z)
@@ -758,6 +813,7 @@ function MoveValidator._stamina(
 	serverTime: number,
 	unjudged: boolean,
 	exempt: boolean,
+	landed: boolean,
 	violations: { Violation }
 )
 	local marks = actor.marks
@@ -766,8 +822,11 @@ function MoveValidator._stamina(
 	local P = SquirrelMotor.params
 	local C = MoveValidator.C
 	local landable = self.world.landable
-	local function onGround(s: State): boolean
+	-- (a packet whose landing the gap hid, `hidden`, came down on a floor and walked off its edge: on the ground; every
+	-- vertical speed here is the validator's own)
+	local function onGround(s: State, hidden: boolean): boolean
 		return s.grounded
+			or hidden
 			or (math.abs(s.vy) < C.STAMINA_AIR_VY and landable ~= nil and landable(s.x, s.y, s.z, C.STAMINA_GROUND))
 	end
 	local span = if unjudged then dtEff else dt
@@ -776,8 +835,8 @@ function MoveValidator._stamina(
 		and span > 1e-3
 		and prev.routeId == nil
 		and next.routeId == nil
-		and onGround(prev)
-		and onGround(next)
+		and onGround(prev, actor.lastLanded)
+		and onGround(next, landed)
 		and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) / span > P.walk * C.STAMINA_WALK
 	if not running then
 		if not unjudged then
