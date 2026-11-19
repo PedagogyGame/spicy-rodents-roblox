@@ -38,6 +38,7 @@
 local CombatRules = require("@shared/Combat/CombatRules")
 local Duel = require("@shared/Combat/Duel")
 local OverheadWatch = require("@shared/Stealth/OverheadWatch")
+local Pace = require("@shared/Stealth/Pace")
 local Rng = require("@shared/Util/Rng")
 
 local DuelSim = {}
@@ -75,6 +76,8 @@ export type Options = {
 	-- speed (default DuelSim.CREEP)
 	pounceFrom: number?,
 	creep: number?,
+	-- ... or its "creep" is tapping W (a macro): the walk for `on` seconds, then still for `off`, over and over
+	tap: { on: number, off: number }?,
 }
 
 export type Result = {
@@ -312,7 +315,11 @@ function DuelSim.run(opts: Options): Result
 		elseif stalking and (opts.rodent == "stalker" or not onWire) then
 			-- walk in while it cannot be heard, then creep; pounce from 9 studs
 			local creep = d <= 27
-			local sp = if creep then (opts.creep or DuelSim.CREEP) else DuelSim.WALK
+			local tap = opts.tap
+			local sp = if not creep
+				then DuelSim.WALK
+				elseif tap then (if now % (tap.on + tap.off) < tap.on then DuelSim.WALK else 0)
+				else (opts.creep or DuelSim.CREEP)
 			vx, vz = ux * sp, uz * sp
 			if d <= (opts.pounceFrom or 9) and canPounce() then
 				startPounce()
@@ -506,11 +513,13 @@ function DuelSim.run(opts: Options): Result
 			local dy = 0
 			local sneaking = false
 			if stealth then
-				-- the rodent's flat speed over the step (Server/Combat/CombatService paceOf); in view by the facing
+				-- the rodent's flat pace by where the server had it (Server/Combat/CombatService paceOf: the fastest
+				-- Stealth/Pace.stretch of its track); in view by the facing
 				local n = #history
 				local speed = if n >= 2
-					then math.sqrt((history[n].x - history[n - 1].x) ^ 2 + (history[n].z - history[n - 1].z) ^ 2)
-						/ DuelSim.SERVER_DT
+					then Pace.stretch(function(t: number): (number, number)
+						return Pace.along(history, t)
+					end, history[n].t, history[1].t)
 					else nil
 				local tx, tz = rx - hx, rz - hz
 				local inView = d > 0 and (tx * math.sin(pyaw) + tz * math.cos(pyaw)) / d >= 0.28

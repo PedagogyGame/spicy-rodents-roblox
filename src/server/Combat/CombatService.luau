@@ -61,6 +61,7 @@ local Duel = Import.shared("Combat/Duel") :: typeof(require("../../shared/Combat
 local VigilanteRules = Import.shared("Combat/VigilanteRules") :: typeof(require("../../shared/Combat/VigilanteRules"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
+local Pace = Import.shared("Stealth/Pace") :: typeof(require("../../shared/Stealth/Pace"))
 
 -- Exported types do not cross Import (W1 Track A note): the shared ones are restated loosely here.
 type Params = any
@@ -97,6 +98,9 @@ export type Opts = {
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
 	-- the person has pointed the rodent out above them (Server/Stealth/OverheadService:spotted): they are aware of it
 	overhead: ((personId: number, rodentId: number) -> boolean)?,
+	-- the rodent's flat pace by its validated motor packets (Movement/MovementService:paceOf: where each accepted packet
+	-- put it, on the server's clock, Stealth/Pace.stretch); nil (or nil returned): read off its root at the duel's steps
+	paceOf: ((id: number) -> number?)?,
 }
 
 export type Motor = { age: number, launchAgo: number? }
@@ -845,20 +849,24 @@ local function stepChases(self: Service, now: number)
 	end
 end
 
--- the rodent's flat speed over its last duel step (studs/s; from where the server had it: Combat/Duel.notices hears a
--- rodent faster than a creep), nil before two steps
-local function paceOf(r: Rodent): number?
+-- the rodent's flat pace (studs/s; Combat/Duel.notices hears a rodent faster than a creep): the fastest move over any
+-- Stealth/Pace C.span of the last C.hold seconds, by its validated motor packets (opts.paceOf), else by where its root
+-- was at the duel's steps; nil before a whole span is known. Not the last step's move: one position arriving late (a
+-- phone's frame hitch) made an honest creep read twice its pace, and tapping W read as its average (review, M2)
+local function paceOf(self: Service, r: Rodent): number?
+	local f = self.opts.paceOf
+	local v = if f then f(r.id) else nil
+	if v ~= nil then
+		return v
+	end
 	local h = r.history
 	local n = #h
 	if n < 2 then
 		return nil
 	end
-	local a, b = h[n - 1], h[n]
-	local dt = b.t - a.t
-	if dt <= 1e-6 then
-		return nil
-	end
-	return math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2) / dt
+	return Pace.stretch(function(t: number): (number, number)
+		return Pace.along(h, t)
+	end, h[n].t, h[1].t)
 end
 
 -- the people round one rodent: their duels (returns nothing; orders, stances and blows are applied)
@@ -922,7 +930,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		local boosted = self:inAlert(a.x, a.z, now)
 		local dy = (best.y - best.hip) - (a.y - a.hip)
 		local seen = false
-		local pace = paceOf(r)
+		local pace = paceOf(self, r)
 		if not hidden then
 			local f = self.opts.overhead
 			seen = Duel.notices(P, guard, {

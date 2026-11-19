@@ -217,8 +217,9 @@ end
 -- being near: the v5.4 predicate's peripheral sense (spotted within 6.8 u = 17 studs whatever the facing) is for one that
 -- moves faster than a creep (the stalk, owner playtest 2026-11-19; the duel's own noticing is the same rule:
 -- Combat/Duel.notices, Tunables duel.quietSpeed and duel.brush). Actors/Perception.spotted itself is unchanged.
-local function stalkedUnseen(actor: Common.Actor, threat: Common.Actor): boolean
-	if threat.speed > QUIET_SPEED then
+-- `speed` is the squirrel's pace (speedOf: a held body's validated pace, not what its client reports).
+local function stalkedUnseen(actor: Common.Actor, threat: Common.Actor, speed: number): boolean
+	if speed > QUIET_SPEED then
 		return false
 	end
 	local dx, dz = threat.x - actor.x, threat.z - actor.z
@@ -228,6 +229,14 @@ local function stalkedUnseen(actor: Common.Actor, threat: Common.Actor): boolean
 	end
 	local dot = (dx * math.sin(actor.yaw) + dz * math.cos(actor.yaw)) / d
 	return dot <= Perception.constants.inViewDot
+end
+
+-- How fast a squirrel is going: a held one's pace by its validated motor packets (ctx.paceOf), never the velocity its
+-- client reports (a client saying 0 would never be loud); anyone else's own speed
+local function speedOf(threat: Common.Actor, ctx: Common.Ctx): number
+	local f = ctx.paceOf
+	local v = if f then f(threat.id) else nil
+	return if v ~= nil then v else threat.speed
 end
 
 -- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted() (and is not stalking
@@ -245,12 +254,13 @@ local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local bestD = math.huge
 	for i = 1, n do
 		local threat = ctx.actorsById[ctx.queryBuffer[i]]
-		if threat and not stalkedUnseen(actor, threat) then
+		local speed = if threat then speedOf(threat, ctx) else 0
+		if threat and not stalkedUnseen(actor, threat, speed) then
 			local t = self.target
 			t.x, t.y, t.z = threat.x, threat.y, threat.z
 			t.groundY = ctx.groundAt(threat.x, threat.z)
-			t.moveSpeed = threat.speed
-			t.focus = threat.variant == "spicy" and threat.speed < Units.st(2.5)
+			t.moveSpeed = speed
+			t.focus = threat.variant == "spicy" and speed < Units.st(2.5)
 			if Perception.spotted(obs, t, self.pctx) then
 				local d = Common.dist2d(actor.x, actor.z, threat.x, threat.z)
 				if d < bestD then

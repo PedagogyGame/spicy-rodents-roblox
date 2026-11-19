@@ -496,6 +496,12 @@ function Game.start(opts: Opts?): any
 	local world = rt.world
 	local possession = rt.possession
 	local devices = rt.devices
+	-- the brains read a held squirrel's pace by its accepted motor packets, not the velocity its client reports
+	-- (Brains/Pedestrian: a creep behind someone is not noticed; a client saying 0 is not a creep)
+	world.ctx.paceOf = function(townId: number): number?
+		local actor = rt.byTownId[townId]
+		return if actor then movement:paceOf(actor.id) else nil
+	end
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
 	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
@@ -1371,6 +1377,15 @@ function Game.start(opts: Opts?): any
 					return nil, nil, nil
 				end
 				return snap.x :: number, snap.y :: number, snap.z :: number
+			end,
+			-- the rodent's pace by its accepted packets, on the server's clock (the duel hears a rodent faster than a creep);
+			-- its root's at the duel's steps when there are none
+			paceOf = function(id: number): number?
+				local actor = rt.byTownId[id]
+				if o.motorOf or actor == nil then
+					return nil
+				end
+				return movement:paceOf(actor.id)
 			end,
 			linkOf = function(id: number): number?
 				local actor = rt.byTownId[id]
