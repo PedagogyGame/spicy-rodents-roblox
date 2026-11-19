@@ -732,6 +732,14 @@ function Game.start(opts: Opts?): any
 				local player = if userId then Players:GetPlayerByUserId(userId) else nil
 				return if player then player.DisplayName else nil
 			end,
+			-- a claim's words to its player, as the notice toast (the computer's squirrels are told nothing)
+			tell = function(key: any, text: string)
+				local userId = tonumber(string.match(tostring(key), "^player (%-?%d+)$"))
+				local player = if userId then Players:GetPlayerByUserId(userId) else nil
+				if player then
+					fire(player, { kind = "notice", text = text })
+				end
+			end,
 		})
 	end)
 	if not okH then
