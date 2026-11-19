@@ -251,6 +251,80 @@ return function(t)
 		end
 	)
 
+	t.test("a squirrel or a person on a stopped sedan's own roof: the sedan drives off from under them", function()
+		-- review 2026-11-18: cars are solid now, their roofs ground; a body on a sedan's roof was in its corridor (a
+		-- squirrel under VIS_HEIGHT over its base) or inside its hard stop (a person), so it and its queue waited
+		for _, case in { "squirrel", "human", "both" } do
+			local svc, v = sedanNB()
+			-- stopped for a person in the lane (the braking rule)
+			local ahead = v.z + st(20)
+			local human = { x = v.x, y = 0, z = ahead, kind = "human" }
+			for _ = 1, 30 * 8 do
+				svc:step(1 / 30, { people = { human } })
+			end
+			t.near(v.speed, 0, 1e-3, `{case}: stopped for the person ahead`)
+			-- the person ahead leaves; the bodies stand on its roof, where it stopped (it does not carry them)
+			local roof = v.y - st(0.04) + Boxes.BOXES.sedan.height
+			local x0, z0 = v.x, v.z
+			local world = { people = {}, squirrels = {} } :: any
+			if case ~= "human" then
+				table.insert(world.squirrels, { id = "sq", x = x0 + st(0.3), y = roof, z = z0 - st(0.5) })
+			end
+			if case ~= "squirrel" then
+				table.insert(world.people, { x = x0 - st(0.2), y = roof, z = z0 + st(0.4), kind = "human" })
+			end
+			-- a body falls (the squirrel's gravity, 75 st/s2) to the road where it stands once the roof has gone from
+			-- under it (on the server even later: its client stands it on the car as drawn, behind the server's)
+			local box = Boxes.BOXES.sedan
+			local road = v.y - st(0.04)
+			local vy: { [any]: number } = {}
+			local function fall()
+				for _, b in { world.squirrels[1], world.people[1] } do
+					local along, across = b.z - v.z, b.x - v.x -- (the lane runs along +z)
+					if b.y > road and (math.abs(along) > box.length / 2 or math.abs(across) > box.width / 2) then
+						vy[b] = (vy[b] or 0) - 75 / 30
+						b.y = math.max(road, b.y + vy[b] / 30)
+					end
+				end
+			end
+			local fell = 0
+			for _ = 1, 30 * 5 do
+				svc:step(1 / 30, world)
+				fall()
+				for _, b in { world.squirrels[1], world.people[1] } do
+					if b.y < roof then
+						fell = 1
+					end
+				end
+			end
+			print(
+				`      {case}: the sedan drove {string.format("%.1f", Units.u(v.z - z0))} u, left them on the road, and waits for them at its tail`
+			)
+			t.eq(fell, 1, `{case}: drove off from under them ({Units.u(v.z - z0)} u)`)
+			t.eq(svc:stats().hits, 0, `{case}: nobody run over`)
+			-- (v5.4's corridor reaches 3.5 u behind a sedan's centre and its hard stop is 3.1 u round its next position:
+			-- a body standing at its tail holds it, as before this branch; the bodies step aside and it drives on)
+			for _, b in { world.squirrels[1], world.people[1] } do
+				b.x += st(4)
+			end
+			local z1 = v.z
+			for _ = 1, 30 * 3 do
+				svc:step(1 / 30, world)
+			end
+			t.truthy(v.z - z1 > st(10), `{case}: drives on once they step aside ({Units.u(v.z - z1)} u)`)
+		end
+		-- the same bodies on the road beside its nose still stop it (the braking rule is unchanged)
+		local svc, v = sedanNB()
+		for _ = 1, 30 * 2 do
+			svc:step(1 / 30, {})
+		end
+		local road = { x = v.x, y = v.y, z = v.z + Boxes.BOXES.sedan.length / 2 + st(2), kind = "human" }
+		for _ = 1, 30 * 4 do
+			svc:step(1 / 30, { people = { road } })
+		end
+		t.near(v.speed, 0, 1e-3, "a person on the road ahead still stops it")
+	end)
+
 	t.test("player cars: a sedan stops behind a player's car standing in its lane, at any angle", function()
 		for _, yaw in { 0, math.pi / 2, math.pi } do
 			local svc, v = sedanNB()
