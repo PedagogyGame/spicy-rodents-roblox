@@ -8,6 +8,8 @@
 -- Usage (repo root; bake first: lune run tools/bake/main.luau, attractions.luau and the expansion bakes):
 --   lune run tools/sim/wall_audit.luau                       4 seeds x 30 simulated minutes, near and far
 --   lune run tools/sim/wall_audit.luau --seeds 1,2 --minutes 10 --far
+--   (review) --combat (the duel round the rodent), --chase (the police chase after each bite), --soft (trees, props and
+--   shoulder clips counted, not budgeted), --sewers (build/Sewers.rbxm's parts as walls too), --no-dogs
 local process = require("@lune/process")
 local Data = require("@shared/Data")
 local WallAudit = require("@tests/lib/WallAudit")
@@ -15,6 +17,7 @@ local WallAudit = require("@tests/lib/WallAudit")
 local seeds = { 1, 2, 3, 4 }
 local minutes = 30
 local modes = { true, false } -- near (a player by the rodent: brains at 10 Hz), far (1 Hz)
+local extra = { combat = false, chase = false, soft = false, sewers = false, dogs = true }
 local i = 1
 local args = process.args
 while i <= #args do
@@ -32,6 +35,16 @@ while i <= #args do
 		modes = { true }
 	elseif a == "--far" then
 		modes = { false }
+	elseif a == "--combat" then
+		extra.combat = true
+	elseif a == "--chase" then
+		extra.chase = true
+	elseif a == "--soft" then
+		extra.soft = true
+	elseif a == "--sewers" then
+		extra.sewers = true
+	elseif a == "--no-dogs" then
+		extra.dogs = false
 	else
 		print(`wall_audit: unknown option {a} (--seeds 1,2 --minutes N --near|--far)`)
 		process.exit(2)
@@ -40,7 +53,11 @@ while i <= #args do
 end
 
 WallAudit.TRAILS = true
-local town = WallAudit.load()
+local files = table.clone(WallAudit.FILES)
+if extra.sewers then
+	table.insert(files, "build/Sewers.rbxm")
+end
+local town = WallAudit.load(files)
 if #town.missing > 0 then
 	print(`wall_audit: not baked: {table.concat(town.missing, ", ")}`)
 	process.exit(2)
@@ -50,14 +67,21 @@ local crossings, steps = 0, 0
 for _, seed in seeds do
 	for _, near in modes do
 		local t0 = os.clock()
-		local r = WallAudit.run(town, data, { seed = seed, minutes = minutes, near = near })
+		local r = WallAudit.run(town, data, {
+			seed = seed,
+			minutes = minutes,
+			near = near,
+			combat = extra.combat,
+			chase = extra.chase,
+			soft = extra.soft,
+		})
 		print(`== seed {seed}, {minutes} min, {if near then "near" else "far"} ({math.floor(os.clock() - t0)} s)`)
 		print(WallAudit.format(r))
 		crossings += r.crossings
 		steps += r.steps
 	end
 end
-for _, night in { false, true } do
+for _, night in if extra.dogs then { false, true } else {} do
 	local r = WallAudit.dogs(town, minutes, night)
 	print(`== yard dogs, {minutes} min, {if night then "night" else "day"}`)
 	print(WallAudit.format(r))

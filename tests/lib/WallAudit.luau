@@ -37,6 +37,7 @@ local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
 local TrafficService = require("@server/Traffic/TrafficService")
 local InfectionService = require("@server/Infection/InfectionService")
+local CombatService = require("@server/Combat/CombatService")
 
 local WallAudit = {}
 
@@ -82,6 +83,11 @@ export type Report = {
 	insideExamples: { [string]: { Crossing } },
 	jumps: number,
 	events: { [string]: number },
+	-- (review, RunOpts.soft) steps through trees ("tree") and props by part name; shoulder clips by cause
+	soft: { [string]: number }?,
+	shoulder: { [string]: number }?,
+	shoulderExamples: { [string]: { Crossing } }?,
+	stuck: { string }?, -- bodies that stood 60 s or more for want of a way
 }
 
 function WallAudit.load(files: { string }?): Town
@@ -129,6 +135,57 @@ function WallAudit.crossing(
 			if t and part then
 				return part
 			end
+		end
+	end
+	return nil
+end
+
+-- (review) the tree or prop a step walks through at the waist (what `wall` leaves out), if any
+function WallAudit.softCrossing(
+	town: Town,
+	ax: number,
+	ay: number,
+	az: number,
+	bx: number,
+	by: number,
+	bz: number
+): BakedWorld.Part?
+	local dx, dy, dz = bx - ax, by - ay, bz - az
+	if dx * dx + dz * dz < 1e-8 then
+		return nil
+	end
+	local function soft(p: BakedWorld.Part): boolean
+		return p.collide and not wall(p)
+	end
+	for _, w in town.worlds do
+		local t, part = w.raycast(ax, ay + WallAudit.HEIGHTS[1], az, dx, dy, dz, soft)
+		if t and part then
+			return part
+		end
+	end
+	return nil
+end
+
+-- (review) a wall a step's shoulders walk into: the lines SHOULDER studs to either side of the step, at HEIGHTS
+function WallAudit.shoulderCrossing(
+	town: Town,
+	ax: number,
+	ay: number,
+	az: number,
+	bx: number,
+	by: number,
+	bz: number
+): BakedWorld.Part?
+	local dx, dz = bx - ax, bz - az
+	local len = math.sqrt(dx * dx + dz * dz)
+	if len < 1e-4 then
+		return nil
+	end
+	local ox, oz = -dz / len * WallAudit.SHOULDER, dx / len * WallAudit.SHOULDER
+	for _, s in { 1, -1 } do
+		local part = WallAudit.crossing(town, ax + ox * s, ay, az + oz * s, bx + ox * s, by, bz + oz * s)
+		if part then
+			return part
 		end
 	end
 	return nil
@@ -251,7 +308,15 @@ export type RunOpts = {
 	near: boolean?, -- brains near the rodent think at the near rate (a player is there); else nobody is near
 	rail: any?,
 	world: any?, -- reuse a built world's rail
+	-- (review additions, all off by default)
+	combat: boolean?, -- run Combat/CombatService (the duel: people square up, close in, back away) round the rodent,
+	-- which feints every few seconds while it lingers at a scene
+	chase: boolean?, -- after each bite the two nearest officers chase the rodent (a new "respond" every 0.5 s, 40 s)
+	soft: boolean?, -- also count steps through trees and props (report.soft) and shoulder clips (report.shoulder:
+	-- the centre line clear but a line SHOULDER to either side hits a wall)
 }
+
+WallAudit.SHOULDER = 0.9 -- studs: half a townsperson's shoulder width
 
 -- spots where a player could leave a body: in every lot (houses with rooms, shops, yards), in the venues, in the
 -- alley, on open ground; each one a place a body stands (the AI's own ground agrees with the baked one)
@@ -365,12 +430,14 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	local ctx = world.ctx :: any
 	local way = ctx.way
 	local ways, worstMs, slow, none = 0, 0, 0, 0
+	local stepMs, worstStepMs = 0, 0
 	if way then
 		ctx.way = function(x0: number, z0: number, x1: number, z1: number): any
 			local t0 = os.clock()
 			local out = way(x0, z0, x1, z1)
 			ways += 1
 			local ms = (os.clock() - t0) * 1000
+			stepMs += ms
 			worstMs = math.max(worstMs, ms)
 			slow += if ms > 4 then 1 else 0
 			none += if out == nil then 1 else 0
@@ -385,6 +452,27 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 		end
 	end
 	TownAI.suspend(world, rodent.id)
+	local combat: any = nil
+	if opts.combat then
+		combat = CombatService.new({
+			world = world,
+			infection = svc,
+			rand = function(): number
+				return rng.next()
+			end,
+			rodents = function(): { number }
+				return { rodent.id }
+			end,
+		})
+	end
+	local nextFeint = 0
+	local chases: { [number]: number } = {} -- officer id -> chase ends
+	local nextChase = 0
+	local stuckRun: { [number]: number } = {}
+	local stuckWorst: { [number]: { number } } = {} -- id -> { seconds, x, z }
+	report.soft = {}
+	report.shoulder = {}
+	report.shoulderExamples = {}
 	if opts.near then
 		TownAI.setFocus(world, function()
 			return { { x = rodent.x, z = rodent.z } }
@@ -452,11 +540,26 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 				end
 				victimAt = { victim.x, victim.z }
 				stay = now + 6 + rng.next() * 10
+				if opts.chase then
+					local cops = table.clone(officers)
+					table.sort(cops, function(p: any, q: any): boolean
+						return (p.x - rx) ^ 2 + (p.z - rz) ^ 2 < (q.x - rx) ^ 2 + (q.z - rz) ^ 2
+					end)
+					for i = 1, math.min(2, #cops) do
+						if free(cops[i]) then
+							chases[cops[i].id] = now + 40
+						end
+					end
+				end
 			end
 		elseif victimAt and now < stay then
 			-- (it lingers by the scene: people round the patient see it and run)
 			local ang = now * 0.7
 			rodent.x, rodent.z = victimAt[1] + math.cos(ang) * 6, victimAt[2] + math.sin(ang) * 6
+			if combat and now >= nextFeint then
+				nextFeint = now + 2 + rng.next() * 3
+				combat:rodentAct(rodent.id, "feint", now)
+			end
 		elseif victimAt then
 			victimAt = nil
 			local s = spot()
@@ -516,9 +619,27 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 			end
 		end
 
+		-- (the police chase: CombatService.stepChases re-orders a chasing officer every 0.5 s where the rodent is)
+		if now >= nextChase then
+			nextChase = now + 0.5
+			for id, untilT in chases do
+				local brain = world.brains[id] :: any
+				if now >= untilT or not free(world.actorsById[id]) or locked[id] then
+					chases[id] = nil
+				elseif brain then
+					brain:onEvent({ type = "respond", x = rodent.x, z = rodent.z, untilTime = now + 1 })
+					count(report, "chaseOrders")
+				end
+			end
+		end
+		stepMs = 0
 		TownAI.stepFrame(world, dt)
 		traffic:step(dt, { people = {} })
 		svc:step(dt)
+		if combat then
+			combat:step(dt, world.now)
+		end
+		worstStepMs = math.max(worstStepMs, stepMs)
 
 		for _, a in world.actors do
 			local p = prev[a.id]
@@ -528,6 +649,9 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 				continue
 			end
 			local mx, mz = fx - p[1], fz - p[3]
+			if combat and (world.brains[a.id] :: any).state == "duel" and a.intent.mode == "walk" then
+				count(report, "duelWalkSteps")
+			end
 			local trail = trails[a.id]
 			if #trail >= WallAudit.TRAIL then
 				table.remove(trail, 1)
@@ -552,7 +676,50 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 						y = fy,
 						trail = table.clone(trail),
 					})
+				elseif opts.soft then
+					local soft = WallAudit.softCrossing(town, p[1], p[2], p[3], fx, fy, fz)
+					if soft then
+						local key = if isTree(soft) then "tree" else soft.name
+						report.soft[key] = (report.soft[key] or 0) + 1
+					end
+					local clip = WallAudit.shoulderCrossing(town, p[1], p[2], p[3], fx, fy, fz)
+					if clip then
+						local cause = causeOf(world, a)
+						report.shoulder[cause] = (report.shoulder[cause] or 0) + 1
+						local list = report.shoulderExamples[cause]
+						if list == nil then
+							list = {}
+							report.shoulderExamples[cause] = list
+						end
+						if #list < 3 then
+							table.insert(list, {
+								t = world.now,
+								id = a.id,
+								post = a.post or a.species,
+								cause = cause,
+								part = clip.path,
+								ax = p[1],
+								az = p[3],
+								bx = fx,
+								bz = fz,
+								y = fy,
+							})
+						end
+					end
 				end
+			end
+			-- standing because no way was found (a brain's leg waiting out a failed search)
+			local brain = world.brains[a.id] :: any
+			local leg = brain and brain.leg
+			if a.species == "human" and leg and leg.points == nil and leg.misses > 0 and a.intent.mode == "stand" then
+				local run = (stuckRun[a.id] or 0) + dt
+				stuckRun[a.id] = run
+				local w = stuckWorst[a.id]
+				if w == nil or run > w[1] then
+					stuckWorst[a.id] = { run, fx, fz }
+				end
+			else
+				stuckRun[a.id] = 0
 			end
 			local inPart = WallAudit.inside(town, fx, fy, fz)
 			if inPart then
@@ -585,10 +752,31 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	for k, v in stats do
 		report.events[k] = v
 	end
+	if combat then
+		for k, v in combat:stats() do
+			report.events["duel_" .. k] = v
+		end
+	end
 	report.events.brainWays = ways
 	report.events.brainWaysOver4ms = slow
 	report.events.brainWaysNone = none
 	report.events.brainWayWorstMs = math.floor(worstMs * 10 + 0.5) / 10
+	report.events.brainWayWorstStepMs = math.floor(worstStepMs * 10 + 0.5) / 10
+	-- bodies that stood for want of a way: how many stood 60 s or more at a stretch, and the longest
+	local over, longest = 0, 0
+	report.stuck = {}
+	for id, w in stuckWorst do
+		longest = math.max(longest, w[1])
+		if w[1] >= 60 then
+			over += 1
+			if #report.stuck < 8 then
+				local a = world.actorsById[id]
+				table.insert(report.stuck, string.format("#%d %s %.0f s at (%.0f, %.0f)", id, a.post, w[1], w[2], w[3]))
+			end
+		end
+	end
+	report.events.noWayStand60s = over
+	report.events.noWayStandLongest = math.floor(longest)
 	return report
 end
 
@@ -707,6 +895,45 @@ function WallAudit.format(report: Report): string
 				table.insert(lines, string.format("      #%d %s %s at (%.1f, %.1f)", e.id, e.post, e.part, e.bx, e.bz))
 			end
 		end
+	end
+	local shoulder = {}
+	for c, n in report.shoulder or {} do
+		table.insert(shoulder, { c, n })
+	end
+	table.sort(shoulder, function(a, b)
+		return a[2] > b[2]
+	end)
+	if #shoulder > 0 then
+		table.insert(lines, `  shoulder clips (centre line clear, {WallAudit.SHOULDER} studs to a side not):`)
+		for _, c in shoulder do
+			table.insert(lines, `    {c[2]}  {c[1]}`)
+			for _, e in (report.shoulderExamples or {})[c[1]] or {} do
+				table.insert(
+					lines,
+					string.format(
+						"      #%d %s %s (%.1f, %.1f) -> (%.1f, %.1f)",
+						e.id,
+						e.post,
+						e.part,
+						e.ax,
+						e.az,
+						e.bx,
+						e.bz
+					)
+				)
+			end
+		end
+	end
+	local soft = {}
+	for k, n in report.soft or {} do
+		table.insert(soft, `{k}={n}`)
+	end
+	if #soft > 0 then
+		table.sort(soft)
+		table.insert(lines, "  steps through trees and props: " .. table.concat(soft, " "))
+	end
+	if report.stuck and #report.stuck > 0 then
+		table.insert(lines, "  stood 60 s+ for want of a way: " .. table.concat(report.stuck, "; "))
 	end
 	local ev = {}
 	for k, v in report.events do
