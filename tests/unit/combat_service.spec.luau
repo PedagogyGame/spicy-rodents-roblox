@@ -1,10 +1,11 @@
 --!strict
 -- Server/Combat/CombatService on the town as Boot/Game runs it (tests/lib/BiteRig: the real town AI, fleet and
 -- bite-to-hospital sequence): the bite at the right moment instead of on contact, the people's side of the duel on the
--- real brains (a vigilante squares up and closes in; a calm person runs), blows that cost the rodent health, a player's
--- townsperson left to their own kicks, feints, the vigilante share through possessions, and the bite's aftermath
--- (the alert zone's hidden boost and near-impossible second bite, the police within two blocks giving chase and
--- stopping past five).
+-- real brains (a vigilante closes in, hidden until provoked; a calm person runs), blows that cost the rodent health, a
+-- player's townsperson left to their own kicks, feints, the vigilante share through possessions, the few vigilantes
+-- shown at 40 % bitten, and the bite's aftermath (the alert zone's hidden boost and near-impossible second bite, the
+-- nearest police giving chase wherever they are and losing it two blocks off). The review's findings 1, 4, 6, 7 and 8
+-- each have a case here.
 local BiteRig = require("@tests/lib/BiteRig")
 
 local function dice(v: number): () -> number

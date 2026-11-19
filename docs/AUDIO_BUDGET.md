@@ -176,4 +176,5 @@ Every cue is a Sound named after it, played at the body (Boot/Game). All should 
 | `Duel.Strike` | a person's kick, swing or baton comes down (at the person) | a whoosh |
 | `Duel.Blow` | the blow lands on the rodent (at the rodent) | a soft thump and a squeak |
 | `Duel.Batted` | a bite batted away (at the person) | a slap and a yelp |
-| `Duel.Squareup` | a vigilante squares up to the rodent (at the person) | a short grunt, "Hey!" |
+| `Duel.Squareup` | someone squares up to the rodent (a vigilante, or the scene turning on it; at the person) | a short grunt, "Hey!" |
+| `Duel.Shout` | someone on the scene of a bite backs off (at the person) | a short shout, no words needed |
