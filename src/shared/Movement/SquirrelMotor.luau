@@ -2611,7 +2611,7 @@ function SquirrelMotor.envelope(
 		-- one, the validator's; E and Space every second frame is how the honest motor climbs a trunk, 29 st/s). Every
 		-- pattern of grabs the gap's frames allow is stepped as the motor steps (the body on its own arc, a grab snapping
 		-- it to the nearest sample over its drawn pose and leaping at the launch's speed); `next` within posSlack of the
-		-- highest any reaches is explained, the earliest last grab kept, the height kept no higher than that pattern's
+		-- highest any reaches is explained, the earliest last grab of those kept, the height no higher than they reach
 		local frames = math.max(1, math.ceil(dt / P.substep - 1e-6))
 		local hiddenMemo: boolean? = nil
 		local function hidden(): boolean
@@ -2688,10 +2688,8 @@ function SquirrelMotor.envelope(
 						end
 					end
 					if any and next.y <= y + E.posSlack then
-						local l = last :: number
-						if l < bestLast or (l == bestLast and y > bestTop) then
-							bestLast, bestTop = l, y
-						end
+						-- (the earliest last grab of any pattern that explains it, the height kept to the highest)
+						bestLast, bestTop = math.min(bestLast, last :: number), math.max(bestTop, y)
 					end
 					return
 				end
@@ -2881,8 +2879,10 @@ function SquirrelMotor.envelope(
 					local hi = (prev.vy + next.vy) / 2 * dt + E.posSlack + gEps * dt
 					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
 					local dy = next.y - prev.y
-					local visited = if shortGap then hidden() else plausible() and railHigh()
-					if (dy > hi and not visited) or (dy < lo and not plausible()) then
+					local function visited(): boolean
+						return if shortGap then hidden() else plausible() and railHigh()
+					end
+					if (dy > hi and not visited()) or (dy < lo and not plausible()) then
 						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
 					end
 					arcVy = expected
