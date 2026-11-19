@@ -136,7 +136,10 @@ end
 
 -- a cylinder across the ride (axis X), `w` wide, of radius r, centred at p
 local function across(k: Kit, name: string, p: V, w: number, r: number, c: Rgb, material: string?): Part
-	return put(k, { name = name, size = { w, r * 2, r * 2 }, pos = at(k, p), color = c, shape = "Cylinder", material = material })
+	return put(
+		k,
+		{ name = name, size = { w, r * 2, r * 2 }, pos = at(k, p), color = c, shape = "Cylinder", material = material }
+	)
 end
 
 local function ball(k: Kit, name: string, p: V, d: number, c: Rgb): Part
@@ -192,10 +195,17 @@ function RidePuppet.drawBicycle(k: Kit, opts: BikeOpts?): Anchors
 	seg(k, "Fork", headFoot, front, tube * 0.9, chrome, "Metal")
 	seg(k, "Stem", headFoot, barAt, tube * 1.1, paint)
 	across(k, "Bars", barAt, 1.3 * s, 0.06 * s, hex(FIXED.bar))
-	block(k, "Saddle", { 0, seatTop[2] + 0.07 * s, seatTop[3] + 0.05 * s }, { 0.42 * s, 0.16 * s, 0.8 * s }, hex(FIXED.saddle))
+	block(
+		k,
+		"Saddle",
+		{ 0, seatTop[2] + 0.07 * s, seatTop[3] + 0.05 * s },
+		{ 0.42 * s, 0.16 * s, 0.8 * s },
+		hex(FIXED.saddle)
+	)
 	across(k, "Chainring", bb, 0.1 * s, 0.32 * s, chrome, "Metal")
 	-- the cranks: one bar through the bottom bracket, its ends the two pedals (left up and forward, right down and back)
-	local crankUp: V, crankDown: V = { -0.45 * s, bb[2] + 0.3 * s, bb[3] - 0.18 * s }, { 0.45 * s, bb[2] - 0.3 * s, bb[3] + 0.18 * s }
+	local crankUp: V, crankDown: V =
+		{ -0.45 * s, bb[2] + 0.3 * s, bb[3] - 0.18 * s }, { 0.45 * s, bb[2] - 0.3 * s, bb[3] + 0.18 * s }
 	seg(k, "Cranks", crankUp, crankDown, 0.05 * s, hex(FIXED.bar), "Metal")
 	if o.basket then
 		block(k, "Basket", { 0, 2.28 * s, -1.5 * s }, { 0.8 * s, 0.5 * s, 0.62 * s }, hex(FIXED.basket), "Wood")
@@ -308,14 +318,34 @@ local function drawFigure(k: Kit, dress: PeopleLooks.Dress, r: Rider, pose: Pose
 	if mime then
 		-- the striped top: two dark bands round the body, and the red scarf at the neck
 		for i, t in { 0.45, 0.8 } do
-			seg(k, `Stripe{i}`, add3(hip, scale3(up, t * s)), add3(hip, scale3(up, (t + 0.13) * s)), 0.52 * s, hex(FIXED.stripe))
+			seg(
+				k,
+				`Stripe{i}`,
+				add3(hip, scale3(up, t * s)),
+				add3(hip, scale3(up, (t + 0.13) * s)),
+				0.52 * s,
+				hex(FIXED.stripe)
+			)
 		end
-		seg(k, "Scarf", add3(shoulder, scale3(up, 0.18 * s)), add3(shoulder, scale3(up, 0.38 * s)), 0.36 * s, hex(FIXED.scarf))
+		seg(
+			k,
+			"Scarf",
+			add3(shoulder, scale3(up, 0.18 * s)),
+			add3(shoulder, scale3(up, 0.38 * s)),
+			0.36 * s,
+			hex(FIXED.scarf)
+		)
 	end
 	local head = add3(shoulder, add3(scale3(up, 0.2 * s), { 0, 0.62 * s, 0 }))
 	ball(k, "Head", head, 1.3 * s, skin).castShadow = true
 	for _, sx in { -1, 1 } do
-		ball(k, if sx < 0 then "EyeL" else "EyeR", add3(head, { sx * 0.22 * s, 0.08 * s, -0.6 * s }), 0.15 * s, hex(FIXED.eye))
+		ball(
+			k,
+			if sx < 0 then "EyeL" else "EyeR",
+			add3(head, { sx * 0.22 * s, 0.08 * s, -0.6 * s }),
+			0.15 * s,
+			hex(FIXED.eye)
+		)
 	end
 	-- hair: a ball a little bigger than the head, set up and back so the face shows; long styles hang lower
 	local style = r.hair or dress.hair or "Hair_short"
@@ -339,7 +369,14 @@ local function drawFigure(k: Kit, dress: PeopleLooks.Dress, r: Rider, pose: Pose
 	elseif style == "Hair_bun" then
 		ball(k, "Bun", add3(head, { 0, 0.62 * s, 0.42 * s }), 0.5 * s, c.hair)
 	elseif style == "Hair_ponytail" then
-		seg(k, "Ponytail", add3(head, { 0, 0.3 * s, 0.68 * s }), add3(head, { 0, -0.35 * s, 0.82 * s }), 0.17 * s, c.hair)
+		seg(
+			k,
+			"Ponytail",
+			add3(head, { 0, 0.3 * s, 0.68 * s }),
+			add3(head, { 0, -0.35 * s, 0.82 * s }),
+			0.17 * s,
+			c.hair
+		)
 	end
 	-- arms to the hand holds (the juggler's up and forward), round hands
 	local hands = pose.hands
@@ -370,7 +407,8 @@ local function drawFigure(k: Kit, dress: PeopleLooks.Dress, r: Rider, pose: Pose
 	end
 	if mime then
 		-- the four juggling balls on their arcs above the hands
-		local arc: { V } = { { -0.62, 0.9, -1.05 }, { -0.22, 1.55, -1.15 }, { 0.24, 1.35, -1.15 }, { 0.62, 0.7, -1.05 } }
+		local arc: { V } =
+			{ { -0.62, 0.9, -1.05 }, { -0.22, 1.55, -1.15 }, { 0.24, 1.35, -1.15 }, { 0.62, 0.7, -1.05 } }
 		for i, p in arc do
 			ball(k, `Ball{i}`, add3(shoulder, scale3(p, s)), 0.34 * s, hex(FIXED.juggle[i]))
 		end
@@ -446,12 +484,20 @@ function RidePuppet.rider(slot: number, index: number?): PartBuilder.ModelSpec
 end
 
 -- A parked bicycle on its own: the root is the bike's box (`size`, centred), drawn standing on the box's floor.
-function RidePuppet.bicycle(opts: { scale: number?, frame: string?, basket: boolean?, size: V?, name: string? }?): PartBuilder.ModelSpec
+function RidePuppet.bicycle(
+	opts: { scale: number?, frame: string?, basket: boolean?, size: V?, name: string? }?
+): PartBuilder.ModelSpec
 	local o = opts or {}
 	local s = o.scale or 1
 	local size: V = o.size or { 1.3 * s, 2.5 * s, 4.98 * s }
 	local k = RidePuppet.newKit(-size[2] / 2)
-	put(k, { name = "RootPart", size = { size[1], size[2], size[3] }, pos = { 0, 0, 0 }, color = hex(o.frame or "#405979"), transparency = 1 })
+	put(k, {
+		name = "RootPart",
+		size = { size[1], size[2], size[3] },
+		pos = { 0, 0, 0 },
+		color = hex(o.frame or "#405979"),
+		transparency = 1,
+	})
 	RidePuppet.drawBicycle(k, { scale = s, frame = o.frame, basket = o.basket })
 	shadows(k.parts)
 	k.parts[1].castShadow = nil

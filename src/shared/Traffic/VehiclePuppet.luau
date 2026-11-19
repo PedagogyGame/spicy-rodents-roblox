@@ -1,7 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Traffic.VehiclePuppet
 -- Part-built vehicles at the TRUE logical boxes (BUILD_PLAN §4.4 W1 #9 and #10, D9, §5.2).
--- Interface: spec(kind, opts?) -> PartBuilder.ModelSpec; KINDS; baseOffset(kind) (root centre above the base); length(kind), width(kind), track(kind)
+-- Interface: spec(kind, opts?) -> PartBuilder.ModelSpec; KINDS; PLAYER_KINDS (drawn only at a given opts.box); baseOffset(kind) (root centre above the base); length(kind), width(kind), track(kind)
 --
 -- The invisible RootPart is exactly the logical box from Traffic/Boxes (the box the fatal test sweeps), and
 -- the visible vehicle fills the same envelope and stays inside it, so a player never dies to a car that
@@ -17,7 +17,9 @@
 local Boxes = require("./Boxes")
 local PartBuilder = require("../Avatar/PartBuilder")
 
-export type Opts = { color: string?, name: string?, beacons: boolean? }
+-- box: { width, height, length } in place of the kind's Traffic/Boxes box (a player's vehicle, Vehicles/Placeholder:
+-- the VehicleKinds box, which is also its collider)
+export type Opts = { color: string?, name: string?, beacons: boolean?, box: { number }? }
 
 local VehiclePuppet = {}
 
@@ -40,6 +42,16 @@ local DEFAULTS: { [string]: { color: string, cabin: number, beacons: boolean } }
 
 local BEACON_RED, BEACON_BLUE, BEACON_WHITE = "#ff2a2a", "#2f6bff", "#fff4e6"
 VehiclePuppet.BEACONS = { red = BEACON_RED, blue = BEACON_BLUE, white = BEACON_WHITE }
+
+-- The player's vehicles that no traffic kind draws (Vehicles/Placeholder: the pickup and SUV the top two humans hold
+-- keys to, the rental jet ski), drawn at the box the caller gives (opts.box). Colours: Vehicles/VehicleKinds.
+-- stylua: ignore
+local PLAYER: { [string]: { color: string, cabin: number, beacons: boolean } } = {
+	pickup = { color = "#8c402e", cabin = 0.45, beacons = false },
+	suv = { color = "#334d40", cabin = 0.5, beacons = false },
+	jetski = { color = "#f2bf1a", cabin = 0.3, beacons = false },
+}
+VehiclePuppet.PLAYER_KINDS = { "jetski", "pickup", "suv" }
 
 VehiclePuppet.KINDS = {} :: { string }
 for kind in DEFAULTS do
@@ -718,6 +730,111 @@ local function cartParts(k: Kit, color: Rgb): number
 	return 0.6
 end
 
+-- Pickup (a player's, Vehicles/Placeholder): the sedan's nose and cab on a taller body, the cab ending two fifths of the
+-- way back, an open bed with its sides and tailgate behind it, big wheels; tuned for the 6.25 x 5.75 x 13.5 box.
+local function pickupParts(k: Kit, color: Rgb): number
+	local hw, hl, L, H = k.hw, k.hl, k.L, k.H
+	local trim, seam, glass = hex(FIXED.trim), hex(FIXED.seam), hex(FIXED.glass)
+	local wheelR, wheelW, archR = 1.2, 0.95, 1.4
+	local bw = hw - 0.16
+	local cw = bw - 0.22
+	local ends = hl - 0.2
+	local sill, waist, belt, roof = 0.8, 2.95, 3.3, H - 0.25
+	local R = 0.6
+	local screen0, screen1 = -hl + L * 0.29, -hl + L * 0.39
+	local cabBack = -hl + L * 0.57
+	local axleF, axleB = -hl + L * 0.18, hl - L * 0.2
+
+	add(k, "Body", bw, sill, waist, -ends + R, cabBack, color)
+	roundNose(k, bw, ends, R, sill, waist, color)
+	add(k, "Bonnet", bw, waist, belt, -ends + R, screen0, color).shape = "Wedge"
+	add(k, "Scuttle", bw, waist, belt, screen0, cabBack, color)
+	add(k, "Cabin", cw, belt, roof, screen1, cabBack, color)
+	local screen = add(k, "Windscreen", cw, belt, roof, screen0, screen1, glass)
+	screen.shape, screen.material = "Wedge", "Glass"
+	add(k, "SideGlass", cw + 0.04, belt + 0.15, roof - 0.4, screen1 + 0.25, cabBack - 0.3, glass).material = "Glass"
+	add(k, "BackGlass", cw - 0.5, belt + 0.3, roof - 0.35, cabBack - 0.02, cabBack + 0.06, glass).material = "Glass"
+	add(k, "Roof", cw - 0.2, roof, roof + 0.2, screen1 + 0.1, cabBack - 0.1, color)
+	add(k, "Mirrors", hw, belt + 0.15, belt + 0.55, screen1 - 0.2, screen1 + 0.08, trim)
+	-- the bed: a dark floor between two painted sides, the tailgate at the back
+	box(k, "BedL", -bw, -bw + 0.25, sill, belt + 0.1, cabBack + 0.1, ends, color)
+	box(k, "BedR", bw - 0.25, bw, sill, belt + 0.1, cabBack + 0.1, ends, color)
+	add(k, "BedFloor", bw - 0.25, sill, 2.05, cabBack + 0.1, ends - 0.25, hex("#2b2c2e"))
+	add(k, "Tailgate", bw - 0.25, sill, belt + 0.1, ends - 0.25, ends, color)
+
+	running(k, bw, hw - 0.05, wheelR, wheelW, archR, 0.55, axleF, axleB)
+	add(k, "BumperF", bw + 0.06, sill - 0.1, 1.4, -hl, -ends + 0.45, trim)
+	add(k, "BumperB", bw + 0.06, sill - 0.1, 1.4, ends - 0.4, hl, trim)
+	add(k, "Seam1", bw + 0.03, sill + 0.3, belt - 0.04, screen1 + 0.1, screen1 + 0.17, seam)
+	local lamp = bw - R - 0.04
+	add(k, "Headlights", lamp, 1.75, 2.3, -ends - 0.05, -ends + 0.05, hex(FIXED.head)).material = "Neon"
+	add(k, "Grille", lamp - 0.95, 1.7, 2.6, -ends - 0.09, -ends + 0.05, seam)
+	add(k, "TailLights", bw - 0.1, 2.3, 2.8, ends - 0.05, ends + 0.05, hex(FIXED.tail)).material = "Neon"
+	add(k, "TailPanel", bw - 0.75, 2.26, 2.84, ends - 0.05, ends + 0.08, color)
+	return (screen1 + cabBack) / 2
+end
+
+-- SUV (a player's): the vans' one-box body on big wheels, glass most of the way back, a spare wheel on the tailgate
+-- and two roof rails; tuned for the 6.25 x 6.25 x 12.25 box.
+local function suvParts(k: Kit, color: Rgb): number
+	local L, H = k.L, k.H
+	local ends = k.hl - 0.2
+	local bw = vanBody(k, color, {
+		inset = 0.16,
+		sill = 0.85,
+		waist = 2.95,
+		belt = 3.35,
+		roof = H - 0.25,
+		roofR = 0.35,
+		R = 0.6,
+		screen0 = L * 0.21,
+		screen1 = L * 0.33,
+		screenTop = H - 0.5,
+		cab = L * 0.5,
+		wheelR = 1.2,
+		wheelW = 0.95,
+		axleF = L * 0.19,
+		axleB = 2 * ends - L * 0.2,
+		lampY = 1.75,
+		tailY = 2.5,
+		doors = true,
+	})
+	for _, sx in { -1, 1 } do
+		along(
+			k,
+			if sx < 0 then "RailL" else "RailR",
+			sx * (bw - 0.6),
+			H - 0.12,
+			0.1,
+			-ends + L * 0.36,
+			ends - 0.5,
+			hex(FIXED.trim)
+		)
+	end
+	along(k, "Spare", 0, 2.6, 0.95, ends + 0.02, ends + 0.18, hex(FIXED.tyre))
+	return 0
+end
+
+-- Jet ski (the rental, a player's): a hull whose bow sweeps up, a dark waterline and a white stripe along it, the deck,
+-- a sloped console with its column and bar, a long seat; tuned for the 3 x 2.75 x 7.5 box, its floor the water.
+local function jetskiParts(k: Kit, color: Rgb): number
+	local hw, hl = k.hw, k.hl
+	local dark, white = hex("#2b2c2e"), hex("#f2f0ea")
+	local bow = -hl + 1.7
+	add(k, "Hull", hw - 0.1, 0, 1.05, bow, hl - 0.1, color)
+	add(k, "Bow", hw - 0.1, 0, 1.05, -hl, bow, color).roll = math.pi
+	add(k, "Keel", hw - 0.06, 0, 0.32, bow, hl - 0.1, dark)
+	add(k, "Stripe", hw - 0.04, 0.62, 0.78, bow + 0.2, hl - 0.4, white)
+	add(k, "Deck", hw - 0.3, 1.05, 1.12, -1.4, hl - 0.25, dark)
+	add(k, "Console", hw - 0.55, 1.05, 1.9, bow, -0.4, color).shape = "Wedge"
+	add(k, "Column", 0.12, 1.85, 2.35, -0.55, -0.35, dark)
+	across(k, "Bars", 0.95, 0.07, 2.4, -0.42, hex(FIXED.trim))
+	add(k, "Seat", 0.5, 1.12, 1.62, -0.2, hl - 0.75, hex("#1c1d20"))
+	add(k, "TailLights", 0.5, 0.85, 1.0, hl - 0.12, hl, hex(FIXED.tail)).material = "Neon"
+	add(k, "Headlights", 0.35, 1.5, 1.6, bow - 0.02, bow + 0.04, hex(FIXED.head)).material = "Neon"
+	return 0
+end
+
 -- Motorcycle: two wheels in line (each drawn as two half-width tyres, so RigSpec's four wheel names
 -- stand), raked forks, a round tank in the paint colour over a dark engine, a seat, mudguards, an
 -- exhaust, handlebars out to the sides of the box and a tall clear screen up to its top.
@@ -785,6 +902,9 @@ local BUILDERS: { [string]: Builder } = {
 	rv = rvParts,
 	cart = cartParts,
 	motorcycle = motorcycleParts,
+	pickup = pickupParts,
+	suv = suvParts,
+	jetski = jetskiParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against
@@ -798,8 +918,13 @@ local function shapedSpec(
 	cabin: number,
 	beacons: boolean
 ): PartBuilder.ModelSpec
-	local size = Boxes.get(kind)
-	local W, L, H = size.width, size.length, size.height
+	local W, L, H
+	if o.box then
+		W, H, L = o.box[1], o.box[2], o.box[3]
+	else
+		local size = Boxes.get(kind)
+		W, L, H = size.width, size.length, size.height
+	end
 	local bottom = -H / 2
 	local k = newKit(W, L, H)
 	put(k, { name = "RootPart", size = { W, H, L }, pos = { 0, 0, 0 }, color = color, transparency = 1 })
@@ -850,7 +975,7 @@ end
 
 function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec
 	local o: Opts = opts or {}
-	local d = DEFAULTS[kind] or error(`VehiclePuppet: unknown kind {kind}`)
+	local d = DEFAULTS[kind] or (if o.box then PLAYER[kind] else nil) or error(`VehiclePuppet: unknown kind {kind}`)
 	local color = hex(o.color or d.color)
 	local build = BUILDERS[kind] or error(`VehiclePuppet: no builder for {kind}`)
 	return shapedSpec(kind, build, o, color, d.cabin, if o.beacons == nil then d.beacons else o.beacons)

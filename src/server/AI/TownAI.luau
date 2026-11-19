@@ -425,6 +425,7 @@ function TownAI.build(opts: Opts): World
 		local x, z = laneSpot(i * 7)
 		local actor = add("human", "rider", "Pedestrian", hipH, x, z)
 		actor.post = "rider"
+		actor.ride = i -- the novelty riders first (the mime, the five kids), then the motorcyclists (RidePuppet.RIDERS)
 		register(actor, Pedestrian.new(actor, riderParams))
 	end
 
