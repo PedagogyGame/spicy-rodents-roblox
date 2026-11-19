@@ -15,6 +15,9 @@
 --             whatever covers the far end: off a rail it is a full leap's apex at any gap (the new section-4 test), so a
 --             step off a trunk or downspout 6 st up goes through the wall of a roofed house at 20 packets a second (the
 --             new root-crossing explanation passes it the same way); from a leap 5 st up at 4 packets a second too
+--   float     (LOW) the climb flag judges only a grounded packet higher than the last one stood: after a rail exit or a
+--             gap too long to judge (no stand height), the first grounded packet may be up to FLOOR_DEPTH over the floor,
+--             and every one after it at that height: the round-3 creep's end (3 st over open ground) without the creep
 -- (Pre-existing at w0-foundation 06a32a1, before the round-3 fix, except where the round-3 fix's own new checks rely on the
 -- same numbers: the section-4 wall test and MovementService._explained read the client's trunk normal and the full rise.)
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
@@ -479,4 +482,35 @@ return function(t)
 			t.falsy(inside, "the root is not left inside a roofed house")
 		end
 	)
+
+	t.test("float: grounded 3 st over open ground for 3 s after a step off a rail, or after a 0.6 s gap", function()
+		local world, vworld = worldWith({})
+		local results = {}
+		for _, how in { "step off a rail", "gap" } do
+			local v = MoveValidator.new(vworld)
+			local tt = 0.15
+			local pt = world.registry:pointAt(trunk, tt)
+			local s = SquirrelMotor.new(pt.x, pt.y, pt.z)
+			s.routeId, s.railT, s.grounded = trunk.id, tt, false
+			local clock = 0
+			v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, clock)
+			local vis = SquirrelMotor.visualPose(s, world)
+			local n = SquirrelMotor.new(vis.x - 1, world.groundHeight + 3, vis.z)
+			n.grounded = true
+			clock += if how == "gap" then 0.6 else 0.05
+			local bad = 0
+			for i = 1, 60 do
+				n.clock = clock
+				n.x -= 0.5 -- (walking west at 10 st/s, 3 st over the ground)
+				local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(n) }, clock)
+				bad += #r.violations
+				clock += 0.05
+			end
+			print(`      after a {how}: 60 grounded packets 3 st over open ground, {bad} violations`)
+			table.insert(results, { how = how, bad = bad })
+		end
+		for _, x in results do
+			t.truthy(x.bad >= 1, `after a {x.how}, standing 3 st over open ground for 3 s is flagged`)
+		end
+	end)
 end
