@@ -2302,6 +2302,16 @@ function SquirrelMotor.envelope(
 				)
 			end
 		end
+		if not alongOk and (prev.grounded or pushOff) and nextRoute.kind == "trunk" then
+			-- (from the ground, E or a walk into it takes a trunk at its foot, t 0 (Motion.groundTrunkCandidate): the foot
+			-- within its reach of where the body could stand, a step up or down, and the run up from it)
+			local foot = reg:foot(nextRoute)
+			local cap = SquirrelMotor.routeCap(nextRoute, boosted)
+			local run = cap * E.railTol * dt + cap * P.substep
+			alongOk = next.railT * nextRoute.length <= run + samplePad
+				and hypot2(foot.x - prev.x, foot.z - prev.z) <= C.groundReachE + travel
+				and math.abs(foot.y - prev.y) <= C.maxRise + rise + fall
+		end
 		if outside > C.airGrab or not alongOk then
 			-- a long gap can hide a first rail B: grabbed within reach of prev, related to the new route,
 			-- and the destination within B's own reach (plus the transfer or fork allowance) of that point

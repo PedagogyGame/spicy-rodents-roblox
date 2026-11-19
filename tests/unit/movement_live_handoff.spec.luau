@@ -305,7 +305,9 @@ return function(t)
 				-- may name the rail pose with the wall)
 				local gateSnaps = 0
 				for why, n in ms:stats().reasons do
-					if string.sub(why, 1, 5) == "gate:" and (string.find(why, "wall") or string.find(why, "railPose")) then
+					if
+						string.sub(why, 1, 5) == "gate:" and (string.find(why, "wall") or string.find(why, "railPose"))
+					then
 						gateSnaps += n
 					end
 				end
