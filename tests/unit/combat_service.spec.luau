@@ -125,53 +125,57 @@ return function(t)
 		t.truthy(rig.lunge(v.id), "a lunge when the click said")
 	end)
 
-	t.test("a vigilante: squares up on sighting, closes in, kicks; into the raised leg no bite lands", function()
-		local rig = BiteRig.new({ seed = 6, duelRand = dice(0) })
-		rig.step(20)
-		local vig = nil
-		for id in rig.combat.flags do
-			local a = rig.world.actorsById[id]
-			if vig == nil or a.id < vig.id then
-				vig = a
+	t.test(
+		"a vigilante: hidden on sighting, closes in, kicks (then shows its stance); into the raised leg no bite lands",
+		function()
+			local rig = BiteRig.new({ seed = 6, duelRand = dice(0) })
+			rig.step(20)
+			local vig = nil
+			for id in rig.combat.flags do
+				local a = rig.world.actorsById[id]
+				if vig == nil or a.id < vig.id then
+					vig = a
+				end
 			end
+			t.truthy(vig ~= nil, "the town has vigilantes")
+			local v = vig :: any
+			t.eq(rig.combat:temperOf(v.id), "tough")
+			-- the rodent 25 studs in front of them
+			rig.holdRodent()
+			local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+			rig.put(rig.rodent, v.x + fx * 25, v.z + fz * 25)
+			local rod = rig.world.actorsById[rig.rodent]
+			local d0 = dist(v, rod)
+			rig.step(0.6)
+			t.eq(rig.attrs[v.id].Stance, "guard", "hidden until provoked: it looks like anyone (owner 2026-11-19)")
+			t.truthy(dist(v, rod) < d0 - 3, `closing in ({d0} -> {dist(v, rod)})`)
+			-- it reaches striking range and kicks (the dice say yes): a blow on the rodent
+			t.truthy(
+				rig.runUntil(4, function(): boolean
+					return #rig.blows > 0
+				end),
+				"a blow lands"
+			)
+			local blow = rig.blows[1]
+			t.eq(blow.by, v.id)
+			t.eq(rig.attrs[v.id].Stance ~= "guard", true, "provoked: its own stance from the strike on")
+			t.truthy(blow.amount == 55 or blow.amount == 35, `a kick or a swing ({blow.amount})`)
+			t.eq(rig.health[rig.rodent], 100 - blow.amount)
+			-- a pounce into the next wind-up is batted away
+			local g = rig.combat:guardOf(v.id) :: any
+			t.truthy(
+				rig.runUntil(3, function(): boolean
+					return g.phase == "windup"
+				end),
+				"winding up again"
+			)
+			t.truthy(not rig.lunge(v.id, 3), "no bite into a raised leg")
+			local news = rig.duelNews[#rig.duelNews]
+			t.truthy(news.what == "batted" or #rig.blows > 1, "batted away, or kicked first")
+			t.truthy(not v.infected)
+			print(`      the vigilante landed {#rig.blows} blows; rodent health {rig.health[rig.rodent]}`)
 		end
-		t.truthy(vig ~= nil, "the town has vigilantes")
-		local v = vig :: any
-		t.eq(rig.combat:temperOf(v.id), "tough")
-		-- the rodent 25 studs in front of them
-		rig.holdRodent()
-		local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
-		rig.put(rig.rodent, v.x + fx * 25, v.z + fz * 25)
-		local rod = rig.world.actorsById[rig.rodent]
-		local d0 = dist(v, rod)
-		rig.step(0.6)
-		t.eq(rig.attrs[v.id].Stance, "squared", "the vigilante's stance: the visible tell")
-		t.truthy(dist(v, rod) < d0 - 3, `closing in ({d0} -> {dist(v, rod)})`)
-		-- it reaches striking range and kicks (the dice say yes): a blow on the rodent
-		t.truthy(
-			rig.runUntil(4, function(): boolean
-				return #rig.blows > 0
-			end),
-			"a blow lands"
-		)
-		local blow = rig.blows[1]
-		t.eq(blow.by, v.id)
-		t.truthy(blow.amount == 55 or blow.amount == 35, `a kick or a swing ({blow.amount})`)
-		t.eq(rig.health[rig.rodent], 100 - blow.amount)
-		-- a pounce into the next wind-up is batted away
-		local g = rig.combat:guardOf(v.id) :: any
-		t.truthy(
-			rig.runUntil(3, function(): boolean
-				return g.phase == "windup"
-			end),
-			"winding up again"
-		)
-		t.truthy(not rig.lunge(v.id, 3), "no bite into a raised leg")
-		local news = rig.duelNews[#rig.duelNews]
-		t.truthy(news.what == "batted" or #rig.blows > 1, "batted away, or kicked first")
-		t.truthy(not v.infected)
-		print(`      the vigilante landed {#rig.blows} blows; rodent health {rig.health[rig.rodent]}`)
-	end)
+	)
 
 	t.test("no blow and no noticing through a housing's walls or a building (review finding 4)", function()
 		local Cover = require("@shared/Combat/Cover")
@@ -260,6 +264,84 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"vigilantes stay hidden until provoked; at 40 % of the town bitten the nearest few show (owner 2026-11-19)",
+		function()
+			local rig = BiteRig.new({ seed = 6, duelRand = dice(0.5) })
+			rig.step(5)
+			rig.holdRodent()
+			rig.put(rig.rodent, 900, 900) -- (off where nobody is: nobody provoked)
+			rig.step(1.2)
+			local P = rig.combat.P
+			-- the bite-to-hospital sequence's word on who has a bite on them, set by the spec
+			local real = rig.infection
+			local bitten: { [number]: boolean } = {}
+			rig.combat.infection = {
+				stateOf = function(_: any, id: number): string?
+					return if bitten[id] then "incubating" else real:stateOf(id)
+				end,
+				engaged = function(_: any, id: number): boolean
+					return real:engaged(id)
+				end,
+				biteable = function(_: any, id: number): boolean
+					return real:biteable(id)
+				end,
+			} :: any
+			local people = {}
+			for _, a in rig.world.actors do
+				if a.species == "human" and a.post == "townsperson" and not rig.combat:isVigilante(a.id) then
+					table.insert(people, a.id)
+				end
+			end
+			local all = 0
+			for _, a in rig.world.actors do
+				if a.species == "human" and a.post == "townsperson" then
+					all += 1
+				end
+			end
+			local function squared(): { number }
+				local out = {}
+				for id in rig.combat.flags do
+					if (rig.attrs[id] or {}).Stance == "squared" then
+						table.insert(out, id)
+					end
+				end
+				return out
+			end
+			local function biteUpTo(share: number)
+				table.clear(bitten)
+				for i = 1, math.floor(all * share) do
+					bitten[people[i]] = true
+				end
+			end
+			biteUpTo(P.revealShare - 0.02)
+			rig.step(1.2)
+			t.eq(#squared(), 0, "under 40 %: every vigilante hidden")
+			biteUpTo(P.revealShare + 0.04)
+			rig.step(1.2)
+			local shown = squared()
+			t.eq(#shown, P.revealCount, "at 40 %: a few show")
+			-- they are the nearest to the rodent
+			local rod = rig.world.actorsById[rig.rodent]
+			local far = 0
+			for _, id in shown do
+				local a = rig.world.actorsById[id]
+				far = math.max(far, (a.x - rod.x) ^ 2 + (a.z - rod.z) ^ 2)
+			end
+			for id in rig.combat.flags do
+				if not table.find(shown, id) then
+					local a = rig.world.actorsById[id]
+					t.truthy((a.x - rod.x) ^ 2 + (a.z - rod.z) ^ 2 >= far - 1e-6, "the nearest ones")
+				end
+			end
+			-- cures bring the share back under: hidden again
+			biteUpTo(P.revealShare - 0.1)
+			rig.step(1.2)
+			t.eq(#squared(), 0, "back under 40 %: hidden again")
+			rig.combat.infection = real
+		end
+	)
 
 	t.test("vigilantes are 8 % of the humans, on AI townspeople; a player taking one moves the flag", function()
 		local rig = BiteRig.new({ seed = 8 })

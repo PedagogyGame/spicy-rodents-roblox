@@ -89,6 +89,8 @@ export type Params = {
 	sceneRadius: number,
 	groupRadius: number,
 	groupMin: number,
+	revealShare: number,
+	revealCount: number,
 	-- from the other branches
 	chanceUnaware: number,
 	pounceWindup: number,
@@ -175,6 +177,8 @@ function CombatRules.params(): Params
 			"sceneRadius",
 			"groupRadius",
 			"groupMin",
+			"revealShare",
+			"revealCount",
 		}
 	do
 		p[k] = g("duel." .. k)

@@ -66,13 +66,13 @@ Tunables.tree = {
 	         react = { v = { calm = 0.3, wary = 0.26, tough = 0.2 }, unit = "s", src = "the reaction window: from the pounce's tell to a raised arm (narrower on a tough person)" },
 	         windup = { v = { calm = 0.58, wary = 0.5, tough = 0.4 }, unit = "s", src = "a kick's wind-up (v5.4 0.58); a swing takes swingWindupMult of it" },
 	         recover = { v = { calm = 0.6, wary = 0.5, tough = 0.3 }, unit = "s", src = "after a strike at a rodent in reach (dodged or not): the opening a bite lands in" },
-	         whiffRecover = { v = { calm = 0.6, wary = 0.55, tough = 0.7 }, unit = "s", src = "after a blow at nothing (the rodent out of reach): overbalanced, the opening a skilled rodent draws" },
+	         whiffRecover = { v = { calm = 0.6, wary = 0.55, tough = 0.8 }, unit = "s", src = "after a blow at nothing (the rodent out of reach): overbalanced, the opening a skilled rodent draws" },
 	         flinchSecs = { v = 0.5, unit = "s" },
 	         backSecs = { v = 1.2, unit = "s", src = "backing away with an arm up" },
 	         stepIn = { v = { calm = 0, wary = 2, tough = 6 }, unit = "st/s", src = "how fast a person steps in while winding up" },
 	         strikeHit = { v = { calm = 0.55, wary = 0.62, tough = 0.8 }, src = "a strike's chance to land on a rodent in reach" },
 	         biteUnaware = { v = { calm = 1.0, wary = 0.95, tough = 0.8 }, src = "times pounce.chanceUnaware" },
-	         biteOpen = { v = { calm = 0.22, wary = 0.35, tough = 0.35 }, src = "a bite in the reaction window, a flinch, a recovery or a turned back" },
+	         biteOpen = { v = { calm = 0.22, wary = 0.35, tough = 0.22 }, src = "a bite in the reaction window, a flinch, a recovery or a turned back" },
 	         biteRunner = { v = { calm = 0.15, wary = 0.2, tough = 0.2 }, src = "a bite at the heels of a running person: most shake it off" },
 	         biteGuard = { v = { calm = 0.04, wary = 0.03, tough = 0 }, src = "a bite into a raised arm (brief: it does not land)" },
 	         readFeint = { v = { calm = 0.15, wary = 0.3, tough = 0.5 }, src = "the chance a feint is read: then the person hits back (counter)" },
@@ -112,7 +112,11 @@ Tunables.tree = {
 	         rallySecs = { v = 8, unit = "s", src = "one who turned on the rodent goes after it this long, striking as soon as it is in reach" },
 	         sceneRadius = { v = 35, unit = "st", src = "the people in sight of a bite this near the victim turn on the rodent" },
 	         groupRadius = { v = 12, unit = "st", src = "a group: people this near the one the rodent sets on (or where its pounce starts)" },
-	         groupMin = { v = 3, src = "this many in a group and they turn on the rodent together" } },
+	         groupMin = { v = 3, src = "this many in a group and they turn on the rodent together" },
+	         -- owner 2026-11-19 (#10): "Keep them hidden until provoked, with the exception that a few become visible once
+	         -- you reach a 40% bitten rate"
+	         revealShare = { v = 0.4, src = "once this share of the townspeople have a bite on them, a few vigilantes show their stance" },
+	         revealCount = { v = 3, src = "how many: the vigilantes nearest a rodent in play" } },
 	-- Power numbers live in Rodent/PowerRules.TABLE (brief v2 §15, verbatim v5.4; golden-tested). These
 	-- leaves are read-only mirrors for the tuning panel; PowerRules is the authority.
 	power = { bitePerson = { v = 100 }, bitePersonHigh = { v = 150 }, highAboveGroundU = { v = 1.6, src = "v5.4 uses absolute Y > 4; Q23" },

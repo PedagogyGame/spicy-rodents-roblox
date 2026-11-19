@@ -25,7 +25,8 @@
 -- the crowd, the crew, the walk home) is left out of the duel.
 -- THE VIGILANTES. VigilanteRules keeps round(human.vigilanteShare x every human actor) flags, rebalanced once a second, on
 -- AI townspeople (the bodies whose brain can take the rodent on); a flagged person is tough and, on sighting the
--- rodent, moves to kick it. `summon(x, z, r)` is the drone's call: flagged people within r head for the spot.
+-- rodent, moves to kick it. Its stance stays an ordinary one until it is provoked (Combat/Duel), except that once
+-- duel.revealShare of the townspeople are bitten, the duel.revealCount vigilantes nearest a rodent show it (`reveal`). `summon(x, z, r)` is the drone's call: flagged people within r head for the spot.
 -- THE AFTERMATH. Every bite opens an alert zone (alert.radiusU, alert.ttl) at the victim: in it every person's blows
 -- carry the hidden strength boost (alert.kickMult; also for a player's kick: `boost`), everyone swings and kicks more
 -- (alert.swingBias), and a bite on anyone in it is multiplied by alert.bitePenalty (close to impossible). The nearest
@@ -144,6 +145,7 @@ export type Service = typeof(setmetatable(
 		tempers: { [number]: Temper },
 		heldKicks: { [number]: number },
 		rallied: { [number]: number },
+		shown: { [number]: boolean },
 		alerts: { Zone },
 		chases: { [number]: Chase },
 		rebalanceAt: number,
@@ -167,6 +169,7 @@ function CombatService.new(opts: Opts): Service
 		tempers = {},
 		heldKicks = {},
 		rallied = {},
+		shown = {},
 		alerts = {},
 		chases = {},
 		rebalanceAt = -math.huge,
@@ -446,11 +449,76 @@ local function release(self: Service, id: number)
 	end
 	self.guards[id] = nil
 	self.fleeing[id] = nil
-	setStance(self, id, nil)
+	setStance(self, id, if self.shown[id] then "squared" else nil)
 	local brain = self.world.brains[id] :: any
 	if brain and brain.kind == "Pedestrian" and controllerOf(self, id) == "ai" then
 		brain:onEvent({ type = "duel", mode = "end" })
 	end
+end
+
+-- Owner 2026-11-19 (#10): "Keep them hidden until provoked, with the exception that a few become visible once you reach
+-- a 40% bitten rate." Once duel.revealShare of the townspeople have a bite on them (a case in the bite-to-hospital
+-- sequence), the duel.revealCount vigilantes nearest a rodent in play show their stance whatever they are doing; under
+-- the share again (cures), they are hidden again. Returns the share.
+local function reveal(self: Service): number
+	local P = self.P
+	local all, bitten = 0, 0
+	for _, a in self.world.actors do
+		if a.species == "human" and a.post == "townsperson" then
+			all += 1
+			local case = if self.infection then self.infection:stateOf(a.id) ~= nil else a.infected == true
+			if case then
+				bitten += 1
+			end
+		end
+	end
+	local share = if all > 0 then bitten / all else 0
+	local want: { [number]: boolean } = {}
+	if share >= P.revealShare then
+		local list = {}
+		for id in self.flags do
+			local a = self.world.actorsById[id]
+			if a then
+				local best = math.huge
+				for rid in self.rods do
+					local rod = self.world.actorsById[rid]
+					if rod then
+						best = math.min(best, (rod.x - a.x) ^ 2 + (rod.z - a.z) ^ 2)
+					end
+				end
+				table.insert(list, { id = id, d = best })
+			end
+		end
+		table.sort(list, function(p: any, q: any): boolean
+			return if p.d == q.d then p.id < q.id else p.d < q.d
+		end)
+		for i = 1, math.min(P.revealCount, #list) do
+			want[list[i].id] = true
+		end
+	end
+	for id in self.shown do
+		if not want[id] then
+			self.shown[id] = nil
+			local g = self.guards[id]
+			if g then
+				g.shown = false
+			else
+				setStance(self, id, nil)
+			end
+		end
+	end
+	for id in want do
+		if not self.shown[id] then
+			self.shown[id] = true
+			local g = self.guards[id]
+			if g then
+				g.shown = true
+			else
+				setStance(self, id, "squared")
+			end
+		end
+	end
+	return share
 end
 
 local function rebalance(self: Service, now: number)
@@ -481,6 +549,7 @@ local function rebalance(self: Service, now: number)
 			end
 		end
 	end
+	reveal(self)
 end
 
 -- can this body take part: an AI townsperson (not a rider) or an AI officer, in sight, not in the sequence's hands
@@ -729,6 +798,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			self.guards[a.id] = g
 		end
 		local guard = g :: Guard
+		guard.shown = self.shown[a.id] == true
 		local r = self.rods[best.id] :: Rodent
 		local dx, dz = best.x - a.x, best.z - a.z
 		local facing = (dx * math.sin(a.yaw) + dz * math.cos(a.yaw)) / math.max(bestD, 1e-6)

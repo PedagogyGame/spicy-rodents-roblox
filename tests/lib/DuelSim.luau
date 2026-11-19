@@ -3,7 +3,7 @@
 -- Combat/Duel on Combat/CombatRules' numbers (the server runs the same Guard), the rodent by a script:
 --   "sprinter": runs straight at the person at a sprint and pounces from 9 studs, again and again (unskilled);
 --   "skilled":  reads the person with a human player's reaction time (0.16 to 0.28 s); goes straight in at anyone not
---               squared up like a vigilante (the stance is visible) and chases a runner down at a sprint; against a
+--               squared up like a vigilante (the stance, once a vigilante shows it: provoked) and chases a runner down at a sprint; against a
 --               vigilante zig-zags in to just outside the reach, backs out of a wind-up, pounces into a flinch or a
 --               recovery, feints (when the feint meter allows) or dips into reach to draw a blow. On the click it
 --               steers straight at the person through the wind-up (the motor pounces along the body's heading).
@@ -80,7 +80,7 @@ export type Summary = {
 	landedOn: { [string]: number }, -- wins by the person's phase at the bite
 }
 
-type Seen = { t: number, phase: string, x: number, z: number }
+type Seen = { t: number, phase: string, stance: string?, x: number, z: number }
 
 function DuelSim.run(opts: Options): Result
 	local P = opts.params or CombatRules.params()
@@ -119,7 +119,6 @@ function DuelSim.run(opts: Options): Result
 	local pounces, feints, hitsTaken = 0, 0, 0
 	local history: { CombatRules.Sample } = {}
 	local reaction = 0.16 + rand() * 0.12
-	local toughLook = temper == "tough"
 	local seen: { Seen } = {}
 	local weave = 1
 	local weaveAt = 0
@@ -131,14 +130,16 @@ function DuelSim.run(opts: Options): Result
 	local move, moveSpeed = "none", 0
 
 	-- what the rodent's player sees: the person `lag` ago (the stance a reaction time before that)
-	local function observed(): (string, number, number)
+	local function observed(): (string, number, number, string?)
 		local wantPhase = now - lag - reaction
 		local wantPos = now - lag
 		local ph, ox, oz = "idle", hx, hz
+		local stance: string? = nil
 		local havePos = false
 		for _, s in seen do
 			if s.t <= wantPhase then
 				ph = s.phase
+				stance = s.stance
 			end
 			if s.t <= wantPos then
 				ox, oz = s.x, s.z
@@ -150,7 +151,7 @@ function DuelSim.run(opts: Options): Result
 		if not havePos and #seen > 0 then
 			ox, oz = seen[1].x, seen[1].z
 		end
-		return ph, ox, oz
+		return ph, ox, oz, stance
 	end
 
 	local function startPounce()
@@ -199,7 +200,7 @@ function DuelSim.run(opts: Options): Result
 		local recovering = now < recoverUntil
 
 		-- the rodent decides, on the person as its player sees them
-		local ph, ox, oz = observed()
+		local ph, ox, oz, stance = observed()
 		local dx, dz = ox - rx, oz - rz
 		local d = math.sqrt(dx * dx + dz * dz)
 		local ux, uz = dx / math.max(d, 1e-6), dz / math.max(d, 1e-6) -- rodent -> person (as seen)
@@ -233,7 +234,8 @@ function DuelSim.run(opts: Options): Result
 			end
 		else
 			-- (just outside where a kick reaches with the step-in: a skilled player learns the reach)
-			local hover = P.kickReach + P.stepIn[temper] * P.windup[temper] + DuelSim.HOVER
+			-- (and a little further on a slow link, as far as a person closing in comes in the time it takes to see it)
+			local hover = P.kickReach + P.stepIn[temper] * P.windup[temper] + DuelSim.HOVER + lag * P.approach
 			local tx, tz = 0, 0 -- the wanted direction (unit-ish), then the weave across it
 			local weaving = true
 			if now >= weaveAt then
@@ -241,7 +243,8 @@ function DuelSim.run(opts: Options): Result
 				weaveAt = now + 0.25 + rand() * 0.15
 			end
 			-- (the vigilante's stance is visible: a person not squared up like one is taken head on)
-			local soft = ph == "ready" and not toughLook
+			-- (a vigilante's stance shows once provoked: until then it looks like anyone, Duel)
+			local soft = ph == "ready" and stance ~= "squared"
 			if
 				soft
 				or ph == "idle"
@@ -416,7 +419,7 @@ function DuelSim.run(opts: Options): Result
 				end
 			end
 			lastX, lastZ = rx, rz
-			table.insert(seen, { t = now, phase = g.phase, x = hx, z = hz })
+			table.insert(seen, { t = now, phase = g.phase, stance = out.stance, x = hx, z = hz })
 			if #seen > 20 then
 				table.remove(seen, 1)
 			end

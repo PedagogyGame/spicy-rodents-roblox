@@ -7,7 +7,9 @@
 --   idle      has not seen the rodent (a bite is "unaware")
 --   ready     squared up: a tough person closes to striking range, the others stand their ground; an arm is up
 --             ("guard"); strikes at a rodent coming into reach (entryStrike: a straight run is readable) and now and
---             then at one that stays there (strikeRate a second)
+--             then at one that stays there (strikeRate a second). A vigilante's stance ("squared", the tell) shows only
+--             once it is provoked (it struck, or was set on) or the server shows it (`shown`); until then it looks
+--             like anyone's ("guard")
 --   startle   a pounce's tell was just seen: the reaction window until react[temper] after the tell, then the response
 --             picked at the tell (CombatRules.weights: flee, back, flinch, swing, kick) takes over. The window is open
 --             unless the person was squared up with the arm already up (guardUp[temper]; a tough person always is)
@@ -56,6 +58,8 @@ export type Guard = {
 	inReach: boolean, -- the rodent was within striking range last tick
 	fleeFrom: number, -- when the flight began
 	rallyUntil: number, -- turned on the rodent (a bite, a group set on) until then: closes in, strikes on reaching it
+	provoked: boolean, -- it has struck at the rodent or been set on by it: a vigilante's stance shows from then on
+	shown: boolean, -- a vigilante shown however it is (Server/Combat/CombatService: the town 40 % bitten)
 	strikes: number,
 	hits: number,
 	trail: { Sample }, -- how a bite would have met them, think by think (the last TRAIL_SECS)
@@ -119,6 +123,8 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 		inReach = false,
 		fleeFrom = 0,
 		rallyUntil = 0,
+		provoked = false,
+		shown = false,
 		strikes = 0,
 		hits = 0,
 		trail = {},
@@ -153,6 +159,7 @@ end
 
 local function startStrike(params: Params, g: Guard, now: number, kind: string, counter: boolean)
 	g.phase = "windup"
+	g.provoked = true
 	g.strike = if g.weapon == "baton" then "baton" else kind
 	g.counter = counter
 	g.untilT = now + windupSecs(params, g)
@@ -190,7 +197,9 @@ local function stanceOf(g: Guard): string?
 	elseif g.phase == "back" then
 		return "guard"
 	elseif g.phase == "ready" or g.phase == "recover" then
-		return if g.temper == "tough" or g.rallyUntil > 0 then "squared" else "guard"
+		-- (a vigilante looks like anyone else until provoked: owner 2026-11-19, "keep them hidden until provoked")
+		local tough = g.temper == "tough" and (g.provoked or g.shown)
+		return if tough or g.rallyUntil > 0 then "squared" else "guard"
 	end
 	return nil
 end
@@ -250,6 +259,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		-- (a runner hears the lunge behind them too: they may keep running, or turn on it)
 		local free = g.phase == "ready" or g.phase == "back" or g.phase == "flinch" or g.phase == "flee"
 		if free and view.dist <= params.threat then
+			g.provoked = true -- (set on: a pounce, or a feint, at them)
 			if view.tellFeint and rand() < params.readFeint[g.temper] then
 				out.read = true
 				startStrike(params, g, now, "kick", true)
@@ -416,6 +426,7 @@ function Duel.rally(params: Params, g: Guard, now: number, mode: string)
 	g.awareAt = now - Duel.STARTLED_SECS
 	g.pending = nil
 	if mode == "attack" then
+		g.provoked = true
 		if g.phase ~= "windup" then
 			ready(g)
 		end
@@ -430,6 +441,7 @@ end
 
 -- A bite failed on this person ("Batted away"): they square up again unless a blow is on its way or they are running.
 function Duel.batted(g: Guard, now: number)
+	g.provoked = true
 	if g.phase == "startle" and g.running then
 		g.phase = "flee" -- (shaken off, and still running)
 	elseif g.phase ~= "windup" and g.phase ~= "flee" then
