@@ -18,10 +18,16 @@
 -- the nearest person in contact. A feint (`rodentAct(id, "feint")`, F) is a tell with no pounce: it costs
 -- duel.feintCost of a feint meter that refills at duel.feintRefill a second, and no pounce follows for feintRecover.
 -- THE PEOPLE. Every AI townsperson (Pedestrian, not a rider) and police officer near a player's rodent runs a Combat/Duel
--- Guard: it notices (spot range x its temperament's notice, in view or close), reacts to tells, squares up, strikes,
+-- Guard: it notices as the town perceives (Combat/Duel.notices: seen in its view cone, heard when the rodent moves faster
+-- than a creep, felt when it brushes them, or pointed out overhead once it comes down: opts.overhead; the rodent's
+-- pace is the one it kept up by its validated packets, opts.paceOf, Stealth/Pace.stretch), reacts to tells, squares up,
+-- strikes,
 -- backs off, flinches or flees, and the service turns the Guard's move into the brain's orders (Pedestrian "duel" and
 -- "witness" events, Officer "respond") and its stance into the body's Stance attribute (clients draw it; the vigilante's
--- "squared" stance is the visible tell). A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
+-- "squared" stance is the visible tell). Nobody closes in on or strikes at a rodent out of reach (higher or lower than
+-- duel.contactHeight: Combat/Duel lets it go after LETGO_SECS, `lapsed` is kept here across its Guard's churn, and an
+-- officer holds his ground meanwhile); a chasing officer waits for one up out of reach at open ground by it
+-- (opts.under), never under it in the road. A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
 -- blows); Boot/Game applies the health, the Power and the knock-out as it does for a player's kick. A person a player
 -- holds is never ordered: they kick with F on their own timing (`heldKick`: a kick aimed at the rodent raises a leg for
 -- HELD_GUARD seconds, no bite lands into it; their kick shares the duel's i-frames, `takeBlow`), and a bite on them is
@@ -60,6 +66,7 @@ local Duel = Import.shared("Combat/Duel") :: typeof(require("../../shared/Combat
 local VigilanteRules = Import.shared("Combat/VigilanteRules") :: typeof(require("../../shared/Combat/VigilanteRules"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
+local Pace = Import.shared("Stealth/Pace") :: typeof(require("../../shared/Stealth/Pace"))
 
 -- Exported types do not cross Import (W1 Track A note): the shared ones are restated loosely here.
 type Params = any
@@ -94,6 +101,14 @@ export type Opts = {
 	-- (default: the bite-to-hospital sequence's own, infection.colliders)
 	colliders: any?,
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
+	-- the person has pointed the rodent out above them (Server/Stealth/OverheadService:spotted): they are aware of it
+	overhead: ((personId: number, rodentId: number) -> boolean)?,
+	-- the rodent's flat pace by its validated motor packets (Movement/MovementService:paceOf: where each accepted packet
+	-- put it, on the server's clock, Stealth/Pace.stretch); nil (or nil returned): read off its root at the duel's steps
+	paceOf: ((id: number) -> number?)?,
+	-- where an officer chasing a rodent up out of reach (a wire, a roof) waits for it: open ground off the road with a
+	-- view of it (Server/Stealth/OverheadService:spotUnder); nil (or nil returned): they hold where they are
+	under: ((personId: number, rodentId: number) -> (number?, number?))?,
 }
 
 -- seconds since the last accepted packet, since the last clean one (nil: the same), and since the last pounce launch a
@@ -159,6 +174,7 @@ export type Service = typeof(setmetatable(
 		opts: Opts,
 		rods: { [number]: Rodent },
 		guards: { [number]: Guard },
+		lapsed: { [number]: boolean? },
 		fleeing: { [number]: boolean },
 		stances: { [number]: string? },
 		flags: { [any]: boolean },
@@ -184,6 +200,7 @@ function CombatService.new(opts: Opts): Service
 		opts = opts,
 		rods = {},
 		guards = {},
+		lapsed = {}, -- people who let the rodent go out of reach (Combat/Duel: kept across their Guard's churn)
 		fleeing = {},
 		stances = {},
 		flags = {},
@@ -730,14 +747,21 @@ local function rally(
 	return attackers
 end
 
-local function order(self: Service, a: any, rod: any, out: any)
+local function order(self: Service, a: any, rod: any, out: any, hold: boolean?)
 	local brain = self.world.brains[a.id] :: any
 	if brain.kind == "Officer" then
-		-- an officer closes in and stands over it (Officer "respond" stops a couple of studs short)
+		-- an officer closes in and stands over it (Officer "respond" stops a couple of studs short); one out of reach
+		-- of it (up a wire, on a wall top) stands where they are, facing it (a point just in front of them)
+		local x, z = rod.x, rod.z
+		if hold then
+			local dx, dz = rod.x - a.x, rod.z - a.z
+			local d = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+			x, z = a.x + dx / d * 0.5, a.z + dz / d * 0.5
+		end
 		brain:onEvent({
 			type = "respond",
-			x = rod.x,
-			z = rod.z,
+			x = x,
+			z = z,
 			untilTime = (self.world.now or 0) + CombatService.ORDER_SECS,
 		})
 		return
@@ -825,14 +849,46 @@ local function stepChases(self: Service, now: number)
 			self.chases[id] = nil
 		elseif now >= c.nextAt and self.guards[id] == nil then
 			c.nextAt = now + CombatService.CHASE_EVERY
+			local x, z = rod.x, rod.z
+			local groundAt = self.world.ctx and self.world.ctx.groundAt
+			if groundAt and (rod.y - rod.hip) - groundAt(rod.x, rod.z) > P.contactHeight then
+				-- (up out of reach: not under it in the road or into the building it is on; to open ground by it, or
+				-- they hold where they are)
+				local f = self.opts.under
+				local ux, uz = nil, nil
+				if f then
+					ux, uz = f(id, zone.biter)
+				end
+				x, z = ux or cop.x, uz or cop.z
+			end
 			brain:onEvent({
 				type = "respond",
-				x = rod.x,
-				z = rod.z,
+				x = x,
+				z = z,
 				untilTime = (self.world.now or 0) + CombatService.CHASE_EVERY * 2,
 			})
 		end
 	end
+end
+
+-- the rodent's flat pace (studs/s; Combat/Duel.notices hears a rodent faster than a creep): the fastest move over any
+-- Stealth/Pace C.span of the last C.hold seconds, by its validated motor packets (opts.paceOf), else by where its root
+-- was at the duel's steps; nil before a whole span is known. Not the last step's move: one position arriving late (a
+-- phone's frame hitch) made an honest creep read twice its pace, and tapping W read as its average (review, M2)
+local function paceOf(self: Service, r: Rodent): number?
+	local f = self.opts.paceOf
+	local v = if f then f(r.id) else nil
+	if v ~= nil then
+		return v
+	end
+	local h = r.history
+	local n = #h
+	if n < 2 then
+		return nil
+	end
+	return Pace.stretch(function(t: number): (number, number)
+		return Pace.along(h, t)
+	end, h[n].t, h[1].t)
 end
 
 -- the people round one rodent: their duels (returns nothing; orders, stances and blows are applied)
@@ -849,6 +905,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			if g then
 				release(self, a.id)
 			end
+			self.lapsed[a.id] = nil
 			continue
 		end
 		-- the nearest rodent in play
@@ -867,6 +924,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			if g then
 				release(self, a.id)
 			end
+			self.lapsed[a.id] = nil
 			continue
 		end
 		local temper = self:temperOf(a.id)
@@ -881,6 +939,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 				CombatRules.nerve(P, a.id, temper),
 				if a.post == "police" then "baton" else "kick"
 			)
+			g.lapsed = self.lapsed[a.id] == true
 			self.guards[a.id] = g
 		end
 		local guard = g :: Guard
@@ -891,20 +950,36 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		-- (out of sight: in a drain or a hollow, behind a housing's walls or a building)
 		local hidden = covered(self, best.id) or not inSight(self, a, best)
 		local boosted = self:inAlert(a.x, a.z, now)
+		local dy = (best.y - best.hip) - (a.y - a.hip)
+		local seen = false
+		local pace = paceOf(self, r)
+		if not hidden then
+			local f = self.opts.overhead
+			seen = Duel.notices(P, guard, {
+				dist = bestD,
+				dy = dy,
+				inView = facing >= 0.28,
+				speed = pace,
+				lunging = r.tell ~= nil and now >= r.tell and now < r.windowUntil,
+				spottedOverhead = f ~= nil and f(a.id, best.id),
+			})
+		end
 		local view: any = {
 			now = now,
 			dt = dt,
 			dist = bestD,
-			dy = (best.y - best.hip) - (a.y - a.hip),
-			seen = not hidden and Duel.notices(P, guard, bestD, facing >= 0.28),
+			dy = dy,
+			seen = seen,
 			tell = if hidden then nil else r.tell,
 			tellFeint = r.tellFeint,
 			committed = now >= r.commitAt and now < r.windowUntil,
 			recovering = now < r.recoverUntil,
 			zigzag = CombatRules.zigzag(P, r.history, dx, dz, now),
 			boosted = boosted,
+			sneaking = pace ~= nil and pace <= P.quietSpeed,
 		}
 		local out = Duel.think(P, guard, view, self.rand)
+		self.lapsed[a.id] = if guard.lapsed then true else nil
 		if guard.phase == "idle" then
 			release(self, a.id)
 			continue
@@ -912,7 +987,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		if hidden and out.move == "approach" then
 			out.move = "stand" -- (lost sight of it: nobody walks into a wall after it)
 		end
-		order(self, a, best, out)
+		order(self, a, best, out, math.abs(dy) > P.contactHeight)
 		setStance(self, a.id, out.stance)
 		local strike = out.strike
 		if strike then

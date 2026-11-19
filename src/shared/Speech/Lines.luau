@@ -10,7 +10,12 @@
 -- crowd at a scene), patient (the victim on the ground), symptoms (the delayed tell), crew (the
 -- ambulance crew at the patient), cured (leaving the hospital), rafters (people in the bowling alley who notice a
 -- squirrel in the rafters over the lanes), drain (someone who saw a squirrel go down a storm drain, BRIEF_ADDENDUM
--- D8), stakeout (the officer standing over the grate the rodent went down).
+-- D8), stakeout (the officer standing over the grate the rodent went down); overhead (a person in town who looks up
+-- and sees a squirrel stalking above them on a wire, fence, branch or roof edge: Stealth/OverheadWatch, owner playtest
+-- 2026-11-19), overheadUneasy (a creep lingering over them: they feel watched), overheadReply (the neighbour they told answers), overheadWary (keeping an eye on it: stepping back,
+-- calling others over), overheadLost (it has gone from sight). The one who points it out names the place only when it
+-- is so (review of the overhead watch, L5): overheadWire, overheadFence, overheadTree, overheadRoof by what it is on
+-- (Server/Stealth/OverheadService.SURFACE), the plain "overhead" lines anywhere else; no line says how it moves.
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
 -- Pure. No side effects on require.
@@ -100,6 +105,75 @@ Lines.GROUPS = table.freeze({
 	stakeout = table.freeze({
 		"It went down the drain!",
 	}),
+	-- town people who look up and see a squirrel stalking overhead (Stealth/OverheadWatch; owner 2026-11-19: "awareness
+	-- and discussion and chatter, if i ... am prowling and stalking from above on a powerline or branch")
+	overhead = table.freeze({
+		"Look! Up there!",
+		"Wait, is that a squirrel up there?",
+		"Don't look now, but there's a squirrel above us.",
+		"That squirrel is following us...",
+		"Why is that squirrel staring at me?",
+		"Hey, is that the red one? Up there!",
+	}),
+	-- ... the same, on what it is on
+	overheadWire = table.freeze({
+		"Look! Up on the wire!",
+		"Wait, is that a squirrel on the power line?",
+		"There's a squirrel on the power line!",
+		"Hey, is that the red one? On the wire!",
+	}),
+	overheadFence = table.freeze({
+		"Up there! On the fence!",
+		"There's a squirrel on that fence!",
+		"Hey, is that the red one? On the fence!",
+		"Look, on top of the fence!",
+	}),
+	overheadTree = table.freeze({
+		"Hey, is that the red one? Up in the tree!",
+		"There's a squirrel in that tree!",
+		"Look! Up in the branches!",
+		"Something's up in that tree...",
+	}),
+	overheadRoof = table.freeze({
+		"Look! Up on the roof!",
+		"There's a squirrel on that roof!",
+		"Hey, is that the red one? On the roof!",
+		"Up there, on the edge of the roof!",
+	}),
+	-- a creep lingering over them: they feel watched before they see anything
+	overheadUneasy = table.freeze({
+		"Did you hear something?",
+		"Something's up there...",
+		"I feel like I'm being watched.",
+		"Was that a rustle up there?",
+		"Hmm. Funny feeling about this street.",
+		"Is something following us?",
+	}),
+	overheadReply = table.freeze({
+		"Where? Oh! I see it.",
+		"Don't make eye contact.",
+		"It's just sitting there. Watching.",
+		"Keep walking. Slowly.",
+		"I'm not standing under that.",
+		"Is it red? Please say it isn't red.",
+		"Wow. It really is looking at us.",
+	}),
+	overheadWary = table.freeze({
+		"Everybody, look up! Squirrel!",
+		"Watch out below!",
+		"Step back, folks. Give it room.",
+		"I'm keeping my eye on you, squirrel.",
+		"Come on down, I dare you.",
+		"Stay out from under it!",
+	}),
+	overheadLost = table.freeze({
+		"Where'd it go?",
+		"It was right there a second ago.",
+		"I lost it. Did you see where it went?",
+		"Huh. Gone.",
+		"Is it still up there somewhere?",
+		"I don't see it anymore.",
+	}),
 }) :: { [string]: { string } }
 
 Lines.SITUATIONS = table.freeze({
@@ -115,6 +189,15 @@ Lines.SITUATIONS = table.freeze({
 	"rafters",
 	"drain",
 	"stakeout",
+	"overhead",
+	"overheadWire",
+	"overheadFence",
+	"overheadTree",
+	"overheadRoof",
+	"overheadUneasy",
+	"overheadReply",
+	"overheadWary",
+	"overheadLost",
 })
 
 function Lines.of(situation: string): { string }

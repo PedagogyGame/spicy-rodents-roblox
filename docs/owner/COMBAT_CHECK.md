@@ -46,6 +46,12 @@ The simulation plays the duel as the server does (ten times a second), with the 
 | skilled | a calm person | 86 % | 87 % | 75 % |
 | straight sprint | a calm person | 88 % | 86 % | 88 % |
 | skilled, right after a bite nearby | calm / wary / vigilante | | 8 % / 4 % / 3 % | |
+| **stalked from behind** (creeps up, pounces from 9 studs) | calm / wary | 89 / 82 % | 86 / 76 % | 86 / 72 % |
+| **dropped from above** (creeps along a wire or bough, drops behind them, pounces) | calm / wary | 89 / 81 % | 81 / 78 % | 82 / 72 % |
+
+**Stalking (added 19 November, after the overhead watch):** people now notice the rodent the way the town sees it: in front of them, or heard when it moves faster than a creep (about 21 studs), or felt when it brushes them (4 studs). A rodent creeping or keeping still behind someone is no longer noticed just for being within 17 studs. Still possible, but harder: someone may hear the hiss of the wind-up and turn at the last moment (a calm person 35 %, a wary one 45 %, a vigilante 55 %: `duel.tellHeard`), and someone who finds the rodent sneaking up close, or shakes off a bite they never saw coming, cries out, turns on it and stays on edge for the rest of the fight (swings and hits as near a fresh bite, arm always up). So in those two rows **about half the fights end in a bite on someone who never saw it coming** (unaware: 53 to 56 % of calm people, 42 to 45 % of wary ones), and the stalk wins about as often as an open fight (calm 81 to 86 %, wary 72 to 78 % on a phone's link) but faster and with fewer blows taken. A rodent that runs straight in is noticed every time (0 % unaware). The first five rows are unchanged.
+
+**After the overhead watch's review (19 November):** the "creep" is the pace the rodent keeps up by its own checked movement (a phone's hiccup no longer makes a creep heard, and tapping W is heard: a stalk by tapping W bites someone unaware 0 % of the time, a real creep about 60 %); the alarm ends when the person lets the rodent go; and nobody squares up to, swings at or walks under a rodent out of reach up a wire or a wall (they let it go after 4 seconds, or at once once it is more than 10 studs over them, and take it up again when it comes down).
 
 Against a vigilante, a skilled rodent takes almost two blows per fight on average (two blows knock it out). A runner no longer reaches "a door": a person runs about six seconds, as the town's people do, and stays on guard if the rodent is still on them.
 

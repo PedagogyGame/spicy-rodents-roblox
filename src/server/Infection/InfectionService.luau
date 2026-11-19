@@ -101,6 +101,9 @@ export type Opts = {
 	driverOf: ((id: number) -> any?)?, -- who plays body `id` now (any value naming the player; nil: the AI)
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
 	onFault: ((where: string, err: any) -> ())?, -- a part of a step failed (it was contained)
+	-- the town's one Speech/SpeechRules state (Boot/Game: shared with the drains, the rafters and the overhead watch);
+	-- default its own
+	speech: any?,
 }
 
 type Record = {
@@ -261,7 +264,7 @@ function InfectionService.new(opts: Opts): Service
 			beds = if layout then math.max(1, #layout.beds) else 1,
 			treatSecs = Tunables.get("hospital.treatSecs"),
 		}),
-		speech = SpeechRules.new(),
+		speech = opts.speech or SpeechRules.new(),
 		params = opts.params or InfectionRules.defaults(),
 		rand = opts.rand or math.random,
 		controllerOf = opts.controllerOf or function(id: number): string
@@ -376,7 +379,16 @@ local function clearLine(self: Service, x0: number, z0: number, x1: number, z1: 
 end
 
 local function say(self: Service, id: number, situation: string, force: boolean?): boolean
-	local line = SpeechRules.request(self.speech, self.now, id, situation, self.rand, { force = force })
+	-- (counted where it is said, in the town's area cap; never held back by it: the scene's own pacing is its own)
+	local a = actorOf(self, id)
+	local line = SpeechRules.request(
+		self.speech,
+		self.now,
+		id,
+		situation,
+		self.rand,
+		{ force = force, x = if a then a.x else nil, z = if a then a.z else nil, unpaced = true }
+	)
 	if line == nil then
 		return false
 	end

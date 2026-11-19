@@ -37,6 +37,7 @@ local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local StanceView = require("./Render/StanceView")
+local GazeView = require("./Render/GazeView")
 local DuelWords = require("./UI/DuelWords")
 local SpeechBubbles = require("./UI/SpeechBubbles")
 local WalletHud = require("./UI/WalletHud")
@@ -124,7 +125,8 @@ if not walletOk then
 	warn(`Client: WalletHud failed: {walletErr}`)
 	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
 end
--- the squirrel's eye over the alley's lanes while people below might see it (the server's RafterService fills it)
+-- the squirrel's eye over the alley's lanes, or overhead in town, while people below might see it (the server's
+-- RafterService and OverheadService fill it)
 local sneakOk, sneakErr = pcall(SneakMeter.start)
 if not sneakOk then
 	warn(`Client: SneakMeter failed: {sneakErr}`)
@@ -140,6 +142,11 @@ task.spawn(function()
 	local okSt, errSt = pcall(StanceView.start, { bodies = bodies :: Instance })
 	if not okSt then
 		warn(`Client: StanceView failed: {errSt}`)
+	end
+	-- people looking up at a squirrel overhead (Server/Stealth/OverheadService: the body's Gaze)
+	local okG, errG = pcall(GazeView.start, { bodies = bodies :: Instance })
+	if not okG then
+		warn(`Client: GazeView failed: {errG}`)
 	end
 	local okV, errV = pcall(MedicalView.start, { bodies = bodies :: Instance })
 	if not okV then

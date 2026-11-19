@@ -63,6 +63,9 @@ export type Ctx = {
 	-- optional event sink: a brain reports something the services care about ("spotted": a person
 	-- just saw a squirrel and started to run). AI/TownAI collects them (drainEvents).
 	emit: ((kind: string, actor: Actor, other: Actor?) -> ())?,
+	-- optional: a held body's flat pace by its validated motor packets (Boot/Game: Movement/MovementService:paceOf);
+	-- nil for a body nobody holds (its `speed` is the brain's own). A held body's `speed` is what its client reports
+	paceOf: ((id: number) -> number?)?,
 }
 
 export type Snapshot = { [string]: any }

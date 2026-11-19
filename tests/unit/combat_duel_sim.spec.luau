@@ -8,6 +8,12 @@
 -- guard if the rodent is still at their heels. On those links a skilled rodent (timing, zig-zag, feints, the
 -- vigilante's stance read) beats a vigilante 25-45 % of the time and an ordinary calm person 70-90 %; a straight sprint
 -- loses to a vigilante almost always; and near a fresh bite (alert.bitePenalty) a bite is close to impossible.
+-- A STALK (the combat review, 19 Nov: "a well-stalked pounce lands on an UNAWARE person"): the people notice the rodent
+-- as the town perceives (Combat/Duel.notices), so a rodent that creeps up from behind, or drops from a wire behind them,
+-- bites about half of them unaware; one that runs straight in is noticed every time. Still possible, but harder: a
+-- person may hear the wind-up and turn at the last moment (duel.tellHeard), and one who finds it sneaking up close is
+-- alarmed for the rest of the duel (Combat/Duel), so a stalk wins about as often as an open skilled duel, and more
+-- cleanly.
 local DuelSim = require("@tests/lib/DuelSim")
 
 local N = 400
@@ -23,12 +29,13 @@ return function(t)
 			cache[key] = s
 			print(
 				string.format(
-					"      %3d ms  %-5s %-8s %-10s wins %3d %%  (knocked out %d, lost %d, out of time %d; %.1f pounces, %.1f feints, %.2f blows taken, %.1f s)",
+					"      %3d ms  %-5s %-8s %-10s wins %3d %% (unaware %3d %%)  (knocked out %d, lost %d, out of time %d; %.1f pounces, %.1f feints, %.2f blows taken, %.1f s)",
 					math.floor(lag * 1000 + 0.5),
 					temper,
 					rodent,
 					if boosted then "fresh bite" else "",
 					math.floor(s.rate * 100 + 0.5),
+					math.floor(s.unawareRate * 100 + 0.5),
 					s.knockouts,
 					s.escapes,
 					s.timeouts,
@@ -51,6 +58,10 @@ return function(t)
 					{ "wary", "skilled" },
 					{ "calm", "skilled" },
 					{ "calm", "sprinter" },
+					{ "calm", "stalker" },
+					{ "wary", "stalker" },
+					{ "calm", "dropper" },
+					{ "wary", "dropper" },
 				}
 			do
 				batch(row[1], row[2], lag)
@@ -121,6 +132,33 @@ return function(t)
 				batch("tough", "skilled", 0.1, true).rate <= 0.05,
 				"a vigilante by a fresh bite is all but unbeatable"
 			)
+		end
+	)
+
+	t.test(
+		"stalked or dropped (100, 150 ms): about half the duels end in an unaware bite; still possible, but harder (calm 75-88 %, wary 60-78 %); a straight run is never unaware",
+		function()
+			for _, lag in LINKS do
+				for _, temper in { "calm", "wary" } do
+					for _, rodent in { "stalker", "dropper" } do
+						local s = batch(temper, rodent, lag)
+						t.truthy(
+							s.unawareRate >= 0.4 and s.unawareRate <= 0.7,
+							`{rodent} vs {temper} at {lag} s: {s.unawareRate} unaware`
+						)
+						local lo, hi = if temper == "calm" then 0.75 else 0.6, if temper == "calm" then 0.88 else 0.78
+						t.truthy(s.rate >= lo and s.rate <= hi, `{rodent} vs {temper} at {lag} s: wins {s.rate}`)
+					end
+				end
+				local sprint = batch("calm", "sprinter", lag)
+				t.truthy(sprint.unawareRate <= 0.02, `a straight run is noticed: {sprint.unawareRate} unaware`)
+				t.eq(sprint.noticed, N, "every person notices a sprinter")
+				-- the overhead watch rarely spots a creep along the wire
+				t.truthy(
+					batch("calm", "dropper", lag).spottedOverhead <= N * 0.1,
+					"a creep on the wire is rarely spotted"
+				)
+			end
 		end
 	)
 end

@@ -55,7 +55,8 @@
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
 --   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
---   number?; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
+--   number?; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:paceOf(actorId) -> number? (read
+--   only: the flat pace of the accepted packets, Stealth/Pace.stretch); M:stats() -> Stats; C
 
 local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
@@ -68,6 +69,7 @@ local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require(
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
 local Curve = Import.shared("Routes/Curve") :: typeof(require("../../shared/Routes/Curve"))
+local Pace = Import.shared("Stealth/Pace") :: typeof(require("../../shared/Stealth/Pace"))
 
 local ValidatorWorld = require("./ValidatorWorld")
 
@@ -193,6 +195,7 @@ export type Movement = {
 	epochOf: (self: Movement, actorId: any) -> number,
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
+	paceOf: (self: Movement, actorId: any) -> number?,
 	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
@@ -657,6 +660,21 @@ function MovementService.new(deps: Deps): Movement
 			return nil, nil, nil, nil
 		end
 		return sq.shot, sq.lastAt, sq.pounceAt, sq.cleanAt
+	end
+
+	-- paceOf(actorId): the body's flat pace by its accepted packets (where each put it, at the server time it came in:
+	-- the pose history), the fastest Stealth/Pace.stretch; nil before a stretch's worth of them. Read only (the duel's
+	-- ear, Combat/CombatService opts.paceOf: a late or bunched packet barely shows, tapping W shows its bursts)
+	function m.paceOf(self: Movement, actorId: any): number?
+		local h = self.histories[actorId]
+		if h == nil or h.count < 2 then
+			return nil
+		end
+		local newest = PoseHistory.newest(h)
+		return Pace.stretch(function(t: number): (number, number)
+			local x, _, z = PoseHistory.sample(h, t)
+			return x, z
+		end, newest, newest - PoseHistory.span(h))
 	end
 
 	-- clickAt(actorId, clock, now): the server time of a click the held squirrel's client made at motor clock `clock`
