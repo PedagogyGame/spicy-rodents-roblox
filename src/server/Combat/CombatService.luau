@@ -43,6 +43,7 @@ local CombatRules = Import.shared("Combat/CombatRules") :: typeof(require("../..
 local Duel = Import.shared("Combat/Duel") :: typeof(require("../../shared/Combat/Duel"))
 local VigilanteRules = Import.shared("Combat/VigilanteRules") :: typeof(require("../../shared/Combat/VigilanteRules"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
+local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
 
 -- Exported types do not cross Import (W1 Track A note): the shared ones are restated loosely here.
 type Params = any
@@ -68,6 +69,9 @@ export type Opts = {
 	hurt: ((rodentId: number, amount: number, cause: string, byId: number) -> ())?,
 	bitten: ((victimId: number, rodentId: number) -> ())?, -- a bite landed: the game's consequences
 	covered: ((id: number) -> boolean)?, -- the rodent is out of everyone's sight (a drain, a hollow)
+	-- the town's solid lots (World/Colliders): nobody sees, or lands a blow on, the rodent through a building
+	-- (default: the bite-to-hospital sequence's own, infection.colliders)
+	colliders: any?,
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
 }
 
@@ -203,6 +207,19 @@ local function covered(self: Service, id: number): boolean
 		return f(id)
 	end
 	return self.world.covered ~= nil and self.world.covered[id] ~= nil
+end
+
+-- can the person at `a` see (and reach) the rodent at `rod`: no Combat/Cover housing between them (one inside, one
+-- out), no building in the line at chest height
+local function inSight(self: Service, a: any, rod: any): boolean
+	if Cover.between(a.x, a.y, a.z, rod.x, rod.y, rod.z) then
+		return false
+	end
+	local c = self.opts.colliders or (self.infection and (self.infection :: any).colliders)
+	if c == nil then
+		return true
+	end
+	return not Colliders.blocked(c, a.x, a.z, rod.x, rod.z, 1, (a.y - (a.hip or 0)) + 3)
 end
 
 local function rodent(self: Service, id: number): Rodent
@@ -563,7 +580,8 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		local r = self.rods[best.id] :: Rodent
 		local dx, dz = best.x - a.x, best.z - a.z
 		local facing = (dx * math.sin(a.yaw) + dz * math.cos(a.yaw)) / math.max(bestD, 1e-6)
-		local hidden = covered(self, best.id)
+		-- (out of sight: in a drain or a hollow, behind a housing's walls or a building)
+		local hidden = covered(self, best.id) or not inSight(self, a, best)
 		local boosted = self:inAlert(a.x, a.z, now)
 		local view: any = {
 			now = now,
@@ -583,13 +601,16 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			release(self, a.id)
 			continue
 		end
+		if hidden and out.move == "approach" then
+			out.move = "stand" -- (lost sight of it: nobody walks into a wall after it)
+		end
 		order(self, a, best, out)
 		setStance(self, a.id, out.stance)
 		local strike = out.strike
 		if strike then
 			self._stats.strikes += 1
 			cue(self, a.id, "Duel.Strike")
-			if strike.hit and now >= r.iUntil then
+			if strike.hit and not hidden and now >= r.iUntil then
 				self._stats.blows += 1
 				r.iUntil = now + P.iFrames
 				endPounce(self, r, now)

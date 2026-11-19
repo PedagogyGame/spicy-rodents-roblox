@@ -148,6 +148,94 @@ return function(t)
 		print(`      the vigilante landed {#rig.blows} blows; rodent health {rig.health[rig.rodent]}`)
 	end)
 
+	t.test("no blow and no noticing through a housing's walls or a building (review finding 4)", function()
+		local Cover = require("@shared/Combat/Cover")
+		local Colliders = require("@shared/World/Colliders")
+		local function firstVigilante(rig: any): any
+			local vig = nil
+			for id in rig.combat.flags do
+				local a = rig.world.actorsById[id]
+				if vig == nil or a.id < vig.id then
+					vig = a
+				end
+			end
+			return vig
+		end
+		-- the rodent inside a housing (a Cover box), the vigilante 5 studs outside it: nothing
+		do
+			local rig = BiteRig.new({ seed = 6, duelRand = dice(0) })
+			rig.step(20)
+			local v = firstVigilante(rig)
+			rig.holdRodent()
+			local rx, rz = v.x + math.sin(v.yaw) * 5, v.z + math.cos(v.yaw) * 5
+			rig.put(rig.rodent, rx, rz)
+			local rod = rig.world.actorsById[rig.rodent]
+			local key = Cover.add({
+				name = "spec housing",
+				place = { x = rx, z = rz, floorY = rod.y - 50, yaw = 0 },
+				x0 = -1.5,
+				x1 = 1.5,
+				y0 = 0,
+				y1 = 100,
+				d0 = -1.5,
+				d1 = 1.5,
+			})
+			rig.step(4, function()
+				rig.put(rig.rodent, rx, rz)
+			end)
+			Cover.remove(key)
+			t.eq(#rig.blows, 0, "no blow through the housing")
+			t.eq((rig.attrs[v.id] or {}).Stance, nil, "not squared up at a rodent it cannot see")
+		end
+		-- a building's wall between them: nothing; the same spot with no wall: kicked
+		for _, wall in { true, false } do
+			local rig = BiteRig.new({ seed = 6, duelRand = dice(0) })
+			rig.step(20)
+			local v = firstVigilante(rig)
+			rig.holdRodent()
+			local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+			local rx, rz = v.x + fx * 6, v.z + fz * 6
+			rig.put(rig.rodent, rx, rz)
+			local colliders = (rig.infection :: any).colliders
+			local box: any = nil
+			if wall then
+				-- a thin wall across the line between them, 3 studs in front of the person
+				local along = math.abs(fx) > math.abs(fz)
+				box = {
+					id = "spec wall",
+					cx = v.x + fx * 3,
+					cz = v.z + fz * 3,
+					hw = if along then 0.4 else 12,
+					hd = if along then 12 else 0.4,
+					y0 = v.y - 20,
+					eave = v.y + 40,
+					peak = v.y + 40,
+					ridge = nil,
+				}
+				Colliders.add(colliders, box)
+			end
+			rig.step(4, function()
+				rig.put(rig.rodent, rx, rz)
+			end)
+			if wall then
+				local i = table.find(colliders.boxes, box)
+				if i then
+					table.remove(colliders.boxes, i)
+				end
+				for _, list in colliders.cells do
+					local j = table.find(list, box)
+					if j then
+						table.remove(list, j)
+					end
+				end
+				t.eq(#rig.blows, 0, "no blow through a wall")
+				t.eq((rig.attrs[v.id] or {}).Stance, nil, "and it never saw the rodent")
+			else
+				t.truthy(#rig.blows > 0, "with no wall it kicks")
+			end
+		end
+	end)
+
 	t.test("vigilantes are 8 % of the humans, on AI townspeople; a player taking one moves the flag", function()
 		local rig = BiteRig.new({ seed = 8 })
 		rig.step(2)
