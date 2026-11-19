@@ -280,7 +280,7 @@ return function(t)
 			local function climb(rate: number, govern: boolean): (number, number, string)
 				local saved = MoveValidator._govern
 				if not govern then
-					MoveValidator._govern = function(...: any) end :: any
+					MoveValidator._govern = function() end :: any
 				end
 				local v = MoveValidator.new(vworld)
 				local dt = 1 / rate
