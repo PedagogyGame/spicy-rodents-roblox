@@ -168,7 +168,6 @@ function DuelSim.run(opts: Options): Result
 	local noticedAt: number? = nil
 	local overhead = OverheadWatch.new()
 	local spottedOverhead = false
-	local lastSpeed: number? = nil
 	if stealth then
 		pyaw = rand() * math.pi * 2
 		if rand() < 0.5 then
@@ -508,7 +507,6 @@ function DuelSim.run(opts: Options): Result
 					then math.sqrt((history[n].x - history[n - 1].x) ^ 2 + (history[n].z - history[n - 1].z) ^ 2)
 						/ DuelSim.SERVER_DT
 					else nil
-				lastSpeed = speed
 				local tx, tz = rx - hx, rz - hz
 				local inView = d > 0 and (tx * math.sin(pyaw) + tz * math.cos(pyaw)) / d >= 0.28
 				-- the overhead watch, while it is up on the wire

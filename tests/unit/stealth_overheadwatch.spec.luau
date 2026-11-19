@@ -72,17 +72,20 @@ return function(t)
 		t.truthy(r < C.quiet, `under the quiet line: {r}`)
 	end)
 
-	t.test("close overhead is heard: a walk over them is spotted; the same walk 30 studs off to the side is not (in 10 s)", function()
-		local over = timeToSpot(squirrel(2, -3, WALK), 20)
-		local side = timeToSpot(squirrel(30, 0, WALK), 10)
-		print(`      over them {over} s, 30 studs to the side {side}`)
-		t.truthy(over and over <= 4, `over: {over}`)
-		t.eq(side, nil, "off to the side, out of view")
-		-- straight over them, and 20 studs off to the side
-		local rOver = OverheadWatch.rate(squirrel(2, -3, WALK), PERSON)
-		local rSide = OverheadWatch.rate(squirrel(20, 0, WALK), PERSON)
-		t.truthy(rOver > rSide * 3, `close over them builds faster than off to the side: {rOver} against {rSide}`)
-	end)
+	t.test(
+		"close overhead is heard: a walk over them is spotted; the same walk 30 studs off to the side is not (in 10 s)",
+		function()
+			local over = timeToSpot(squirrel(2, -3, WALK), 20)
+			local side = timeToSpot(squirrel(30, 0, WALK), 10)
+			print(`      over them {over} s, 30 studs to the side {side}`)
+			t.truthy(over and over <= 4, `over: {over}`)
+			t.eq(side, nil, "off to the side, out of view")
+			-- straight over them, and 20 studs off to the side
+			local rOver = OverheadWatch.rate(squirrel(2, -3, WALK), PERSON)
+			local rSide = OverheadWatch.rate(squirrel(20, 0, WALK), PERSON)
+			t.truthy(rOver > rSide * 3, `close over them builds faster than off to the side: {rOver} against {rSide}`)
+		end
+	)
 
 	t.test("the leaves: a walk on a branch takes more than twice as long", function()
 		local open = timeToSpot(squirrel(0, 20, WALK), 30) :: number
@@ -119,45 +122,48 @@ return function(t)
 		t.deepEq({ got[1], got[2], got[3] }, { "glance", "look", "spot" })
 	end)
 
-	t.test("wary while it is in sight after the spot; lost once out of sight; a creep is not spotted again at once", function()
-		local state = OverheadWatch.new()
-		local s = squirrel(0, 10, WALK)
-		local now = 0
-		local kinds: { [string]: number } = {}
-		local function tick(seen: OverheadWatch.Seen?)
-			now += DT
-			local m = {}
-			m[PERSON.id] = seen
-			for _, e in OverheadWatch.step(state, now, DT, m) do
-				kinds[e.kind] = kinds[e.kind] or now
+	t.test(
+		"wary while it is in sight after the spot; lost once out of sight; a creep is not spotted again at once",
+		function()
+			local state = OverheadWatch.new()
+			local s = squirrel(0, 10, WALK)
+			local now = 0
+			local kinds: { [string]: number } = {}
+			local function tick(seen: OverheadWatch.Seen?)
+				now += DT
+				local m = {}
+				m[PERSON.id] = seen
+				for _, e in OverheadWatch.step(state, now, DT, m) do
+					kinds[e.kind] = kinds[e.kind] or now
+				end
 			end
+			while kinds.spot == nil and now < 10 do
+				tick(seenOf(s, PERSON))
+			end
+			for _ = 1, 20 do
+				tick(seenOf(s, PERSON))
+			end
+			t.truthy(kinds.wary and kinds.wary - kinds.spot >= C.waryAfter - DT, "wary a while after the spot")
+			t.truthy(OverheadWatch.spotted(state, PERSON.id, "rodent"))
+			local m, seen = OverheadWatch.meterOf(state, "rodent")
+			t.eq(m, 1)
+			t.truthy(seen)
+			-- gone (out of everyone's sight)
+			local gone = now
+			while kinds.lost == nil and now < gone + 20 do
+				tick(nil)
+			end
+			t.truthy(kinds.lost and kinds.lost - gone >= C.forget - DT and kinds.lost - gone <= C.forget + DT, "lost")
+			t.falsy(OverheadWatch.spotted(state, PERSON.id, "rodent"))
+			-- creeping in front of them again, right away: nothing builds
+			local c = squirrel(0, 10, CREEP)
+			local m0 = OverheadWatch.meterOf(state, "rodent")
+			for _ = 1, 20 do
+				tick(seenOf(c, PERSON))
+			end
+			t.truthy(OverheadWatch.meterOf(state, "rodent") <= m0, "a creep adds nothing just after it was lost")
 		end
-		while kinds.spot == nil and now < 10 do
-			tick(seenOf(s, PERSON))
-		end
-		for _ = 1, 20 do
-			tick(seenOf(s, PERSON))
-		end
-		t.truthy(kinds.wary and kinds.wary - kinds.spot >= C.waryAfter - DT, "wary a while after the spot")
-		t.truthy(OverheadWatch.spotted(state, PERSON.id, "rodent"))
-		local m, seen = OverheadWatch.meterOf(state, "rodent")
-		t.eq(m, 1)
-		t.truthy(seen)
-		-- gone (out of everyone's sight)
-		local gone = now
-		while kinds.lost == nil and now < gone + 20 do
-			tick(nil)
-		end
-		t.truthy(kinds.lost and kinds.lost - gone >= C.forget - DT and kinds.lost - gone <= C.forget + DT, "lost")
-		t.falsy(OverheadWatch.spotted(state, PERSON.id, "rodent"))
-		-- creeping in front of them again, right away: nothing builds
-		local c = squirrel(0, 10, CREEP)
-		local m0 = OverheadWatch.meterOf(state, "rodent")
-		for _ = 1, 20 do
-			tick(seenOf(c, PERSON))
-		end
-		t.truthy(OverheadWatch.meterOf(state, "rodent") <= m0, "a creep adds nothing just after it was lost")
-	end)
+	)
 
 	t.test("a glance that empties ends ('away'); a person with nothing left is dropped", function()
 		local state = OverheadWatch.new()

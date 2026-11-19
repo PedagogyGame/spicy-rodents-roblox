@@ -112,8 +112,23 @@ export type Opts = {
 	speech: any?, -- a Speech/SpeechRules.State on the town's clock (default its own)
 }
 
--- A squirrel overhead this tick.
-export type Overhead = OverheadWatch.Squirrel & { kind: string?, held: boolean }
+-- A squirrel overhead this tick (Stealth/OverheadWatch's Squirrel, written out: types do not cross Import, and the
+-- route's kind and whether a player holds it).
+export type Overhead = {
+	id: any,
+	x: number,
+	y: number,
+	z: number,
+	speed: number,
+	sprint: boolean?,
+	canopy: boolean?,
+	landed: boolean?,
+	kind: string?,
+	held: boolean,
+}
+type Event = { kind: string, person: any, squirrel: any, other: any? }
+type Seen = { squirrel: any, rate: number, impulse: number, exposure: number, creep: boolean? }
+type Observer = { id: any, x: number, y: number, z: number, faceX: number, faceZ: number }
 
 type Sense = { lastOn: number, kind: string?, air: boolean }
 
@@ -253,11 +268,7 @@ local function gather(self: any, t: number): { Overhead }
 		local s = self.sense[a.id]
 		local high = h >= C.minHeight
 		local onRoute = high and (if known then kind ~= nil and OverheadService.ABOVE[kind] == true else true)
-		local inAir = not onRoute
-			and high
-			and routeId == nil
-			and s ~= nil
-			and t - s.lastOn <= C.airGrace
+		local inAir = not onRoute and high and routeId == nil and s ~= nil and t - s.lastOn <= C.airGrace
 		local isHeld = held(self, a.id)
 		local peak = if isHeld then Pace.take(self.pace, a.id) else nil
 		if not (onRoute or inAir) then
@@ -470,7 +481,7 @@ local function point(self: any, id: number)
 end
 
 -- one event of the watch, acted on
-local function act(self: any, e: OverheadWatch.Event, byId: { [number]: Overhead })
+local function act(self: any, e: Event, byId: { [number]: Overhead })
 	local id = e.person :: number
 	local s = byId[e.squirrel :: number] or self.above[e.squirrel :: number]
 	local st = self._stats
@@ -575,7 +586,7 @@ function OverheadService._tick(self: any, dt: number)
 		end
 	end
 	self.above = byId
-	local seen: { [any]: OverheadWatch.Seen } = {}
+	local seen: { [any]: Seen } = {}
 	if #above > 0 then
 		st.busyTicks += 1
 		rebuildPeople(self)
@@ -588,7 +599,7 @@ function OverheadService._tick(self: any, dt: number)
 				if a == nil then
 					continue
 				end
-				local obs: OverheadWatch.Observer = {
+				local obs: Observer = {
 					id = a.id,
 					x = a.x,
 					y = eyeOf(a),
@@ -692,7 +703,7 @@ end
 
 -- stop(): every head, arm and eye let go
 function OverheadService.stop(self: any)
-	for id in table.clone(self.gazes) do
+	for id in table.clone(self.gazes) :: { [number]: any } do
 		gaze(self, id, nil)
 	end
 	for id in self.gestures do

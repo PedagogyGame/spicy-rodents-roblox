@@ -147,7 +147,10 @@ return function(t)
 				t.truthy(sprint.unawareRate <= 0.02, `a straight run is noticed: {sprint.unawareRate} unaware`)
 				t.eq(sprint.noticed, N, "every person notices a sprinter")
 				-- the overhead watch rarely spots a creep along the wire
-				t.truthy(batch("calm", "dropper", lag).spottedOverhead <= N * 0.1, "a creep on the wire is rarely spotted")
+				t.truthy(
+					batch("calm", "dropper", lag).spottedOverhead <= N * 0.1,
+					"a creep on the wire is rarely spotted"
+				)
 			end
 		end
 	)

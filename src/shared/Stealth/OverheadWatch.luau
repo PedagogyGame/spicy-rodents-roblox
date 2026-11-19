@@ -218,7 +218,7 @@ function OverheadWatch.step(state: State, now: number, dt: number, seen: { [any]
 		end
 	end
 	for person, tr in state.tracks do
-		local s = seen[person]
+		local s: Seen? = seen[person]
 		if s and s.squirrel ~= tr.squirrel then
 			s = nil -- (they are watching another one)
 		end
@@ -288,11 +288,11 @@ end
 -- tell(state, now, from, to, squirrel): `from` points it out to `to`: they look up at it at once (at least "look")
 -- and answer C.replyDelay later (a "reply" event). False when `to` has already spotted it or is answering someone.
 function OverheadWatch.tell(state: State, now: number, from: any, to: any, squirrel: any): boolean
-	local tr = state.tracks[to]
-	if tr and (tr.stage == 4 or tr.replyAt ~= nil) then
+	local had = state.tracks[to]
+	if had and (had.stage == 4 or had.replyAt ~= nil) then
 		return false
 	end
-	tr = track(state, to, squirrel)
+	local tr = track(state, to, squirrel)
 	tr.squirrel = squirrel
 	tr.meter = math.max(tr.meter, C.look)
 	tr.calmUntil = -math.huge
