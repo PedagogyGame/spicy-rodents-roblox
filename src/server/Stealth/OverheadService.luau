@@ -40,8 +40,8 @@
 --   * the rodent's own player sees an eye (Client/UI/SneakMeter, the rafters' meter): `cue(rodentId, meter, seen)`, the
 --     highest meter of anyone watching it and whether anyone has spotted it; (nil, nil) once it is not overhead.
 -- Costs: no work at all on a tick with no squirrel overhead (the people's grid is not even built); with one, the grid of
--- the town's people (one set per person) and a few people near it rated, a building check each. stats().lastMs and
--- peakMs say what a tick took (tests/unit/overhead_service.spec.luau holds it under a budget with 60+ people).
+-- the town's people (one set per person) and a few people near it rated, a building check each. stats().lastMs, peakMs
+-- and busyMs say what the ticks took (tests/unit/overhead_service.spec.luau holds them under a budget with 60+ people).
 -- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; new(opts) -> Service; :step(dt); :spotted(personId, squirrelId) ->
 --   boolean; :stageOf(personId) -> string; :overhead() -> { [id]: Overhead } (last tick's); :stats(); :stop()
 -- Ids are TownAI actor ids. Positions in studs. No side effects on require.
@@ -147,6 +147,7 @@ export type Stats = {
 	refused: number, -- lines the caps held back
 	lastMs: number,
 	peakMs: number,
+	busyMs: number, -- all the ticks with a squirrel overhead, added up (busyMs / busyTicks: the mean)
 }
 
 local function clock(): number
@@ -192,6 +193,7 @@ function OverheadService.new(opts: Opts): any
 			refused = 0,
 			lastMs = 0,
 			peakMs = 0,
+			busyMs = 0,
 		} :: Stats,
 	}, OverheadService)
 	return self
@@ -682,6 +684,9 @@ function OverheadService._tick(self: any, dt: number)
 	local ms = (clock() - t0) * 1000
 	st.lastMs = ms
 	st.peakMs = math.max(st.peakMs, ms)
+	if #above > 0 then
+		st.busyMs += ms
+	end
 end
 
 -- spotted(personId, squirrelId): that person has pointed the squirrel out above them (Combat/Duel.notices: aware)

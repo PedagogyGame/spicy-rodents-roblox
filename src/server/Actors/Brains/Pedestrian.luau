@@ -29,6 +29,7 @@
 
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../../shared/Config/Tunables"))
 local Common = require("./Common")
 local Directive = require("./Directive")
 local Perception = require("../Perception")
@@ -90,6 +91,8 @@ local DAMP_WALK, DAMP_FLEE = 6.8, 10 -- lambda (L7138)
 local REJOIN_FAR = 6 -- studs off the lane: further than this the person walks back instead of sliding
 local REJOIN_NEAR = 1.5 -- studs: on the lane again
 local REJOIN_SPEED = Units.st(1.6)
+local QUIET_SPEED = Tunables.get("duel.quietSpeed") -- studs/s: no faster than this a squirrel is creeping
+local BRUSH = Tunables.get("duel.brush") -- studs: this near a person feels it whatever it does
 local HURRY_SPEED = Units.st(2.6) -- walking on briskly from under a squirrel (6.5 st/s; the walk is 2 to 4)
 local HURRY_STEP = Units.st(37) -- how far along the lane the brisk walk heads
 
@@ -210,7 +213,25 @@ local function reseat(self: Brain)
 	pickGoal(self)
 end
 
--- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted().
+-- A squirrel creeping (or keeping still) outside a person's view cone, and not brushing them, is not noticed just for
+-- being near: the v5.4 predicate's peripheral sense (spotted within 6.8 u = 17 studs whatever the facing) is for one that
+-- moves faster than a creep (the stalk, owner playtest 2026-11-19; the duel's own noticing is the same rule:
+-- Combat/Duel.notices, Tunables duel.quietSpeed and duel.brush). Actors/Perception.spotted itself is unchanged.
+local function stalkedUnseen(actor: Common.Actor, threat: Common.Actor): boolean
+	if threat.speed > QUIET_SPEED then
+		return false
+	end
+	local dx, dz = threat.x - actor.x, threat.z - actor.z
+	local d = math.sqrt(dx * dx + dz * dz)
+	if d < BRUSH then
+		return false
+	end
+	local dot = (dx * math.sin(actor.yaw) + dz * math.cos(actor.yaw)) / d
+	return dot <= Perception.constants.inViewDot
+end
+
+-- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted() (and is not stalking
+-- them unseen: stalkedUnseen).
 local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local actor = self.actor
 	local n = ctx.threats:query(actor.x, actor.z, SPOT_RADIUS, ctx.queryBuffer)
@@ -224,7 +245,7 @@ local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local bestD = math.huge
 	for i = 1, n do
 		local threat = ctx.actorsById[ctx.queryBuffer[i]]
-		if threat then
+		if threat and not stalkedUnseen(actor, threat) then
 			local t = self.target
 			t.x, t.y, t.z = threat.x, threat.y, threat.z
 			t.groundY = ctx.groundAt(threat.x, threat.z)
