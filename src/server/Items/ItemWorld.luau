@@ -1406,6 +1406,24 @@ function ItemWorld.start(opts: StartOpts): World
 			for _, k in kites do
 				flierAttr(k.player, false) -- (the flier's controls come back)
 			end
+			for _, loan in loans.all() do
+				endLoan(loan, "stopped") -- (no borrowed Tool outlives the world; the thing goes home)
+			end
+			for _, th in thrown do
+				if not th.taken then
+					th.taken = true
+					sendHome(th.thing)
+				end
+			end
+			for _, c in cushions do
+				cushionHome(c, nil)
+			end
+			for _, owner in chairs.owners() do
+				local m = chairs.chairOf(owner)
+				if m then
+					foldChair(owner, m, true)
+				end
+			end
 			folder:Destroy()
 		end,
 	}
