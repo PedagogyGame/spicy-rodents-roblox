@@ -1,8 +1,12 @@
 --!strict
 -- ServerScriptService.Server.Persistence.ProfileSchema
 -- The versioned DataStore profile (BUILD_PLAN D26, risk 24; spike S15): the wallet in integer cents,
--- the receipt ledger, the wardrobe, the item inventory, reputation and lifetime stats. Pure: a
--- template, forward migrations and a validator so a corrupt or future record is never written over.
+-- the receipt ledger, the wardrobe (clothing owned) and what is worn (slot -> id), the item inventory,
+-- reputation and lifetime stats. Pure: a template, forward migrations and a validator so a corrupt or
+-- future record is never written over. What the live game writes today is only `wardrobe` and `worn`
+-- (owner D16 #25: clothing carries over, nothing else; Server/Cosmetics/Wardrobe); the other fields keep
+-- whatever the record holds.
+-- v2 (19 November): adds `worn`.
 -- Interface: VERSION, template() -> Data, migrate(raw) -> (Data?, err?), validate(data) -> (ok, err?)
 
 export type ReceiptEntry = { productId: number, cents: number, at: number, playerId: number }
@@ -11,6 +15,7 @@ export type Data = {
 	wallet: { cents: number },
 	receipts: { ids: { string }, byId: { [string]: ReceiptEntry } },
 	wardrobe: { [string]: boolean },
+	worn: { [string]: string },
 	inventory: { [string]: number },
 	reputation: number,
 	stats: { [string]: number },
@@ -18,7 +23,7 @@ export type Data = {
 
 local ProfileSchema = {}
 
-ProfileSchema.VERSION = 1
+ProfileSchema.VERSION = 2
 
 function ProfileSchema.template(): Data
 	return {
@@ -26,6 +31,7 @@ function ProfileSchema.template(): Data
 		wallet = { cents = 0 },
 		receipts = { ids = {}, byId = {} },
 		wardrobe = {},
+		worn = {},
 		inventory = {},
 		reputation = 0,
 		stats = {},
@@ -55,8 +61,23 @@ function ProfileSchema.validate(data: any): (boolean, string?)
 			return false, "receipt index"
 		end
 	end
-	if type(data.wardrobe) ~= "table" or type(data.inventory) ~= "table" or type(data.stats) ~= "table" then
+	if
+		type(data.wardrobe) ~= "table"
+		or type(data.worn) ~= "table"
+		or type(data.inventory) ~= "table"
+		or type(data.stats) ~= "table"
+	then
 		return false, "collections"
+	end
+	for slot, id in data.worn do
+		if type(slot) ~= "string" or type(id) ~= "string" then
+			return false, "worn"
+		end
+	end
+	for id, v in data.wardrobe do
+		if type(id) ~= "string" or type(v) ~= "boolean" then
+			return false, "wardrobe"
+		end
 	end
 	if type(data.reputation) ~= "number" then
 		return false, "reputation"
@@ -64,8 +85,8 @@ function ProfileSchema.validate(data: any): (boolean, string?)
 	return true, nil
 end
 
--- nil (a new player) -> template; schema 0 (the pre-S15 shape { cents = n }) -> v1; a newer schema
--- than this build knows is refused so an old server never truncates a newer record.
+-- nil (a new player) -> template; schema 0 (the pre-S15 shape { cents = n }) -> v1; v1 -> v2 (nothing
+-- worn); a newer schema than this build knows is refused so an old server never truncates a newer record.
 function ProfileSchema.migrate(raw: any): (Data?, string?)
 	if raw == nil then
 		return ProfileSchema.template(), nil
@@ -84,9 +105,15 @@ function ProfileSchema.migrate(raw: any): (Data?, string?)
 	if schema == 0 then
 		local fresh = ProfileSchema.template()
 		fresh.wallet.cents = if isWhole(raw.cents) then raw.cents else 0
-		data = fresh
+		data = fresh -- (already the present shape)
+		schema = ProfileSchema.VERSION
 	end
-	-- fill fields added after a record was written (none yet in v1; kept for the pattern)
+	if schema == 1 then
+		data = table.clone(data)
+		data.worn = {}
+		data.schema = 2
+	end
+	-- fill fields added after a record was written (none yet; kept for the pattern)
 	local template = ProfileSchema.template() :: any
 	for k, v in template do
 		if data[k] == nil then
