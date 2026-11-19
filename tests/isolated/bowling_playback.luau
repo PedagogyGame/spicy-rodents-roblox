@@ -4,7 +4,8 @@
 -- Client/Minigames/BowlingPlayback against the server's lane on the same fake parts: the client draws a throw
 -- from the server's script and must finish exactly where the server has the pins and the ball (otherwise they
 -- would pop when playback hands back); every pin of the rack is written every frame (so the server's coarser
--- copy never shows through); pins in the pit are hidden locally and unhidden at the end; cues fire in order;
+-- copy never shows through); pins in the pit are hidden locally and unhidden at the end; cues fire in order
+-- (the pinsetter's sweep after the playback lets go, at its own time);
 -- a cut-short throw restores the rack; a lane that is not there plays nothing and binds nothing.
 -- Interface: return function(t) (the spec shape)
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -140,11 +141,13 @@ return function(t)
 					t.truthy(sawHidden, "a pin in the pit goes out of sight")
 					t.eq(pitPin:FindFirstChild("Body").LocalTransparencyModifier, 0)
 				end
-				-- cues in the script's order
+				-- cues in the script's order; the pinsetter's sweep is still to come (after the playback lets go,
+				-- at its own time: BowlingPlayback's `later`), and the stop below drops it
 				local want = RollScript.cues(script)
-				t.eq(#cues, #want)
-				for i, c in want do
-					t.eq(cues[i], c[2])
+				t.eq(want[#want][2], "sweep")
+				t.eq(#cues, #want - 1)
+				for i = 1, #want - 1 do
+					t.eq(cues[i], want[i][2])
 				end
 				server:reset(true)
 				BowlingPlayback.stop(LANE, PLACE, PinModel.fullRack())
@@ -152,6 +155,54 @@ return function(t)
 			BowlingPlayback.clock = os.clock
 		end)
 	end)
+
+	t.test(
+		"the pinsetter's sweep sounds after the playback lets go, at its time; a stop before then drops it",
+		function()
+			FakeEngine.with(function()
+				local lm, server = buildLane()
+				local _ = lm
+				local now = 100
+				BowlingPlayback.clock = function()
+					return now
+				end
+				local function throw(): ({ string }, any)
+					local ok, why, script = server:release({ offset = 0.165, angle = 0, power = 0.7, spin = 0 }, 1, 3)
+					t.truthy(ok, why)
+					while server.state ~= "counted" do
+						server:step(0.05)
+					end
+					server:takeResult()
+					server:reset(true)
+					local heard: { string } = {}
+					t.truthy(BowlingPlayback.play(PLACE, LANE, RollScript.check(script), function(name: string)
+						table.insert(heard, name)
+					end))
+					while BowlingPlayback.playing(LANE) do
+						now += 1 / 60
+						FakeEngine.renderStep(1 / 60)
+					end
+					return heard, script
+				end
+				local heard, script = throw()
+				t.falsy(table.find(heard, "sweep"), "not while the throw plays")
+				-- the playback let go TAIL after the end (to a frame); the sweep is due SWEEP_AT after the end
+				t.eq(FakeEngine.delayedCount(), 1, "one cue still due")
+				local due = -1
+				FakeEngine.runDelayed(function(seconds: number): boolean
+					due = seconds
+					return true
+				end)
+				t.near(due, RollScript.SWEEP_AT - BowlingPlayback.TAIL, 1 / 30)
+				t.eq(heard[#heard], "sweep", "then the sweep")
+				t.near(script.tEnd + RollScript.SWEEP_AT, script.tEnd + LaneCycle.SETTLE + LaneCycle.PAUSE, 1e-9)
+				local heard2 = throw()
+				BowlingPlayback.stop(LANE)
+				FakeEngine.runDelayed()
+				t.falsy(table.find(heard2, "sweep"), "a stopped lane plays no late sweep")
+			end)
+		end
+	)
 
 	t.test("a throw cut short: playback stops and the lane shows the rack the server has", function()
 		FakeEngine.with(function()

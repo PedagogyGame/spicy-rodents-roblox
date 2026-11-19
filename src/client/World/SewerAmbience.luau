@@ -19,8 +19,9 @@
 --     in drain 1, the crossing's A / D as it comes up and which arm was taken; the controller's refusals reworded for
 --     a drain (filter: "No room to jump down here"). No compass words: the game's map has east at -x
 --     (Shared/Map/MapModel), so a grate is told by its name (what stands beside it).
--- Sound cues (SewerAmbience.CUES, cue -> asset id). NOTHING IS UPLOADED AND NOTHING PLAYS YET: every id is empty, so
--- play() is silent and only counted; filling an id in (docs/AUDIO_BUDGET.md, Sewers) makes it sound.
+-- Sound cues (SewerAmbience.CUES, cue -> asset id, each a licensed library sound: docs/AUDIO_BUDGET.md, Sewers;
+-- nothing uploaded), each played at its own VOLUME (the per-stride ones quiet); every firing is also counted. The
+-- echo is the place's (SoundService.AmbientReverb SewerPipe while inside), so the sounds themselves are dry.
 --   sewer.grateIn / grateOut   going down / coming up out of a mouth
 --   sewer.rung                 every C.rungStep studs climbed or descended in a shaft
 --   sewer.footEcho             every C.echoStride studs run along a passage (the echo of the footfall)
@@ -30,12 +31,12 @@
 --   sewer.streetMurmur (loop)  within C.murmurRadius of a mouth, from below
 --   sewer.hiss                 the small alligator (v5.4's idle predator for the sewer: a sound and a line, nothing
 --                              to see): still for C.hissAfter seconds underground; the toast is HISS_LINE
---   sewer.carOverhead, sewer.trolleyOverhead   named, not fired yet (they need the traffic poses over a pipe)
+--   sewer.carOverhead, sewer.trolleyOverhead   chosen, not fired yet (they need the traffic poses over a pipe)
 -- Lamps: only the space's lamps within C.lampRadius of the body are on (at most C.maxLit, the nearest), moving with
 -- it as it runs; shadows on the C.shadowLamps nearest. A 370-stud culvert never has all its 34 lights on.
 -- Who goes down: squirrels and the Spicy Rodent (a person, the fox or a deer never sees the prompt and is never
 -- "inside"). Computer squirrels are not this client's business.
--- Interface (pure): C; CUES; HISS_LINE; PROMPT; placeName(pipe) -> string; canGoDown(species?, variant?) -> boolean;
+-- Interface (pure): C; CUES; VOLUME; HISS_LINE; PROMPT; placeName(pipe) -> string; canGoDown(species?, variant?) -> boolean;
 --   shaftAt(layout, x, y, z) -> Mouth?; prompt(layout, view) -> string?;
 --   crossing(layout, view) -> string?; armAt(layout, x, z) -> Mouth?; litLamps(points, at, radius, max) -> { index };
 --   grade(level) -> { brightness, contrast,
@@ -90,19 +91,35 @@ SewerAmbience.C = {
 	maxLog = 64, -- the last cue firings kept for a developer (and the specs)
 }
 
+-- (ProSoundEffects, Roblox's licensed library; picked by name and length, to be heard in the game)
 SewerAmbience.CUES = {
-	["sewer.grateIn"] = "",
-	["sewer.grateOut"] = "",
-	["sewer.rung"] = "",
-	["sewer.footEcho"] = "",
-	["sewer.drip"] = "",
-	["sewer.trickle"] = "",
-	["sewer.riverHum"] = "",
-	["sewer.streetMurmur"] = "",
-	["sewer.hiss"] = "",
-	["sewer.carOverhead"] = "",
-	["sewer.trolleyOverhead"] = "",
+	["sewer.grateIn"] = "rbxassetid://9125426401", -- Cast Iron Fireplace Grate: drop on its side and shift
+	["sewer.grateOut"] = "rbxassetid://9125426396", -- the same, shorter
+	["sewer.rung"] = "rbxassetid://9116801858", -- Metal Rungs 1: a ladder climb's resonant hit (played quiet)
+	["sewer.footEcho"] = "rbxassetid://9119455498", -- Spider Footsteps 4: soft fast surface taps (a small patter)
+	["sewer.drip"] = "rbxassetid://9126176614", -- Water Drip: distant single drop, sharp, reverberant
+	["sewer.trickle"] = "rbxassetid://9118187543", -- River Water 1: the California Aqueduct, inside a tunnel (27 s)
+	["sewer.riverHum"] = "rbxassetid://9119643864", -- Storm Drain Presence 1: a 3' pipe, slowed, wind-like (36 s)
+	["sewer.streetMurmur"] = "rbxassetid://9112758242", -- City Ambience 1: traffic, a car over a metal plate (27 s)
+	["sewer.hiss"] = "rbxassetid://9119302862", -- Snake Hiss 1: airy hisses (the small alligator, never seen)
+	["sewer.carOverhead"] = "rbxassetid://9116750726", -- Metal Plate Impact, Manhole Hit
+	["sewer.trolleyOverhead"] = "rbxassetid://9114257912", -- Electric Trolley 2: a pass by
 } :: { [string]: string }
+
+-- how loud each cue plays (0..1): a cue every stride or every stud is kept down; the loops sit under the rest
+SewerAmbience.VOLUME = {
+	["sewer.grateIn"] = 0.6,
+	["sewer.grateOut"] = 0.5,
+	["sewer.rung"] = 0.2,
+	["sewer.footEcho"] = 0.25,
+	["sewer.drip"] = 0.5,
+	["sewer.trickle"] = 0.35,
+	["sewer.riverHum"] = 0.5,
+	["sewer.streetMurmur"] = 0.25,
+	["sewer.hiss"] = 0.7,
+	["sewer.carOverhead"] = 0.6,
+	["sewer.trolleyOverhead"] = 0.5,
+} :: { [string]: number }
 
 SewerAmbience.HISS_LINE = "A low hiss and a ripple in the sewer water…"
 
@@ -530,7 +547,7 @@ function SewerAmbience.start(ctx: Context): Handle
 		local s = Instance.new("Sound")
 		s.Name = `Sewer_{cue}`
 		s.SoundId = id
-		s.Volume = 0.6
+		s.Volume = SewerAmbience.VOLUME[cue] or 0.6
 		s.Parent = SoundService
 		s.Ended:Once(function()
 			s:Destroy()
@@ -551,7 +568,7 @@ function SewerAmbience.start(ctx: Context): Handle
 			s.Name = `Sewer_{cue}`
 			s.SoundId = id
 			s.Looped = true
-			s.Volume = 0.4
+			s.Volume = SewerAmbience.VOLUME[cue] or 0.4
 			s.Parent = SoundService
 			s:Play()
 			loopSounds[cue] = s

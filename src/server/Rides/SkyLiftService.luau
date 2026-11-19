@@ -29,7 +29,9 @@
 --     that clears itself after LUNCH_SECS; one per player). Until the wallet lands it is free, with the line
 --     "On the house today". THE ONE CHARGE GOES HERE when it does: Town.charge (see `counter`), LUNCH_CENTS = 10
 --     under the name "hilltop_lunch" (an EconomyRules.PRICES entry of the same name).
--- Sounds: named cue points only (Sound instances with empty ids, never synthesised): CUES.
+-- Sounds: Shared/Rides/SkyLiftSounds (licensed library sounds, nothing uploaded or synthesised): the three cues
+--   here (CUES) on their posts, and the Lookout's three loops (the fire, the dining room, the terrace) on posts of
+--   their own in Workspace.SkyLift, playing for good and heard only near (RollOffMaxDistance).
 -- Engine only inside the functions; no side effects on require. Steppable: step() reads the clock it was given.
 -- The joiner's one line in Boot/Game.start (after the attractions, so `canRide` can see the games):
 --   local skylift = SkyLiftService.start({ game = { possession = possession, runtime = rt, devices = devices,
@@ -54,6 +56,7 @@ local PlayerVehicles =
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local SkyLift = Import.shared("Rides/SkyLift") :: typeof(require("../../shared/Rides/SkyLift"))
+local SkyLiftSounds = Import.shared("Rides/SkyLiftSounds") :: typeof(require("../../shared/Rides/SkyLiftSounds"))
 local BodyPin = require("../Movement/BodyPin")
 
 local SkyLiftService = {}
@@ -134,8 +137,8 @@ SkyLiftService.WORDS = table.freeze({
 	gaveUp = "Your place on the sky lift is given up: %s",
 })
 
--- named cue points (empty ids: the owner uploads; docs/AUDIO_BUDGET.md). The server plays only these three; the
--- cabin's own cues (CableHum, DoorsOpen, DoorsClose, TowerClunk, WindAtHeight) are the client's (lane 5).
+-- the cues the server plays (their sounds: Shared/Rides/SkyLiftSounds; docs/AUDIO_BUDGET.md); the cabin's own
+-- (CableHum, DoorsOpen, DoorsClose, TowerClunk, WindAtHeight) are the client's (Client/Rides/SkyLiftView)
 SkyLiftService.CUES = table.freeze({
 	bell = "SkyLift.StationBell", -- on each gate post, when a cabin's doors open there
 	counter = "SkyLift.CounterBell", -- on the counter post, when a lunch is served
@@ -330,10 +333,13 @@ local function newPart(className: string, name: string, size: Vector3, cf: CFram
 	return p
 end
 
-local function cue(parent: any, name: string): any
+local function cue(parent: any, name: string, looped: boolean?): any
 	local s = Instance.new("Sound") :: any
 	s.Name = name
-	s.SoundId = "" -- a cue point: the owner uploads (docs/AUDIO_BUDGET.md)
+	s.SoundId = SkyLiftSounds.CUES[name] or ""
+	s.Volume = SkyLiftSounds.VOLUME[name] or 0.5
+	s.RollOffMaxDistance = SkyLiftSounds.REACH[name] or 60
+	s.Looped = looped == true
 	s.Parent = parent
 	return s
 end
@@ -525,6 +531,16 @@ function SkyLiftService.new(opts: Opts): any
 	self.counterPost = newPart("Part", "CounterPost", Vector3.new(0.4, 0.4, 0.4), CFrame.new(cx, cy, cz), folder)
 	self.counterPost.Transparency = 1
 	self.counterCue = cue(self.counterPost, SkyLiftService.CUES.counter)
+	-- the Lookout's loops (the fire, the dining room, the terrace): each on a post of its own, playing for good
+	self.lookoutLoops = {}
+	for _, l in SkyLiftSounds.LOOKOUT_LOOPS do
+		local lx0, ly0, lz0 = AlleyLayout.toWorld(place, l.at[1], l.at[2], l.at[3])
+		local post = newPart("Part", `{l.cue}Post`, Vector3.new(0.4, 0.4, 0.4), CFrame.new(lx0, ly0, lz0), folder)
+		post.Transparency = 1
+		local s = cue(post, l.cue, true)
+		play(s)
+		table.insert(self.lookoutLoops, s)
+	end
 	-- the chairs round every table (tools/bake/lookout table4: 2.7 out on each side, facing the table, the seat's
 	-- top 1.5 up) and the host's spot by the counter (anchor host)
 	self.chairs = {} :: { { x: number, y: number, z: number, yaw: number } }

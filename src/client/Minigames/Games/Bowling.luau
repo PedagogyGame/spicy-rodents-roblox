@@ -8,7 +8,8 @@
 --     server's own copy of the motion shows), but the bowler is told either way: the server HAS counted it;
 --   the ten-frame scorecard (two mark boxes a frame, three in the tenth, the running total under them, the
 --     bowler up highlighted) and the end card (ranked scores, strikes, spares, misses);
---   the strike and spare calls, and the lane's sound cues (silent until their ids are filled in below).
+--   the strike and spare calls, and the lane's sound cues (library sounds; the roll is the game's own upload,
+--     Shared/Audio/Uploads "bowling_roll", silent until the lead uploads it; docs/AUDIO_BUDGET.md).
 -- Interface: a ClientGame.ClientGame
 
 local Import = require("../../Import")
@@ -16,6 +17,7 @@ local Referee =
 	Import.shared("Minigames/Bowling/Referee") :: typeof(require("../../../shared/Minigames/Bowling/Referee"))
 local RollScript =
 	Import.shared("Minigames/Bowling/RollScript") :: typeof(require("../../../shared/Minigames/Bowling/RollScript"))
+local Uploads = Import.shared("Audio/Uploads") :: typeof(require("../../../shared/Audio/Uploads"))
 local BowlingClient = require("../BowlingClient")
 local BowlingPlayback = require("../BowlingPlayback")
 local ClientGame = require("../ClientGame")
@@ -175,13 +177,13 @@ local entry: ClientGame.ClientGame = {
 	watch = watch,
 	sounds = {
 		release = "rbxassetid://9126236431", -- the ball leaves the hand (Wood Beam Impact Resonant Clunk)
-		roll = "", -- the rumble down the lane (looped until the pins or the pit)
-		gutter = "", -- the ball drops into the channel
+		roll = Uploads.id("bowling_roll"), -- the rumble down the lane (the game's own: none in the library)
+		gutter = "rbxassetid://9117973595", -- the ball drops into the channel (Punch Wood Box 2: a hollow wooden knock)
 		pin = "rbxassetid://9120840234", -- one clatter of pins (Wood Down Shaft Clanking 5)
 		pit = "rbxassetid://9113531800", -- the ball thumps into the pit (Body Pat Muted 1)
 		strike = "rbxassetid://1840076509", -- the call (Through the Roof, sting)
 		spare = "rbxassetid://1848287311", -- (The Little Things, hit)
-		sweep = "", -- the pinsetter
+		sweep = "rbxassetid://9125792061", -- the pinsetter (Pump Cycle Machine: mechanical clunks, an air burst)
 	},
 	words = {
 		idle = "You were taken off the lane: two turns in a row went unplayed",

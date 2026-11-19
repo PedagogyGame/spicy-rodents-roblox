@@ -23,10 +23,10 @@
 
 local NutMeter = {}
 
--- the pick-up's tick, heard by the picker only (a Sound under the meter's gui; nothing replicated): a stand-in from
--- the licensed library already in the game (Items.Click, Flashlight Switch 13, ProSoundEffects), quiet, until a nut
--- sound is picked (docs/AUDIO_BUDGET.md "Nuts")
-NutMeter.PICK_SOUND = { id = "rbxassetid://9114481274", volume = 0.35, speed = 1.3 }
+-- the pick-up's tick, heard by the picker only (a Sound under the meter's gui; nothing replicated), quiet and a
+-- little higher: Wood Drop, Impacts On Concrete, Small Pieces (ProSoundEffects: a small wooden tick and bounce;
+-- docs/AUDIO_BUDGET.md "Nuts")
+NutMeter.PICK_SOUND = { id = "rbxassetid://9120863989", volume = 0.35, speed = 1.2 }
 NutMeter.WIDTH = 210
 NutMeter.HEIGHT = 44 -- with the hint line; 26 without
 NutMeter.CLAIM = 0.7 -- the tick on the bar (Tunables forage.ownThreshold)

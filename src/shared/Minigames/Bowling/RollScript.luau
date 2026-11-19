@@ -31,6 +31,9 @@ RollScript.LIE_DROP = 0.22 -- a lying pin's pivot is this much lower than a stan
 RollScript.PIT_HIDE = 0.3 -- seconds after going over the edge before a pin is out of sight
 RollScript.GRAVITY = 80 -- studs/s^2 for things dropping into the pit (looks right at this scale)
 RollScript.REST = 0.4 -- seconds after the last movement before the throw is over
+-- seconds after the throw is over when the pinsetter's bar comes down (LaneCycle.SETTLE + LaneCycle.PAUSE: the
+-- server counts the throw, looks at the leave, then sweeps; tests/unit/bowling_rollscript.spec.luau ties them)
+RollScript.SWEEP_AT = 1.15
 
 export type Flags = {
 	gutter: boolean,
@@ -273,7 +276,7 @@ function RollScript.pin(script: Script, n: number, t: number): (number, number, 
 	return x, y, d, tilt, yaw, hidden
 end
 
--- Placeholder sound cue points for a throw, in time order: { t, name, volume 0..1 }.
+-- Sound cue points for a throw, in time order: { t, name, volume 0..1 }; the pinsetter's sweep comes last.
 function RollScript.cues(script: Script): { { any } }
 	local out: { { any } } = {}
 	local function cue(t: number, name: string, volume: number)
@@ -309,6 +312,7 @@ function RollScript.cues(script: Script): { { any } }
 		end
 	end
 	cue(script.tBallEnd, "pit", 0.5)
+	cue(script.tEnd + RollScript.SWEEP_AT, "sweep", 0.5) -- the pinsetter (after the playback lets go: BowlingPlayback)
 	table.sort(out, function(a, b)
 		return a[1] < b[1]
 	end)
