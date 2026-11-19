@@ -459,4 +459,464 @@ return function(t)
 			t.truthy(off <= 3, "the duel judges bites and blows where the accepted packets have the rodent")
 		end
 	)
+
+	-- ===================================================================================================================
+	-- The fixer's attack cases (round 4's rule: every allowance kept gets the cheater's own cases: alternate packet types,
+	-- slow and fast clocks, 2 to 30 packets a second, tiny violations under the flag, rail touches)
+	-- ===================================================================================================================
+
+	local apex = (P.leapUp * E.launchTol) ^ 2 / (2 * g)
+
+	-- the validator's view of a copy of `s` (what MoveValidator keeps: Judged)
+	local function copy(s: State): State
+		return SquirrelMotor.deserialize(SquirrelMotor.serialize(s))
+	end
+
+	-- A greedy hover: every packet the highest height that passes the envelope from what the validator kept, of a
+	-- walk-off claiming a landing hidden in the gap (the most fall the gap allows), a leap off such a landing (vertical
+	-- speed one over the last kept) and a plain arc, walking east at a walk. `rate` packets a second of server time, the
+	-- client's clock running `clockRate` times as fast. Returns the highest point over the ground, the mean height, and
+	-- the validator's violations (the clock's among them).
+	local function greedyHover(rate: number, clockRate: number, secs: number): (number, number, number)
+		local v = MoveValidator.new(town.vworld)
+		local s = town.openStart()
+		local ground = town.world.groundHeight
+		v:accept("g", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
+		local dt = 1 / rate
+		local cdt = dt * clockRate
+		local server, clock, seq = 0, 0, 1
+		local peak, sum, n, bad = 0, 0, 0, 0
+		while server < secs do
+			server += dt
+			clock += cdt
+			seq += 1
+			local prev = v:last("g") :: State
+			local best: State? = nil
+			for _, kind in { "walk", "leap", "arc" } do
+				local c = copy(prev)
+				c.clock = clock
+				c.grounded, c.committedAirborne = false, true
+				c.x, c.vx, c.vz = prev.x + P.walk * cdt, P.walk, 0
+				c.vy = if kind == "walk" then -g * cdt elseif kind == "leap" then prev.vy + 1 else prev.vy - g * cdt
+				local top = prev.y + 12
+				local y = top
+				while y >= ground do
+					c.y = y
+					if #SquirrelMotor.envelope(prev, c, cdt, v.world, false) == 0 then
+						break
+					end
+					y -= 0.1
+				end
+				if y >= ground and (best == nil or y > (best :: State).y) then
+					best = copy(c)
+				end
+			end
+			local next = best or copy(prev)
+			if best == nil then
+				-- (nothing in the air passes: it stands)
+				next.clock, next.grounded, next.vy, next.y = clock, true, 0, ground
+			end
+			local r = v:accept("g", { seq = seq, snapshot = SquirrelMotor.serialize(next) }, server)
+			bad += #r.violations
+			peak = math.max(peak, next.y - ground)
+			sum += next.y - ground
+			n += 1
+		end
+		return peak, sum / math.max(1, n), bad
+	end
+
+	t.test("attack (hidden landing): the greediest hover at 2 to 30 packets a second stays under a leap", function()
+		for _, rate in { 2, 4, 10, 20, 30 } do
+			local peak, mean, bad = greedyHover(rate, 1, 4)
+			print(
+				`      {rate} packets/s: the highest a landing hidden in every gap holds is {string.format("%.2f", peak)} st, {string.format(
+					"%.2f",
+					mean
+				)} st on average (a leap's apex {string.format("%.2f", apex)}); {bad} violations`
+			)
+			t.truthy(peak <= apex + E.floorSlack + E.posSlack + 0.1, `{rate}/s: never above a leap over the floor`)
+			t.truthy(mean <= apex, `{rate}/s: no hover at a leap's top`)
+		end
+	end)
+
+	t.test("attack (hidden landing): a slow clock buys no height, a fast one is a clock violation", function()
+		for _, k in { 0.5, 0.8, 1.15, 1.3 } do
+			local peak, mean, bad = greedyHover(4, k, 8)
+			print(
+				`      clock x{k} at 4 packets/s: peak {string.format("%.2f", peak)} st, mean {string.format(
+					"%.2f",
+					mean
+				)} st; {bad} violations`
+			)
+			t.truthy(peak <= apex + E.floorSlack + E.posSlack + 0.1, `clock x{k}: never above a leap over the floor`)
+			if k > 1.1 then
+				t.truthy(bad >= 1, `clock x{k}: the clock shows`)
+			end
+		end
+	end)
+
+	t.test("attack (hidden landing): a hover claiming the walk-off of a landing is flagged above floorSlack", function()
+		for _, rate in { 2, 4, 10, 30 } do
+			for _, h in { E.floorSlack + 0.2, 2, 6 } do
+				local v = MoveValidator.new(town.vworld)
+				local s = town.openStart()
+				local ground = town.world.groundHeight
+				v:accept("h", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
+				local dt = 1 / rate
+				local first: number? = nil
+				for i = 1, rate * 2 do
+					local c = copy(s)
+					c.clock, c.grounded, c.committedAirborne = i * dt, false, true
+					c.y = ground + h
+					c.vy = -g * dt -- (the most fall a landing in the gap allows)
+					local r = v:accept("h", { seq = i + 1, snapshot = SquirrelMotor.serialize(c) }, i * dt)
+					if #r.violations > 0 and first == nil then
+						first = i * dt
+					end
+				end
+				print(`      {rate}/s, {string.format("%.2f", h)} st up: first flagged at {first}`)
+				t.truthy(first ~= nil and (first :: number) <= 1, `{rate}/s at {h} st: flagged within a second`)
+			end
+		end
+	end)
+
+	-- the slow pounce near a wall: a window jump with the speed of a hop, beside the house's west wall
+	t.test("attack (slow pounce near a wall): a hop in place 2.5 st off a wall it faces is no pounce", function()
+		local b = town.boxes[1]
+		local cz = (b.minZ + b.maxZ) / 2
+		local ground = town.world.groundHeight
+		local function hop(off: number, moveX: number, yaw: number, dt: number): boolean
+			local prev = SquirrelMotor.new(b.minX - off - moveX, ground, cz)
+			prev.grounded = true
+			local next = copy(prev)
+			next.clock = prev.clock + dt
+			next.x = b.minX - off
+			next.grounded, next.committedAirborne = false, true
+			next.attackWindow = P.pounceWindow - 0.02
+			next.vy = 9 - g * 0.02
+			next.vx, next.vz = 2, 0
+			next.yaw = yaw
+			next.y = ground + 0.15
+			local _, _, pounce = SquirrelMotor.envelope(prev, next, dt, town.vworld, false)
+			return pounce ~= nil
+		end
+		local east, west = math.pi / 2, -math.pi / 2
+		for _, dt in { 0.05, 0.1, 0.25 } do
+			local inPlace = hop(2.5, 0, east, dt)
+			local away = hop(2.5, -1, east, dt) -- (moving west, away from the wall it says it faces)
+			local backTurned = hop(1, 0, west, dt) -- (touching the wall, facing away from it)
+			local touching = hop(1, 0, east, dt) -- (control: a point-blank pounce into the wall)
+			local toward = hop(1.2, 1.5, east, dt) -- (control: lunged 1.5 st at the wall and stopped against it)
+			print(
+				`      dt {dt}: in place 2.5 st off {inPlace}, moving away {away}, back to the wall {backTurned}; touching {touching}, toward it {toward}`
+			)
+			t.falsy(inPlace, `dt {dt}: a hop in place 2.5 st off the wall is no pounce`)
+			t.falsy(away, `dt {dt}: a hop away from the wall is no pounce`)
+			t.falsy(backTurned, `dt {dt}: facing away from the wall is no pounce`)
+			t.truthy(touching, `dt {dt}: (control) a point-blank pounce into the wall`)
+			t.truthy(toward, `dt {dt}: (control) a lunge stopped by the wall`)
+		end
+	end)
+
+	-- the standing creep: grounded packets a little higher each time, alone or every other packet in the air, at 2 to
+	-- 30 packets a second; the highest clean packet over the open ground
+	t.test("attack (standing creep): a grounded body rising with no floor under it stops at FLOOR_NEAR", function()
+		local near = ValidatorWorld.C.FLOOR_NEAR
+		for _, rate in { 2, 10, 30 } do
+			for _, step in { 0.02, E.posSlack, 1.3 } do
+				for _, mode in { "ground", "alternate" } do
+					local v = MoveValidator.new(town.vworld)
+					local s = town.openStart()
+					local ground = town.world.groundHeight
+					v:accept("c", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
+					local dt = 1 / rate
+					local y = ground
+					local highest = 0
+					local flagged: number? = nil
+					for i = 1, rate * 4 do
+						local c = copy(s)
+						c.clock = i * dt
+						local air = mode == "alternate" and i % 2 == 1
+						if not air then
+							y += step
+						end
+						c.y = y + (if air then step else 0)
+						c.grounded = not air
+						c.vy = if air then -g * dt else 0
+						local r = v:accept("c", { seq = i + 1, snapshot = SquirrelMotor.serialize(c) }, i * dt)
+						if #r.violations == 0 then
+							highest = math.max(highest, c.y - ground)
+						elseif flagged == nil then
+							flagged = c.y - ground
+						end
+						if r.flagged then
+							break
+						end
+					end
+					print(
+						`      {rate}/s, {step} st a step, {mode}: highest clean {string.format("%.2f", highest)} st; first flagged at {flagged}`
+					)
+					t.truthy(
+						highest <= near + E.posSlack + step,
+						`{rate}/s {step} {mode}: never stands more than FLOOR_NEAR over the floor`
+					)
+				end
+			end
+		end
+	end)
+
+	-- the gap and the rail: a step off a trunk landing beyond the garden wall at 2 to 20 packets a second, near (a short
+	-- line) and far (a line longer than a chord: weighed as a gap's, a second one in 20 s a whole flag)
+	t.test("attack (rail exit): off a trunk beyond a garden wall after a gap of 0.05 to 0.45 s", function()
+		local world, vworld, trunk, box = gardenWall()
+		local pt = world.registry:pointAt(trunk, 0.05)
+		for _, dt in { 0.05, 0.1, 0.25, 0.45 } do
+			for _, past in { 0.6, 3.5 } do
+				local v = MoveValidator.new(vworld)
+				local on = SquirrelMotor.new(pt.x, pt.y, pt.z)
+				on.routeId, on.railT, on.grounded = trunk.id, 0.05, false
+				local clock, flagged, codes = 0, false, {}
+				for i = 1, 2 do
+					-- (twice in 20 s: on the trunk, then off it beyond the wall; the validator keeps its marks)
+					clock += 1
+					on.clock = clock
+					v:reset("r", SquirrelMotor.serialize(on), clock, i * 2 - 1)
+					local off = SquirrelMotor.new(box.maxX + past, world.groundHeight, pt.z)
+					off.grounded = true
+					off.clock = clock + dt
+					local r = v:accept("r", { seq = i * 2, snapshot = SquirrelMotor.serialize(off) }, clock + dt)
+					for _, x in r.violations do
+						table.insert(codes, x.code)
+					end
+					flagged = flagged or r.flagged
+				end
+				print(`      dt {dt}, {past} st past the wall: [{table.concat(codes, ", ")}], flagged {flagged}`)
+				t.truthy(table.find(codes, "wall") ~= nil, `dt {dt}, {past} st past: a wall`)
+				t.truthy(flagged, `dt {dt}, {past} st past: flagged by the second`)
+			end
+		end
+	end)
+
+	-- the rail wait: one packet on the trunk, then the root walked through the wall within the second the old test
+	-- waited (silent, or the packets still on the rail); and in and out again
+	local function railRoot(variant: string): (number, number?)
+		local world, vworld, trunk, box = gardenWall()
+		local foot = world.registry:foot(trunk)
+		local from: number? = nil
+		local rig = LiveRig.new({
+			world = world,
+			vworld = vworld,
+			link = QUIET,
+			seed = 71,
+			silent = function(now: number): boolean
+				return variant == "silent" and from ~= nil and now > (from :: number)
+			end,
+			rootCheat = function(p: { x: number, y: number, z: number }, now: number, s: State)
+				if from == nil and now >= CHEAT_AT and s.routeId ~= nil then
+					from = now
+				end
+				if from == nil then
+					return
+				end
+				local k = (now - (from :: number)) / 0.4
+				local x = if variant == "inout" and k > 1 then box.maxX + 0.6 - (k - 1) * 4 else foot.x + k * 4
+				p.x = math.min(x, box.maxX + 0.6)
+				p.y, p.z = world.groundHeight, foot.z
+			end,
+		})
+		rig:possess(
+			SquirrelMotor.new(foot.x - 1.5, world.groundHeight, foot.z),
+			function(now: number, s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+				local inp = SquirrelMotor.idleInput(-math.pi / 2)
+				inp.grab = now > 1 and now < 1.1 and s.routeId == nil
+				return inp
+			end
+		)
+		rig:run(CHEAT_AT + 3)
+		local r = rig:result()
+		print(
+			`      {variant}: {LiveRig.describe("root through the wall by the trunk", r)}; first snap at {r.firstSnap}`
+		)
+		return r.snaps, r.firstSnap
+	end
+
+	t.test(
+		"attack (rail wait): a root walked through a wall within a second of a packet on the trunk is a wall",
+		function()
+			for _, variant in { "silent", "railed", "inout" } do
+				local snaps, at = railRoot(variant)
+				t.truthy(snaps >= 1, `{variant}: snapped`)
+				t.truthy(at ~= nil and (at :: number) <= CHEAT_AT + 2, `{variant}: within RAIL_RECENT of the crossing`)
+			end
+		end
+	)
+
+	-- the late/early tie, the cheater's ways: a slowed clock while holding (at 4 to 20 packets a second, with the
+	-- link's jitter faked before the click by an uneven clock), and a click sent after the lunge
+	local function heldWith(seed: number, hold: number, rate: number, fake: number): (boolean, number?, number?)
+		local click = CHEAT_AT
+		local launch = CHEAT_AT + windup + hold
+		local pounced: number? = nil
+		local clickAt: number? = nil
+		local skew, lastT, lastSent = 0, nil :: number?, -math.huge
+		local rig: any
+		rig = LiveRig.new({
+			world = town.world,
+			vworld = town.vworld,
+			link = QUIET,
+			seed = seed,
+			packetCheat = function(snap: { [string]: any }, now: number): boolean?
+				local step = if lastT then now - (lastT :: number) else 0
+				lastT = now
+				if now > click + windup * 0.5 and now < launch then
+					skew += step * 0.8
+				end
+				if now - lastSent < 1 / rate - 1e-3 then
+					return false
+				end
+				lastSent = now
+				-- (an uneven clock for the 2 s before the click, slowed then sped up again: the arrivals' spread looks like a
+				-- jittery link's, the clock never goes back nor ahead of its arrivals)
+				local u = (now - (click - 2)) / 2
+				local fakeNow = if u > 0 and u < 1 then fake * (1 - math.abs(2 * u - 1)) else 0
+				snap.clock = (snap.clock :: number) - skew - fakeNow
+				return nil
+			end,
+		})
+		rig:possess(
+			town.openStart(),
+			function(now: number, s: State, events: { SquirrelMotor.Event }): SquirrelMotor.Input
+				for _, e in events do
+					if e.kind == "pounce" and pounced == nil then
+						pounced = now
+					end
+				end
+				if clickAt == nil and now >= click and rig.t then
+					local k = s.clock
+					clickAt = -1
+					rig:at(now + QUIET.latency, function()
+						clickAt = (rig.movement :: any):clickAt(heldId(rig), k, rig.t)
+					end)
+				end
+				local inp = SquirrelMotor.idleInput(-math.pi / 2)
+				inp.pounce = now >= launch and pounced == nil
+				return inp
+			end
+		)
+		rig:run(CHEAT_AT + 2)
+		local sq = (rig.movement :: any).squirrels[heldId(rig)]
+		local pounceAt = sq.pounceAt
+		local tied = pounceAt ~= nil
+			and clickAt ~= nil
+			and (clickAt :: number) > 0
+			and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup)
+		return tied, pounceAt, clickAt
+	end
+
+	t.test(
+		"attack (late tie): a held lunge with a slowed clock, at 4 to 20 packets a second, jitter faked or not",
+		function()
+			-- the most an honest link's jitter lets a lunge be late: the round trip the server measures (QUIET: 0.21) and
+			-- launchLate; held longer, never tied
+			local ping = 2 * QUIET.latency + QUIET.jitter
+			for _, rate in { 4, 10, 20 } do
+				for _, fake in { 0, 0.3 } do
+					local hold = ping + CP.launchLate + 0.08
+					local tied, pa, ca = heldWith(80 + rate, hold, rate, fake)
+					print(
+						`      {rate}/s, jitter faked {fake} s, held {string.format("%.2f", hold)} s with the clock slowed: tied {tied} (launch {pa}, click {ca})`
+					)
+					t.falsy(tied, `{rate}/s, faked {fake}: a lunge held {hold} s is not tied`)
+				end
+			end
+			-- (control: on time it is, at 20 packets a second)
+			local tied = heldWith(90, 0, 20, 0)
+			t.truthy(tied, "(control) on time it is tied")
+		end
+	)
+
+	local function lateClick(seed: number, after: number): (boolean, number?, number?)
+		local pounced: number? = nil
+		local clickAt: number? = nil
+		local rig: any
+		rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = QUIET, seed = seed })
+		local launchClock: number? = nil
+		rig:possess(
+			town.openStart(),
+			function(now: number, s: State, events: { SquirrelMotor.Event }): SquirrelMotor.Input
+				for _, e in events do
+					if e.kind == "pounce" and pounced == nil then
+						pounced = now
+						launchClock = s.clock
+					end
+				end
+				if launchClock ~= nil and clickAt == nil and now >= (pounced :: number) + after then
+					local k = (launchClock :: number) - windup
+					clickAt = -1
+					rig:at(now + QUIET.latency, function()
+						clickAt = (rig.movement :: any):clickAt(heldId(rig), k, rig.t)
+					end)
+				end
+				local inp = SquirrelMotor.idleInput(-math.pi / 2)
+				inp.pounce = now >= CHEAT_AT and pounced == nil
+				return inp
+			end
+		)
+		rig:run(CHEAT_AT + 2)
+		local pounceAt = (rig.movement :: any).squirrels[heldId(rig)].pounceAt
+		local tied = pounceAt ~= nil
+			and clickAt ~= nil
+			and (clickAt :: number) > 0
+			and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup)
+		return tied, pounceAt, clickAt
+	end
+
+	t.test("attack (early tie): a click sent 0.1 to 0.45 s after its lunge, back-dated onto it", function()
+		-- up to the link's spread (QUIET: 0.01) and a packet (POUNCE_GAP 0.13) after the launch the server dated, the click
+		-- may still be tied (an honest click on a jittery link arrives that late); later, never
+		for _, after in { 0.05, 0.1, 0.2, 0.3, 0.45 } do
+			local tied, pa, ca = lateClick(100 + math.floor(after * 100), after)
+			print(`      the click {after} s after the lunge: tied {tied} (launch {pa}, click {ca})`)
+			if after >= 0.2 then
+				t.falsy(tied, `a click {after} s after the lunge is not tied`)
+			end
+		end
+	end)
+
+	t.test(
+		"attack (gap rule): a lunge after a silence longer than a packet and the link's spread is not dated",
+		function()
+			for _, silence in { 0.2, 0.3, 0.45 } do
+				local pounced: number? = nil
+				local rig: any
+				rig = LiveRig.new({
+					world = town.world,
+					vworld = town.vworld,
+					link = QUIET,
+					seed = 120,
+					silent = function(now: number): boolean
+						return now > CHEAT_AT and now < CHEAT_AT + silence
+					end,
+				})
+				rig:possess(
+					town.openStart(),
+					function(now: number, _s: State, events: { SquirrelMotor.Event }): SquirrelMotor.Input
+						for _, e in events do
+							if e.kind == "pounce" and pounced == nil then
+								pounced = now
+							end
+						end
+						local inp = SquirrelMotor.idleInput(-math.pi / 2)
+						-- (the lunge goes inside the silence; the packet after it shows its window)
+						inp.pounce = now >= CHEAT_AT + silence - 0.06 and pounced == nil
+						return inp
+					end
+				)
+				rig:run(CHEAT_AT + 2)
+				local pounceAt = (rig.movement :: any).squirrels[heldId(rig)].pounceAt
+				print(`      a silence of {silence} s: the motor pounced at {pounced}, the server dates it {pounceAt}`)
+				t.eq(pounceAt, nil, `after a {silence} s silence the lunge is not dated`)
+			end
+		end
+	)
 end

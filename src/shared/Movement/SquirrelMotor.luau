@@ -67,6 +67,12 @@ export type World = Motion.World & {
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
 	-- a wall collider? (Colliders in W1). yHigh: the higher end's feet; rise: how far over it the arc could reach
 	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number, yHigh: number?, rise: number?) -> boolean)?,
+	-- optional, for validators: the longest line `crosses` judges (studs), and the same test chord by chord for a longer
+	-- one (Server/Movement/ValidatorWorld.crossesLong)
+	maxChord: number?,
+	crossesLong: (
+		(x0: number, z0: number, x1: number, z1: number, y: number, yHigh: number?, rise: number?) -> boolean
+	)?,
 	-- optional floor test for validators: is there something to stand on under feet at (x, y, z)?
 	floorBelow: ((x: number, y: number, z: number) -> boolean)?,
 	-- optional, for validators: is there ground within `depth` under feet at (x, y, z)? (else groundAt is asked)
@@ -2074,13 +2080,14 @@ function SquirrelMotor.envelope(
 		-- leapt from it no higher than a leap ending at the speed `next` shows rises in the time left, ((u^2 - v^2) / 2g,
 		-- u at most v + g * left). A higher floor leaves more time, so the lowest floor that explains `next` is found by
 		-- arithmetic, and one ray (under prev, else under next) asks whether a floor lies between it and the top. A body
-		-- standing at `prev` landed on its own floor (the vertical bounds below hold it to it).
-		local function landedIn(leapt: boolean): boolean
-			if prev.grounded then
+		-- standing at `prev` landed on its own floor (the vertical bounds below hold it to it). `from`: the body left
+		-- `prev` at that vertical speed instead (a whole leap hidden before the launch seen: it came down on a ledge)
+		local function landedIn(leapt: boolean, from: number?): boolean
+			if prev.grounded and from == nil then
 				return true
 			end
 			local g = P.gravity
-			local vy0 = prev.vy
+			local vy0 = from or prev.vy
 			local top = prev.y + math.max(vy0, 0) ^ 2 / (2 * g)
 			local bottom = prev.y + vy0 * dt - 0.5 * g * dt * dt - E.posSlack
 			local v = next.vy
@@ -2218,16 +2225,28 @@ function SquirrelMotor.envelope(
 			-- a launch inside the gap rises what the body rose before it at its earlier speed and what the launch, ending
 			-- at the speed it shows, rose after it: (u^2 - v^2) / 2g, u the launch's own speed (the pounce's, which the
 			-- window dates; else no more than gravity takes in the gap above the speed now, and never above the cap). A
-			-- long gap from the ground or a rail may hide a whole leap before it (ledge to ledge), never more than the
-			-- launch speed over the gap. (Not the launch speed over the gap for every launch: a launch every packet
-			-- climbed at a leap's speed for as long as it liked)
+			-- long gap may hide a landing before it, or from the ground a whole leap onto a ledge (ledge to ledge): only
+			-- where landedIn finds that floor, and in the time the fall or the leap onto it left. (Not the launch speed
+			-- over the gap for every launch: a launch every packet climbed at a leap's speed for as long as it liked; nor
+			-- a whole apex added to every launch from the ground: round 4's greedy adversary claimed two leaps' height in
+			-- one packet every half second, from flat ground onto a 14-stud roof)
 			local v = math.max(next.vy, 0)
 			local u = math.min(capUp, if pounce then next.vy + P.gravity * pounce else next.vy + P.gravity * dt + gEps)
 			local rise = if u > v then (u * u - v * v) / (2 * P.gravity) else 0
-			if fromGroundOrRail and not shortGap then
-				rise = math.min(launchUp * dt, rise + launchUp * launchUp / (2 * P.gravity))
+			if pounce and prev.grounded then
+				-- (a pounce in the air after a leap off the ground inside the gap: the leap rose for the time before it)
+				local t1 = math.min(math.max(0, dt - pounce) + E.gravityEps, launchUp / P.gravity)
+				rise += launchUp * t1 - 0.5 * P.gravity * t1 * t1
 			end
 			upCap = math.max(prev.vy, 0) * dt + rise + E.posSlack
+			if
+				dy > upCap
+				and fromGroundOrRail
+				and not shortGap
+				and (if prev.grounded then landedIn(true, launchUp) else landedIn(true))
+			then
+				upCap = dy
+			end
 			if dy > upCap and fromGroundOrRail and plausible() then
 				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
 				-- the grab having carried the body up to the rail)

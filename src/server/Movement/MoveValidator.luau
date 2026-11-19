@@ -545,17 +545,18 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	elseif next.grounded then
 		actor.standY = next.y
 	end
-	if floorBelow and next.grounded and not next.routeId and not riverLanding then
+	local onBed = floorBelow ~= nil
+		and next.grounded
+		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
+	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
 		local floorNear = self.world.floorNear
 		local rose = not resync and standY ~= nil and next.y > (standY :: number) + 1e-3
-		if Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) then
-			-- (a trampoline's bed)
-		elseif rose and floorNear then
+		if rose and floorNear then
 			if not floorNear(next.x, next.y, next.z) then
 				table.insert(violations, {
 					code = "climb",
 					severity = 1,
-					detail = `rose {next.y - prev.y} st on the ground with no floor just under the feet`,
+					detail = `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`,
 				})
 			end
 		elseif not floorBelow(next.x, next.y, next.z) then
