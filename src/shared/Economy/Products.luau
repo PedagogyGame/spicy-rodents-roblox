@@ -4,9 +4,17 @@
 -- Q19; spike S15). The owner creates the products on the Creator Hub (whole Robux amounts); their
 -- IDs are wired into products.json by Claude. Until then `productId` is nil and no tier is buyable,
 -- so a receipt for an unknown product is never granted (ProcessReceipt answers NotProcessedYet).
--- Interface: defaults() -> { Tier }, catalog(tiers) -> Catalog, lookup(catalog, productId) -> Tier?
+-- A tier is either fixed (`robux` and `cents`: the price and what it sells) or a RATE (`perRobux`: Spicy cents granted
+-- for each Robux the receipt says was spent, its CurrencySpent). The owner's "Spicy buck" product is a rate: "4 Spicy
+-- Dollars per 1 Robux" (owner 2026-11-19, BRIEF_ADDENDUM D15). The key cannot read the product's price, so the grant
+-- is worked out from what each purchase actually cost: right whatever price the product has on the Creator Hub, and
+-- still right if it is changed there.
+-- NOT LIVE: no ProcessReceipt is hooked in Boot/Game, and nothing sells it until money is saved between visits
+-- (Persistence/ProfileStore wired in): Robux must never buy money that is gone when the player leaves.
+-- Interface: defaults() -> { Tier }, spicyBuck() -> Tier, catalog(tiers) -> Catalog, lookup(catalog, productId) -> Tier?,
+--   grantFor(tier, receipt) -> cents? (nil: the receipt cannot be priced; answer NotProcessedYet)
 
-export type Tier = { productId: number?, robux: number, cents: number, label: string }
+export type Tier = { productId: number?, robux: number?, cents: number?, perRobux: number?, label: string }
 export type Catalog = { byProductId: { [number]: Tier }, tiers: { Tier } }
 
 local Products = {}
@@ -20,18 +28,31 @@ function Products.defaults(): { Tier }
 	}
 end
 
--- Validates and indexes tiers; errors on a fractional Robux price, a non-integer grant or a repeated id.
+Products.SPICY_BUCK_ID = 3730438620 -- the owner's "Spicy buck" developer product (docs/spec/PROJECT_IDS.md)
+Products.PER_ROBUX = 400 -- Spicy cents per Robux: 4 Spicy Dollars per 1 Robux (owner, D15)
+Products.MAX_ROBUX = 100000 -- a receipt claiming more is not believed (the Creator Hub's own cap is far lower)
+
+-- The owner's product as a rate tier.
+function Products.spicyBuck(): Tier
+	return { productId = Products.SPICY_BUCK_ID, perRobux = Products.PER_ROBUX, label = "Spicy Dollars" }
+end
+
+local function whole(v: any): boolean
+	return type(v) == "number" and v >= 1 and math.floor(v) == v
+end
+
+-- Validates and indexes tiers; errors on a fractional Robux price, a non-integer grant, a tier that is both or
+-- neither fixed and rate, or a repeated id.
 function Products.catalog(tiers: { Tier }): Catalog
 	local byProductId: { [number]: Tier } = {}
 	for i, tier in tiers do
-		assert(
-			type(tier.robux) == "number" and tier.robux >= 1 and math.floor(tier.robux) == tier.robux,
-			`tier {i}: robux must be a whole number`
-		)
-		assert(
-			type(tier.cents) == "number" and tier.cents >= 1 and math.floor(tier.cents) == tier.cents,
-			`tier {i}: cents must be a whole number`
-		)
+		if tier.perRobux ~= nil then
+			assert(whole(tier.perRobux), `tier {i}: perRobux must be a whole number of cents`)
+			assert(tier.robux == nil and tier.cents == nil, `tier {i}: a rate tier has no fixed robux or cents`)
+		else
+			assert(whole(tier.robux), `tier {i}: robux must be a whole number`)
+			assert(whole(tier.cents), `tier {i}: cents must be a whole number`)
+		end
 		local id = tier.productId
 		if id ~= nil then
 			assert(byProductId[id] == nil, `tier {i}: productId {id} repeated`)
@@ -43,6 +64,25 @@ end
 
 function Products.lookup(catalog: Catalog, productId: number): Tier?
 	return catalog.byProductId[productId]
+end
+
+-- The Spicy cents a receipt for this tier grants: the fixed amount, or the rate times the Robux the receipt says
+-- were spent (CurrencySpent, in Robux: CurrencyType Robux or absent). nil when a rate tier's receipt carries no
+-- believable whole Robux amount: the purchase is not granted (NotProcessedYet), never guessed.
+function Products.grantFor(tier: Tier, receipt: { CurrencySpent: any?, CurrencyType: any? }): number?
+	local rate = tier.perRobux
+	if rate == nil then
+		return tier.cents
+	end
+	local spent = receipt.CurrencySpent
+	local kind = receipt.CurrencyType
+	if kind ~= nil and tostring(kind) ~= "Enum.CurrencyType.Robux" and tostring(kind) ~= "Robux" then
+		return nil
+	end
+	if type(spent) ~= "number" or not whole(spent) or spent > Products.MAX_ROBUX then
+		return nil
+	end
+	return spent * rate
 end
 
 return Products

@@ -44,7 +44,9 @@ local Receipts = {}
 local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 	local stats = self.stats
 	local tier = Products.lookup(self.deps.catalog, receipt.ProductId)
-	if tier == nil then
+	local cents = if tier then Products.grantFor(tier, receipt) else nil
+	if cents == nil then
+		-- an unknown product, or a rate product whose receipt does not say what was paid
 		stats.unknownProduct += 1
 		return "NotProcessedYet"
 	end
@@ -65,7 +67,7 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 			return "PurchaseGranted"
 		end
 	else
-		local ok = ReceiptLedger.grant(profile.data, receipt, tier.cents, self.deps.now())
+		local ok = ReceiptLedger.grant(profile.data, receipt, cents, self.deps.now())
 		if not ok then
 			stats.saveFailed += 1
 			return "NotProcessedYet"

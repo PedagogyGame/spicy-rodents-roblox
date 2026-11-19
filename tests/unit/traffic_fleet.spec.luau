@@ -9,6 +9,7 @@ local Fleet = require("@shared/Traffic/Fleet")
 local Ghost = require("@shared/Traffic/Ghost")
 local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
 local Boxes = require("@shared/Traffic/Boxes")
+local AICarMotor = require("@shared/Traffic/AICarMotor")
 local Schemas = require("@shared/Net/Schemas")
 local Net = require("@shared/Net/Net")
 local BufferCodec = require("@shared/Util/BufferCodec")
@@ -219,7 +220,7 @@ return function(t)
 	end
 
 	t.test(
-		"yielding: sedans stop for a human and a ground squirrel ahead, but not for a squirrel up on a wire",
+		"yielding: sedans stop for a human ahead, not for a squirrel (it must dodge: owner D15), nor one up on a wire",
 		function()
 			-- human 20 u ahead in the lane
 			local svc, v = sedanNB()
@@ -230,14 +231,26 @@ return function(t)
 			end
 			t.truthy(v.z < ahead - st(3), `stopped short of the human ({Units.u(ahead - v.z)} u)`)
 			t.near(v.speed, 0, 1e-3)
-			-- squirrel on the ground: also a hazard now (rebuild fix, traffic §13)
+			-- squirrel on the ground: cars brake for people only, squirrels must dodge (the owner's decision
+			-- 2026-11-19, BRIEF_ADDENDUM D15 (b)): the sedan keeps going and runs it over
 			svc, v = sedanNB()
 			ahead = v.z + st(20)
 			local sq = { id = "sq", x = v.x, y = st(0.18), z = ahead }
 			for _ = 1, 30 * 10 do
 				svc:step(1 / 30, { squirrels = { sq } })
 			end
-			t.truthy(v.z < ahead - st(2), "stopped short of the ground squirrel")
+			t.truthy(v.z > ahead, "did not stop for the ground squirrel")
+			t.truthy(svc:stats().hits >= 1, "and ran it over: the squirrel has to dodge")
+			-- the v5.4 rule is kept behind the switch: on, the sedan stops short of it as before
+			AICarMotor.BRAKE_FOR_SQUIRRELS = true
+			svc, v = sedanNB()
+			ahead = v.z + st(20)
+			sq = { id = "sq", x = v.x, y = st(0.18), z = ahead }
+			for _ = 1, 30 * 10 do
+				svc:step(1 / 30, { squirrels = { sq } })
+			end
+			AICarMotor.BRAKE_FOR_SQUIRRELS = false
+			t.truthy(v.z < ahead - st(2), "with the switch on: stopped short of the ground squirrel")
 			t.eq(svc:stats().hits, 0)
 			-- squirrel on a wire 17 u up: invisible to the driver (relative 4.76 u), passes under, no hit
 			svc, v = sedanNB()

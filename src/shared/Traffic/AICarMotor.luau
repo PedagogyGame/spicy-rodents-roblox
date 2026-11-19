@@ -19,7 +19,8 @@
 --            A trip dispatched with `held` stays on scene until `release` (the medical sequence loads
 --            its patient first); without it the scene timer runs as in v5.4.
 --   event (§5.11): the 2400 s living-event glide (fatal even at a crawl).
--- Rebuild fixes (traffic.md §11-§13): squirrels are in every yielding class's hazard set with RELATIVE
+-- Rebuild fixes (traffic.md §11-§13): squirrels were in every yielding class's hazard set (now off by the owner's
+-- decision D15: cars brake for people only, squirrels dodge; AICarMotor.BRAKE_FOR_SQUIRRELS) with RELATIVE
 -- visibility (squirrel y - vehicle base y < 4.76 u, not the absolute 4.8); opposing vehicles are excluded
 -- from the same-lane tests (the trolley deadlock, §6.1); emergency classes keep at least the hard stop
 -- for people. A wrap, an appearance and a dispatch set `teleported` for that tick (SweptCollision skips it).
@@ -351,14 +352,20 @@ local function onRoof(v: Vehicle, p: Person): boolean
 		and math.abs(dx * fz - dz * fx) <= v.box.width / 2 + AICarMotor.ROOF_SLACK
 end
 
--- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels visible
--- relative to the vehicle base; none on its own roof: onRoof) and the vehicles it braces for (bracesFor).
+-- Cars brake for people only; squirrels must dodge (the owner's decision 2026-11-19, BRIEF_ADDENDUM D15, choice (b)
+-- of "should cars stop for squirrels?": after the playtest "I don't know why a car stopped for me"). The v5.4 rule
+-- (squirrels in every yielding class's hazard set, traffic.md §13) is kept behind this switch, off.
+AICarMotor.BRAKE_FOR_SQUIRRELS = false
+
+-- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels only with
+-- BRAKE_FOR_SQUIRRELS, visible relative to the vehicle base; none on its own roof: onRoof) and the vehicles it
+-- braces for (bracesFor).
 local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicles: boolean): { LaneMath.Hazard }
 	local out: { LaneMath.Hazard } = {}
 	for _, p in ctx.people do
 		if p.visible ~= false and not p.hospital and not p.injured and not onRoof(v, p) then
 			if p.kind == "squirrel" then
-				if p.y - v.y < AICarMotor.VIS_HEIGHT then
+				if AICarMotor.BRAKE_FOR_SQUIRRELS and p.y - v.y < AICarMotor.VIS_HEIGHT then
 					table.insert(out, { x = p.x, z = p.z, r = R_SQUIRREL })
 				end
 			else

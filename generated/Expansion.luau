@@ -7,7 +7,12 @@
 return {
 	families = { F1 = "food_shops", F2 = "civic", F3 = "leisure", F4 = "rides_minigame_props" },
 	foodBaseline = {
-		{ name = "CHILI'S", enterable = false, food = "bar_and_grill", lot = "east_chilis_restaurant" },
+		{
+			name = "CHILI PEPPER GRILL",
+			enterable = false,
+			food = "bar_and_grill",
+			lot = "east_chilis_restaurant",
+		},
 		{ name = "CORNER SHOPS (diner)", enterable = false, food = "diner", lot = "east_corner_shops" },
 		{
 			name = "ICE CREAM (standalone)",

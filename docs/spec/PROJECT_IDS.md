@@ -12,7 +12,7 @@ USE THESE, all in the experience **Spicy Rodent** (Universe **10775476638**):
 
 | What | ID | Status |
 |---|---|---|
-| "Spicy buck" currency product (given by the owner 2026-11-11) | **3730438620** | Recorded only. NOT wired into `src/shared/Economy/Products.luau`: the key cannot read developer products (the API answers "Scope not authorized"), so its Robux price and the Spicy Dollars it sells are not known here. It must not be attached to a tier by guess, because a wrong tier grants the wrong amount for real Robux. Waiting on the owner for: the price in Robux and the amount it should grant. |
+| "Spicy buck" currency product (given by the owner 2026-11-11) | **3730438620** | Rate: **4 Spicy Dollars per 1 Robux** (owner 2026-11-19, BRIEF_ADDENDUM D15): `Shared/Economy/Products.spicyBuck()` grants 400 cents per Robux on the receipt (`CurrencySpent`), so the product's Creator Hub price does not need to be known. Not live: no ProcessReceipt is hooked until money is saved between visits. |
 
 DO NOT USE: "Spicy Rodents" (Universe 10775476357, Place 71294450489810), an earlier duplicate the owner created.
 

@@ -106,9 +106,13 @@ function EconomyRules.gigPay(gig: string, quality: number): GigRules.Payout
 	return GigRules.payout(gig, quality)
 end
 
-function EconomyRules.grant(catalog: Products.Catalog, productId: number): number?
+function EconomyRules.grant(
+	catalog: Products.Catalog,
+	productId: number,
+	receipt: { CurrencySpent: any?, CurrencyType: any? }?
+): number?
 	local tier = Products.lookup(catalog, productId)
-	return if tier then tier.cents else nil
+	return if tier then Products.grantFor(tier, receipt or {}) else nil
 end
 
 -- One credit per purchase: the key is the PurchaseId Roblox repeats on redelivery (D26).

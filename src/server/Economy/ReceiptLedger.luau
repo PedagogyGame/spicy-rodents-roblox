@@ -11,7 +11,13 @@ local Import = require("../Import")
 local Wallet = Import.shared("Economy/Wallet") :: typeof(require("../../shared/Economy/Wallet"))
 local ProfileSchema = require("../Persistence/ProfileSchema")
 
-export type Receipt = { PurchaseId: string, PlayerId: number, ProductId: number }
+export type Receipt = {
+	PurchaseId: string,
+	PlayerId: number,
+	ProductId: number,
+	CurrencySpent: number?, -- Robux paid (a rate tier's grant is worked out from it: Products.grantFor)
+	CurrencyType: any?,
+}
 
 local ReceiptLedger = {}
 
