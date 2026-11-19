@@ -2214,8 +2214,8 @@ return function(t)
 				h.step(1.2)
 			end
 		end
-		t.eq(riders, 8)
-		t.eq(h.svc:stats().bites, 8, "every bite is counted")
+		t.eq(riders, 6, "the mime and the five kids (the motorcyclists ride the traffic's motorcycles)")
+		t.eq(h.svc:stats().bites, 6, "every bite is counted")
 		-- (the people who saw it run; none of that opens a case)
 		t.eq(h.svc:stats().cases, 0)
 		h.world.possessed[h.rodent] = nil
