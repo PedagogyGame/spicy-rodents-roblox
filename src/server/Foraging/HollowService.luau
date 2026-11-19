@@ -67,6 +67,10 @@ export type Opts = {
 	-- who a body's claims belong to (default: the body's id); a player's key keeps the claim theirs
 	keyOf: ((id: number) -> Who)?,
 	nameOf: ((key: Who) -> string?)?, -- a claimant's shown name (a player's), nil for the computer's
+	-- the feet of a player's squirrel where the server holds it (Boot/Game: its last clean accepted motor packet); when
+	-- given, a player's squirrel brings nuts in and visits by that place, never by the root its client moves (nil: it
+	-- is in no hollow). The computer's squirrels by the AI world's own place, as before
+	placeOf: ((id: number) -> (number?, number?, number?))?,
 	-- start only
 	parent: any?, -- default workspace
 }
@@ -82,6 +86,7 @@ export type Service = typeof(setmetatable(
 		show: (hollowId: string, attrs: { [string]: any }) -> (),
 		keyOf: (id: number) -> Who,
 		nameOf: (key: Who) -> string?,
+		placeOf: ((id: number) -> (number?, number?, number?))?,
 		uncover: () -> (),
 		root: any?,
 		parts: number,
@@ -118,6 +123,7 @@ function HollowService.new(opts: Opts): Service
 		nameOf = opts.nameOf or function(): string?
 			return nil
 		end,
+		placeOf = opts.placeOf,
 		uncover = function() end,
 		root = nil,
 		parts = 0,
@@ -271,6 +277,16 @@ function HollowService.owner(self: Service, hollowId: string): Who?
 	return if c then c.owner else nil
 end
 
+-- spaceOf(actor): the hollow space a squirrel brings its nuts into: a player's by where the server holds it (placeOf),
+-- the computer's by the AI world's cover
+function HollowService.spaceOf(self: Service, actor: any): string?
+	if self.placeOf and self.world.possessed[actor.id] then
+		local x, y, z = self.placeOf(actor.id)
+		return if x and y and z then self.layout.contains(x, y + (actor.hip or 0), z) else nil
+	end
+	return TownAI.covered(self.world, actor.id)
+end
+
 -- step(day): every squirrel inside a claimable hollow brings in what it carries and visits; then each hollow's decay
 -- and lapse as of `day` (fractional game days), and its attributes when they changed
 function HollowService.step(self: Service, day: number)
@@ -284,7 +300,7 @@ function HollowService.step(self: Service, day: number)
 		if self.carrying[actor.id] and self.carrier[actor.id] ~= key then
 			self:drop(actor.id) -- the body changed hands: what it carried is gone
 		end
-		local h = hollowOfSpace(self.layout, TownAI.covered(self.world, actor.id))
+		local h = hollowOfSpace(self.layout, HollowService.spaceOf(self, actor))
 		local c = if h then self.claims[h.id] else nil
 		if h and c then
 			local held = self.carrying[actor.id] or 0

@@ -145,6 +145,8 @@ type Entry = {
 	windSeen: number?, -- the body's PounceAt attribute as last seen (the pounce's wind-up)
 	windTrack: AnimationTrack?, -- the start of the Pounce clip: the rodent gathering itself
 	windStop: number?, -- os.clock() when the wind-up's crouch is let go
+	pickSeen: number?, -- the body's PickAt attribute as last seen (a nut picked up)
+	pickStop: number?, -- os.clock() when the pick-up's dip is let go
 	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
 	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
 	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
@@ -583,6 +585,10 @@ AnimationDriver.BITE = { rate = 2.2, fade = 0.08 }
 -- client plays the start of the Pounce clip, the gather before the spring, slowed, for `secs`, so a person sees it
 -- coming. The same stamp rule as the bite (biteDue).
 AnimationDriver.WINDUP = { rate = 0.6, fade = 0.05, secs = 0.25 }
+-- A nut picked up (Server/Foraging/ForageService stamps PickAt; the same stamp rule): the start of the Bite clip, the
+-- head going down to the ground, played gently and let go after `secs`, so a squirrel is seen to take each nut in its
+-- mouth (squirrels carry nuts that way). Not a bite: half weight, slower, no snap.
+AnimationDriver.PICK = { rate = 1.2, weight = 0.6, fade = 0.08, secs = 0.3 }
 function AnimationDriver.biteDue(seen: number?, at: any, first: boolean): (boolean, number?)
 	if type(at) ~= "number" then
 		return false, seen
@@ -1184,6 +1190,32 @@ function AnimationDriver.start(opts: Opts): Driver
 				if e.windTrack and windStop and os.clock() >= windStop then
 					e.windTrack:Stop(AnimationDriver.WINDUP.fade)
 					e.windStop = nil
+				end
+				-- a nut picked up: the head dips to the ground (the Bite clip's start, gently), over whatever it is doing
+				local pickNow, pickAt =
+					AnimationDriver.biteDue(e.pickSeen, body and body:GetAttribute("PickAt"), e.current == nil)
+				e.pickSeen = pickAt
+				if pickNow and heroSet.Bite then
+					local bt = e.biteTrack
+					if bt == nil then
+						bt = track(e, "Bite")
+						if bt then
+							(e.tracks :: { [string]: AnimationTrack? }).Bite = nil
+							bt.Priority = Enum.AnimationPriority.Action
+							bt.Looped = false
+							e.biteTrack = bt
+						end
+					end
+					if bt and not bt.IsPlaying then
+						local P = AnimationDriver.PICK
+						bt:Play(P.fade, P.weight, P.rate)
+						e.pickStop = os.clock() + P.secs
+					end
+				end
+				local pickStop = e.pickStop
+				if e.biteTrack and pickStop and os.clock() >= pickStop then
+					e.biteTrack:Stop(AnimationDriver.PICK.fade)
+					e.pickStop = nil
 				end
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil
