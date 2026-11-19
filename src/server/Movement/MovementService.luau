@@ -1190,7 +1190,8 @@ function MovementService.new(deps: Deps): Movement
 					local last = sq.clickSeq
 					local d = if last then (cs - last) % 256 else 1
 					if d >= 1 and d < 128 then
-						v.click = { seq = cs, clock = (snapshot.clock :: number) - ((snapshot.clickAgo :: number?) or 0) }
+						v.click =
+							{ seq = cs, clock = (snapshot.clock :: number) - ((snapshot.clickAgo :: number?) or 0) }
 					end
 				end
 				local rid = snapshot.routeId

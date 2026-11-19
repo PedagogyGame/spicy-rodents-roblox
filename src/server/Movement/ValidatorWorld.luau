@@ -109,7 +109,17 @@ end
 local function chordTest(
 	wall: Ray,
 	down: Ray?
-): (number, number, number, number, number, number?, number?, number?, boolean) -> (boolean, boolean)
+): (
+	number,
+	number,
+	number,
+	number,
+	number,
+	number?,
+	number?,
+	number?,
+	boolean
+) -> (boolean, boolean)
 	local covered = if down then ValidatorWorld.cover(down) else nil
 	return function(
 		x0: number,
@@ -311,8 +321,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		carFloor = if o.cars
 			then function(x: number, y: number, z: number): boolean
 				local floors = (o.cars :: Cars).floors
-				return floors.n > 0
-					and Solid.ray(floors, x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + C.CAR_SLACK), 0)
+				return floors.n > 0 and Solid.ray(floors, x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + C.CAR_SLACK), 0)
 			end
 			else nil,
 		landable = if down then ValidatorWorld.landable(down) else nil,

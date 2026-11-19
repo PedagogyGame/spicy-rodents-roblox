@@ -377,11 +377,11 @@ return function(t)
 		local rig: any
 		local dues: { number } = {}
 		-- (the duel's door, as Boot/Game: a click number taken once, then dated)
-		local function take(seq: number, clock: number, t: number)
+		local function take(seq: number, clock: number, arrived: number)
 			local id = heldId(rig)
 			if (rig.movement :: any):clickNew(id, seq) then
-				local at = (rig.movement :: any):clickAt(id, clock, t)
-				table.insert(dues, (at or t) + windup)
+				local at = (rig.movement :: any):clickAt(id, clock, arrived)
+				table.insert(dues, (at or arrived) + windup)
 			end
 		end
 		rig = LiveRig.new({
@@ -503,7 +503,10 @@ return function(t)
 					allResent += resent
 				end
 				print(
-					`      {all} pounces, {allTied} tied: {string.format("%.2f", 100 * (all - allTied) / math.max(1, all))} % lost ({allResent} remotes resent)`
+					`      {all} pounces, {allTied} tied: {string.format(
+						"%.2f",
+						100 * (all - allTied) / math.max(1, all)
+					)} % lost ({allResent} remotes resent)`
 				)
 				t.truthy(all - allTied < 0.005 * all, "honest pounces bite when they land")
 			end

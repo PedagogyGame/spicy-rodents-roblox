@@ -23,6 +23,7 @@ local TestWorld = require("@tests/cheat/TestWorld")
 local LiveRig = require("@tests/lib/LiveRig")
 local Driver = require("@tests/cheat/Driver")
 local Motion = require("@shared/Routes/Motion")
+local Units = require("@shared/Config/Units")
 
 type State = SquirrelMotor.State
 
@@ -160,33 +161,168 @@ return function(t)
 		end
 		t.eq(#SquirrelMotor.fieldCheck(snap(), vworld), 0, "an honest packet")
 		local bad: { { any } } = {
-			{ "trunkNormal x5", function(s) s.trunkNormalX, s.trunkNormalZ = 5, 0 end },
-			{ "trunkNormal x0", function(s) s.trunkNormalX, s.trunkNormalZ = 0, 0 end },
-			{ "railT 1.5", function(s) s.railT = 1.5 end },
-			{ "railT -0.2", function(s) s.railT = -0.2 end },
-			{ "vx 500", function(s) s.vx = 500 end },
-			{ "vy 100", function(s) s.vy = 100 end },
-			{ "vy -500", function(s) s.vy = -500 end },
-			{ "moveSpeed 200", function(s) s.moveSpeed = 200 end },
-			{ "moveSpeed -1", function(s) s.moveSpeed = -1 end },
-			{ "boostRemaining 1000", function(s) s.boostRemaining = 1000 end },
-			{ "cooldown 3", function(s) s.cooldown = 3 end },
-			{ "attack 2", function(s) s.attack = 2 end },
-			{ "attackWindow -0.1", function(s) s.attackWindow = -0.1 end },
-			{ "attackWindow 2", function(s) s.attackWindow = 2 end },
-			{ "cameraCommit 9", function(s) s.cameraCommit = 9 end },
-			{ "routeFreeLook 9", function(s) s.routeFreeLook = 9 end },
-			{ "stamina 1.5", function(s) s.stamina = 1.5 end },
-			{ "emergedEnd 0.5", function(s) s.emergedEnd = 0.5 end },
-			{ "emergedFw 3", function(s) s.emergedFw = 3 end },
-			{ "pendingFork 999999", function(s) s.pendingFork = 999999 end },
-			{ "selectedJunction 999999", function(s) s.selectedJunction = 999999 end },
-			{ "emergedFrom 999999", function(s) s.emergedFrom = 999999 end },
-			{ "railDir 0", function(s) s.railDir = 0 end },
-			{ "grounded 1", function(s) s.grounded = 1 end },
-			{ "clickSeq 1.5", function(s) s.clickSeq = 1.5 end },
-			{ "clickAgo 2", function(s) s.clickAgo = 2 end },
-			{ "clickAgo with no click", function(s) s.clickSeq, s.clickAgo = 0, 0.2 end },
+			{
+				"trunkNormal x5",
+				function(s)
+					s.trunkNormalX, s.trunkNormalZ = 5, 0
+				end,
+			},
+			{
+				"trunkNormal x0",
+				function(s)
+					s.trunkNormalX, s.trunkNormalZ = 0, 0
+				end,
+			},
+			{
+				"railT 1.5",
+				function(s)
+					s.railT = 1.5
+				end,
+			},
+			{
+				"railT -0.2",
+				function(s)
+					s.railT = -0.2
+				end,
+			},
+			{
+				"vx 500",
+				function(s)
+					s.vx = 500
+				end,
+			},
+			{
+				"vy 100",
+				function(s)
+					s.vy = 100
+				end,
+			},
+			{
+				"vy -500",
+				function(s)
+					s.vy = -500
+				end,
+			},
+			{
+				"moveSpeed 200",
+				function(s)
+					s.moveSpeed = 200
+				end,
+			},
+			{
+				"moveSpeed -1",
+				function(s)
+					s.moveSpeed = -1
+				end,
+			},
+			{
+				"boostRemaining 1000",
+				function(s)
+					s.boostRemaining = 1000
+				end,
+			},
+			{
+				"cooldown 3",
+				function(s)
+					s.cooldown = 3
+				end,
+			},
+			{
+				"attack 2",
+				function(s)
+					s.attack = 2
+				end,
+			},
+			{
+				"attackWindow -0.1",
+				function(s)
+					s.attackWindow = -0.1
+				end,
+			},
+			{
+				"attackWindow 2",
+				function(s)
+					s.attackWindow = 2
+				end,
+			},
+			{
+				"cameraCommit 9",
+				function(s)
+					s.cameraCommit = 9
+				end,
+			},
+			{
+				"routeFreeLook 9",
+				function(s)
+					s.routeFreeLook = 9
+				end,
+			},
+			{
+				"stamina 1.5",
+				function(s)
+					s.stamina = 1.5
+				end,
+			},
+			{
+				"emergedEnd 0.5",
+				function(s)
+					s.emergedEnd = 0.5
+				end,
+			},
+			{
+				"emergedFw 3",
+				function(s)
+					s.emergedFw = 3
+				end,
+			},
+			{
+				"pendingFork 999999",
+				function(s)
+					s.pendingFork = 999999
+				end,
+			},
+			{
+				"selectedJunction 999999",
+				function(s)
+					s.selectedJunction = 999999
+				end,
+			},
+			{
+				"emergedFrom 999999",
+				function(s)
+					s.emergedFrom = 999999
+				end,
+			},
+			{
+				"railDir 0",
+				function(s)
+					s.railDir = 0
+				end,
+			},
+			{
+				"grounded 1",
+				function(s)
+					s.grounded = 1
+				end,
+			},
+			{
+				"clickSeq 1.5",
+				function(s)
+					s.clickSeq = 1.5
+				end,
+			},
+			{
+				"clickAgo 2",
+				function(s)
+					s.clickAgo = 2
+				end,
+			},
+			{
+				"clickAgo with no click",
+				function(s)
+					s.clickSeq, s.clickAgo = 0, 0.2
+				end,
+			},
 			{
 				"a transfer 30 st long",
 				function(s)
@@ -232,57 +368,68 @@ return function(t)
 		print(`      {#bad} out-of-bound fields, each flagged`)
 	end)
 
-	t.test("fields: a transfer's start held beside a rail (frozen, or a new one every packet) at 2 to 30 a second", function()
-		local world, vworld = worldWith({})
-		local wire = longestWire(world)
-		local rows = {}
-		for _, rate in RATES do
-			for _, how in { "frozen", "renewed" } do
-				local v = MoveValidator.new(vworld)
-				local dt = 1 / rate
-				local tt = 0.3
-				local s = onRail(world, wire, tt)
-				v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
-				local bad, sent = 0, 0
-				local side = Motion.C.enterMaxGap -- (the widest a transfer starts from its target)
-				for i = 1, math.ceil(3 * rate) do
-					tt += 10 * dt / wire.length -- (a walk along the wire)
-					local q = world.registry:pointAt(wire, tt)
-					s.railT, s.x, s.y, s.z = tt, q.x, q.y, q.z
-					s.clock = i * dt
-					local fx, fy, fz = q.x + side, q.y, q.z
-					if how == "frozen" and i > 1 then
-						fx, fy, fz = (s.bridge :: any).fx, (s.bridge :: any).fy, (s.bridge :: any).fz
+	t.test(
+		"fields: a transfer's start held beside a rail (frozen, or a new one every packet) at 2 to 30 a second",
+		function()
+			local world, vworld = worldWith({})
+			local wire = longestWire(world)
+			local rows = {}
+			for _, rate in RATES do
+				for _, how in { "frozen", "renewed" } do
+					local v = MoveValidator.new(vworld)
+					local dt = 1 / rate
+					local tt = 0.3
+					local s = onRail(world, wire, tt)
+					v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
+					local bad, sent = 0, 0
+					local side = Motion.C.enterMaxGap -- (the widest a transfer starts from its target)
+					for i = 1, math.ceil(3 * rate) do
+						tt += 10 * dt / wire.length -- (a walk along the wire)
+						local q = world.registry:pointAt(wire, tt)
+						s.railT, s.x, s.y, s.z = tt, q.x, q.y, q.z
+						s.clock = i * dt
+						local fx, fy, fz = q.x + side, q.y, q.z
+						if how == "frozen" and i > 1 then
+							fx, fy, fz = (s.bridge :: any).fx, (s.bridge :: any).fy, (s.bridge :: any).fz
+						end
+						s.bridge = {
+							fx = fx,
+							fy = fy,
+							fz = fz,
+							tx = q.x,
+							ty = q.y,
+							tz = q.z,
+							elapsed = 0,
+							duration = Motion.bridgeDuration(
+								math.sqrt((q.x - fx) ^ 2 + (q.y - fy) ^ 2 + (q.z - fz) ^ 2)
+							),
+						}
+						-- (the body at the transfer's start: beside the rail)
+						s.x, s.y, s.z = fx, fy, fz
+						local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(s) }, s.clock)
+						sent += 1
+						if #r.violations > 0 then
+							bad += 1
+						end
 					end
-					s.bridge = {
-						fx = fx,
-						fy = fy,
-						fz = fz,
-						tx = q.x,
-						ty = q.y,
-						tz = q.z,
-						elapsed = 0,
-						duration = Motion.bridgeDuration(math.sqrt((q.x - fx) ^ 2 + (q.y - fy) ^ 2 + (q.z - fz) ^ 2)),
-					}
-					-- (the body at the transfer's start: beside the rail)
-					s.x, s.y, s.z = fx, fy, fz
-					local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(s) }, s.clock)
-					sent += 1
-					if #r.violations > 0 then
-						bad += 1
-					end
+					table.insert(rows, `{rate}/s {how}: {bad}/{sent} flagged`)
+					t.truthy(bad >= sent - 1, `{rate}/s, {how}: a body held a transfer's reach off the rail is flagged`)
 				end
-				table.insert(rows, `{rate}/s {how}: {bad}/{sent} flagged`)
-				t.truthy(bad >= sent - 1, `{rate}/s, {how}: a body held a transfer's reach off the rail is flagged`)
 			end
+			print(`      {table.concat(rows, "; ")}`)
 		end
-		print(`      {table.concat(rows, "; ")}`)
-	end)
+	)
 
 	-- railspeed --------------------------------------------------------------------------------------------------------
 	-- along a rail as fast as the validator passes, each packet the furthest railT it takes, at each rate and clock: the
 	-- pace against the bound an honest body has (the faster of its run and a leap along it)
-	local function railGreedy(world: any, vworld: any, r: any, rate: number, clockRate: number): (number, number, number)
+	local function railGreedy(
+		world: any,
+		vworld: any,
+		r: any,
+		rate: number,
+		clockRate: number
+	): (number, number, number)
 		local v = MoveValidator.new(vworld)
 		local tt = 0.02
 		local s = onRail(world, r, tt)
@@ -341,11 +488,17 @@ return function(t)
 						)}, cap {cap})`
 					)
 					if k <= 1 then
-						t.truthy(pace <= honest * 1.01 + 0.5, `{r.kind} at {rate}/s x{k}: {pace} st/s within the honest bound`)
+						t.truthy(
+							pace <= honest * 1.01 + 0.5,
+							`{r.kind} at {rate}/s x{k}: {pace} st/s within the honest bound`
+						)
 						t.eq(bad, 0, `{r.kind} at {rate}/s x{k}: the greedy packets pass`)
 					else
 						-- a clock run fast is the clock check's: the gain is the clock's, and flagged
-						t.truthy(pace <= honest * k * 1.01 + 0.5, `{r.kind} at {rate}/s x{k}: no more than the clock's gain`)
+						t.truthy(
+							pace <= honest * k * 1.01 + 0.5,
+							`{r.kind} at {rate}/s x{k}: no more than the clock's gain`
+						)
 					end
 				end
 			end
@@ -356,77 +509,120 @@ return function(t)
 	end)
 
 	-- exit -------------------------------------------------------------------------------------------------------------
-	t.test("exit: greedy straight up and level off a trunk at every gap; another rail near only when reachable", function()
-		local world, vworld = worldWith({})
-		local v = MoveValidator.new(vworld)
-		local launchUp = P.leapUp * E.launchTol
-		local launchXZ = SquirrelMotor.launchCapXZ(false) * E.launchTol
+	t.test(
+		"exit: greedy straight up and level off a trunk at every gap; another rail near only when reachable",
+		function()
+			local world, vworld = worldWith({})
+			local v = MoveValidator.new(vworld)
+			local launchUp = P.leapUp * E.launchTol
+			local launchXZ = SquirrelMotor.launchCapXZ(false) * E.launchTol
+			local rows = {}
+			for _, rate in RATES do
+				local dt = 1 / rate
+				for _, tt in { 0.5, 1 } do
+					local prev = onRail(world, tall, tt)
+					local vis = SquirrelMotor.visualPose(prev, world)
+					-- up: the highest `next` (any vertical speed it may claim) above the drawn pose
+					local bestUp = -math.huge
+					for vy = -P.gravity * dt, launchUp, 1 do
+						local up = most(0, 80, function(h: number): boolean
+							local n = SquirrelMotor.new(vis.x, vis.y + h, vis.z)
+							n.grounded, n.committedAirborne, n.vy = false, true, vy
+							n.clock = dt
+							return clean(v, prev, n, dt)
+						end)
+						bestUp = math.max(bestUp, up or -math.huge)
+					end
+					-- level: the furthest across, out along the bark's normal
+					local across = most(0, 120, function(d: number): boolean
+						local n = SquirrelMotor.new(vis.x + d, vis.y, vis.z)
+						n.grounded, n.committedAirborne, n.vy = false, true, 0
+						n.clock = dt
+						return clean(v, prev, n, dt)
+					end) or 0
+					local railCap = SquirrelMotor.routeCap(tall, false)
+					-- (an honest body: up the trunk, a leap, a grab of a bough a grab's reach higher and a leap off it, the
+					-- gap's time shared between the climb and the two leaps; a short gap hides no grab)
+					local capT = railCap * E.railTol
+					local n = if dt > E.shortDt then 2 else 1
+					local t2 = math.clamp(n * (launchUp - capT) / P.gravity, 0, dt)
+					local honestUp = capT * (dt - t2)
+						+ launchUp * t2
+						- P.gravity * t2 * t2 / (2 * n)
+						+ (if dt > E.shortDt then Motion.C.airGrab + Motion.C.visualBranchLift else 0)
+						-- (and the gravity tolerance on the launch's speed: E.gravityEps of gravity, about a stud of rise)
+						+ P.gravity * E.gravityEps * launchUp / P.gravity
+						+ 0.2
+					local honestAcross = launchXZ * dt + 2 * Motion.C.airGrab + railCap * dt + 2
+					table.insert(
+						rows,
+						`dt {string.format("%.3f", dt)} t {tt}: up {string.format("%.1f", bestUp)} (bound {string.format(
+							"%.1f",
+							honestUp
+						)}), across {string.format("%.1f", across)} (bound {string.format("%.1f", honestAcross)})`
+					)
+					t.truthy(bestUp <= honestUp, `up off a trunk in {dt} s: {bestUp}`)
+					t.truthy(across <= honestAcross, `across off a trunk in {dt} s: {across}`)
+				end
+			end
+			for _, row in rows do
+				print(`      {row}`)
+			end
+		end
+	)
+
+	-- the ledge allowance (a launch off a rail comes down on a floor a step over the feet and launches again: the alley's
+	-- light rails under the rafters' beams): only where the server's own ray finds that floor, within a launch and a step
+	t.test("exit: a ledge beside a trunk explains a second leap only within a leap and a step of the launch", function()
 		local rows = {}
 		for _, rate in RATES do
 			local dt = 1 / rate
-			for _, tt in { 0.5, 1 } do
-				local prev = onRail(world, tall, tt)
-				local vis = SquirrelMotor.visualPose(prev, world)
-				-- up: the highest `next` (any vertical speed it may claim) above the drawn pose
-				local bestUp = -math.huge
-				for vy = -P.gravity * dt, launchUp, 1 do
-					local up = most(0, 80, function(h: number): boolean
-						local n = SquirrelMotor.new(vis.x, vis.y + h, vis.z)
-						n.grounded, n.committedAirborne, n.vy = false, true, vy
-						n.clock = dt
-						return clean(v, prev, n, dt)
-					end)
-					bestUp = math.max(bestUp, up or -math.huge)
-				end
-				-- level: the furthest across, out along the bark's normal
-				local across = most(0, 120, function(d: number): boolean
-					local n = SquirrelMotor.new(vis.x + d, vis.y, vis.z)
-					n.grounded, n.committedAirborne, n.vy = false, true, 0
-					n.clock = dt
-					return clean(v, prev, n, dt)
-				end) or 0
-				local railCap = SquirrelMotor.routeCap(tall, false)
-				-- (an honest body: up the trunk, a leap, a grab of a bough a grab's reach higher and a leap off it, the
-				-- gap's time shared between the climb and the two leaps; a short gap hides no grab)
-				local capT = railCap * E.railTol
-				local n = if dt > E.shortDt then 2 else 1
-				local t2 = math.clamp(n * (launchUp - capT) / P.gravity, 0, dt)
-				local honestUp = capT * (dt - t2)
-					+ launchUp * t2
-					- P.gravity * t2 * t2 / (2 * n)
-					+ (if dt > E.shortDt then Motion.C.airGrab + Motion.C.visualBranchLift else 0)
-					-- (and the gravity tolerance on the launch's speed: E.gravityEps of gravity, about a stud of rise)
-					+ P.gravity * E.gravityEps * launchUp / P.gravity
-					+ 0.2
-				-- (or, in any gap, a transfer onto a bough the trunk leads to: the transfer's easing in the gap, a run up
-				-- the bough and a launch off it)
-				local boughCap = 0
-				for _, id in world.graph:neighbours(tall.id) do
-					local r = world.registry:get(id)
-					if r then
-						boughCap = math.max(boughCap, SquirrelMotor.routeCap(r, false) * E.railTol)
+			for _, over in { 1, 3, 6, 12 } do
+				-- (a box beside the trunk whose top is `over` studs over the drawn pose at t = 0.3)
+				local pt = base.registry:pointAt(trunk, 0.3)
+				local top = pt.y + over
+				local box = { minX = foot.x + 3, maxX = foot.x + 13, minZ = foot.z - 5, maxZ = foot.z + 5, top = top }
+				-- the greedy's highest off the trunk, with the box (its roof a ledge) and without it
+				-- (over the ledge's roof: the feet from its top up)
+				local function highest(boxes: { TestWorld.Box }): number
+					local world, vworld = worldWith(boxes, boxes)
+					local v = MoveValidator.new(vworld)
+					local prev = onRail(world, trunk, 0.3)
+					prev.trunkNormalX, prev.trunkNormalZ = 1, 0
+					local vis = SquirrelMotor.visualPose(prev, world)
+					local launchUp = P.leapUp * E.launchTol
+					local best = -math.huge
+					for vy = -P.gravity * dt, launchUp, 1.5 do
+						local h = most(over, 40, function(x: number): boolean
+							local n = SquirrelMotor.new(foot.x + 5, vis.y + x, foot.z)
+							n.grounded, n.committedAirborne, n.vy, n.clock = false, true, vy, dt
+							return clean(v, prev, n, dt)
+						end)
+						best = math.max(best, h or -math.huge)
 					end
+					return best
 				end
-				honestUp = math.max(
-					honestUp,
-					railCap * E.railTol * dt
-						+ Motion.C.enterMaxGap * Motion.ease(dt / Motion.C.bridgeMin)
-						+ boughCap * dt
-						+ (launchUp * math.min(dt, launchUp / P.gravity) - 0.5 * P.gravity * math.min(dt, launchUp / P.gravity) ^ 2)
-						+ P.gravity * E.gravityEps * launchUp / P.gravity
-						+ Motion.C.visualBranchLift
-						+ 0.2
-				)
-				local honestAcross = launchXZ * dt + 2 * Motion.C.airGrab + railCap * dt + 2
+				local launchUp = P.leapUp * E.launchTol
+				local withLedge, without = highest({ box }), highest({})
+				-- (an honest body: a launch rising in the gap, a step onto the ledge and a launch off it, as high as a
+				-- launch from the ledge could rise in the gap; or, with no ledge in reach, the launch alone)
+				local tu = math.min(dt, launchUp / P.gravity)
+				local riseInDt = launchUp * tu - 0.5 * P.gravity * tu * tu
+				local railCap = SquirrelMotor.routeCap(trunk, false) * E.railTol
+				local reachable = over <= railCap * dt + riseInDt + Units.st(1.4) + E.floorSlack
+				local G = P.gravity * dt + P.gravity * E.gravityEps
+				local secondRise = G * (2 * launchUp - G) / (2 * P.gravity)
+				local bound = if reachable
+					then math.max(without, over + secondRise + E.floorSlack + E.posSlack + 0.05)
+					else without
 				table.insert(
 					rows,
-					`dt {string.format("%.3f", dt)} t {tt}: up {string.format("%.1f", bestUp)} (bound {string.format(
+					`{rate}/s ledge {over} st over: up {string.format("%.1f", withLedge)}, {string.format(
 						"%.1f",
-						honestUp
-					)}), across {string.format("%.1f", across)} (bound {string.format("%.1f", honestAcross)})`
+						without
+					)} with none (reachable {reachable}, bound {string.format("%.1f", bound)})`
 				)
-				t.truthy(bestUp <= honestUp, `up off a trunk in {dt} s: {bestUp}`)
-				t.truthy(across <= honestAcross, `across off a trunk in {dt} s: {across}`)
+				t.truthy(withLedge <= bound + 1e-3, `{rate}/s, a ledge {over} st over: {withLedge} st up`)
 			end
 		end
 		for _, row in rows do
@@ -506,7 +702,10 @@ return function(t)
 					)})`
 				)
 				if k <= 1 then
-					t.truthy(rateUp <= 1.1 * cap, `rail touches at {rate}/s x{k}: {rateUp} st/s, about the trunk's pace`)
+					t.truthy(
+						rateUp <= 1.1 * cap,
+						`rail touches at {rate}/s x{k}: {rateUp} st/s, about the trunk's pace`
+					)
 				else
 					t.truthy(bad > 0, `rail touches at {rate}/s x{k}: the clock run fast is flagged`)
 				end
@@ -532,51 +731,54 @@ return function(t)
 		return world, vworld, x0
 	end
 
-	t.test("roofed: no way into a roofed house off a trunk or from a leap beside it, at 2 to 30 packets a second", function()
-		local world, vworld, x0 = roofedHouse()
-		local v = MoveValidator.new(vworld)
-		local launchUp = P.leapUp * E.launchTol
-		local passed = {}
-		local tried = 0
-		for _, rate in RATES do
-			local dt = 1 / rate
-			-- off the trunk, any height up it, the bark facing the house or not, into the house at any height under the roof
-			for h = 1, 13, 1 do
-				for _, nx in { 1, 0 } do
-					local prev = onRail(world, trunk, h / trunk.length)
-					prev.trunkNormalX, prev.trunkNormalZ = nx, 1 - nx
-					for _, inX in { x0 + 1.4, x0 + 2.5, x0 + 4 } do
-						-- (feet anywhere from the floor to a body's height under the roof: inside it)
-						for y = 0, 14 - world.groundHeight - ValidatorWorld.C.TOP, 1.5 do
-							for _, vy in { -P.gravity * dt, 0, launchUp } do
-								tried += 1
-								local n = SquirrelMotor.new(inX, world.groundHeight + y, foot.z)
-								n.grounded, n.committedAirborne, n.vy, n.clock = false, true, vy, dt
-								if clean(v, prev, n, dt) then
-									table.insert(passed, `{rate}/s off the trunk at {h} into ({inX - x0}, {y})`)
+	t.test(
+		"roofed: no way into a roofed house off a trunk or from a leap beside it, at 2 to 30 packets a second",
+		function()
+			local world, vworld, x0 = roofedHouse()
+			local v = MoveValidator.new(vworld)
+			local launchUp = P.leapUp * E.launchTol
+			local passed = {}
+			local tried = 0
+			for _, rate in RATES do
+				local dt = 1 / rate
+				-- off the trunk, any height up it, the bark facing the house or not, into the house at any height under the roof
+				for h = 1, 13, 1 do
+					for _, nx in { 1, 0 } do
+						local prev = onRail(world, trunk, h / trunk.length)
+						prev.trunkNormalX, prev.trunkNormalZ = nx, 1 - nx
+						for _, inX in { x0 + 1.4, x0 + 2.5, x0 + 4 } do
+							-- (feet anywhere from the floor to a body's height under the roof: inside it)
+							for y = 0, 14 - world.groundHeight - ValidatorWorld.C.TOP, 1.5 do
+								for _, vy in { -P.gravity * dt, 0, launchUp } do
+									tried += 1
+									local n = SquirrelMotor.new(inX, world.groundHeight + y, foot.z)
+									n.grounded, n.committedAirborne, n.vy, n.clock = false, true, vy, dt
+									if clean(v, prev, n, dt) then
+										table.insert(passed, `{rate}/s off the trunk at {h} into ({inX - x0}, {y})`)
+									end
 								end
 							end
 						end
 					end
 				end
-			end
-			-- from a leap beside the wall (outside, any height and vertical speed) onto the floor inside
-			for h = 0, 13, 1 do
-				for _, vy in { -P.gravity * dt, 0, launchUp / 2, launchUp } do
-					tried += 1
-					local prev = SquirrelMotor.new(x0 - 1, world.groundHeight + h, foot.z)
-					prev.grounded, prev.vy, prev.committedAirborne = h == 0, if h == 0 then 0 else vy, h > 0
-					local n = SquirrelMotor.new(x0 + 2.5, world.groundHeight, foot.z)
-					n.grounded, n.clock = true, dt
-					if clean(v, prev, n, dt) then
-						table.insert(passed, `{rate}/s from a leap {h} st up`)
+				-- from a leap beside the wall (outside, any height and vertical speed) onto the floor inside
+				for h = 0, 13, 1 do
+					for _, vy in { -P.gravity * dt, 0, launchUp / 2, launchUp } do
+						tried += 1
+						local prev = SquirrelMotor.new(x0 - 1, world.groundHeight + h, foot.z)
+						prev.grounded, prev.vy, prev.committedAirborne = h == 0, if h == 0 then 0 else vy, h > 0
+						local n = SquirrelMotor.new(x0 + 2.5, world.groundHeight, foot.z)
+						n.grounded, n.clock = true, dt
+						if clean(v, prev, n, dt) then
+							table.insert(passed, `{rate}/s from a leap {h} st up`)
+						end
 					end
 				end
 			end
+			print(`      {tried} ways in tried, {#passed} passed {table.concat(passed, "; ")}`)
+			t.eq(#passed, 0, "no way through the wall of a roofed house")
 		end
-		print(`      {tried} ways in tried, {#passed} passed {table.concat(passed, "; ")}`)
-		t.eq(#passed, 0, "no way through the wall of a roofed house")
-	end)
+	)
 
 	t.test("roofed: an open garden wall is still leapt (the honest leap over a fence under open sky)", function()
 		-- (the same walls with no roof: a leap's rise clears a wall 1.5 st high)
@@ -594,52 +796,58 @@ return function(t)
 	end)
 
 	-- float ------------------------------------------------------------------------------------------------------------
-	t.test("float: after a rail or a long gap, standing over the ground or a car's roof at 2 to 30 packets a second", function()
-		local cars = { walls = Solid.newSet(), floors = Solid.newSet() }
-		local world, vworld = worldWith({}, nil, cars)
-		local rows = {}
-		for _, onCar in { false, true } do
-			for _, rate in RATES do
-				for _, h in (if onCar then { 0.7, 1.4, 3 } else { 0.7, 1.5, 3 }) :: { number } do
-					local v = MoveValidator.new(vworld)
-					local dt = 1 / rate
-					local s = onRail(world, trunk, 0.1)
-					v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
-					local vis = SquirrelMotor.visualPose(s, world)
-					local roof = 0
-					Solid.clear(cars.floors)
-					if onCar then
-						-- (a car parked under the path, its roof 4 st up)
-						local car = Solid.box(6, 60, 4, vis.x - 30, world.groundHeight, vis.z, math.pi / 2)
-						Solid.add(cars.floors, car)
-						roof = 4
-					end
-					local n = SquirrelMotor.new(vis.x - 1, world.groundHeight + roof + h, vis.z)
-					n.grounded = true
-					local flaggedAt: number? = nil
-					local clock = 0
-					-- (a third a packet on a car's roof: at 2 a second the bucket's leak takes most of it)
-					for i = 1, math.ceil((if onCar then 6 else 3) * rate) do
-						clock += dt
-						n.clock = clock
-						n.x -= 10 * dt -- (walking along)
-						local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(n) }, clock)
-						if r.flagged and flaggedAt == nil then
-							flaggedAt = clock
+	t.test(
+		"float: after a rail or a long gap, standing over the ground or a car's roof at 2 to 30 packets a second",
+		function()
+			local cars = { walls = Solid.newSet(), floors = Solid.newSet() }
+			local world, vworld = worldWith({}, nil, cars)
+			local rows = {}
+			for _, onCar in { false, true } do
+				for _, rate in RATES do
+					for _, h in (if onCar then { 0.7, 1.4, 3 } else { 0.7, 1.5, 3 }) :: { number } do
+						local v = MoveValidator.new(vworld)
+						local dt = 1 / rate
+						local s = onRail(world, trunk, 0.1)
+						v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
+						local vis = SquirrelMotor.visualPose(s, world)
+						local roof = 0
+						Solid.clear(cars.floors)
+						if onCar then
+							-- (a car parked under the path, its roof 4 st up)
+							local car = Solid.box(6, 60, 4, vis.x - 30, world.groundHeight, vis.z, math.pi / 2)
+							Solid.add(cars.floors, car)
+							roof = 4
 						end
+						local n = SquirrelMotor.new(vis.x - 1, world.groundHeight + roof + h, vis.z)
+						n.grounded = true
+						local flaggedAt: number? = nil
+						local clock = 0
+						-- (a third a packet on a car's roof: at 2 a second the bucket's leak takes most of it)
+						for i = 1, math.ceil((if onCar then 6 else 3) * rate) do
+							clock += dt
+							n.clock = clock
+							n.x -= 10 * dt -- (walking along)
+							local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(n) }, clock)
+							if r.flagged and flaggedAt == nil then
+								flaggedAt = clock
+							end
+						end
+						table.insert(
+							rows,
+							`{if onCar then "car" else "ground"} {rate}/s {h} st over: flagged at {flaggedAt or "never"}`
+						)
+						t.truthy(
+							flaggedAt ~= nil,
+							`{h} st over the {if onCar then "car" else "ground"} at {rate}/s is flagged`
+						)
 					end
-					table.insert(
-						rows,
-						`{if onCar then "car" else "ground"} {rate}/s {h} st over: flagged at {flaggedAt or "never"}`
-					)
-					t.truthy(flaggedAt ~= nil, `{h} st over the {if onCar then "car" else "ground"} at {rate}/s is flagged`)
 				end
 			end
+			for _, row in rows do
+				print(`      {row}`)
+			end
 		end
-		for _, row in rows do
-			print(`      {row}`)
-		end
-	end)
+	)
 
 	-- clicks -----------------------------------------------------------------------------------------------------------
 	t.test("clicks: a click's number is taken once, the newer only, wrapping at 255", function()
@@ -674,7 +882,12 @@ return function(t)
 	-- finding 6). Returns whether the launch is tied to the click, and whether the server dated the launch at all.
 	local CP = CombatRules.params()
 	local windup = Tunables.get("pounce.windup")
-	local function heldBehindClick(hold: number, copy: boolean, clockRate: number, seed: number): (boolean, boolean, string)
+	local function heldBehindClick(
+		hold: number,
+		copy: boolean,
+		clockRate: number,
+		seed: number
+	): (boolean, boolean, string)
 		local _, vworld = worldWith({})
 		local launch = CHEAT_AT
 		local pounced: number? = nil
@@ -704,11 +917,8 @@ return function(t)
 				if copy and pounced and now >= launch and now < launch + hold + 0.3 then
 					-- (the click's copy, claiming the wind-up before the lunge)
 					snap.clickSeq = 9
-					snap.clickAgo = math.clamp(
-						(snap.clock :: number) - ((pounced :: number) - windup),
-						0,
-						SquirrelWire.CLICK_COPY
-					)
+					snap.clickAgo =
+						math.clamp((snap.clock :: number) - ((pounced :: number) - windup), 0, SquirrelWire.CLICK_COPY)
 				end
 				return nil
 			end,
@@ -746,26 +956,29 @@ return function(t)
 		return tied, sq.pounceAt ~= nil, `launch dated {sq.pounceAt}, {#dues} click(s) taken`
 	end
 
-	t.test("clicks: a lunge held behind its click (the remote ahead of it, or a copy in the held packets) is not tied", function()
-		local rows = {}
-		for _, copy in { false, true } do
-			for _, k in { 0.5, 1, 1.3 } do
-				for _, hold in { 0.05, 0.2, 0.3, 0.45 } do
-					local tied, dated, what = heldBehindClick(hold, copy, k, 60 + math.floor(hold * 100))
-					local how = if copy then "copy" else "remote"
-					table.insert(rows, `{how} x{k} held {hold} s: tied {tied} ({what})`)
-					if hold > 0.14 then
-						-- (past the link's spread and a packet: QUIET's 0.01 + 0.13)
-						t.falsy(tied, `{how}, clock x{k}, held {hold} s: not tied`)
-					elseif k == 1 then
-						-- (the control: a hold the link's tolerance takes is dated and tied, as an honest late packet is)
-						t.truthy(dated and tied, `{how}, held {hold} s: dated and tied (the link's tolerance)`)
+	t.test(
+		"clicks: a lunge held behind its click (the remote ahead of it, or a copy in the held packets) is not tied",
+		function()
+			local rows = {}
+			for _, copy in { false, true } do
+				for _, k in { 0.5, 1, 1.3 } do
+					for _, hold in { 0.05, 0.2, 0.3, 0.45 } do
+						local tied, dated, what = heldBehindClick(hold, copy, k, 60 + math.floor(hold * 100))
+						local how = if copy then "copy" else "remote"
+						table.insert(rows, `{how} x{k} held {hold} s: tied {tied} ({what})`)
+						if hold > 0.14 then
+							-- (past the link's spread and a packet: QUIET's 0.01 + 0.13)
+							t.falsy(tied, `{how}, clock x{k}, held {hold} s: not tied`)
+						elseif k == 1 then
+							-- (the control: a hold the link's tolerance takes is dated and tied, as an honest late packet is)
+							t.truthy(dated and tied, `{how}, held {hold} s: dated and tied (the link's tolerance)`)
+						end
 					end
 				end
 			end
+			for _, row in rows do
+				print(`      {row}`)
+			end
 		end
-		for _, row in rows do
-			print(`      {row}`)
-		end
-	end)
+	)
 end
