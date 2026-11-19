@@ -9,8 +9,10 @@
 --   * The obstacles are the building boxes of World/Colliders (every solid lot, the built venues, the bowling
 --     alley) and, for walkers only, what else stands on the ground (`extras`): the fence and parapet lines (the
 --     harvested fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own
---     bakes that Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), and anything
---     at least LOW tall (a fountain's rim is a wall to a walker). The river is closed ground (World/FootPath).
+--     bakes that Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks
+--     (the park's footbridge), the bowling alley's raised rear alley and its yard's house, and anything at least
+--     LOW tall (a fountain's rim is a wall to a walker). The river
+--     is closed ground (World/FootPath).
 --   * A building people work in has its own ways inside and a door (`rooms`): the bowling alley (Attractions/
 --     AlleyWalk, out by its main doors), the hospital (Infection/HospitalLayout's lanes, out by its entrance), the
 --     police station (the locker room's way out past the front desk: Actors/StaffRounds.POLICE_EXIT) and a built
@@ -30,6 +32,8 @@ local Colliders = require("./Colliders")
 local FootPath = require("./FootPath")
 local Ground = require("./Ground")
 local Height = require("./Height")
+local AlleyLayout = require("../Attractions/AlleyLayout")
+local AlleyRoof = require("../Attractions/AlleyRoof")
 local AlleyStaff = require("../Attractions/AlleyStaff")
 local AlleyWalk = require("../Attractions/AlleyWalk")
 local HospitalLayout = require("../Infection/HospitalLayout")
@@ -61,6 +65,7 @@ WalkWay.LOW = 1.5 -- studs: anything this tall stops a walker (lower is stepped 
 WalkWay.MARGIN = 0.2 -- studs a point must be inside a box's walls to be in it
 WalkWay.KEEP = 2.5 -- studs from a building's own ways (a lane, a round) a body may be let go and join them straight
 WalkWay.LANE_MIN = 6 -- studs: a piece of lane shorter than this is not walked
+WalkWay.DECK_MAX = 4 -- studs: a slab lot (a footbridge's deck) up to this tall is a wall to a walker; higher is a canopy
 -- the venues baked by their own bakes that World/Colliders does not hold (it is also the squirrels' world, and the
 -- TV station's arena is walked into for paintball): solid to walkers
 WalkWay.BAKED_VENUES = table.freeze({ "f3_tv_station", "f4_lift_base", "f3_hilltop" })
@@ -110,6 +115,83 @@ function WalkWay.addFences(c: Colliders.Colliders, data: any): number
 		end
 	end
 	return n
+end
+
+-- The raised decks (lots of category "slab" whose deck stands LOW to DECK_MAX above the ground: the park's
+-- footbridge): the computer's ground does not know a deck, so a walker would walk into its edge at the waist. Higher
+-- slabs are canopies walked under (the fuel canopy, a porte-cochere); lower ones are stepped onto (a dock).
+local function addDecks(c: Colliders.Colliders, data: any): number
+	local lt = data:module("LotTypes") :: any
+	local types = if lt and lt.types then lt.types else {}
+	local n = 0
+	for _, lot in data:lots() do
+		local t = types[lot.type]
+		local fp = lot.footprint
+		local h = if t and t.heightU then t.heightU * Height.STUDS_PER_UNIT else 0
+		if t and fp and t.category == "slab" and h >= WalkWay.LOW and h <= WalkWay.DECK_MAX then
+			local y0 = Height.at(lot.x, lot.z)
+			Colliders.add(c, {
+				id = lot.id,
+				cx = lot.x,
+				cz = lot.z,
+				hw = fp.w / 2,
+				hd = fp.d / 2,
+				y0 = y0,
+				eave = y0 + h,
+				peak = y0 + h,
+				ridge = nil,
+			})
+			n += 1
+		end
+	end
+	return n
+end
+
+-- The bowling alley's rear alley (AlleyLayout zone "rear_alley": raised paving behind the hall, a kerb and a fence,
+-- with a ramp down at each end, RAMP_RUN long): outside the building's box, and higher than the computer's ground.
+WalkWay.RAMP_RUN = 20 -- studs past each end of the rear alley's paving its ramps reach
+-- a box in the alley's frame (X0..X1, D0..D1) as a world box
+local function addAlleyBox(c: Colliders.Colliders, alley: any, id: string, r: { number }, y0: number, top: number)
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, corner in { { r[1], r[3] }, { r[2], r[3] }, { r[1], r[4] }, { r[2], r[4] } } do
+		local x, _, z = AlleyLayout.toWorld(alley, corner[1], 0, corner[2])
+		minX, maxX = math.min(minX, x), math.max(maxX, x)
+		minZ, maxZ = math.min(minZ, z), math.max(maxZ, z)
+	end
+	Colliders.add(c, {
+		id = id,
+		cx = (minX + maxX) / 2,
+		cz = (minZ + maxZ) / 2,
+		hw = (maxX - minX) / 2,
+		hd = (maxZ - minZ) / 2,
+		y0 = y0,
+		eave = top,
+		peak = top,
+		ridge = nil,
+	})
+end
+
+-- The bowling alley's neighbours in its own bake, outside its box: the rear alley (AlleyLayout zone "rear_alley":
+-- raised paving behind the hall, a kerb and a fence, a ramp down at each end, RAMP_RUN long) and the yard's house
+-- (AlleyRoof.HOUSE, its porch PORCH out), both higher than the computer's ground or solid.
+WalkWay.RAMP_RUN = 20
+WalkWay.PORCH = 4
+local function addAlleyNeighbours(c: Colliders.Colliders, alley: any)
+	local zone = AlleyLayout.zone("rear_alley")
+	local y = alley.floorY + (zone.y or 0)
+	local run = WalkWay.RAMP_RUN
+	addAlleyBox(c, alley, "bowling_alley_rear", { zone.x0 - run, zone.x1 + run, zone.d0, zone.d1 }, y - 4, y + 4)
+	local h = AlleyRoof.HOUSE
+	local p = WalkWay.PORCH
+	local floor = alley.floorY + h.floorY
+	addAlleyBox(
+		c,
+		alley,
+		"bowling_alley_yard_house",
+		{ h.x0 - p, h.x1 + p, h.d0 - p, h.d1 + p },
+		floor,
+		alley.floorY + h.ridgeY
+	)
 end
 
 -- the venues in BAKED_VENUES, as Colliders.addBuiltVenues boxes them
@@ -228,7 +310,12 @@ function WalkWay.new(opts: Opts): Way
 	local data = opts.data
 	local c = opts.colliders or Colliders.fromData(data)
 	WalkWay.addFences(c, data)
+	addDecks(c, data)
 	addBakedVenues(c, data)
+	local alleyPlace = AlleyStaff.placeOf(data)
+	if alleyPlace then
+		addAlleyNeighbours(c, alleyPlace)
+	end
 	local river = Height.RIVER
 	local S = Height.STUDS_PER_UNIT
 	local foot = FootPath.new({
