@@ -2,31 +2,50 @@
 -- ServerScriptService.Server.Persistence.PlayerSaves
 -- The live server's saved profiles: one session-locked profile per player (Persistence/ProfileStore over the
 -- engine's DataStore, key Profiles.key(userId) in the store named STORE), loaded when the player joins, saved
--- when something in it changes, on a period while they play, and released when they leave or the server shuts
--- down (BindToClose: closeAll). What goes into the profile is the caller's (Boot/Game hands it Cosmetics/Wardrobe,
--- which writes only the clothing: owner D16 #25); this module only keeps the profile and its lock honest.
+-- a few seconds after something in it changes, on a period while they play, and released when they leave or the
+-- server shuts down (BindToClose: closeAll). What goes into the profile is the caller's (Boot/Game hands it
+-- Cosmetics/Wardrobe, which writes only the clothing: owner D16 #25); this module only keeps the profile, its lock
+-- and the server's DataStore budget honest.
+-- MONEY AND RECEIPTS: when they are saved, they go into the profile this module holds (data(player), dirty), never
+-- through Persistence/Profiles.new or Economy/Receipts' own ProfileStore: those would take a second session lock
+-- on the same key from the same server, and the two would lock each other out.
 -- A player's session is in one of these states (status(player); Boot/Game shows it as the player attribute
 -- ClothesSaved):
 --   loading   the profile is on its way (play goes on meanwhile; nothing waits on it)
---   saved     the profile is held: a change is written at once (and retried), the rest on the autosave period
+--   saved     the profile is held: a change marks it dirty and step() writes it (see WRITES below)
 --   unsaved   the load failed (DataStore errors, or another server still holds a live lock past the waits): the
 --             player is told once, play goes on, and the load is retried with backoff (RETRY_FIRST doubling to
 --             RETRY_MAX) for as long as they stay; when it lands, `loaded` merges what changed here meanwhile
 --   lost      another server took the lock (ours lapsed): nothing is written again by this server; told once
---   corrupt   the record could not be read (a newer schema than this build, or broken): never written over;
---             told once
+--   corrupt   the record could not be read (a newer schema than this build, or not a profile at all): never
+--             written over; play goes on unsaved; told once
 --   off       saving is off on this server (no DataStore: Studio without "Enable Studio Access to API
 --             Services", or an unpublished place); said once in the log, and to a player when it matters
+-- WRITES (the DataStore's per-server allowance is 60 + 10 x players UpdateAsync a minute, 360 with 30 players):
+--   * a change (dirty) only marks the profile; step() (1 Hz) writes a dirty profile once its last write is
+--     WRITE_GAP (6 s) old, so one player costs at most 10 writes a minute whatever their client does;
+--   * a purchase (dirty(player, true)) is written at once if that player's gap and the budget allow, else by step;
+--   * the autosave writes a clean profile every 30 s (it renews the 180 s lease);
+--   * every one of those takes a token from a server-wide bucket refilled at BUDGET_SHARE (half) of the
+--     allowance, 30 + 5 x players a minute (180 with 30 players; at most BURST saved up), the stalest profile
+--     first; loads (one per join) and releases (one per leave) take none and have the other half.
+-- One session id per player per server ("<jobId>:<userId>") is used by every load, retry and release, so a load
+-- whose reply was lost (the lock written, the answer gone) is taken back by the next try at once, and a leave
+-- clears such an orphan lock. A player who leaves before their profile loaded, with something bought or changed
+-- here, gets one last look: if the lock is free, the profile is loaded, merged and released (else it stays here).
 -- A save that fails after ProfileStore's own retries is tried again every SAVE_RETRY seconds; the player is told
 -- once that saving is slow and once more when it has caught up. Nothing a player has is taken away by a failure:
 -- the live state is the caller's, on this server, whatever the store does.
 -- Every DataStore call runs in its own thread (deps.spawn: task.spawn in the engine) through one queue per
 -- player, so two writes for the same key never overlap, a rejoin's load waits for the leave's release, and a
 -- frame never waits on a DataStore. In Lune deps.spawn runs the job at once, so specs are synchronous.
--- Interface: new(deps) -> Saves; Saves:join(player); Saves:leave(player); Saves:dirty(player);
+-- Shutdown (closeAll): queued loads and saves are dropped (each release writes the latest data), every session is
+-- released, and the store is told it is closing (one retry per call, no lock waits), inside CLOSE_SECONDS.
+-- Interface: new(deps) -> Saves; Saves:join(player); Saves:leave(player); Saves:dirty(player, purchase?);
 --   Saves:data(player) -> ProfileSchema.Data? (only while `saved`); Saves:status(player) -> State?;
 --   Saves:step(now); Saves:closeAll(timeoutSeconds?) (yields until every release is done or the time is up);
---   Saves:busy() -> boolean; STORE; WORDS; offError(err) -> boolean (pure)
+--   Saves:busy() -> boolean; STORE; WORDS; WRITE_GAP; BUDGET_SHARE; BURST; budgetPerMinute(players) (pure);
+--   offError(err) -> boolean (pure)
 -- No engine but what deps hands in; no side effects on require.
 
 local ProfileSchema = require("./ProfileSchema")
@@ -36,14 +55,16 @@ export type State = "loading" | "saved" | "unsaved" | "lost" | "corrupt" | "off"
 
 export type Deps = {
 	store: ProfileStore.DataStoreLike?, -- nil: saving is off
-	jobId: string,
+	jobId: string, -- unique per server (game.JobId; a fresh id per Studio session)
 	now: () -> number, -- a wall clock every server shares (os.time)
 	sleep: (seconds: number) -> (),
 	spawn: (fn: () -> ()) -> (), -- runs a job off the caller's thread (task.spawn)
 	tell: (player: any, words: string) -> (),
 	-- the profile arrived: merge what this server already has for the player into `data`; true if it changed
-	-- `data` (then it is saved at once)
+	-- `data` (then it is written on the next step)
 	loaded: (player: any, data: ProfileSchema.Data) -> boolean,
+	-- something changed here that is not in a profile yet (a player who leaves unsaved gets one last look)
+	pending: ((player: any) -> boolean)?,
 	changed: ((player: any, state: State) -> ())?, -- the session's state moved (Boot/Game: an attribute)
 	log: ((line: string) -> ())?,
 	warn: ((line: string) -> ())?,
@@ -59,28 +80,36 @@ export type Deps = {
 type Session = {
 	player: any,
 	id: number,
+	session: string, -- the lock's session id: one per player per server, kept across retries and rejoins
 	state: State,
 	profile: ProfileStore.Profile?,
 	left: boolean,
+	finished: boolean, -- the leave's work is done (released, or handed back when the load came in)
 	loadQueued: boolean,
 	saveQueued: boolean,
+	mayHoldLock: boolean, -- a load failed ambiguously: our lock may be in the record
 	failing: boolean, -- a save failed and has not caught up (the player was told)
+	lastWriteAt: number, -- when the last write of this profile went out (the load included)
 	nextSaveAt: number,
 	nextLoadAt: number,
 	loadDelay: number,
 	told: { [string]: boolean? },
 }
 
-type Queue = { jobs: { () -> () }, running: boolean }
+type Job = { kind: string, run: () -> () }
+type Queue = { jobs: { Job }, running: boolean }
 
 export type Saves = {
 	deps: Deps,
 	profiles: ProfileStore.Store?,
 	sessions: { [number]: Session },
 	queues: { [number]: Queue },
+	closing: boolean,
+	tokens: number,
+	tokensAt: number,
 	join: (self: Saves, player: any) -> (),
 	leave: (self: Saves, player: any) -> (),
-	dirty: (self: Saves, player: any) -> (),
+	dirty: (self: Saves, player: any, purchase: boolean?) -> (),
 	data: (self: Saves, player: any) -> ProfileSchema.Data?,
 	status: (self: Saves, player: any) -> State?,
 	step: (self: Saves, now: number) -> (),
@@ -95,6 +124,9 @@ PlayerSaves.RETRY_FIRST = 15 -- seconds before a failed load is tried again (dou
 PlayerSaves.RETRY_MAX = 240
 PlayerSaves.SAVE_RETRY = 30 -- seconds between tries of a save that failed
 PlayerSaves.CLOSE_SECONDS = 25 -- BindToClose: Roblox gives a closing server 30 s
+PlayerSaves.WRITE_GAP = 6 -- seconds: at most one write of a player's profile this often (changes, purchases)
+PlayerSaves.BUDGET_SHARE = 0.5 -- of the server's UpdateAsync allowance, for saves (loads and releases: the rest)
+PlayerSaves.BURST = 10 -- saves the bucket can hold in hand
 
 PlayerSaves.WORDS = table.freeze({
 	unsaved = "Your saved clothes have not loaded yet. Play on: we keep trying, and nothing you buy is lost.",
@@ -104,6 +136,12 @@ PlayerSaves.WORDS = table.freeze({
 	lost = "Your clothes were opened on another server, so changes made here stay on this server.",
 	corrupt = "Your saved clothes could not be read on this server. They are left as they were.",
 })
+
+-- The DataStore's UpdateAsync allowance for one server a minute, and the share of it saves may use.
+function PlayerSaves.budgetPerMinute(players: number): (number, number)
+	local allowance = 60 + 10 * players
+	return allowance, allowance * PlayerSaves.BUDGET_SHARE
+end
 
 -- An error that means this server can never reach the DataStore (Studio without API access, an unpublished place):
 -- no point retrying.
@@ -159,23 +197,23 @@ local function shout(self: Saves, line: string)
 end
 
 -- one queue per player: jobs run one after another on a spawned thread
-local function enqueue(self: Saves, id: number, job: () -> ())
+local function enqueue(self: Saves, id: number, kind: string, job: () -> ())
 	local q = self.queues[id]
 	if q == nil then
 		q = { jobs = {}, running = false }
 		self.queues[id] = q
 	end
 	local queue = q :: Queue
-	table.insert(queue.jobs, job)
+	table.insert(queue.jobs, { kind = kind, run = job })
 	if queue.running then
 		return
 	end
 	queue.running = true
 	self.deps.spawn(function()
 		while #queue.jobs > 0 do
-			local nextJob = table.remove(queue.jobs, 1) :: () -> ()
+			local nextJob = table.remove(queue.jobs, 1) :: Job
 			local ok, err = pcall(function()
-				nextJob()
+				nextJob.run()
 			end)
 			if not ok then
 				shout(self, `a job for {id} failed: {err}`)
@@ -188,10 +226,30 @@ local function enqueue(self: Saves, id: number, job: () -> ())
 	end)
 end
 
+-- the server-wide bucket of saves: refilled at BUDGET_SHARE of 60 + 10 x players a minute, at most BURST in hand
+local function refill(self: Saves, now: number)
+	local players = 0
+	for _ in self.sessions do
+		players += 1
+	end
+	local _, perMinute = PlayerSaves.budgetPerMinute(players)
+	local elapsed = math.max(0, now - self.tokensAt)
+	self.tokens = math.min(PlayerSaves.BURST, self.tokens + elapsed * perMinute / 60)
+	self.tokensAt = now
+end
+
+local function spend(self: Saves): boolean
+	if self.tokens < 1 then
+		return false
+	end
+	self.tokens -= 1
+	return true
+end
+
 local function saveJob(self: Saves, s: Session)
 	s.saveQueued = false
 	local profile = s.profile
-	if s.state ~= "saved" or profile == nil or s.left then
+	if s.state ~= "saved" or profile == nil or s.left or self.closing then
 		return
 	end
 	local ok, err = profile:save()
@@ -217,24 +275,51 @@ local function saveJob(self: Saves, s: Session)
 	tellOnce(self, s, "slow")
 end
 
-local function queueSave(self: Saves, s: Session)
+-- (the caller has taken a token from the bucket)
+local function queueSave(self: Saves, s: Session, now: number)
 	if s.saveQueued or s.state ~= "saved" then
 		return
 	end
 	s.saveQueued = true
-	enqueue(self, s.id, function()
+	s.lastWriteAt = now
+	enqueue(self, s.id, "save", function()
 		saveJob(self, s)
 	end)
 end
 
+-- Does this held profile want a write now? A failed save on its retry time; else, once its last write is WRITE_GAP
+-- old, a dirty profile or one due its autosave.
+local function wantsSave(self: Saves, s: Session, p: ProfileStore.Profile, now: number): boolean
+	if s.saveQueued then
+		return false
+	end
+	if s.failing then
+		return now >= s.nextSaveAt
+	end
+	if now - s.lastWriteAt < PlayerSaves.WRITE_GAP then
+		return false
+	end
+	local autosave = (self.profiles :: ProfileStore.Store).autosave
+	return p.revision > p.savedRevision or now - p.lastSaveAt >= autosave
+end
+
+-- what was changed here merged into a profile that is about to be released (the player has left)
+local function mergeLeft(self: Saves, s: Session, p: ProfileStore.Profile)
+	local pending = self.deps.pending
+	if pending and pending(s.player) then
+		self.deps.loaded(s.player, p.data)
+		p:markDirty()
+	end
+end
+
 local function loadJob(self: Saves, s: Session)
 	s.loadQueued = false
-	if s.left or (s.state ~= "loading" and s.state ~= "unsaved") then
+	if s.left or self.closing or (s.state ~= "loading" and s.state ~= "unsaved") then
 		return
 	end
 	local store = self.profiles :: ProfileStore.Store
 	local retry = s.state == "unsaved"
-	local profile, status, detail = store:load(profileKey(s.id))
+	local profile, status, detail = store:load(profileKey(s.id), s.session)
 	if profile == nil then
 		if status == "corrupt" then
 			setState(self, s, "corrupt")
@@ -247,6 +332,9 @@ local function loadJob(self: Saves, s: Session)
 			shout(self, `saving is off on this server: {detail}`)
 			return
 		end
+		if status == "error" then
+			s.mayHoldLock = true -- (a write may have landed before the error: our lock, which the next try takes back)
+		end
 		setState(self, s, "unsaved")
 		s.nextLoadAt = self.deps.now() + s.loadDelay
 		shout(self, `{s.id}: the profile did not load ({status}: {detail}); trying again in {s.loadDelay} s`)
@@ -255,7 +343,11 @@ local function loadJob(self: Saves, s: Session)
 		return
 	end
 	local p = profile :: ProfileStore.Profile
+	s.mayHoldLock = false
+	s.lastWriteAt = self.deps.now()
 	if s.left then
+		s.finished = true
+		mergeLeft(self, s, p)
 		p:release() -- they went while it loaded: hand the lock straight back
 		return
 	end
@@ -269,8 +361,7 @@ local function loadJob(self: Saves, s: Session)
 		tellOnce(self, s, "back")
 	end
 	if changed then
-		p:markDirty()
-		queueSave(self, s)
+		p:markDirty() -- (written by step once the load's write is WRITE_GAP old)
 	end
 end
 
@@ -279,12 +370,46 @@ local function queueLoad(self: Saves, s: Session)
 		return
 	end
 	s.loadQueued = true
-	enqueue(self, s.id, function()
+	enqueue(self, s.id, "load", function()
 		loadJob(self, s)
 	end)
 end
 
+-- the player left before their profile loaded: one last look if something here is not saved (no lock waits; a
+-- free lock is taken, the change merged in and the lock handed back), else clear any orphan lock of ours
+local function lastLook(self: Saves, s: Session)
+	local store = self.profiles
+	if store == nil then
+		return
+	end
+	local key = profileKey(s.id)
+	local pending = self.deps.pending
+	if pending and pending(s.player) then
+		local p, status = store:load(key, s.session, 0)
+		if p then
+			mergeLeft(self, s, p)
+			local ok, err = p:release()
+			say(self, `{s.id}: saved on the way out ({if ok then "released" else err})`)
+			return
+		end
+		if status ~= "error" then
+			return -- (locked by another server, or corrupt: nothing of ours is in the record)
+		end
+		s.mayHoldLock = true
+	end
+	if s.mayHoldLock then
+		local ok, err = store:unlock(key, s.session)
+		if not ok then
+			shout(self, `{s.id}: could not clear an unanswered load's lock ({err}); it lapses in its lease`)
+		end
+	end
+end
+
 local function releaseJob(self: Saves, s: Session)
+	if s.finished then
+		return
+	end
+	s.finished = true
 	local profile = s.profile
 	if profile and s.state == "saved" then
 		profile:markDirty()
@@ -292,6 +417,8 @@ local function releaseJob(self: Saves, s: Session)
 		if not ok then
 			shout(self, `{s.id}: release failed ({err}); the lock lapses in its lease`)
 		end
+	elseif s.state == "loading" or s.state == "unsaved" then
+		lastLook(self, s)
 	end
 	s.profile = nil
 end
@@ -310,10 +437,14 @@ function PlayerSaves.new(deps: Deps): Saves
 				backoffSeconds = deps.backoffSeconds,
 				lockWaits = deps.lockWaits,
 				lockWaitSeconds = deps.lockWaitSeconds,
+				fatal = PlayerSaves.offError, -- saving off: no retries, "off" at once
 			})
 			else nil,
 		sessions = {},
 		queues = {},
+		closing = false,
+		tokens = PlayerSaves.BURST,
+		tokensAt = deps.now(),
 	} :: Saves
 	if deps.store == nil then
 		shout(
@@ -325,18 +456,22 @@ function PlayerSaves.new(deps: Deps): Saves
 	function self.join(me: Saves, player: any)
 		local id = keyOf(player)
 		local old = me.sessions[id]
-		if old and not old.left then
+		if (old and not old.left) or me.closing then
 			return
 		end
 		local s: Session = {
 			player = player,
 			id = id,
+			session = `{me.deps.jobId}:{id}`,
 			state = if me.profiles then "loading" else "off",
 			profile = nil,
 			left = false,
+			finished = false,
 			loadQueued = false,
 			saveQueued = false,
+			mayHoldLock = false,
 			failing = false,
+			lastWriteAt = -math.huge,
 			nextSaveAt = 0,
 			nextLoadAt = 0,
 			loadDelay = PlayerSaves.RETRY_FIRST,
@@ -359,16 +494,27 @@ function PlayerSaves.new(deps: Deps): Saves
 		end
 		s.left = true
 		me.sessions[id] = nil
-		enqueue(me, id, function()
+		enqueue(me, id, "release", function()
 			releaseJob(me, s)
 		end)
 	end
 
-	function self.dirty(me: Saves, player: any)
+	-- the profile changed: marked dirty, written by step within WRITE_GAP; a purchase goes at once when the
+	-- player's gap and the server's budget allow
+	function self.dirty(me: Saves, player: any, purchase: boolean?)
 		local s = me.sessions[keyOf(player)]
 		if s and s.state == "saved" and s.profile then
-			(s.profile :: ProfileStore.Profile):markDirty()
-			queueSave(me, s)
+			local p = s.profile :: ProfileStore.Profile
+			p:markDirty()
+			if purchase and not me.closing then
+				local now = me.deps.now()
+				if wantsSave(me, s, p, now) then
+					refill(me, now)
+					if spend(me) then
+						queueSave(me, s, now)
+					end
+				end
+			end
 		end
 	end
 
@@ -386,20 +532,29 @@ function PlayerSaves.new(deps: Deps): Saves
 	end
 
 	function self.step(me: Saves, now: number)
-		local autosave = if me.profiles then me.profiles.autosave else math.huge
+		if me.closing or me.profiles == nil then
+			return
+		end
+		refill(me, now)
+		local due: { Session } = {}
 		for _, s in me.sessions do
 			if s.state == "saved" and s.profile then
-				local p = s.profile :: ProfileStore.Profile
-				if s.failing then
-					if now >= s.nextSaveAt then
-						queueSave(me, s)
-					end
-				elseif now - p.lastSaveAt >= autosave then
-					queueSave(me, s) -- (renews the lease too)
+				if wantsSave(me, s, s.profile :: ProfileStore.Profile, now) then
+					table.insert(due, s)
 				end
 			elseif s.state == "unsaved" and now >= s.nextLoadAt then
 				queueLoad(me, s)
 			end
+		end
+		-- the stalest profile first, while the bucket has tokens; the rest wait for the next step
+		table.sort(due, function(a: Session, b: Session): boolean
+			return a.lastWriteAt < b.lastWriteAt
+		end)
+		for _, s in due do
+			if not spend(me) then
+				break
+			end
+			queueSave(me, s, now)
 		end
 	end
 
@@ -408,6 +563,18 @@ function PlayerSaves.new(deps: Deps): Saves
 	end
 
 	function self.closeAll(me: Saves, timeoutSeconds: number?)
+		me.closing = true
+		if me.profiles then
+			me.profiles.closing = true -- one retry per call, no lock waits, sleeps cut short
+		end
+		-- releases first: queued loads and saves are dropped (each release writes the latest data)
+		for _, q in me.queues do
+			for i = #q.jobs, 1, -1 do
+				if q.jobs[i].kind ~= "release" then
+					table.remove(q.jobs, i)
+				end
+			end
+		end
 		local players = {}
 		for _, s in me.sessions do
 			table.insert(players, s.player)

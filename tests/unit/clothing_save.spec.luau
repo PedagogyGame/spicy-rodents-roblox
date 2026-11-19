@@ -63,6 +63,9 @@ local function server(store: any, jobId: string, now: () -> number, sleep: (numb
 		loaded = function(player: any, data: any): boolean
 			return sv.wardrobe:loaded(player, data)
 		end,
+		pending = function(player: any): boolean
+			return sv.wardrobe:pending(player)
+		end,
 		changed = function(player: any, state: string)
 			sv.attrs[player.UserId] = sv.attrs[player.UserId] or {}
 			sv.attrs[player.UserId].ClothesSaved = state
@@ -155,39 +158,50 @@ return function(t)
 		t.deepEq({ Clothing.wear(e, "kite") }, { false, "not clothing" })
 	end)
 
-	t.test("schema v2: a v1 record keeps its wardrobe and gains an empty worn; v0 still migrates", function()
-		local v1 = {
-			schema = 1,
-			wallet = { cents = 5 },
-			receipts = { ids = {}, byId = {} },
-			wardrobe = { [SHIRT] = true },
-			inventory = {},
-			reputation = 0,
-			stats = {},
-		}
-		local d = ProfileSchema.migrate(v1) :: any
-		t.eq(d.schema, 2)
-		t.deepEq(d.worn, {})
-		t.deepEq(d.wardrobe, { [SHIRT] = true })
-		t.eq(v1.worn, nil, "the raw record is not changed in place")
-		t.eq((ProfileSchema.migrate({ cents = 7 }) :: any).wallet.cents, 7)
-		local bad = ProfileSchema.migrate({ schema = 2, worn = { shirt = 3 } })
-		t.eq(bad, nil)
-	end)
+	t.test(
+		"schema v2: a v1 record keeps its wardrobe and gains an empty worn; nothing without a schema migrates",
+		function()
+			local v1 = {
+				schema = 1,
+				wallet = { cents = 5 },
+				receipts = { ids = {}, byId = {} },
+				wardrobe = { [SHIRT] = true },
+				inventory = {},
+				reputation = 0,
+				stats = {},
+			}
+			local d = ProfileSchema.migrate(v1) :: any
+			t.eq(d.schema, 2)
+			t.deepEq(d.worn, {})
+			t.deepEq(d.wardrobe, { [SHIRT] = true })
+			t.eq(v1.worn, nil, "the raw record is not changed in place")
+			-- there is no v0: nothing wrote the store before v1, so a table without a numeric schema is broken
+			t.eq(ProfileSchema.migrate({ cents = 7 }), nil)
+			t.eq(ProfileSchema.migrate({ schema = 0 }), nil)
+			t.eq(
+				ProfileSchema.migrate(nil),
+				nil,
+				"(a new player is template(), decided by the store: only an absent key)"
+			)
+			local bad = ProfileSchema.migrate({ schema = 2, worn = { shirt = 3 } })
+			t.eq(bad, nil)
+		end
+	)
 
 	t.test("bought on one server, worn on the next; money and other items are not saved", function()
 		local store = MockDataStore.new()
-		local _c, now, sleep = clock()
+		local c, now, sleep = clock()
 		local a = server(store, "A", now, sleep)
 		local ann = { UserId = 11 }
 		a.saves:join(ann)
 		t.eq(a.saves:status(ann), "saved")
 		t.eq(a.attrs[11].ClothesSaved, "saved")
+		c.t += PlayerSaves.WRITE_GAP -- (the load was a write: the next waits its gap)
 		local ok, note = a.wardrobe:give(ann, SHIRT)
 		t.truthy(ok)
 		t.eq(note, nil) -- saved: nothing to add to the shop's words
 		local rec = saved(store, 11)
-		t.deepEq(rec.wardrobe, { [SHIRT] = true }, "written at once, not at the next autosave")
+		t.deepEq(rec.wardrobe, { [SHIRT] = true }, "a purchase is written at once, not at the next autosave")
 		t.deepEq(rec.worn, { shirt = SHIRT })
 		t.eq(a.attrs[11].Clothes, SHIRT)
 		-- nothing else in the record moved from the template (D16 #25: only clothing carries over)
@@ -198,7 +212,12 @@ return function(t)
 			end
 		end
 		a.wardrobe:takeOff(ann, "shirt")
-		t.deepEq(saved(store, 11).worn, {})
+		t.deepEq(saved(store, 11).worn, { shirt = SHIRT }, "a change is only marked")
+		a.saves:step(now())
+		t.deepEq(saved(store, 11).worn, { shirt = SHIRT }, "not before the write gap")
+		c.t += PlayerSaves.WRITE_GAP
+		a.saves:step(now())
+		t.deepEq(saved(store, 11).worn, {}, "written by the step once the gap is up")
 		a.wardrobe:wear(ann, SHIRT)
 		a.wardrobe:leave(ann)
 		a.saves:leave(ann)
@@ -236,6 +255,8 @@ return function(t)
 		b.saves:step(now())
 		t.eq(b.saves:status(bo), "saved")
 		t.truthy(told(b, bo, PlayerSaves.WORDS.back))
+		c.t += PlayerSaves.WRITE_GAP -- (the merged profile is written once the load's write is a gap old)
+		b.saves:step(now())
 		local rec = saved(store, 12)
 		t.deepEq(rec.wardrobe, { [SHIRT] = true, paintball_garb_set = true }, "both servers' clothes")
 		t.deepEq(rec.worn, { shirt = SHIRT, suit = "paintball_garb_set" })
@@ -272,6 +293,7 @@ return function(t)
 		local a = server(store, "A", now, sleep)
 		local di = { UserId = 14 }
 		a.saves:join(di)
+		c.t += PlayerSaves.WRITE_GAP
 		store:fail("error", 3)
 		local ok, note = a.wardrobe:give(di, SHIRT)
 		t.truthy(ok)
@@ -288,6 +310,8 @@ return function(t)
 		-- an ambiguous failure (written, then the reply lost) is safe to write again
 		store:fail("commitThenError", 1)
 		a.wardrobe:takeOff(di, "shirt")
+		c.t += PlayerSaves.WRITE_GAP
+		a.saves:step(now())
 		t.deepEq(saved(store, 14).worn, {})
 	end)
 
@@ -307,6 +331,8 @@ return function(t)
 		b.saves:join(ed)
 		t.eq(b.saves:status(ed), "saved")
 		b.wardrobe:give(ed, SHIRT)
+		c.t += PlayerSaves.WRITE_GAP
+		b.saves:step(now())
 		-- A wakes up and tries to save its own change: refused, told, never written
 		local ok, note = a.wardrobe:give(ed, "paintball_garb_set")
 		t.truthy(ok)
@@ -363,7 +389,7 @@ return function(t)
 
 	t.test("threads: a leave while loading hands the lock back; a rejoin waits for the release", function()
 		local store = MockDataStore.new()
-		local _c, now, sleep = clock()
+		local c, now, sleep = clock()
 		local a = server(store, "A", now, sleep, true)
 		local hu = { UserId = 18 }
 		a.saves:join(hu)
@@ -374,6 +400,9 @@ return function(t)
 		t.eq(note, Wardrobe.WORDS.loading)
 		run(a)
 		t.eq(a.saves:status(hu), "saved")
+		c.t += PlayerSaves.WRITE_GAP
+		a.saves:step(now())
+		run(a)
 		t.deepEq(saved(store, 18).wardrobe, { [SHIRT] = true })
 		-- leave and rejoin before the release has run: one queue, in order
 		a.saves:leave(hu)
@@ -412,7 +441,7 @@ return function(t)
 
 	t.test("the gift shop sells the shirt once through the wallet, then puts it on and takes it off", function()
 		local store = MockDataStore.new()
-		local _c, now, sleep = clock()
+		local c, now, sleep = clock()
 		local a = server(store, "A", now, sleep)
 		local wallet = Credits.new({
 			tell = function(_p: any, _w: string) end,
@@ -423,6 +452,7 @@ return function(t)
 		local species = "human"
 		wallet.join(jo)
 		a.saves:join(jo)
+		c.t += PlayerSaves.WRITE_GAP -- (walking to the desk)
 		local said: { string } = {}
 		local deps: GiftShop.Deps = {
 			wallet = wallet,

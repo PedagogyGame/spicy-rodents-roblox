@@ -9,7 +9,14 @@
 -- every save, and step() autosaves on a period well inside the lease.
 -- Pure apart from the injected store, clock and sleep, so Lune drives it with MockDataStore and a
 -- fake clock; the engine passes DataStoreService:GetDataStore(...), os.time and task.wait.
--- Interface: new(store, opts) -> Store; Store:load(key) -> (Profile?, status, detail?);
+-- Only an absent key is a new player: a record that is there but is not { data = { schema = n, ... } } is
+-- "corrupt" and never written over (nor is a newer schema than this build's).
+-- A caller that loads the same key again after an ambiguous failure (the write committed, the reply was lost)
+-- passes the same session id: its own orphan lock is then taken back at once instead of waited out (PlayerSaves
+-- keeps one id per player per server). Store.closing (the server is shutting down) cuts every retry budget to
+-- CLOSING_RETRIES and ends lock waits and backoff sleeps early, so the releases fit in BindToClose's window.
+-- Interface: new(store, opts) -> Store; Store:load(key, session?, lockWaits?) -> (Profile?, status, detail?);
+--            Store:unlock(key, session) -> (ok, err?) (clears that session's lock, if it is still there);
 --            Store.readOnly(key) -> Profile; Profile:markDirty() -> revision; Profile:save() -> (ok, err?);
 --            Profile:release() -> (ok, err?); Profile:step(now) (autosave + lease renewal);
 --            Profile:isActive() -> boolean
@@ -31,6 +38,8 @@ export type Options = {
 	lockWaits: number?, -- how many times load() waits on another live session before giving up
 	lockWaitSeconds: number?,
 	newSessionId: (() -> string)?,
+	-- an error that will never go away (saving is off on this server): no retry, returned at once
+	fatal: ((err: string) -> boolean)?,
 }
 
 export type Status = "ok" | "stolen" | "locked" | "corrupt" | "error"
@@ -64,7 +73,9 @@ export type Store = {
 	lockWaits: number,
 	lockWait: number,
 	counter: number,
-	load: (self: Store, key: string) -> (Profile?, Status, string?),
+	closing: boolean, -- the server is shutting down: short retries, no lock waits
+	load: (self: Store, key: string, session: string?, lockWaits: number?) -> (Profile?, Status, string?),
+	unlock: (self: Store, key: string, session: string) -> (boolean, string?),
 }
 
 local ProfileStore = {}
@@ -78,20 +89,41 @@ ProfileStore.DEFAULTS = {
 	lockWaitSeconds = 4,
 }
 
--- pcall `fn` up to retries + 1 times with exponential backoff; returns (ok, lastError)
-local function withRetries(self: Store, fn: () -> ()): (boolean, string?)
-	local lastErr: string? = nil
-	for attempt = 1, self.retries + 1 do
+ProfileStore.CLOSING_RETRIES = 1 -- retries per call once the server is shutting down (Store.closing)
+
+-- sleep in steps of at most a second, ending early once the server starts shutting down
+local function pause(self: Store, seconds: number)
+	local left = seconds
+	while left > 0 and not self.closing do
+		local step = math.min(left, 1)
+		self.opts.sleep(step)
+		left -= step
+	end
+end
+
+-- pcall `fn` up to retries + 1 times with exponential backoff (once closing: `closingRetries`, default
+-- CLOSING_RETRIES; none for a fatal error); returns (ok, lastError)
+local function withRetries(self: Store, fn: () -> (), closingRetries: number?): (boolean, string?)
+	local attempt = 0
+	while true do
+		attempt += 1
 		local ok, err = pcall(fn :: any)
 		if ok then
 			return true, nil
 		end
-		lastErr = tostring(err)
-		if attempt <= self.retries then
-			self.opts.sleep(self.backoff * 2 ^ (attempt - 1))
+		local lastErr = tostring(err)
+		local fatal = self.opts.fatal
+		if fatal and fatal(lastErr) then
+			return false, lastErr
 		end
+		local budget = if self.closing
+			then math.min(self.retries, closingRetries or ProfileStore.CLOSING_RETRIES)
+			else self.retries
+		if attempt > budget then
+			return false, lastErr
+		end
+		pause(self, self.backoff * 2 ^ (attempt - 1))
 	end
-	return false, lastErr
 end
 
 local function lockOf(record: any): any
@@ -203,12 +235,14 @@ local function newProfile(owner: Store, key: string, data: ProfileSchema.Data, s
 	}
 end
 
-local function load(self: Store, key: string): (Profile?, Status, string?)
+local function load(self: Store, key: string, sessionId: string?, lockWaits: number?): (Profile?, Status, string?)
 	self.counter += 1
-	local session = if self.opts.newSessionId
-		then self.opts.newSessionId()
-		else `{self.opts.jobId}:{self.counter}:{math.floor(self.opts.now() * 1000)}`
-	for wait = 0, self.lockWaits do
+	local session = sessionId
+		or if self.opts.newSessionId
+			then self.opts.newSessionId()
+			else `{self.opts.jobId}:{self.counter}:{math.floor(self.opts.now() * 1000)}`
+	local waits = lockWaits or self.lockWaits
+	for wait = 0, waits do
 		local outcome: Status = "error"
 		local loaded: ProfileSchema.Data? = nil
 		local detail: string? = nil
@@ -226,7 +260,14 @@ local function load(self: Store, key: string): (Profile?, Status, string?)
 					detail = tostring(lock.jobId)
 					return nil
 				end
-				local data, merr = ProfileSchema.migrate(if type(old) == "table" then old.data else nil)
+				local data: ProfileSchema.Data?, merr: string? = nil, nil
+				if old == nil then
+					data = ProfileSchema.template() -- a new player: only a key never written
+				elseif type(old) ~= "table" or type(old.data) ~= "table" then
+					merr = "not a profile record"
+				else
+					data, merr = ProfileSchema.migrate(old.data)
+				end
 				if data == nil then
 					outcome = "corrupt"
 					detail = merr
@@ -244,13 +285,13 @@ local function load(self: Store, key: string): (Profile?, Status, string?)
 					},
 				}
 			end)
-		end)
+		end, 0) -- (a load is no use once the server is closing: no retry then)
 		if not ok then
 			return nil, "error", err
 		end
 		if outcome == "locked" then
-			if wait < self.lockWaits then
-				self.opts.sleep(self.lockWait)
+			if wait < waits and not self.closing then
+				pause(self, self.lockWait)
 				continue
 			end
 			return nil, "locked", detail
@@ -261,6 +302,23 @@ local function load(self: Store, key: string): (Profile?, Status, string?)
 		return newProfile(self, key, loaded :: ProfileSchema.Data, session), outcome, detail
 	end
 	return nil, "error", "unreachable"
+end
+
+-- Clear `session`'s lock if the record still bears it (a load whose reply was lost left it there): the data is
+-- left exactly as it is. Writes nothing when the lock is anyone else's or gone.
+local function unlock(self: Store, key: string, session: string): (boolean, string?)
+	return withRetries(self, function()
+		self.store:UpdateAsync(key, function(old: any, _info: any): any
+			local lock = lockOf(old)
+			if lock == nil or lock.session ~= session then
+				return nil
+			end
+			return {
+				data = old.data,
+				meta = { lock = nil, writes = writesOf(old) + 1, updatedAt = self.opts.now() },
+			}
+		end)
+	end)
 end
 
 function ProfileStore.new(store: DataStoreLike, opts: Options): Store
@@ -275,7 +333,9 @@ function ProfileStore.new(store: DataStoreLike, opts: Options): Store
 		lockWaits = opts.lockWaits or d.lockWaits,
 		lockWait = opts.lockWaitSeconds or d.lockWaitSeconds,
 		counter = 0,
+		closing = false,
 		load = load,
+		unlock = unlock,
 	}
 end
 

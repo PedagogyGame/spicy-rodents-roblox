@@ -6,16 +6,19 @@
 --               name) and hands it over to the Wardrobe, which puts it on and saves it (owner D16 #25: clothing
 --               carries over between servers). Short of money: the wallet's words, nothing taken.
 --   owned       puts it on, or takes it off if it is on (saved too).
--- Only a person shops (an animal is told so). A second press while one is being served is refused with words.
+-- Only a person shops (an animal is told so). A second press while one is being served is refused with words; a
+-- press within COOLDOWN of the last one is ignored without words (a held E or an autoclicker does nothing more, and
+-- each change is saved by PlayerSaves at most once every few seconds anyway).
 -- The souvenirs (postcard, toy pin, mug) are not sold here yet; they would stay on the server, like every other item.
 -- The prompt is made at boot on the baked desk (no bake change): 1 Attachment and 1 ProximityPrompt, no parts.
 -- Interface: press(deps, player) -> (ok, words) (pure over deps); start(opts) -> Shop? (nil without the desk);
---   ITEM; WORDS
+--   ITEM; WORDS; COOLDOWN
 -- Engine only inside start; no side effects on require.
 
 local GiftShop = {}
 
 GiftShop.ITEM = "alley_shirt"
+GiftShop.COOLDOWN = 0.5 -- seconds between one player's presses that count
 
 GiftShop.WORDS = table.freeze({
 	animal = "Only people shop here.",
@@ -39,6 +42,8 @@ export type Deps = {
 	present: (player: any) -> boolean,
 	tell: (player: any, words: string) -> (),
 	serving: { [any]: boolean }?,
+	now: (() -> number)?, -- a clock for the press cooldown (os.clock); none: no cooldown
+	lastPress: { [any]: number }?,
 }
 
 local function withNote(words: string, extra: string?): string
@@ -61,6 +66,16 @@ function GiftShop.press(d: Deps, player: any): (boolean, string)
 	local serving = d.serving or {}
 	d.serving = serving
 	local key = player.UserId or player
+	if d.now then
+		local t = d.now()
+		local presses = d.lastPress or {}
+		d.lastPress = presses
+		local last = presses[key]
+		if last and t - last < GiftShop.COOLDOWN then
+			return false, GiftShop.WORDS.busy -- (not said: a held E would only flood the screen)
+		end
+		presses[key] = t
+	end
 	if serving[key] then
 		return say(false, GiftShop.WORDS.busy)
 	end
@@ -142,7 +157,12 @@ function GiftShop.start(opts: Opts): Shop?
 		end,
 		tell = opts.tell,
 		serving = {},
+		now = os.clock,
+		lastPress = {},
 	}
+	local gone = Players.PlayerRemoving:Connect(function(player: Player)
+		(deps.lastPress :: { [any]: number })[player.UserId] = nil
+	end)
 	local conn = prompt.Triggered:Connect(function(player: Player)
 		local ok, err = pcall(function()
 			GiftShop.press(deps, player)
@@ -155,6 +175,7 @@ function GiftShop.start(opts: Opts): Shop?
 		prompt = prompt,
 		stop = function()
 			conn:Disconnect()
+			gone:Disconnect()
 			att:Destroy()
 		end,
 	}

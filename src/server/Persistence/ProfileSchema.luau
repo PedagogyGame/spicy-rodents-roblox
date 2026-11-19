@@ -6,7 +6,8 @@
 -- future record is never written over. What the live game writes today is only `wardrobe` and `worn`
 -- (owner D16 #25: clothing carries over, nothing else; Server/Cosmetics/Wardrobe); the other fields keep
 -- whatever the record holds.
--- v2 (19 November): adds `worn`.
+-- v2 (19 November): adds `worn`. There is no v0: nothing wrote the "Profiles" store before v1, so a record without a
+-- numeric `schema` is broken, never a player to start afresh (ProfileStore: only an absent key is a new player).
 -- Interface: VERSION, template() -> Data, migrate(raw) -> (Data?, err?), validate(data) -> (ok, err?)
 
 export type ReceiptEntry = { productId: number, cents: number, at: number, playerId: number }
@@ -85,29 +86,25 @@ function ProfileSchema.validate(data: any): (boolean, string?)
 	return true, nil
 end
 
--- nil (a new player) -> template; schema 0 (the pre-S15 shape { cents = n }) -> v1; v1 -> v2 (nothing
--- worn); a newer schema than this build knows is refused so an old server never truncates a newer record.
+-- A stored profile's data -> the present shape: v1 -> v2 (nothing worn); v2 as it is. Anything else is refused
+-- (nil, why), so it is never written over: no data or no numeric schema (broken), an unknown older schema, and a
+-- newer schema than this build knows (an old server never truncates a newer record). A new player is
+-- template(), not migrate(nil).
 function ProfileSchema.migrate(raw: any): (Data?, string?)
-	if raw == nil then
-		return ProfileSchema.template(), nil
-	end
 	if type(raw) ~= "table" then
-		return nil, "not a table"
+		return nil, if raw == nil then "no data" else "not a table"
 	end
-	local schema = raw.schema or 0
+	local schema = raw.schema
 	if type(schema) ~= "number" then
-		return nil, "bad schema"
+		return nil, "no schema"
 	end
 	if schema > ProfileSchema.VERSION then
 		return nil, `schema {schema} is newer than {ProfileSchema.VERSION}`
 	end
-	local data: any = raw
-	if schema == 0 then
-		local fresh = ProfileSchema.template()
-		fresh.wallet.cents = if isWhole(raw.cents) then raw.cents else 0
-		data = fresh -- (already the present shape)
-		schema = ProfileSchema.VERSION
+	if schema < 1 then
+		return nil, `schema {schema} is not one this game ever wrote`
 	end
+	local data: any = raw
 	if schema == 1 then
 		data = table.clone(data)
 		data.worn = {}

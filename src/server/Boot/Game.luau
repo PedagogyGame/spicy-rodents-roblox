@@ -2155,8 +2155,8 @@ function Game.start(opts: Opts?): any
 	end
 
 	-- 6e. Clothing carries over between servers (owner D16 #25): Persistence/PlayerSaves holds one session-locked
-	-- profile per player in the DataStore PlayerSaves.STORE (loaded on join, saved on a change and every 30 s,
-	-- released on leave and at shutdown), Cosmetics/Wardrobe writes only the clothing into it (what is owned and
+	-- profile per player in the DataStore PlayerSaves.STORE (loaded on join, saved a few seconds after a change and
+	-- every 30 s, within a server-wide write budget, released on leave and at shutdown), Cosmetics/Wardrobe writes only the clothing into it (what is owned and
 	-- what is worn) and puts it on the player's body, Cosmetics/GiftShop sells the alley shirt. Money and every
 	-- other item stay on this server. A DataStore failure never blocks play and never takes back a purchase
 	-- (PlayerSaves: retry, a notice). The player attributes Clothes (what is worn) and ClothesSaved (the save's state)
@@ -2176,7 +2176,10 @@ function Game.start(opts: Opts?): any
 		end
 		saves = PlayerSaves.new({
 			store = store,
-			jobId = if game.JobId ~= "" then game.JobId else "studio",
+			-- (each Studio session its own id: two Studio sessions never take each other's lock for their own)
+			jobId = if game.JobId ~= ""
+				then game.JobId
+				else `studio-{game:GetService("HttpService"):GenerateGUID(false)}`,
 			now = os.time,
 			sleep = function(seconds: number)
 				task.wait(seconds)
@@ -2189,6 +2192,9 @@ function Game.start(opts: Opts?): any
 			end,
 			loaded = function(player: any, profileData: any): boolean
 				return wardrobe ~= nil and wardrobe:loaded(player, profileData)
+			end,
+			pending = function(player: any): boolean
+				return wardrobe ~= nil and wardrobe:pending(player)
 			end,
 			changed = function(player: any, state: string)
 				setAttr(player, "ClothesSaved", state)
@@ -2221,6 +2227,7 @@ function Game.start(opts: Opts?): any
 			table.insert(
 				clothesConns,
 				Players.PlayerAdded:Connect(function(player: Player)
+					wardrobe:join(player)
 					saves:join(player)
 				end)
 			)
