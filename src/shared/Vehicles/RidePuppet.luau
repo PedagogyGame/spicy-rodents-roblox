@@ -19,6 +19,7 @@
 -- ground, the only part that can be queried or touched; every other part is welded to it and collides with nothing.
 -- Only the big parts (the body, the head, the tyres) cast shadows.
 -- Interface: rider(slot, index?) -> PartBuilder.ModelSpec; RIDERS; ROOT_HEIGHT; drawBicycle(kit, opts) -> Anchors;
+--   drawRider(kit, slot, seat, hands, feet, lean, prefix) -> parts drawn;
 --   newKit(ground) -> Kit; bicycle(opts?) -> PartBuilder.ModelSpec (root = the bike's own box, for a parked bike)
 -- Pure. No side effects on require.
 
@@ -440,7 +441,8 @@ local function joints(parts: { Part }, root: string): { PartBuilder.JointSpec }
 end
 
 -- The rider in town slot `slot` (1-8; past 8 the list starts again, recoloured from the palette by `index`).
-function RidePuppet.rider(slot: number, index: number?): PartBuilder.ModelSpec
+-- Who rides in slot `slot` and what they wear (a slot past 8 recoloured from the palette by `index`).
+local function dressFor(slot: number, index: number?): (Rider, PeopleLooks.Dress, number)
 	local n = #RidePuppet.RIDERS
 	local i = math.max(1, math.floor(slot))
 	local r = RidePuppet.RIDERS[(i - 1) % n + 1]
@@ -452,7 +454,34 @@ function RidePuppet.rider(slot: number, index: number?): PartBuilder.ModelSpec
 		skin, shirt = look.skin, look.shirt
 	end
 	shirt = if r.role == "mime" then shirt else RolePalettes.clothed(shirt, skin, who)
-	local dress = PeopleLooks.dress(r.role, who, { skin = skin, shirt = shirt })
+	return r, PeopleLooks.dress(r.role, who, { skin = skin, shirt = shirt }), who
+end
+
+-- drawRider(kit, slot, seat, hands, feet, lean, prefix): slot's rider alone, seated on someone else's ride (a traffic
+-- motorcycle: Traffic/VehiclePuppet), each part's name after `prefix`. Returns how many parts it drew.
+function RidePuppet.drawRider(
+	k: Kit,
+	slot: number,
+	seat: V,
+	hands: { V },
+	feet: { V },
+	lean: number,
+	prefix: string
+): number
+	local r, dress = dressFor(slot)
+	local first = #k.parts + 1
+	drawFigure(k, dress, r, { seat = seat, lean = lean, hands = hands, feet = feet })
+	local drawnParts = {}
+	for i = first, #k.parts do
+		k.parts[i].name = prefix .. k.parts[i].name
+		table.insert(drawnParts, k.parts[i])
+	end
+	shadows(drawnParts)
+	return #k.parts - first + 1
+end
+
+function RidePuppet.rider(slot: number, index: number?): PartBuilder.ModelSpec
+	local r, dress, who = dressFor(slot, index)
 	local k = RidePuppet.newKit(-RidePuppet.ROOT_HEIGHT)
 	put(k, {
 		name = "HumanoidRootPart",

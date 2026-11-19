@@ -16,10 +16,13 @@
 
 local Boxes = require("./Boxes")
 local PartBuilder = require("../Avatar/PartBuilder")
+local RidePuppet = require("../Vehicles/RidePuppet")
 
 -- box: { width, height, length } in place of the kind's Traffic/Boxes box (a player's vehicle, Vehicles/Placeholder:
 -- the VehicleKinds box, which is also its collider)
-export type Opts = { color: string?, name: string?, beacons: boolean?, box: { number }? }
+-- rider: a motorcycle's rider, a Vehicles/RidePuppet slot (Traffic/Ghost: Morgan Rider 7, Alex Rider 8), seated above
+-- the box (a motorcycle is not fatal; without one the motorcycle is drawn riderless, as the placeholders are)
+export type Opts = { color: string?, name: string?, beacons: boolean?, box: { number }?, rider: number? }
 
 local VehiclePuppet = {}
 
@@ -929,6 +932,16 @@ local function shapedSpec(
 	local k = newKit(W, L, H)
 	put(k, { name = "RootPart", size = { W, H, L }, pos = { 0, 0, 0 }, color = color, transparency = 1 })
 	local barZ = build(k, color)
+	if kind == "motorcycle" and o.rider then
+		-- on the seat, hands on the bar ends, feet on the pegs, leaning a little into the bars (named Rider*)
+		local axle = k.hl - 0.83
+		local seat = { 0, 2.05, 0.7 }
+		local hands = { { -(k.hw - 0.08), 2.68, -axle + 0.85 }, { k.hw - 0.08, 2.68, -axle + 0.85 } }
+		local feet = { { -0.42, 0.95, 0.1 }, { 0.42, 0.95, 0.1 } }
+		local rider = RidePuppet.newKit(k.bottom)
+		RidePuppet.drawRider(rider, o.rider, seat, hands, feet, 0.3, "Rider")
+		table.move(rider.parts, 1, #rider.parts, #k.parts + 1, k.parts)
+	end
 	local bar = { { name = "LightBar", sx = -1, color = BEACON_RED } }
 	if beacons then
 		table.insert(

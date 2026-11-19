@@ -581,7 +581,9 @@ function Ghost.render(
 		end
 		local model = models[id]
 		if not model then
-			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}` })
+			-- the fleet's two motorcycles (ids 8 and 11) carry Morgan and Alex (RidePuppet slots 7 and 8)
+			local rider = if k.kind == "motorcycle" then 7 + id % 2 else nil
+			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}`, rider = rider })
 			local built = PartBuilder.instantiate(spec, lib) :: Model
 			Ghost.solidify(built)
 			built.Parent = folder

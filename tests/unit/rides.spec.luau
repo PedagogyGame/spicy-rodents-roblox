@@ -295,4 +295,26 @@ return function(t)
 		t.eq(seen.mower, 1)
 		t.eq(seen.shed, 1)
 	end)
+
+	t.test(
+		"the traffic's motorcycles carry Morgan and Alex; without a rider the motorcycle is drawn as before",
+		function()
+			local bare = VehiclePuppet.spec("motorcycle")
+			for _, slot in { 7, 8 } do
+				local spec = VehiclePuppet.spec("motorcycle", { rider = slot })
+				local p = byName(spec)
+				t.truthy(p.RiderHead and p.RiderHelmet and p.RiderHandL and p.RiderShoeR, `slot {slot}: a rider`)
+				t.truthy(same(p.RiderHelmet.color, PartBuilder.hex(RidePuppet.RIDERS[slot].helmet :: string)))
+				t.truthy(#spec.parts - #bare.parts <= 22, `{#spec.parts - #bare.parts} rider parts`)
+				joinedOnce(t, spec, `motorcycle {slot}`)
+				-- the motorcycle itself is untouched: every part of the bare one, where it was
+				for _, q in bare.parts do
+					t.eq(serde.encode("json", p[q.name]), serde.encode("json", q), `{q.name} unchanged`)
+				end
+				-- the rider sits on the seat, hands at the bar
+				t.near(p.RiderHandL.pos[2], p.Bars.pos[2], 0.01, "hands on the bar")
+				t.truthy(p.RiderPelvis.pos[2] > p.Seat.pos[2], "on the seat")
+			end
+		end
+	)
 end
