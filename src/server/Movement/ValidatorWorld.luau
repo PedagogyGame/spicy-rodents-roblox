@@ -38,7 +38,8 @@
 --   stops(kind, name, parentName) -> boolean (the one rule: does a ray of `kind` "wall" | "floor" | "cover" stop at a
 --   colliding part of that name under that parent);
 --   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
---   maxChord (the world's: C.MAX_CHORD); landable(down) ->
+--   maxChord (the world's: C.MAX_CHORD); floorUnder(down) -> (x, y, z, depth) -> number? (the first floor's height under
+--   feet at y); landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray, cover: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
 -- Ray: (ox, oy, oz, dx, dy, dz) -> boolean, true when the segment origin -> origin + d meets a solid.
@@ -86,6 +87,9 @@ ValidatorWorld.C = table.freeze({
 	-- line let a second wall cleared over its top into a roofed house go unasked). A line within the chord bound meets
 	-- two or three; a further one cleared over its top is a crossing. Cost: (COVER_RAYS + 1 + 3) rays each
 	COVER_WALLS = 3,
+	-- floorUnder's bisection: the most rays, and the height it stops at
+	FLOOR_RAYS = 14,
+	FLOOR_STEP = 0.05,
 })
 local C = ValidatorWorld.C
 
@@ -307,6 +311,30 @@ function ValidatorWorld.landable(down: Ray): (number, number, number, number) ->
 	end
 end
 
+-- floorUnder(down)(x, y, z, depth) -> number?: the height of the first floor under feet at y within `depth` (nil: none),
+-- to C.FLOOR_STEP by bisection over the down ray (at most C.FLOOR_RAYS rays: a Reset's target, rate-limited)
+function ValidatorWorld.floorUnder(down: Ray): (number, number, number, number) -> number?
+	return function(x: number, y: number, z: number, depth: number): number?
+		local top = y + 0.1
+		if not down(x, top, z, 0, -(depth + 0.1), 0) then
+			return nil
+		end
+		local lo, hi = 0, depth + 0.1 -- (no floor within lo under top; one within hi)
+		for _ = 1, C.FLOOR_RAYS do
+			if hi - lo <= C.FLOOR_STEP then
+				break
+			end
+			local mid = (lo + hi) / 2
+			if down(x, top, z, 0, -mid, 0) then
+				hi = mid
+			else
+				lo = mid
+			end
+		end
+		return top - hi
+	end
+end
+
 -- The car boxes the rays meet (Traffic/Solid sets; exported types do not cross Import)
 export type Cars = { walls: any, floors: any }
 
@@ -356,6 +384,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 			end
 			else nil,
 		landable = if down then ValidatorWorld.landable(down) else nil,
+		floorUnder = if down then ValidatorWorld.floorUnder(down) else nil,
 		maxChord = C.MAX_CHORD, -- (the longest line `crosses` judges; a longer one is crossesLong's)
 	}
 end

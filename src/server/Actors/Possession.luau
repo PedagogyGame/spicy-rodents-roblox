@@ -61,8 +61,12 @@ export type Deps = {
 	-- After recover moved a held body (x, y, z: the pivot it was put at): Movement/MovementService.teleported, so
 	-- the squirrel validator takes the new place as its baseline instead of snapping the body back from it.
 	onTeleport: ((actor: Actor, x: number, y: number, z: number, why: string) -> ())?,
-	-- Recovery target for a body (default: where it stands, lifted 3 studs).
-	safePose: ((actor: Actor) -> (number, number, number, number))?,
+	-- Recovery target for a body (default: where it stands, lifted 3 studs); nil: none known, the body is not moved.
+	safePose: ((actor: Actor) -> (number?, number?, number?, number?))?,
+	-- The place the server holds for a player-held body (its pivot; Movement/MovementService.heldPlace for a squirrel, its
+	-- feet raised by HipHeight), nil when it holds none (a kind it does not validate). Invariant D (validator round 8): a
+	-- release takes the body there, never at the root its client writes (default: the pose, as before)
+	heldPose: ((actor: Actor) -> (number?, number?, number?))?,
 	recoverEvery: number?, -- seconds between two recovers a player may ask for (default RECOVER_EVERY)
 }
 
@@ -184,9 +188,17 @@ function Possession.new(deps: Deps): Service
 			return nil
 		end
 		local actor = deps.actors:get(actorId) :: Actor
-		-- last validated state: the body's pose as the server holds it (W1: MoveValidator's last
-		-- accepted state, which the client cannot push past the validator)
-		local x, y, z = deps.actors:poseOf(actor)
+		-- last validated state: the place the server holds for the body (MovementService.heldPlace: the last packet the
+		-- validator accepted, else where the server put it), never its root, which the client writes between the
+		-- server's watches (validator round 7: a root written 600 st off, a swap and a retake moved the body there)
+		local x, y, z, yaw = deps.actors:poseOf(actor)
+		local held = false
+		if deps.heldPose then
+			local hx, hy, hz = deps.heldPose(actor)
+			if hx and hy and hz then
+				x, y, z, held = hx, hy, hz, true
+			end
+		end
 		local ok, err = pcall(function()
 			if player.Character == actor.body then
 				engine.setCharacter(player, nil)
@@ -195,6 +207,10 @@ function Possession.new(deps: Deps): Service
 		end)
 		self.owners[actorId] = nil
 		deps.actors:setBodyMode(actor, "ai", nil)
+		if held then
+			-- (the body itself there at once: the gate of whoever takes it next reads the pose, before the AI's first step)
+			pcall(engine.teleport, actor.body, x, y, z, yaw)
+		end
 		engine.markDriver(actor.body, 0)
 		actor.driver = nil
 		actor.releasedAt = engine.now()
@@ -355,7 +371,10 @@ function Possession.new(deps: Deps): Service
 			x, y, z, yaw = deps.actors:poseOf(actor)
 			y += 3
 		end
-		engine.teleport(actor.body, x, y, z, yaw)
+		if not (x and y and z) then
+			return false -- (no place known to put it: left where it is)
+		end
+		engine.teleport(actor.body, x, y, z, yaw or 0)
 		if deps.onTeleport then
 			deps.onTeleport(actor, x, y, z, "reset")
 		end

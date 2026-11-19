@@ -53,7 +53,8 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
+--   M:epochOf(actorId) -> number; M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
+--   -> (x, y, z)? (THE place the server holds for a held squirrel: invariant D); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
 --   number?; M:clickNew(actorId, seq) -> boolean (a click's number not taken yet: the first copy of a click to arrive,
 --   the Duel remote's or a motor packet's (verdict.click), is the one taken); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:paceOf(actorId) -> number? (read
@@ -201,6 +202,7 @@ export type Movement = {
 	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
 	safeTarget: (self: Movement, actorId: any) -> (number?, number?, number?),
+	heldPlace: (self: Movement, actorId: any) -> (number?, number?, number?),
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
 	clickNew: (self: Movement, actorId: any, seq: any) -> boolean,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
@@ -267,6 +269,7 @@ MovementService.C = table.freeze({
 	CROSSINGS_MAX = 4, -- unexplained crossings kept at once (a fifth is a wall at once)
 	RAILS_TRIED = 8, -- rail packets a new crossing is tried against (the newest)
 	RIVER_ROOT_RISE = 1, -- studs: the root on the quay ahead of the packet, this near the quay's height (a step on)
+	FLOOR_SEARCH = 200, -- studs: how far under a held place with no floor a Reset looks for one (safeTarget)
 })
 local C = MovementService.C
 
@@ -794,26 +797,58 @@ function MovementService.new(deps: Deps): Movement
 	-- the river it is in (Recovery.riverFall), else the newest place a clean grounded packet stood on a floor at least 4
 	-- st across from there (Recovery.unstick), else the newest such place, else that place itself; the feet on the
 	-- floor, no lift over it. nil: the server holds no place of the body
+	-- (validator round 8: with no safe sample, the held place itself only when a floor is under it; else the first
+	-- floor below it, the server's own ray: a body taken on a wire and never stood on a floor is not left stuck there)
 	function m.safeTarget(self: Movement, actorId: any): (number?, number?, number?)
 		local sq = self.squirrels[actorId]
 		if sq == nil then
 			return nil, nil, nil
 		end
-		local last: Gate? = if sq.placed then { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = 0 } else nil
-		local held: Gate? = if sq.lastAt then last else sq.gate or sq.pinAt or last
-		if held == nil then
+		local hx, hy, hz = self:heldPlace(actorId)
+		if not (hx and hy and hz) then
 			return nil, nil, nil
 		end
-		local h = held :: Gate
-		local qx, qy, qz = Recovery.riverFall(h.x, h.y, h.z)
+		local qx, qy, qz = Recovery.riverFall(hx, hy, hz)
 		if qx and qy and qz then
 			return qx, qy, qz
 		end
-		local s = Recovery.unstick(sq.safe, h.x, h.y, h.z) or Recovery.safePos(sq.safe)
+		local s = Recovery.unstick(sq.safe, hx, hy, hz) or Recovery.safePos(sq.safe)
 		if s then
 			return s.x, s.y, s.z
 		end
-		return h.x, h.y, h.z
+		local validator = self.deps.validator
+		local world = if validator then validator.world else nil
+		if world and world.floorNear and not world.floorNear(hx, hy, hz) and world.floorUnder then
+			local fy = world.floorUnder(hx, hy, hz, C.FLOOR_SEARCH)
+			if fy then
+				return hx, fy, hz
+			end
+		end
+		return hx, hy, hz
+	end
+
+	-- heldPlace(actorId) -> (x, y, z)? (feet): THE place the server holds for a player-held squirrel-family body, the one
+	-- accessor every server system reads to decide anything about it (invariant D, validator round 8: where to move it,
+	-- release it, knock it, seat it, judge a bite or a blow, count it in an area): the last packet the validator accepted
+	-- this epoch, else the gate (where the server put the body: a snap, a teleport, a hand-off), else where it keeps a
+	-- pinned body, else the last accepted packet. Never the root its client writes (the watch alone reads that, to judge
+	-- it). nil: no place held (not a body the validator watches)
+	function m.heldPlace(self: Movement, actorId: any): (number?, number?, number?)
+		local sq = self.squirrels[actorId]
+		if sq == nil then
+			return nil, nil, nil
+		end
+		if sq.lastAt then
+			return sq.lastX, sq.lastY, sq.lastZ
+		end
+		local g = sq.gate or sq.pinAt
+		if g then
+			return g.x, g.y, g.z
+		end
+		if sq.placed then
+			return sq.lastX, sq.lastY, sq.lastZ
+		end
+		return nil, nil, nil
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number

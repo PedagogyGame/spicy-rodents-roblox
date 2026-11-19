@@ -13,7 +13,8 @@
 -- The one call Main.server needs: ActorsRuntime.start({}) (after WorldBoot). The S2 test place keeps
 -- its own harness.
 -- Interface: start(opts) -> Runtime { world, actors, possession, roles, devices, pickBody(player, rung),
---   become(player, species, variant?) -> (ok, reason), stop() }; speciesForRung(rung); AI_ONLY;
+--   become(player, species, variant?) -> (ok, reason), placeOf(actor) -> (x, y, z) (the body's pivot as the server holds
+--   it: invariant D), stop() }; speciesForRung(rung); AI_ONLY;
 --   pickFree(actors, free, species, variant?, near?) -> town actor? (pure)
 -- Engine only inside the functions. No side effects on require.
 
@@ -51,6 +52,7 @@ export type Runtime = {
 	bodies: Folder,
 	byTownId: { [number]: any },
 	pickBody: (player: any, rung: string?) -> any?,
+	placeOf: (actor: any) -> (number, number, number),
 	become: (player: any, species: string, variant: string?) -> (boolean, string?),
 	step: (dt: number) -> (),
 	stop: () -> (),
@@ -178,7 +180,47 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	end
 
 	local movement = opts.movement
+	local function isSquirrelFamily(actor: any): boolean
+		return actor.species == "squirrel" or actor.species == "rodent"
+	end
+	local function hipOf(actor: any): number
+		local okH, hip = pcall(function()
+			return actor.body:GetAttribute("HipHeight")
+		end)
+		return if okH and type(hip) == "number" then hip else 0
+	end
+	-- heldPose(actor): a player-held squirrel's place as the server holds it (Movement/MovementService.heldPlace, the
+	-- feet raised by HipHeight to the pivot); nil for any other body, or none held
+	local function heldPose(actor: any): (number?, number?, number?)
+		if movement and movement.heldPlace and isSquirrelFamily(actor) then
+			local x, y, z = movement:heldPlace(actor.id)
+			if x and y and z then
+				return x, y + hipOf(actor), z
+			end
+		end
+		return nil, nil, nil
+	end
+	-- placeOf(actor) -> (x, y, z): the body's pivot as the server holds it (invariant D, validator round 8): a
+	-- player-held squirrel at its held place (heldPose), else where the world record has it (never its root, which its
+	-- client writes); every other body at its pivot (an AI body's is the server's own BulkMoveTo; a held person's is
+	-- not validated: Movement/MovementService's generic kinds are log-only)
+	local function placeOf(actor: any): (number, number, number)
+		if actor.mode ~= "ai" and isSquirrelFamily(actor) then
+			local x, y, z = heldPose(actor)
+			if x and y and z then
+				return x, y, z
+			end
+			local tid = townIdOf[actor.id]
+			local a = if tid then world.actorsById[tid] else nil
+			if a then
+				return a.x, a.y - a.hip + offsets[tid], a.z
+			end
+		end
+		local x, y, z = actors:poseOf(actor)
+		return x, y, z
+	end
 	local possession = Possession.new({
+		heldPose = heldPose,
 		actors = actors,
 		engine = opts.engine,
 		onGranted = function(player: any, payload: any)
@@ -210,7 +252,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 				movement:teleported(actor.id, x, feet, z, why, workspace:GetServerTimeNow())
 			end
 		end,
-		safePose = function(actor: any): (number, number, number, number)
+		safePose = function(actor: any): (number?, number?, number?, number?)
 			local x, y, z, yaw = actors:poseOf(actor)
 			local okH, hip = pcall(function()
 				return actor.body:GetAttribute("HipHeight")
@@ -224,7 +266,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 				if fx and fy and fz then
 					return fx, fy + lift, fz, yaw
 				end
-				return x, y, z, yaw -- (no place the server holds: left where it is, no lift)
+				return nil, nil, nil, nil -- (no place the server holds: not moved; never to the root its client writes)
 			end
 			local h = history[actor.id]
 			local rx, ry, rz = x, y + 3, z
@@ -257,7 +299,8 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		local near: Vector3? = nil
 		local current = possession:actorOf(player)
 		if current then
-			near = (current.body :: Model):GetPivot().Position
+			local x, y, z = placeOf(current) -- (invariant D: never the root a held squirrel's client writes)
+			near = Vector3.new(x, y, z)
 		end
 		return freeOf(species, variant, near)
 	end
@@ -333,11 +376,37 @@ function ActorsRuntime.start(opts: Opts): Runtime
 						body:SetAttribute("Task", a.task)
 					end
 				end
+			elseif isSquirrelFamily(actor) then
+				-- a held squirrel feeds the AI world from the place the server holds (invariant D, validator round 8:
+				-- perception, traffic, the duel, the lounge's guards, the overhead watch all read this record; its root is
+				-- its client's to write between the watches): MovementService.heldPlace, and the pace of its accepted
+				-- packets; the brain stays suspended. Its Reset is the validator's (MovementService.safeTarget), and the
+				-- river its client's motor and the validator's riverEntry; a held place in the water is recovered here
+				local hx, hy, hz = heldPose(actor)
+				if hx and hy and hz then
+					a.x, a.z = hx, hz
+					a.y = hy - offsets[a.id] + a.hip
+					local shot, at = nil, nil
+					if movement and movement.motorOf then
+						shot, at = movement:motorOf(actor.id)
+					end
+					local fresh = shot and at and workspace:GetServerTimeNow() - at < 0.5
+					local vx = if fresh and type(shot.vx) == "number" then shot.vx else 0
+					local vz = if fresh and type(shot.vz) == "number" then shot.vz else 0
+					a.speed = math.sqrt(vx * vx + vz * vz)
+					local feet = hy - hipOf(actor)
+					if Recovery.riverFall(hx, feet, hz) or not Recovery.isSane(hx, feet, hz) then
+						local driver = possession:controllerOf(actor)
+						if driver ~= "ai" then
+							possession:recover(driver)
+						end
+					end
+				end
 			else
 				local r = roots[a.id]
 				local p = r.Position
-				-- the held body's pose feeds the AI world (perception: people spot and flee a held
-				-- rodent; traffic yields to and sweeps held squirrels); the brain stays suspended
+				-- a held person's (or deer's, or fox's) pose feeds the AI world (not validated: the generic kinds are
+				-- log-only); the brain stays suspended
 				local v = r.AssemblyLinearVelocity
 				a.x, a.z = p.X, p.Z
 				a.y = p.Y - offsets[a.id] + a.hip
@@ -374,10 +443,10 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	TownAI.setFocus(world, function()
 		local out = {}
 		for _, p in Players:GetPlayers() do
-			local c = p.Character
-			if c then
-				local pos = c:GetPivot().Position
-				table.insert(out, { x = pos.X, z = pos.Z })
+			local held = possession:actorOf(p)
+			if held then
+				local x, _, z = placeOf(held) -- (invariant D)
+				table.insert(out, { x = x, z = z })
 			end
 		end
 		return out
@@ -430,6 +499,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		bodies = bodies :: Folder,
 		byTownId = byTownId,
 		pickBody = pickBody,
+		placeOf = placeOf,
 		become = become,
 		step = step,
 		stop = function()

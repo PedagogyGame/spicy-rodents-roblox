@@ -385,9 +385,15 @@ function ItemWorld.start(opts: StartOpts): World
 				local p = playerOfTown(a.id)
 				local px, py, pz = a.x, a.y, a.z
 				if p then
-					local root = rootOf(p)
-					if root then
-						px, py, pz = root.Position.X, root.Position.Y, root.Position.Z
+					local held = actorOf(p)
+					if held and rt and rt.placeOf and (held.species == "squirrel" or held.species == "rodent") then
+						-- (a held squirrel where the server holds it, never the root its client writes: invariant D)
+						px, py, pz = rt.placeOf(held)
+					else
+						local root = rootOf(p)
+						if root then
+							px, py, pz = root.Position.X, root.Position.Y, root.Position.Z
+						end
 					end
 				end
 				table.insert(out, { kind = kind, id = a.id, x = px, y = py, z = pz, player = p })
