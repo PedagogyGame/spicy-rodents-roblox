@@ -17,7 +17,7 @@
 --   * idle: the attract show (Pinball/Attract: the lamp figures and the backglass pages, a pure function of the
 --     shared clock, so every screen shows the same), the best scores (the cabinet's "Best" attribute, which
 --     the server writes) and the flippers at rest.
--- Sounds are named cue points (MinigameSounds "pinball.<variant>.<cue>", one set per machine, no asset ids yet)
+-- Sounds are named cue points (MinigameSounds "pinball.<variant>.<cue>", one set per machine: Roblox's own pinball set)
 -- fired as the drawing passes them; a bumper's cap and a slingshot's rubber flash when they fire. The player's
 -- own machine is heard flat; anyone else's from the cabinet, quieter with distance (HEAR_NEAR, HEAR_FAR). A hit
 -- is as loud as it was hard (loudness), and each pop bumper rings at its own pitch.
@@ -29,8 +29,8 @@
 --   retire(cab, msg) (a seat that has gone, from a tick on); rebase(cab); idle(cab); over(cab, msg);
 --   show(cab, frame, dt?) (the controller's live frames); cue(cab, cue, a, b) (one cue: its sound and its flash);
 --   loudness(cue, a, b) -> (volume, pitch); hearFrom(cab) -> Instance? (nil: flat, the player's own);
---   hear(cab, name, volume, pitch); CUE_NAMES; cueName(variant, cue) -> string; SOUNDS (every cue name, for the
---   game's sounds); step(dt) (the render step; specs call it); reset() (specs); awake() -> number; DELAY;
+--   hear(cab, name, volume, pitch); CUE_NAMES; cueName(variant, cue) -> string; IDS (cue -> its sound);
+--   SOUNDS (every cue name, for the game's sounds); step(dt) (the render step; specs call it); reset() (specs); awake() -> number; DELAY;
 --   CHUNK; SLEEP; BIND; KEEP; HEAR_NEAR; HEAR_FAR; IMPACT_MIN; BUMPER_PITCH; reach(dt) (the Stepped step: the
 --   hands of whoever plays, on the buttons; specs call it); handTargets(cab, frame) -> (left, right); GRIP_NEAR;
 --   GRIP_LOOK; GRIP_EASE
@@ -84,13 +84,50 @@ end
 function Cabinet.cueName(variant: string, cue: number): string
 	return `pinball.{variant}.{Cabinet.CUE_NAMES[cue] or tostring(cue)}`
 end
--- every sound this game may ask for, one set per machine (asset ids all empty for now)
+-- each cue's sound: Roblox's own pinball set ("Audio/Roblox_Pinball_...", made by Roblox for every experience;
+-- docs/AUDIO_BUDGET.md "Pinball"), the same on the three machines; nothing uploaded
+Cabinet.IDS = table.freeze({
+	flip_up = "rbxassetid://16480564862", -- Flipper Up 01
+	flip_down = "rbxassetid://16480567211", -- Flipper Down 01
+	flipper_hit = "rbxassetid://16480567946", -- Bumper Weighted Click 01 (the ball off a flipper)
+	wall = "rbxassetid://16480568611", -- Bumper Soft Click 02
+	post = "rbxassetid://16480568821", -- Bumper Soft Click 01
+	bumper = "rbxassetid://16480574637", -- Bumper Full 01 (each bumper at its own pitch)
+	sling = "rbxassetid://16480569302", -- Bumper Mecanical Air 02
+	standup = "rbxassetid://16480567747", -- Bumper Weighted Click 03
+	drop = "rbxassetid://16480555593", -- Modern Machine Mechanics 01 (a drop target going down)
+	rollover = "rbxassetid://16480550292", -- Tiny Button Press 01
+	spin = "rbxassetid://16480553171", -- Small Button Press 05 (one turn of the spinner)
+	saucer = "rbxassetid://16480560857", -- Giant Button Press 01 (the ball caught)
+	eject = "rbxassetid://16480569639", -- Bumper Mecanical Air 03
+	ramp_in = "rbxassetid://16480576404", -- Ball Plastic Slide 01
+	ramp_out = "rbxassetid://16480576087", -- Ball Plastic Slide 04
+	balls_click = "rbxassetid://16480551554", -- Small Metal Click 01
+	drain = "rbxassetid://16480555243", -- Modern Machine Mechanics 03
+	plunge = "rbxassetid://16480558943", -- Joystick Buzz Release 01 (the spring let go)
+	save = "rbxassetid://16480578169", -- 8Bit Riser 01
+	bonus_tick = "rbxassetid://16480580213", -- 8Bit Blip 01
+	tilt_warn = "rbxassetid://16480560696", -- Giant Button Press 02
+	tilt = "rbxassetid://16480555445", -- Modern Machine Mechanics 02
+	ball_start = "rbxassetid://16480551414", -- Startup Mechanical 01
+	ball_end = "rbxassetid://16480575731", -- Big Metal Tally 02
+	extra_ball = "rbxassetid://16480578036", -- 8Bit Riser 02
+	game_over = "rbxassetid://16480567382", -- Endgame Tally 01
+	say = "rbxassetid://16480579431", -- 8Bit Blip 05 (a callout on the display)
+	nudge = "rbxassetid://16480557599", -- Joystick Slam 01
+	search = "rbxassetid://16480563821", -- Gameplay Actions 01 (the ball search firing the coils)
+	reset_drops = "rbxassetid://16480551277", -- Startup Mechanical 02
+	jingle = "rbxassetid://16480577565", -- 8Bit Riser 04 (a goal made)
+	gate = "rbxassetid://16480550090", -- Tiny Button Press 02
+	reel = "rbxassetid://16480575322", -- Big Metal Tally 03 (ACORN ATTACK's score reels)
+}) :: { [string]: string }
+-- every sound this game may ask for, one set per machine
 Cabinet.SOUNDS = {} :: { [string]: string }
 for variant in Tables.VARIANTS do
-	for code in Cabinet.CUE_NAMES do
-		Cabinet.SOUNDS[Cabinet.cueName(variant, code)] = ""
+	for code, name in Cabinet.CUE_NAMES do
+		Cabinet.SOUNDS[Cabinet.cueName(variant, code)] = Cabinet.IDS[name] or ""
 	end
-	Cabinet.SOUNDS[`pinball.{variant}.reel`] = "" -- ACORN ATTACK's score reels clacking round
+	Cabinet.SOUNDS[`pinball.{variant}.reel`] = Cabinet.IDS.reel -- ACORN ATTACK's score reels clacking round
 end
 
 -- how loud each cue is (0..1); a cue not listed is 0.5

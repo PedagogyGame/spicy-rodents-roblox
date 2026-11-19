@@ -270,15 +270,21 @@ return function(t)
 		t.truthy((per["sewer.bowllane sewer.drip"] or 0) >= 20, "Bowl Lane drips along its length")
 	end)
 
-	t.test("every cue is named in docs/AUDIO_BUDGET.md and none has a sound yet (nothing uploaded)", function()
+	t.test("every cue is named in docs/AUDIO_BUDGET.md and has a library sound and a volume (none silent)", function()
 		local doc = fs.readFile("docs/AUDIO_BUDGET.md")
 		local n = 0
 		for cue, id in SewerAmbience.CUES do
 			n += 1
-			t.eq(id, "", `{cue}: no asset id yet`)
+			t.truthy(string.match(id, "^rbxassetid://%d+$") ~= nil, `{cue}: a library asset id`)
+			t.truthy(string.find(doc, id, 1, true) ~= nil, `{cue}'s id is recorded in docs/AUDIO_BUDGET.md`)
+			local v = SewerAmbience.VOLUME[cue]
+			t.truthy(type(v) == "number" and v > 0 and v <= 1, `{cue}: a volume`)
 			t.truthy(string.find(doc, "`" .. cue .. "`", 1, true) ~= nil, `{cue} is in docs/AUDIO_BUDGET.md`)
 		end
 		t.eq(n, 11)
+		-- the per-stride and per-stud cues are kept under the one-off ones
+		t.truthy(SewerAmbience.VOLUME["sewer.footEcho"] < SewerAmbience.VOLUME["sewer.grateIn"])
+		t.truthy(SewerAmbience.VOLUME["sewer.rung"] < SewerAmbience.VOLUME["sewer.grateIn"])
 	end)
 
 	t.test("the look: nothing at all outside, darker, cooler and closer inside, never black", function()

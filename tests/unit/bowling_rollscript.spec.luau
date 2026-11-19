@@ -5,6 +5,7 @@
 -- refused before it could be played.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local BallPath = require("@shared/Minigames/Bowling/BallPath")
+local LaneCycle = require("@shared/Minigames/Bowling/LaneCycle")
 local PinModel = require("@shared/Minigames/Bowling/PinModel")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
 local Rng = require("@shared/Util/Rng")
@@ -230,11 +231,14 @@ return function(t)
 		t.eq(j.params.angle, BallPath.RANGES.angle)
 	end)
 
-	t.test("cues: release first, a clatter per pin contact in time order, the pit last", function()
+	t.test("cues: release first, a clatter per pin contact in time order, the pit, then the sweep", function()
 		local s = RollScript.build(POCKET, PinModel.fullRack(), 3)
 		local cues = RollScript.cues(s)
 		t.eq(cues[1][2], "release")
-		t.eq(cues[#cues][2], "pit")
+		t.eq(cues[#cues - 1][2], "pit")
+		t.eq(cues[#cues][2], "sweep")
+		-- the sweep when the server's pinsetter bar comes down: counted SETTLE after the end, then PAUSE
+		t.near(cues[#cues][1], s.tEnd + LaneCycle.SETTLE + LaneCycle.PAUSE, 1e-9)
 		local pins = 0
 		for i, c in cues do
 			if i > 1 then
