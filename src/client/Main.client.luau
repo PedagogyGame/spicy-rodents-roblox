@@ -55,6 +55,7 @@ local SewerArt = require("./World/SewerArt")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
 local SneakMeter = require("./UI/SneakMeter")
+local NutMeter = require("./UI/NutMeter")
 local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
@@ -130,6 +131,11 @@ end
 local sneakOk, sneakErr = pcall(SneakMeter.start)
 if not sneakOk then
 	warn(`Client: SneakMeter failed: {sneakErr}`)
+end
+-- the squirrel's nuts: carried, and the hollow tree it holds (the server's Foraging/ForageService and HollowService)
+local nutOk, nutErr = pcall(NutMeter.start)
+if not nutOk then
+	warn(`Client: NutMeter failed: {nutErr}`)
 end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()

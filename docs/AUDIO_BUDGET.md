@@ -178,3 +178,8 @@ Every cue is a Sound named after it, played at the body (Boot/Game). All should 
 | `Duel.Batted` | a bite batted away (at the person) | a slap and a yelp |
 | `Duel.Squareup` | someone squares up to the rodent (a vigilante, or the scene turning on it; at the person) | a short grunt, "Hey!" |
 | `Duel.Shout` | someone on the scene of a bite backs off (at the person) | a short shout, no words needed |
+
+### Nuts (`src/client/UI/NutMeter.luau`, `PICK_SOUND`; branch `feat/nuts`; nothing uploaded)
+| Cue | When it fires | Now | Wanted |
+|---|---|---|---|
+| `Nuts.Pick` | the player's own squirrel picks a nut up (heard by that player only, quiet) | a stand-in: Flashlight Switch 13 (ProSoundEffects, 9114481274, the store's click), played a little higher | a small wooden tap or a nut rolled in a paw; a library pick replaces the stand-in in one line |
