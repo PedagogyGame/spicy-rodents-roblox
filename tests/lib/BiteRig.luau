@@ -217,6 +217,9 @@ function BiteRig.new(opts: Options?): any
 			rig.combat.opts.overhead = function(person: number, rodent: number): boolean
 				return rig.overhead:spotted(person, rodent)
 			end
+			rig.combat.opts.under = function(person: number, rodent: number): (number?, number?)
+				return rig.overhead:spotUnder(person, rodent)
+			end
 		end
 	end
 	local people = {}

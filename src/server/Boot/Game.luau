@@ -1600,6 +1600,7 @@ function Game.start(opts: Opts?): any
 				overhead = nil
 				if combat then
 					combat.opts.overhead = nil
+					combat.opts.under = nil
 				end
 			end
 		end
@@ -1868,6 +1869,12 @@ function Game.start(opts: Opts?): any
 		if combat then
 			combat.opts.overhead = function(person: number, rodent: number): boolean
 				return overhead ~= nil and overhead:spotted(person, rodent)
+			end
+			combat.opts.under = function(person: number, rodent: number): (number?, number?)
+				if overhead == nil then
+					return nil, nil
+				end
+				return overhead:spotUnder(person, rodent)
 			end
 		end
 	end)

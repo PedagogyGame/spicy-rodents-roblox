@@ -47,7 +47,8 @@
 -- the town's people (one set per person) and a few people near it rated, a building check each. stats().lastMs, peakMs
 -- and busyMs say what the ticks took (tests/unit/overhead_service.spec.luau holds them under a budget with 60+ people).
 -- Interface: TICK; C; EYE_OVER_ROOT; ABOVE; CANOPY; TOP; new(opts) -> Service; :step(dt); :spotted(personId, squirrelId) ->
---   boolean; :stageOf(personId) -> string; :overhead() -> { [id]: Overhead } (last tick's); :stats(); :stop()
+--   boolean; :stageOf(personId) -> string; spotFor(self, person, squirrel, mode) -> (x, z)?; :spotUnder(personId,
+--   squirrelId) -> (x, z)?; walkTo(self, id, x, z, faceX, faceZ, secs, speed) -> boolean (the one way it sends anyone); :overhead() -> { [id]: Overhead } (last tick's); :stats(); :stop()
 -- Ids are TownAI actor ids. Positions in studs. No side effects on require.
 
 local Import = require("../Import")
@@ -58,6 +59,7 @@ local AreaPace = Import.shared("Speech/AreaPace") :: typeof(require("../../share
 local CombatRules = Import.shared("Combat/CombatRules") :: typeof(require("../../shared/Combat/CombatRules"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
+local MedicalRoute = Import.shared("Infection/MedicalRoute") :: typeof(require("../../shared/Infection/MedicalRoute"))
 local Perception = require("../Actors/Perception")
 
 local OverheadService = {}
@@ -93,6 +95,13 @@ OverheadService.C = {
 	backSpeed = 5,
 	hurrySecs = 8, -- ... then hurries on this long
 	closeSpeed = 6, -- studs/s a vigilante closes in under it
+	-- where a person is sent (spotFor): the nearest open ground to the point under it, off the roads and out of the
+	-- buildings, with a clear view of it and a straight way there that crosses neither; tried on rings round that point
+	spotRings = { 0, 3, 6, 9, 12, 16, 20, 25 },
+	spotDirs = 12,
+	backFrom = 8, -- studs level from under it a calm person steps back to (at least)
+	backWalk = 12, -- ... no further than this from where they stand
+	roadPad = 1, -- studs: a spot this near the asphalt counts as on it
 	-- a person's Gaze (a replicated attribute) is written again only once the squirrel has moved more than gazeAngle off
 	-- the way it was written, seen from their eye, and at most every gazeEvery seconds (a new squirrel, or none, at once):
 	-- the client's neck eases between (Client/Render/GazeView). Network: 2 writes a second a person at most
@@ -109,6 +118,7 @@ export type Opts = {
 	infection: any?, -- Infection/InfectionService (feared, engaged, isInfected, colliders)
 	combat: any?, -- Combat/CombatService (temperOf, isVigilante)
 	colliders: any?, -- World/Colliders (default infection.colliders)
+	roads: any?, -- Infection/MedicalRoute.Roads: the asphalt nobody is sent onto (default infection.roads)
 	groundAt: ((x: number, z: number) -> number)?, -- default world.ctx.groundAt
 	-- the held squirrel's validated motor (Movement/MovementService:motorOf): its route and whether it stands on
 	-- something; nil when it has sent nothing
@@ -175,6 +185,7 @@ function OverheadService.new(opts: Opts): any
 		infection = opts.infection,
 		combat = opts.combat,
 		colliders = opts.colliders or (opts.infection and (opts.infection :: any).colliders),
+		roads = opts.roads or (opts.infection and (opts.infection :: any).roads),
 		groundAt = opts.groundAt or world.ctx.groundAt,
 		rand = opts.rand or math.random,
 		speech = opts.speech or SpeechRules.new(),
@@ -418,27 +429,133 @@ local function say(self: any, id: number, situation: string, force: boolean?, ne
 	return true
 end
 
--- an order to the person's brain (never to one the bite-to-hospital sequence has)
-local function order(self: any, id: number, mode: string, s: Overhead, secs: number, speed: number?)
+-- an order to stand and look up at it (never to one the bite-to-hospital sequence has)
+local function order(self: any, id: number, mode: string, s: Overhead, secs: number)
 	if not free(self, id) then
 		return
 	end
 	local brain = self.world.brains[id] :: any
-	if brain == nil then
+	if brain == nil or mode ~= "stand" then
 		return
+	end
+	if brain.kind == "Pedestrian" then
+		brain:onEvent({ type = "overhead", mode = "stand", x = s.x, z = s.z, speed = 0, untilTime = now(self) + secs })
+	elseif brain.kind == "Staff" then
+		brain:onEvent({ type = "pause", seconds = secs })
+	end
+end
+
+-- is (x, z) ground a person may be sent to: not inside a building, not on the asphalt
+local function walkable(self: any, x: number, z: number): boolean
+	local c = self.colliders
+	if c and Colliders.pointIn(c, x, z, self.groundAt(x, z) + 3, 1.5) ~= nil then
+		return false
+	end
+	local roads = self.roads
+	return not (roads and MedicalRoute.onRoad(roads, x, z, C.roadPad))
+end
+
+-- the straight walk from (x0, z0) to (x1, z1): through no building and over no asphalt (a person already on the road,
+-- a crossing, may step off it)
+local function wayClear(self: any, x0: number, z0: number, x1: number, z1: number): boolean
+	local c = self.colliders
+	if c and Colliders.blocked(c, x0, z0, x1, z1, 1, self.groundAt(x0, z0) + 3) then
+		return false
+	end
+	local roads = self.roads
+	if roads == nil then
+		return true
+	end
+	local d = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
+	local n = math.max(1, math.ceil(d / 2))
+	local started = MedicalRoute.onRoad(roads, x0, z0, C.roadPad)
+	for i = 1, n do
+		local k = i / n
+		local on = MedicalRoute.onRoad(roads, x0 + (x1 - x0) * k, z0 + (z1 - z0) * k, C.roadPad)
+		if on and not started then
+			return false
+		end
+		started = started and on
+	end
+	return true
+end
+
+-- spotFor(self, a, s, mode): where to send person `a` about squirrel `s` (review M1: never under it in the road or
+-- inside the building it is on). "approach" (wait below it): the walkable spot nearest the point under it, within
+-- C.closeSpeed x C.waitSecs of them; "back" (step back from under it): the walkable spot nearest them at least
+-- C.backFrom level from under it, within C.backWalk of them. Each with a clear view of it and a clear straight way
+-- there (wayClear). Nil when there is none: the order is not given.
+function OverheadService.spotFor(self: any, a: any, s: Overhead, mode: string): (number?, number?)
+	local reach = if mode == "back" then C.backWalk else C.closeSpeed * C.waitSecs
+	local list: { { number } } = {}
+	for _, r in C.spotRings do
+		local n = if r == 0 then 1 else C.spotDirs
+		for k = 1, n do
+			local ang = (k - 1) / n * math.pi * 2
+			local x, z = s.x + math.cos(ang) * r, s.z + math.sin(ang) * r
+			local far = math.sqrt((x - a.x) ^ 2 + (z - a.z) ^ 2)
+			if far <= reach and (mode ~= "back" or r >= C.backFrom) then
+				table.insert(list, { if mode == "back" then far else r + far * 0.01, x, z })
+			end
+		end
+	end
+	table.sort(list, function(p: { number }, q: { number }): boolean
+		return p[1] < q[1]
+	end)
+	for _, c in list do
+		local x, z = c[2], c[3]
+		if walkable(self, x, z) and wayClear(self, a.x, a.z, x, z) then
+			local eye = { x = x, z = z, y = self.groundAt(x, z) + 3 }
+			if clear(self, eye, s) then
+				return x, z
+			end
+		end
+	end
+	return nil, nil
+end
+
+-- walkTo(self, id, x, z, faceX, faceZ, secs, speed): THE one way this service sends a person somewhere (to `x`, `z` at `speed`, facing the squirrel at
+-- `faceX`, `faceZ` once there, for `secs`). Today the brains walk the straight line (spotFor has checked it); once the
+-- town's walking route-finder lands (World/WalkWay, feat/no-wall-walk), this is the one place to switch to it.
+-- An officer's own order comes first: a chase, a sewer stakeout (review L6). False when no order was given.
+function OverheadService.walkTo(
+	self: any,
+	id: number,
+	x: number,
+	z: number,
+	faceX: number,
+	faceZ: number,
+	secs: number,
+	speed: number
+): boolean
+	if not free(self, id) then
+		return false
+	end
+	local brain = self.world.brains[id] :: any
+	if brain == nil then
+		return false
 	end
 	local untilTime = now(self) + secs
 	if brain.kind == "Pedestrian" then
-		brain:onEvent({ type = "overhead", mode = mode, x = s.x, z = s.z, speed = speed or 0, untilTime = untilTime })
-	elseif brain.kind == "Staff" then
-		if mode == "stand" then
-			brain:onEvent({ type = "pause", seconds = secs })
-		end
+		brain:onEvent({
+			type = "overhead",
+			mode = "approach",
+			x = x,
+			z = z,
+			faceX = faceX,
+			faceZ = faceZ,
+			speed = speed,
+			untilTime = untilTime,
+		})
+		return true
 	elseif brain.kind == "Officer" then
-		if mode == "approach" then
-			brain:onEvent({ type = "respond", x = s.x, z = s.z, untilTime = untilTime })
+		if brain.stakeout ~= nil or (brain.respondUntil or 0) > now(self) then
+			return false -- (on a chase, a call or a stakeout: that comes first)
 		end
+		brain:onEvent({ type = "respond", x = x, z = z, untilTime = untilTime })
+		return true
 	end
+	return false
 end
 
 local function temperOf(self: any, id: number): string
@@ -576,9 +693,16 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 			return
 		end
 		local temper = temperOf(self, id)
+		local a = self.world.actorsById[id]
+		if a == nil then
+			return
+		end
 		if temper == "tough" then
-			-- waits below it (a vigilante, an officer): close in under it and stand there
-			order(self, id, "approach", s, C.waitSecs, C.closeSpeed)
+			-- waits below it (a vigilante, an officer): the nearest open ground under it, and stand there
+			local x, z = OverheadService.spotFor(self, a, s, "approach")
+			if x and z then
+				OverheadService.walkTo(self, id, x, z, s.x, s.z, C.waitSecs, C.closeSpeed)
+			end
 			say(self, id, "overheadWary")
 		elseif temper == "wary" then
 			-- keeps watching, and calls the others over
@@ -591,9 +715,16 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 				end
 			end
 		else
-			-- steps back from under it, then hurries on
-			order(self, id, "back", s, C.backSecs, C.backSpeed)
-			self.hurry[id] = { x = s.x, z = s.z, at = now(self) + C.backSecs }
+			-- steps back from under it (to open ground off the road), then hurries on
+			local x, z = OverheadService.spotFor(self, a, s, "back")
+			local at = now(self)
+			if x and z then
+				local secs = math.min(C.backSecs * 2, math.sqrt((x - a.x) ^ 2 + (z - a.z) ^ 2) / C.backSpeed)
+				if OverheadService.walkTo(self, id, x, z, s.x, s.z, secs, C.backSpeed) then
+					at += secs
+				end
+			end
+			self.hurry[id] = { x = s.x, z = s.z, at = at }
 		end
 	elseif kind == "lost" then
 		st.lost += 1
@@ -743,6 +874,17 @@ end
 -- spotted(personId, squirrelId): that person has pointed the squirrel out above them (Combat/Duel.notices: aware)
 function OverheadService.spotted(self: any, personId: number, squirrelId: number): boolean
 	return OverheadWatch.spotted(self.watch, personId, squirrelId)
+end
+
+-- spotUnder(personId, squirrelId): where that person would wait for the squirrel overhead (spotFor "approach"; nil
+-- when it is not overhead or there is no such spot): Combat/CombatService opts.under, for an officer chasing it
+function OverheadService.spotUnder(self: any, personId: number, squirrelId: number): (number?, number?)
+	local s = self.above[squirrelId]
+	local a = self.world.actorsById[personId]
+	if s == nil or a == nil then
+		return nil, nil
+	end
+	return OverheadService.spotFor(self, a, s, "approach")
 end
 
 function OverheadService.stageOf(self: any, personId: number): string

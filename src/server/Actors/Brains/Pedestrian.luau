@@ -20,9 +20,11 @@
 -- untilTime, then walk back to the lane; a medical order or a gathering is never interrupted by it. A flight in the
 -- duel is the ordinary flee ("witness").
 -- The overhead watch (Server/Stealth/OverheadService, Stealth/OverheadWatch): the event "overhead" (mode stand | approach
--- | back as the duel's, at the squirrel's x and z, until untilTime; "hurry": walk on briskly away from x and z along the
--- lane until untilTime; "end") is the same standing, closing in or backing away, looking up at a squirrel overhead. It
--- never cuts into a duel's order (the duel's "duel" event does cut into it), a flight, a gathering or a medical order.
+-- | back as the duel's, at the squirrel's x and z, until untilTime; with faceX and faceZ, "approach" walks to x and z
+-- and stands there facing them: the service picks the spot, off the road; "hurry": walk on briskly away from x and z
+-- along the lane until untilTime, also once back on the lane after a rejoin; "end") is the same standing, closing in or
+-- backing away, looking up at a squirrel overhead. It never cuts into a duel's order (the duel's "duel" event does cut
+-- into it), a flight, a gathering or a medical order.
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -64,7 +66,9 @@ type Brain = Common.Brain & {
 	gatherUntil: number,
 	duel: Duel?, -- an order from Combat/CombatService while the person faces the rodent
 	duelSource: string?, -- who gave the order: "duel" (Combat/CombatService) or "overhead" (the overhead watch)
-	hurryUntil: number, -- walking on briskly (the overhead watch's "hurry") until then
+	hurryUntil: number, -- walking on briskly (the overhead watch's "hurry") until then ...
+	hurryX: number, -- ... away from here
+	hurryZ: number,
 	threat: Common.Actor?,
 	observer: Perception.Observer,
 	target: Perception.Target,
@@ -73,7 +77,7 @@ type Brain = Common.Brain & {
 
 -- What Server/Combat/CombatService has the person do while they face the rodent (Combat/Duel's move): stand facing it,
 -- close in, or back away from it, at `speed`, until `untilTime` (the service renews it every tick it still holds).
-type Duel = { mode: string, x: number, z: number, speed: number, untilTime: number }
+type Duel = { mode: string, x: number, z: number, speed: number, untilTime: number, faceX: number?, faceZ: number? }
 
 local Pedestrian = {}
 
@@ -204,6 +208,14 @@ local function adopt(self: Brain): number
 	return bestD
 end
 
+-- The brisk walk on (the overhead watch's "hurry"): the goal along the lane away from (hurryX, hurryZ).
+local function hurryOn(self: Brain)
+	local u = along(self)
+	local tu = if self.lane.axis == "x" then self.hurryX else self.hurryZ
+	local away = if u >= tu then 1 else -1
+	self.goal = math.clamp(u + away * HURRY_STEP, self.lane.min, self.lane.max)
+end
+
 -- Adopt the nearest lane and walk onto it (state "rejoin"); when the person is on it already, just
 -- walk on.
 local function reseat(self: Brain)
@@ -320,7 +332,11 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 			intent.laneAxis, intent.laneCoord = nil, nil
 			intent.turnRate = 10
 			intent.damp = DAMP_FLEE
-			if o.mode == "approach" and o.speed > 0 then
+			local fx, fz = o.faceX, o.faceZ
+			if o.mode == "approach" and fx and fz and dx * dx + dz * dz < 1 then
+				intent.mode = "stand" -- (at the spot it was sent to: facing the squirrel)
+				intent.heading = Common.yawOf(fx - actor.x, fz - actor.z)
+			elseif o.mode == "approach" and o.speed > 0 then
 				intent.mode = "walk"
 				intent.tx, intent.tz = o.x, o.z
 				intent.speed = o.speed
@@ -342,6 +358,9 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		if d <= REJOIN_NEAR then
 			self.state = "walk"
 			pickGoal(self)
+			if ctx.now < self.hurryUntil then
+				hurryOn(self) -- (still hurrying on: away from it, not to a new goal)
+			end
 		else
 			local intent = actor.intent
 			intent.mode = "walk"
@@ -429,11 +448,13 @@ end
 function Methods.onEvent(self: Brain, evt: { [string]: any })
 	if evt.type == "overhead" then
 		-- (never into a duel's order, a flight, a gathering, a rejoin or an order from the medical sequence)
+		-- (a hurry on reaches someone walking back to the lane, too: they hurry on once there)
+		local rejoining = self.state == "rejoin" and evt.mode ~= "hurry"
 		if
 			Directive.active(self.directive)
 			or self.state == "gather"
 			or self.state == "flee"
-			or self.state == "rejoin"
+			or rejoining
 			or (self.state == "duel" and self.duelSource ~= "overhead")
 		then
 			return
@@ -447,16 +468,22 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 			if evt.mode == "hurry" then
 				-- on along the lane, away from it, briskly
 				self.hurryUntil = evt.untilTime
-				local u = along(self)
-				local tu = if self.lane.axis == "x" then evt.x else evt.z
-				local away = if u >= tu then 1 else -1
-				self.goal = math.clamp(u + away * HURRY_STEP, self.lane.min, self.lane.max)
+				self.hurryX, self.hurryZ = evt.x, evt.z
+				hurryOn(self)
 			end
 			return
 		end
 		self.state = "duel"
 		self.duelSource = "overhead"
-		self.duel = { mode = evt.mode, x = evt.x, z = evt.z, speed = evt.speed or 0, untilTime = evt.untilTime }
+		self.duel = {
+			mode = evt.mode,
+			x = evt.x,
+			z = evt.z,
+			speed = evt.speed or 0,
+			untilTime = evt.untilTime,
+			faceX = evt.faceX,
+			faceZ = evt.faceZ,
+		}
 		return
 	end
 	if evt.type == "duel" then
@@ -535,6 +562,8 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		duel = nil,
 		duelSource = nil,
 		hurryUntil = 0,
+		hurryX = 0,
+		hurryZ = 0,
 		threat = nil,
 		observer = { x = 0, y = 0, z = 0, facing = 0, witnessUntil = 0 },
 		target = { x = 0, y = 0, z = 0, groundY = 0, moveSpeed = 0, focus = false, inInterior = false },

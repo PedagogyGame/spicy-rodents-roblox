@@ -101,6 +101,9 @@ export type Opts = {
 	-- the rodent's flat pace by its validated motor packets (Movement/MovementService:paceOf: where each accepted packet
 	-- put it, on the server's clock, Stealth/Pace.stretch); nil (or nil returned): read off its root at the duel's steps
 	paceOf: ((id: number) -> number?)?,
+	-- where an officer chasing a rodent up out of reach (a wire, a roof) waits for it: open ground off the road with a
+	-- view of it (Server/Stealth/OverheadService:spotUnder); nil (or nil returned): they hold where they are
+	under: ((personId: number, rodentId: number) -> (number?, number?))?,
 }
 
 export type Motor = { age: number, launchAgo: number? }
@@ -839,10 +842,22 @@ local function stepChases(self: Service, now: number)
 			self.chases[id] = nil
 		elseif now >= c.nextAt and self.guards[id] == nil then
 			c.nextAt = now + CombatService.CHASE_EVERY
+			local x, z = rod.x, rod.z
+			local groundAt = self.world.ctx and self.world.ctx.groundAt
+			if groundAt and (rod.y - rod.hip) - groundAt(rod.x, rod.z) > P.contactHeight then
+				-- (up out of reach: not under it in the road or into the building it is on; to open ground by it, or
+				-- they hold where they are)
+				local f = self.opts.under
+				local ux, uz = nil, nil
+				if f then
+					ux, uz = f(id, zone.biter)
+				end
+				x, z = ux or cop.x, uz or cop.z
+			end
 			brain:onEvent({
 				type = "respond",
-				x = rod.x,
-				z = rod.z,
+				x = x,
+				z = z,
 				untilTime = (self.world.now or 0) + CombatService.CHASE_EVERY * 2,
 			})
 		end

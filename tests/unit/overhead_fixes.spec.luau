@@ -1,6 +1,6 @@
 --!strict
--- Review of feat/overhead-watch (merged onto w0-foundation): failing cases. Each case says what the game should do;
--- the review (scratchpad review_overhead.md) says what it does instead and what would fix it.
+-- The overhead watch's review (19 Nov; its findings H1, M1-M4, L1-L7): the cases it found failing, kept as specs, and
+-- the specs of the fixes. Each case says what the game should do.
 --   1. A rodent that keeps still on a wire after people have pointed it out does not hold them in the duel for good:
 --      the officers who spotted it stand in the road under the wire and swing at it, 40 studs up, as long as it stays.
 --   2. "Alarmed for the rest of the duel": once the person has let the rodent go (not aware), the alarm is over too.
@@ -10,9 +10,18 @@
 --   4. A squirrel walking to and fro 10.5 studs up on something that is not a route (a parked truck's roof, a wall
 --      top: the motor stands on any colliding top), 5 studs in front of a person, is noticed by someone: the duel
 --      leaves anything over duel.overheadY to the overhead watch, and the overhead watch only counts routes.
+--   5. Nobody is sent under a squirrel into the road or into the building it is on: the spot they are sent to is open
+--      ground off the asphalt with a clear straight way there (M1); an officer's own order comes first (L6).
+--   6. A calm person told to hurry on while walking back to the lane hurries on once there (L3).
 local BiteRig = require("@tests/lib/BiteRig")
 local CombatRules = require("@shared/Combat/CombatRules")
 local Duel = require("@shared/Combat/Duel")
+local Colliders = require("@shared/World/Colliders")
+local MedicalRoute = require("@shared/Infection/MedicalRoute")
+local OverheadService = require("@server/Stealth/OverheadService")
+local Pedestrian = require("@server/Actors/Brains/Pedestrian")
+local Officer = require("@server/Actors/Brains/Officer")
+local Common = require("@server/Actors/Brains/Common")
 
 local WIRE = 163 -- the spec's wire over the busiest crossing (overhead_service.spec)
 
@@ -225,4 +234,145 @@ return function(t)
 			t.truthy(noticed, "the duel or the overhead watch notices it")
 		end
 	)
+
+	t.test("nobody is sent under a squirrel into the road or into the building it is on (wire 163, the roofs)", function()
+		local rig = BiteRig.new({ seed = 3, overhead = true })
+		rig.step(4)
+		local world = rig.world
+		local svc = rig.overhead
+		local colliders, roads = rig.infection.colliders, rig.infection.roads
+		local function open(x: number, z: number): boolean
+			return Colliders.pointIn(colliders, x, z, world.ctx.groundAt(x, z) + 3, 1) == nil
+				and not MedicalRoute.onRoad(roads, x, z)
+		end
+		-- someone standing on open ground 8 to 30 studs from (x, z)
+		local function standBy(x: number, z: number): any
+			local a = rig.near(x, z, "police")
+			for r = 8, 30, 2 do
+				for k = 0, 15 do
+					local px, pz = x + math.cos(k * 0.39) * r, z + math.sin(k * 0.39) * r
+					if open(px, pz) then
+						rig.put(a.id, px, pz)
+						return a
+					end
+				end
+			end
+			return nil
+		end
+		local function check(kind: string, x: number, y: number, z: number): (boolean, boolean)
+			local a = standBy(x, z)
+			if a == nil then
+				return false, true
+			end
+			local s: any = { id = rig.rodent, x = x, y = y, z = z, speed = 0, held = true, kind = kind }
+			local ok = true
+			for _, mode in { "approach", "back" } do
+				local sx, sz = OverheadService.spotFor(svc, a, s, mode)
+				if sx and sz then
+					ok = ok
+						and open(sx, sz)
+						and not Colliders.blocked(colliders, a.x, a.z, sx, sz, 1, world.ctx.groundAt(a.x, a.z) + 3)
+				end
+				if mode == "approach" and sx == nil then
+					return false, ok -- (nowhere to wait by it: nobody is sent)
+				end
+			end
+			return true, ok
+		end
+		local found, bad = 0, 0
+		local pts = world.routes.byId(WIRE).points
+		for i = 1, #pts, 5 do
+			local p = pts[i]
+			local had, ok = check("wire", p[1], p[2] + 0.8, p[3])
+			if had then
+				found += 1
+			end
+			if not ok then
+				bad += 1
+			end
+		end
+		local roofs, roofFound, roofBad = 0, 0, 0
+		for id = 1, world.routes.count do
+			local r = world.routes.byId(id)
+			if r and r.kind == "roof" and roofs < 12 then
+				roofs += 1
+				local p = r.points[math.max(1, #r.points // 2)]
+				local had, ok = check("roof", p[1], p[2] + 0.8, p[3])
+				if had then
+					roofFound += 1
+				end
+				if not ok then
+					roofBad += 1
+				end
+			end
+		end
+		print(
+			`      wire 163: a spot to wait at for {found} of its points (none in the road or a building: {bad} bad); roofs: {roofFound} of {roofs} ({roofBad} bad)`
+		)
+		t.eq(bad, 0, "no spot by the wire is in the road, in a building or across either")
+		t.eq(roofBad, 0, "nor by a roof")
+		t.truthy(found >= 5, "there is somewhere to wait by the wire")
+		-- (a squirrel in the middle of a roof is out of sight from the ground, OverheadService's edgeSlack: nobody waits)
+		t.truthy(roofFound >= 1, "and by a roof whose squirrel shows from below")
+	end)
+
+	t.test("an officer's own order comes first: the overhead watch does not take over a chase or a stakeout", function()
+		local rig = BiteRig.new({ seed = 3, overhead = true })
+		rig.step(2)
+		local world = rig.world
+		local cop = rig.near(0, 0, "police")
+		local brain: any = world.brains[cop.id]
+		local now = world.now
+		brain:onEvent({ type = "respond", x = 500, z = 500, untilTime = now + 30 })
+		t.falsy(OverheadService.walkTo(rig.overhead, cop.id, 1, 1, 0, 0, 8, 6), "not over a call")
+		t.eq(brain.respondX, 500, "the call stands")
+		brain.respondUntil = 0
+		brain:onEvent({ type = "stakeout", x = 9, z = 9, faceX = 10, faceZ = 10, secs = 20, mouth = "m" })
+		t.falsy(OverheadService.walkTo(rig.overhead, cop.id, 1, 1, 0, 0, 8, 6), "nor over a stakeout")
+		brain:onEvent({ type = "stakeoutEnd" })
+		t.truthy(OverheadService.walkTo(rig.overhead, cop.id, 1, 1, 0, 0, 8, 6), "free, they come and wait")
+		t.eq(brain.respondX, 1)
+		local _ = Officer
+	end)
+
+	t.test("a calm person told to hurry on while walking back to the lane hurries on once there", function()
+		local actor = Common.newActor(1, "human", "default", "Pedestrian", 0, 0, 1.5)
+		local brain: any = Pedestrian.new(actor, {
+			lanes = Pedestrian.defaultLanes(),
+			coreLanes = 4,
+			speedMin = 3,
+			speedMax = 3,
+			rng = function(): number
+				return 0.3
+			end,
+		})
+		-- stepped back off the lane (it runs along x at z -12.1): walking back to it
+		actor.x, actor.z = 40, -22
+		brain:onEvent({ type = "overhead", mode = "back", x = 40, z = -14, speed = 5, untilTime = 0.1 })
+		local ctx: any = {
+			now = 1,
+			rng = function(): number
+				return 0.3
+			end,
+			groundAt = function(): number
+				return 0
+			end,
+			threats = { query = function(): number
+				return 0
+			end },
+			actorsById = {},
+			queryBuffer = {},
+		}
+		brain:think(0.1, ctx)
+		t.eq(brain.state, "rejoin", "walking back to the lane")
+		brain:onEvent({ type = "overhead", mode = "hurry", x = 52, z = -12.1, untilTime = 20 })
+		t.eq(brain.hurryUntil, 20, "the hurry is taken")
+		actor.x, actor.z = brain.lane.fixed == -12.1 and 40 or 40, brain.lane.fixed
+		brain:think(0.1, ctx)
+		t.eq(brain.state, "walk")
+		local u = if brain.lane.axis == "x" then actor.x else actor.z
+		local away = if brain.lane.axis == "x" then 52 else -12.1
+		t.truthy((brain.goal - u) * (u - away) > 0, `on along the lane away from it (goal {brain.goal}, at {u})`)
+		t.truthy(math.abs(brain.goal - u) > 20, "a good way on")
+	end)
 end
