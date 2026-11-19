@@ -16,7 +16,8 @@
 -- SewerService follows it with a "respond"). A medical directive still comes first.
 -- Every walk (the beat's corners, a call, a stakeout, the way back from wherever a player left the officer) goes
 -- by the town's way (ctx.way: World/WalkWay through Common.toward), never in a straight line through a building;
--- with no way there the officer waits where they are.
+-- with no way there the officer waits where they are; back on the beat with no way to it (Common.stuck: none found
+-- twice, and no player to see the body), the officer is put on the beat's corner, out of sight.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -92,6 +93,10 @@ local function stakeout(self: Brain, dt: number, ctx: Common.Ctx): boolean
 			local tx, tz = Common.toward(self.leg, actor, ctx, s.x, s.z)
 			if tx == nil or tz == nil then
 				intent.mode = "stand" -- no way there (yet): wait rather than go through a wall
+				if Common.stuck(self.leg, actor, ctx) then
+					self.stakeout = nil -- (no way to that grate at all: back to the beat)
+					return false
+				end
 				return true
 			end
 			intent.mode = "walk"
@@ -162,6 +167,9 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local tx, tz = Common.toward(self.leg, actor, ctx, p[1], p[2])
 	if tx == nil or tz == nil then
 		intent.mode = "stand"
+		if Common.stuck(self.leg, actor, ctx) then
+			Common.place(self.leg, actor, ctx, p[1], p[2]) -- (out of sight: on the beat)
+		end
 		return
 	end
 	intent.mode = "walk"

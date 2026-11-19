@@ -11,8 +11,12 @@
 --     fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own bakes that
 --     Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks (the
 --     park's footbridge), the bowling alley's raised rear alley and its yard's house, the farmland under the sky
---     lift (Rides/SkyLiftCountry: hedges, walls, the farm); any of them at least LOW
---     tall (a fountain's rim is a wall to a walker). The river is closed ground (World/FootPath).
+--     lift (Rides/SkyLiftCountry: hedges, walls, the farm), the sky lift's tower footings (Rides/SkyLift.towers), the
+--     river's embankment walls (both banks, past the river's ends), the plinth a clock tower stands on
+--     (WorldGen/Builders/Fixtures: PLINTH_OUT past its footprint) and the benches on the bowling alley's front lawn
+--     (Attractions/AlleyLayout.STREET_BENCHES); any of them at least LOW tall (a fountain's rim is a wall to a
+--     walker). The river is closed ground (World/FootPath). tests/unit/wall_walk.spec holds every baked wall a
+--     walker's waist meets to lying inside one of these boxes (tests/lib/WallAudit.uncovered).
 --   * A building people work in has its own ways inside and a door (`rooms`): the bowling alley (Attractions/
 --     AlleyWalk, out by its main doors), the hospital (Infection/HospitalLayout's lanes, out by its entrance), the
 --     police station (the locker room's way out past the front desk: Actors/StaffRounds.POLICE_EXIT) and a built
@@ -20,13 +24,23 @@
 --     A walk into or out of one goes by its door; a walk inside one keeps to its ways.
 --   * Any other box is solid: a point inside one has no way (find gives nil) and `putBack` names the nearest spot
 --     outside it, where a body a player left in there is let go to the computer (TownAI.resume).
---   * Outside, World/FootPath finds the way round the boxes (the boxes grown by a walker's half width).
+--   * The river bridge (the Quay's stone bridge, World/Height.RIVER: its ramps and deck, which the ground closes) is
+--     a building with a door at each end (BRIDGE): on it a walker keeps to the walk line BRIDGE.walkZ, clear of the
+--     traffic, the tower piers and the lamps; off it, a FootPath link joins the two doors, so the far bank is a way
+--     over the bridge (AI/TownAI gives its ground the deck's height there).
+--   * Outside, World/FootPath finds the way round the boxes (the boxes grown by a walker's half width), over the
+--     whole of the town AI's bounds (opts.bounds), with its connected areas labelled at build: a way between two
+--     areas no bridge joins (a fenced yard, the Lookout's top) is no way at once, without a search.
 -- Interface: new(opts) -> Way; find(way, x0, z0, x1, z1, opts?) -> ({ {x, z} }?, length) (the points after the
 --   start, the goal last); clear(way, x0, z0, x1, z1) -> boolean (a straight walk passes nothing); solidAt(way,
---   x, z) -> Box? (a box with no ways inside that holds the point); roomAt(way, x, z) -> Room?; putBack(way, x, z)
+--   x, z, margin?) -> Box? (a box with no ways inside that holds the point, MARGIN inside its walls unless
+--   `margin` says); roomAt(way, x, z) -> Room?; putBack(way, x, z)
 --   -> (x, z, nx, nz) (where a body left at (x, z) can walk from, and the way out of the wall it was moved past);
 --   splitLane(way, lane) -> { Lane } (the pieces of a straight lane that miss every obstacle); addFences(colliders,
---   data) -> n; LOW, MARGIN, KEEP, LANE_MIN, DECK_MAX, BAKED_VENUES, VENUE_YARD, RAMP_RUN, PORCH
+--   data) -> n; bounds() -> the town AI's bounds (studs); posts(data) -> { {x, z, r} } (the telephone poles and tree
+--   trunks: props, not walls); dodges(posts, lane) -> { {u, off} }? (those standing on a lane: where, and the step
+--   aside that clears each); LOW, MARGIN, KEEP, LANE_MIN, DECK_MAX, BAKED_VENUES,
+--   VENUE_YARD, RAMP_RUN, PORCH, BRIDGE
 -- Pure; studs. No side effects on require.
 
 local Colliders = require("./Colliders")
@@ -40,6 +54,7 @@ local AlleyWalk = require("../Attractions/AlleyWalk")
 local HospitalLayout = require("../Infection/HospitalLayout")
 local StaffRounds = require("../Actors/StaffRounds")
 local SkyLiftCountry = require("../Rides/SkyLiftCountry")
+local SkyLift = require("../Rides/SkyLift")
 
 export type Room = {
 	id: string,
@@ -47,6 +62,9 @@ export type Room = {
 	-- the way between two points inside (the start left out, the goal last)
 	within: (x0: number, z0: number, x1: number, z1: number) -> { { number } },
 	door: { number }, -- the spot in front of its door, outside: every walk in or out goes by it
+	-- more than one door (the bridge: one at each end): a walk out goes by the one nearer where it is going, a walk
+	-- in by the one nearer where it comes from
+	doors: { { number } }?,
 	-- where a body left at (x, z) inside is let go to the computer: a point its ways join without crossing what
 	-- stands in the room (nil: anywhere inside joins them)
 	settle: ((x: number, z: number) -> (number, number))?,
@@ -59,7 +77,15 @@ export type Way = {
 	roomOf: { [string]: Room }, -- box id -> its room
 }
 
-export type Lane = { axis: "x" | "z", fixed: number, min: number, max: number, inward: number? }
+-- (dodges: the posts standing on it, each { u along the lane, the step aside from its line }: dodges())
+export type Lane = {
+	axis: "x" | "z",
+	fixed: number,
+	min: number,
+	max: number,
+	inward: number?,
+	dodges: { { number } }?,
+}
 
 local WalkWay = {}
 
@@ -74,6 +100,28 @@ WalkWay.BAKED_VENUES = table.freeze({ "f3_tv_station", "f4_lift_base", "f3_hillt
 -- studs a baked venue's box reaches past its footprint: the TV station's yard (its plinth, steps and the paintball
 -- arena's yard fence stand up to 16 studs out)
 WalkWay.VENUE_YARD = table.freeze({ f3_tv_station = 18 })
+
+-- The Quay's stone bridge (World/Height.RIVER, studs): its ramps and deck run x0..x1 (|z| under half); the walk
+-- line keeps walkZ, between the road's traffic and the tower piers, parapets and lamps (the piers stand from
+-- |z| 17.8, a downspout at 17.1, the lamps at 16.1); its doors are `out` past each ramp's foot, on the walk line.
+WalkWay.BRIDGE = table.freeze({
+	id = "quay_stone_bridge",
+	x0 = Height.RIVER.rampStart * Height.STUDS_PER_UNIT,
+	x1 = Height.RIVER.rampEnd * Height.STUDS_PER_UNIT,
+	half = 7.8 * Height.STUDS_PER_UNIT,
+	walkZ = 12,
+	out = 8,
+})
+
+-- studs a clock tower's plinth stands past its footprint (WorldGen/Builders/Fixtures: W + 4 across)
+WalkWay.PLINTH_OUT = 2
+-- the river's embankment walls (the Quay's: 1.3 units thick along each bank, Height.RIVER.halfWidth from the
+-- channel's centre line, from the bed to the coping over the bank): boxed every EMBANK_STEP studs along z,
+-- EMBANK_HALF studs each side of the line (the wall, its coping and the meander across a box)
+WalkWay.EMBANK_STEP = 12
+WalkWay.EMBANK_HALF = 3.5
+-- studs each way round a sky lift tower's footing (tools/bake/skylift/Towers: 6.4 square, turned with the line)
+WalkWay.FOOTING = 4.6
 
 local FENCE_HALF = 0.5 -- studs: half a panel's thickness and a little more
 local FENCE_PIECE = 3 -- studs: a slanted fence is boxed in pieces this long
@@ -190,6 +238,13 @@ local function addAlleyNeighbours(c: Colliders.Colliders, alley: any)
 	local st = AlleyRoof.STAIR
 	local foot = alley.floorY + st.footY
 	addAlleyBox(c, alley, "bowling_alley_stair", { 101.8, st.footX + 4, st.d0 - 0.5, st.d1 + 0.5 }, foot, foot + 22)
+	-- the benches on the front lawn (their backs are at a walker's waist)
+	local bd = AlleyLayout.STREET_BENCH_D
+	for _, b in AlleyLayout.STREET_BENCHES do
+		local wx, _, wz = AlleyLayout.toWorld(alley, (b[1] + b[2]) / 2, 0, (bd[1] + bd[2]) / 2)
+		local g = Height.at(wx, wz)
+		addAlleyBox(c, alley, "bowling_alley_bench", { b[1] - 0.3, b[2] + 0.3, bd[1] - 0.3, bd[2] + 0.3 }, g, g + 3.5)
+	end
 	local h = AlleyRoof.HOUSE
 	local p = WalkWay.PORCH
 	local floor = alley.floorY + h.floorY
@@ -250,6 +305,83 @@ local function addCountry(c: Colliders.Colliders): number
 	local sh = SkyLiftCountry.SHELTER
 	box("lift_shelter", sh.x, sh.z, sh.x, sh.z, sh.half)
 	return n
+end
+
+-- The river's embankment walls (Height.RIVER: the channel's centre line wanders 9 units each way; the walls stand
+-- halfWidth from it on both banks and reach a little past the river's two ends, where the bank steps down)
+local function addEmbankments(c: Colliders.Colliders): number
+	local R, S = Height.RIVER, Height.STUDS_PER_UNIT
+	local z0, z1 = (R.zMin - 1) * S, (R.zMax + 1) * S
+	local n = 0
+	local steps = math.ceil((z1 - z0) / WalkWay.EMBANK_STEP)
+	for i = 0, steps - 1 do
+		local za, zb = z0 + (z1 - z0) * i / steps, z0 + (z1 - z0) * (i + 1) / steps
+		for _, side in { -1, 1 } do
+			local xa = (Height.riverCenterU(za / S) + side * R.halfWidth) * S
+			local xb = (Height.riverCenterU(zb / S) + side * R.halfWidth) * S
+			Colliders.add(c, {
+				id = "river_embankment",
+				cx = (xa + xb) / 2,
+				cz = (za + zb) / 2,
+				hw = math.abs(xb - xa) / 2 + WalkWay.EMBANK_HALF,
+				hd = (zb - za) / 2,
+				y0 = R.bedY * S,
+				eave = R.bankY * S + 0.6,
+				peak = R.bankY * S + 0.6,
+				ridge = nil,
+			})
+			n += 1
+		end
+	end
+	return n
+end
+
+-- the plinth under each clock tower (a landmark tower named for its clock), PLINTH_OUT past its footprint
+local function addPlinths(c: Colliders.Colliders, data: any): number
+	local n = 0
+	for _, lot in data:lots() do
+		local fp = lot.footprint
+		if lot.type == "landmark_tower" and fp and string.find(lot.id, "clock", 1, true) then
+			local y0 = Height.at(lot.x, lot.z)
+			Colliders.add(c, {
+				id = `{lot.id}_plinth`,
+				cx = lot.x,
+				cz = lot.z,
+				hw = fp.w / 2 + WalkWay.PLINTH_OUT,
+				hd = fp.d / 2 + WalkWay.PLINTH_OUT,
+				y0 = y0,
+				eave = y0 + 6,
+				peak = y0 + 6,
+				ridge = nil,
+			})
+			n += 1
+		end
+	end
+	return n
+end
+
+-- the sky lift's tower footings
+local function addFootings(c: Colliders.Colliders): number
+	local ok, towers = pcall(SkyLift.towers)
+	if not ok then
+		return 0
+	end
+	local half = WalkWay.FOOTING
+	for _, t in towers do
+		local y0 = Height.at(t.x, t.z)
+		Colliders.add(c, {
+			id = "lift_footing",
+			cx = t.x,
+			cz = t.z,
+			hw = half,
+			hd = half,
+			y0 = y0 - 2,
+			eave = y0 + 4,
+			peak = y0 + 4,
+			ridge = nil,
+		})
+	end
+	return #towers
 end
 
 -- the venues in BAKED_VENUES, as Colliders.addBuiltVenues boxes them
@@ -364,7 +496,61 @@ export type Opts = {
 	data: any, -- Shared/Data
 	colliders: Colliders.Colliders?, -- the building boxes (default Colliders.fromData(data))
 	hospital: HospitalLayout.Layout?, -- default HospitalLayout.fromData(data)
+	-- where the path-finder has ground (studs; default bounds(): the town AI's, where a player can leave a body)
+	bounds: { minX: number, maxX: number, minZ: number, maxZ: number }?,
 }
+
+-- bounds(): the town AI's bounds (AI/TownAI's ctx.bounds: World/Height.worldClamp read as units), studs
+function WalkWay.bounds(): { minX: number, maxX: number, minZ: number, maxZ: number }
+	local c = Height.worldClamp()
+	local s = Height.STUDS_PER_UNIT
+	return { minX = c.minX * s, maxX = c.maxX * s, minZ = c.minZ * s, maxZ = c.maxZ * s }
+end
+
+-- the bridge as a building with a door at each end: on it, onto the walk line, along it, and off it to the goal
+local function bridgeRoom(): Room
+	local B = WalkWay.BRIDGE
+	local west, east = { B.x0 - B.out, B.walkZ }, { B.x1 + B.out, B.walkZ }
+	return {
+		id = B.id,
+		inside = function(x: number, z: number): boolean
+			return x > B.x0 and x < B.x1 and math.abs(z) < B.half
+		end,
+		within = function(x0: number, z0: number, x1: number, z1: number): { { number } }
+			local out: { { number } } = {}
+			local function add(x: number, z: number)
+				local last = out[#out]
+				if last == nil or math.abs(last[1] - x) + math.abs(last[2] - z) > 0.5 then
+					table.insert(out, { x, z })
+				end
+			end
+			if math.abs(z0 - B.walkZ) > 0.5 then
+				add(math.clamp(x0, west[1], east[1]), B.walkZ)
+			end
+			add(math.clamp(x1, west[1], east[1]), B.walkZ)
+			add(x1, z1)
+			return out
+		end,
+		door = west,
+		doors = { west, east },
+	}
+end
+
+-- the door of `room` nearest (x, z)
+local function doorOf(room: Room, x: number, z: number): { number }
+	local doors = room.doors
+	if doors == nil then
+		return room.door
+	end
+	local best, bestD = room.door, math.huge
+	for _, d in doors do
+		local dd = (d[1] - x) ^ 2 + (d[2] - z) ^ 2
+		if dd < bestD then
+			best, bestD = d, dd
+		end
+	end
+	return best
+end
 
 function WalkWay.new(opts: Opts): Way
 	local data = opts.data
@@ -373,17 +559,23 @@ function WalkWay.new(opts: Opts): Way
 	addDecks(c, data)
 	addBakedVenues(c, data)
 	addCountry(c)
+	addEmbankments(c)
+	addPlinths(c, data)
+	addFootings(c)
 	local alleyPlace = AlleyStaff.placeOf(data)
 	if alleyPlace then
 		addAlleyNeighbours(c, alleyPlace)
 	end
 	local river = Height.RIVER
 	local S = Height.STUDS_PER_UNIT
+	local B = WalkWay.BRIDGE
 	local foot = FootPath.new({
 		colliders = c,
-		bounds = Height.worldClamp(),
+		bounds = opts.bounds or WalkWay.bounds(),
 		minHeight = WalkWay.LOW,
-		-- nobody walks through the river, or over its bridge (the AI motor does not know the deck)
+		areas = true,
+		-- nobody walks through the river; over it only by the bridge's walk line (the link, door to door)
+		links = { { B.x0 - B.out, B.walkZ, B.x1 + B.out, B.walkZ } },
 		isBlocked = function(x: number, z: number): boolean
 			return Ground.surfaceKind(x, z) ~= "terrain"
 		end,
@@ -399,6 +591,7 @@ function WalkWay.new(opts: Opts): Way
 		table.insert(way.rooms, room)
 		way.roomOf[room.id] = room
 	end
+	add(bridgeRoom())
 	local alley = AlleyStaff.placeOf(data)
 	if alley then
 		local ox, oz = AlleyWalk.outside(alley)
@@ -508,6 +701,16 @@ function WalkWay.roomAt(way: Way, x: number, z: number): Room?
 	return nil
 end
 
+-- is (x, z) inside any box a walker cannot pass (by any margin; a building with ways' box too)?
+local function inWalls(way: Way, x: number, z: number): boolean
+	for _, b in Colliders.query(way.colliders, x, z, x, z) do
+		if b.eave - b.y0 >= WalkWay.LOW and math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd then
+			return true
+		end
+	end
+	return false
+end
+
 local function push(points: { { number } }, x: number, z: number)
 	local last = points[#points]
 	if last and math.abs(last[1] - x) + math.abs(last[2] - z) < 0.5 then
@@ -522,8 +725,9 @@ function WalkWay.clear(way: Way, x0: number, z0: number, x1: number, z1: number)
 	if WalkWay.roomAt(way, x0, z0) or WalkWay.roomAt(way, x1, z1) then
 		return false
 	end
-	-- (an end inside a wall at all, however little, is in the box: never a straight line through the rest of it)
-	if WalkWay.solidAt(way, x0, z0, 0) or WalkWay.solidAt(way, x1, z1, 0) then
+	-- (an end inside a wall at all, however little, is in the box: never a straight line through the rest of it; a
+	-- building with ways too, outside its ways: its front wall's base, say)
+	if inWalls(way, x0, z0) or inWalls(way, x1, z1) then
 		return false
 	end
 	-- (an end within a walker's half width of a wall may cross that margin, never the wall)
@@ -540,7 +744,8 @@ function WalkWay.clear(way: Way, x0: number, z0: number, x1: number, z1: number)
 end
 
 -- find: the way on foot from (x0, z0) to (x1, z1) (see the header), or nil. A goal inside a solid box is taken
--- to the nearest spot outside it (putBack): the way ends there.
+-- to the nearest spot outside it (putBack): the way ends there. With opts.partial, a search out of budget gives the
+-- way as far as it got (the third result true): the walker walks it and asks again from its end.
 function WalkWay.find(
 	way: Way,
 	x0: number,
@@ -548,7 +753,7 @@ function WalkWay.find(
 	x1: number,
 	z1: number,
 	opts: FootPath.FindOpts?
-): ({ { number } }?, number)
+): ({ { number } }?, number, boolean?)
 	-- a goal inside a solid box (a spot by a fence that falls in its panel's box) is the nearest spot outside it
 	if WalkWay.roomAt(way, x1, z1) == nil and WalkWay.solidAt(way, x1, z1) then
 		x1, z1 = WalkWay.putBack(way, x1, z1)
@@ -561,14 +766,16 @@ function WalkWay.find(
 	local points: { { number } } = {}
 	local sx, sz = x0, z0
 	if r0 then
-		for _, p in r0.within(x0, z0, r0.door[1], r0.door[2]) do
+		local door = doorOf(r0, x1, z1)
+		for _, p in r0.within(x0, z0, door[1], door[2]) do
 			push(points, p[1], p[2])
 		end
-		sx, sz = r0.door[1], r0.door[2]
+		sx, sz = door[1], door[2]
 	end
 	local ex, ez = x1, z1
 	if r1 then
-		ex, ez = r1.door[1], r1.door[2]
+		local door = doorOf(r1, sx, sz)
+		ex, ez = door[1], door[2]
 	end
 	if WalkWay.solidAt(way, sx, sz) or WalkWay.solidAt(way, ex, ez) then
 		return nil, 0
@@ -576,14 +783,18 @@ function WalkWay.find(
 	local o: FootPath.FindOpts? = opts
 	local pre = FootPath.length(x0, z0, points)
 	if opts and opts.maxLength then
-		o = { maxNodes = opts.maxNodes, maxLength = opts.maxLength - pre }
+		o = { maxNodes = opts.maxNodes, maxLength = opts.maxLength - pre, partial = opts.partial }
 	end
-	local mid = FootPath.find(way.foot, sx, sz, ex, ez, o)
+	local mid, _, partial = FootPath.find(way.foot, sx, sz, ex, ez, o)
 	if mid == nil then
 		return nil, 0
 	end
 	for _, p in mid do
 		push(points, p[1], p[2])
+	end
+	if partial then
+		-- (out of budget: the way as far as it got; the walker asks again from its end)
+		return points, FootPath.length(x0, z0, points), true
 	end
 	if r1 then
 		for _, p in r1.within(ex, ez, x1, z1) do
@@ -644,6 +855,56 @@ function WalkWay.putBack(way: Way, x: number, z: number): (number, number, numbe
 	return bx, bz, nx, nz
 end
 
+-- posts(data): the telephone poles and the trees' trunks (the harvested routes of kind "trunk": a pole or a tree
+-- stands on each one's foot), { x, z, radius }. Props a walker steps round, not walls: a lane is never cut for one.
+WalkWay.POST_RADIUS = 1.25 -- studs: a trunk route's surface radius when it names none
+function WalkWay.posts(data: any): { { number } }
+	local ok, registry = pcall(function()
+		return data:routes()
+	end)
+	local out: { { number } } = {}
+	if not ok or registry == nil then
+		return out
+	end
+	for _, r in registry:all() do
+		local pts = r.points
+		if r.kind == "trunk" and pts and #pts >= 2 then
+			local a, b = pts[1], pts[2]
+			local foot = if b.y < a.y then b else a
+			-- (upright at its foot: a trunk, not a fallen log or a slanted limb)
+			if math.abs(b.y - a.y) > 2 * math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2) then
+				table.insert(out, { foot.x, foot.z, math.max(r.surfaceRadius or 0, WalkWay.POST_RADIUS) })
+			end
+		end
+	end
+	return out
+end
+
+WalkWay.DODGE_CLEAR = 1.2 -- studs between a post's side and a walker's centre line stepping round it
+WalkWay.DODGE_MIN = 1.5 -- studs: the least step aside
+
+-- dodges(posts, lane): the posts standing on a lane (nearer its line than radius + DODGE_CLEAR), in order along it:
+-- { u, off }, off the step aside (to the side away from the post) that clears it. nil when none.
+function WalkWay.dodges(posts: { { number } }, lane: Lane): { { number } }?
+	local out: { { number } } = {}
+	for _, p in posts do
+		local u, c = if lane.axis == "x" then p[1] else p[2], if lane.axis == "x" then p[2] else p[1]
+		local d = c - lane.fixed
+		local need = p[3] + WalkWay.DODGE_CLEAR
+		if math.abs(d) < need and u >= lane.min - need and u <= lane.max + need then
+			local side = if d > 0 then -1 else 1
+			table.insert(out, { u, side * math.max(WalkWay.DODGE_MIN, need - math.abs(d)) })
+		end
+	end
+	if #out == 0 then
+		return nil
+	end
+	table.sort(out, function(a: { number }, b: { number }): boolean
+		return a[1] < b[1]
+	end)
+	return out
+end
+
 -- splitLane: the pieces of a straight lane (Server/Actors/Nav lanes, Brains/Pedestrian) that miss every obstacle
 -- (each box grown by a walker's half width): a sidewalk that runs into a building's front, a trolley stop's shelter
 -- standing on it, or a fence across it is walked up to, never through. Pieces shorter than LANE_MIN are dropped.
@@ -675,7 +936,10 @@ function WalkWay.splitLane(way: Way, lane: Lane): { Lane }
 	local from = lane.min
 	local function piece(a: number, b: number)
 		if b - a >= WalkWay.LANE_MIN then
-			table.insert(out, { axis = lane.axis, fixed = lane.fixed, min = a, max = b, inward = lane.inward })
+			table.insert(
+				out,
+				{ axis = lane.axis, fixed = lane.fixed, min = a, max = b, inward = lane.inward, dodges = nil }
+			)
 		end
 	end
 	for _, cut in cuts do

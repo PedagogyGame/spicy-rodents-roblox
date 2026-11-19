@@ -17,8 +17,9 @@
 -- straight through the walls; let go at the stop they were working at, they carry on with the work.
 -- Off the round (more than OFF_ROUND from its legs: let go by a player, the end of a run, back from the hospital)
 -- every member of staff walks back by the town's way (ctx.way: World/WalkWay through Common.toward, by the doors of
--- the buildings they work in), never straight through a wall; with no way they wait. The round's own legs are clear
--- (the bake keeps them so) and are walked straight.
+-- the buildings they work in), never straight through a wall; with no way they wait, and with none found twice and no
+-- player to see the body (Common.stuck) they are put on the round, out of sight. The round's own legs are clear (the
+-- bake keeps them so) and are walked straight.
 -- Interface: new(actor, params), think, suspend, resume, rejoin, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -181,6 +182,9 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		local wx, wz = Common.toward(self.leg, actor, ctx, tx, tz)
 		if wx == nil or wz == nil then
 			intent.mode = "stand"
+			if Common.stuck(self.leg, actor, ctx) then
+				Common.place(self.leg, actor, ctx, tx, tz) -- (out of sight: on the round)
+			end
 			return
 		end
 		tx, tz = wx, wz

@@ -22,6 +22,12 @@
 --                                 body can stand: in the houses, the alley, the venues, the yards), stepped for
 --                                 `minutes`; every step of every computer-run body on the ground is tested
 --   dogs(town, minutes, night) -> Report   the yard dogs' own walk (Shared/Wildlife/YardDogs), day or night
+--   uncovered(town, way, groundAt) -> { Gap }   (static, no luck needed) the baked walls a walker's waist meets that
+--                                 no World/WalkWay obstacle covers: every wall part sampled every COVER_STEP studs
+--                                 over its footprint at HEIGHTS over the town AI's ground; a sample inside the part
+--                                 must lie in a WalkWay box (grown by a walker's half width: the path-finder keeps a
+--                                 walker that far off it), a building with ways inside, closed ground (the river) or
+--                                 off the path-finder's ground. One Gap per part: the part and the first sample
 -- Report: steps tested, `crossings` (each with the body, its post, the brain and the leg that moved it, the part),
 -- `byCause` and `byPart` counts, `inside` (body-steps spent with the waist in a wall, by cause), `jumps` (moves
 -- longer than JUMP in one step: a body placed somewhere, not a walk).
@@ -29,6 +35,8 @@
 
 local fs = require("@lune/fs")
 local BakedWorld = require("@tests/lib/BakedWorld")
+local Colliders = require("@shared/World/Colliders")
+local WalkWay = require("@shared/World/WalkWay")
 local Height = require("@shared/World/Height")
 local AlleyStaff = require("@shared/Attractions/AlleyStaff")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -56,6 +64,7 @@ WallAudit.JUMP = 8 -- studs in one step: a body placed somewhere, not walking
 WallAudit.EXAMPLES = 6 -- crossings kept per cause
 WallAudit.TRAILS = false -- format() prints each example's last steps
 WallAudit.TRAIL = 8 -- steps kept
+WallAudit.BUDGET_MS = 1e9 -- the brains' think budget a frame in a run: every brain thinks when due (repeatable)
 
 export type Town = { worlds: { BakedWorld.World }, missing: { string } }
 
@@ -312,7 +321,7 @@ export type RunOpts = {
 	combat: boolean?, -- run Combat/CombatService (the duel: people square up, close in, back away) round the rodent,
 	-- which feints every few seconds while it lingers at a scene
 	chase: boolean?, -- after each bite the two nearest officers chase the rodent (a new "respond" every 0.5 s, 40 s)
-	budgetMs: number?, -- (review) the brain scheduler's think budget per frame (BrainScheduler: 4 ms of os.clock)
+	budgetMs: number?, -- the brain scheduler's think budget per frame (default BUDGET_MS; the game's is 4 ms of os.clock)
 	soft: boolean?, -- also count steps through trees and props (report.soft) and shoulder clips (report.shoulder:
 	-- the centre line clear but a line SHOULDER to either side hits a wall)
 }
@@ -382,11 +391,10 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	local dt = opts.dt or 0.2
 	local rng = Rng.new(opts.seed)
 	local world = TownAI.build({ data = data, seed = opts.seed, rail = opts.rail })
-	if opts.budgetMs then
-		-- (review: the scheduler's think budget is wall-clock time, so a run under load defers other brains and
-		-- walks differently; a huge budget makes a run repeatable)
-		(world.scheduler :: any).params.budgetMs = opts.budgetMs
-	end
+	-- (the scheduler's think budget is wall-clock time: under load other brains are put off and the same seed walks
+	-- differently; a fixed budget makes every run of a seed the same run)
+	local scheduler = world.scheduler :: any
+	scheduler.params.budgetMs = opts.budgetMs or WallAudit.BUDGET_MS
 	local traffic = TrafficService.new({
 		lanes = data:lanes(),
 		roads = data:roads(),
@@ -784,6 +792,85 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	report.events.noWayStand60s = over
 	report.events.noWayStandLongest = math.floor(longest)
 	return report
+end
+
+WallAudit.COVER_STEP = 1.5 -- studs between the samples of a wall part's footprint (uncovered)
+WallAudit.COVER_HEIGHTS = { 2.0, 2.6, 3.2, 3.8 } -- studs over the ground it samples (HEIGHTS and between: a step
+-- that climbs is tested at its feet's height all along it)
+
+export type Gap = { part: BakedWorld.Part, x: number, z: number, y: number }
+
+function WallAudit.uncovered(town: Town, way: WalkWay.Way, groundAt: (x: number, z: number) -> number): { Gap }
+	local r = 0
+	local foot = way.foot
+	local fb = foot.bounds
+	local function covered(x: number, z: number): boolean
+		if x < fb.minX or x > fb.maxX or z < fb.minZ or z > fb.maxZ then
+			return true
+		end
+		for _, b in Colliders.query(way.colliders, x - r, z - r, x + r, z + r) do
+			if b.eave - b.y0 >= WalkWay.LOW and math.abs(x - b.cx) < b.hw + r and math.abs(z - b.cz) < b.hd + r then
+				return true
+			end
+		end
+		local blocked = foot.isBlocked
+		return blocked ~= nil and blocked(x, z)
+	end
+	local lo, hi = WallAudit.HEIGHTS[1], WallAudit.HEIGHTS[#WallAudit.HEIGHTS]
+	local step = WallAudit.COVER_STEP
+	local out: { Gap } = {}
+	for _, w in town.worlds do
+		for _, p in w.parts do
+			if not wall(p) then
+				continue
+			end
+			-- (the ground round it: a part wholly under the waist or over the chest is passed)
+			local g0, g1 = math.huge, -math.huge
+			for _, c in
+				{
+					{ p.x0, p.z0 },
+					{ p.x1, p.z0 },
+					{ p.x0, p.z1 },
+					{ p.x1, p.z1 },
+					{ (p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2 },
+				}
+			do
+				local g = groundAt(c[1], c[2])
+				g0, g1 = math.min(g0, g), math.max(g1, g)
+			end
+			if p.y1 < g0 + lo or p.y0 > g1 + hi then
+				continue
+			end
+			local nx = math.max(1, math.ceil((p.x1 - p.x0) / step))
+			local nz = math.max(1, math.ceil((p.z1 - p.z0) / step))
+			local found = false
+			for i = 0, nx do
+				for k = 0, nz do
+					local x, z = p.x0 + (p.x1 - p.x0) * i / nx, p.z0 + (p.z1 - p.z0) * k / nz
+					if not covered(x, z) then
+						local g = groundAt(x, z)
+						for _, h in WallAudit.COVER_HEIGHTS do
+							local hit = w.containing(x, g + h, z, function(q: BakedWorld.Part): boolean
+								return q == p
+							end)
+							if #hit > 0 then
+								table.insert(out, { part = p, x = x, z = z, y = g + h })
+								found = true
+								break
+							end
+						end
+					end
+					if found then
+						break
+					end
+				end
+				if found then
+					break
+				end
+			end
+		end
+	end
+	return out
 end
 
 -- the yard dogs walking their yards (day: wandering; night: to the house and lying down)

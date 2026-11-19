@@ -52,6 +52,7 @@ local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../..
 local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local WalkWay = Import.shared("World/WalkWay") :: typeof(require("../../shared/World/WalkWay"))
+local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -120,6 +121,10 @@ local TownAI = {}
 
 TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
 TownAI.WAY_NODES = 1000 -- cells a brain's way search may open (World/FootPath): a brain thinks inside a frame
+-- studs: a player further off than this does not see a body (ctx.seen: a body nobody sees that has no way is put on
+-- its own ground, Brains/Common.stuck), nor one with a building between at EYE over its ground
+TownAI.SEEN = 250
+TownAI.EYE = 5
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins
@@ -233,12 +238,13 @@ function TownAI.build(opts: Opts): World
 	local town = Town.fromData(data)
 	local nav = Nav.build(town, data:module("Interiors") :: any)
 	local okLayout, layout = pcall(HospitalLayout.fromData, data, Tunables.get("hospital.beds"))
-	local way = WalkWay.new({ data = data, hospital = if okLayout then layout else nil })
+	local clampU = Height.worldClamp()
+	local bounds = { minX = st(clampU.minX), maxX = st(clampU.maxX), minZ = st(clampU.minZ), maxZ = st(clampU.maxZ) }
+	-- (the way on foot over the same bounds: a body a player leaves anywhere in them has a way back)
+	local way = WalkWay.new({ data = data, hospital = if okLayout then layout else nil, bounds = bounds })
 	local ground = Ground.world({ town = town })
 	local rail = opts.rail or RailWorld.get(data, Height.at)
 	local routes = RouteAdapter.new(rail)
-	local clampU = Height.worldClamp()
-	local bounds = { minX = st(clampU.minX), maxX = st(clampU.maxX), minZ = st(clampU.minZ), maxZ = st(clampU.maxZ) }
 
 	local params = table.clone(BrainScheduler.DEFAULTS)
 	params.budgetMs = opts.budgetMs or params.budgetMs
@@ -260,6 +266,11 @@ function TownAI.build(opts: Opts): World
 				return inside
 			end
 			local y = ground.groundAt(x, z, Height.at(x, z) + 1)
+			-- the river bridge's ramps and deck (World/WalkWay walks people over it): its height, wherever it stands
+			local deck = Height.riverDeckAt(x, z)
+			if deck and deck > y then
+				y = deck
+			end
 			local floor = StaffRounds.floorAt(venues, x, z)
 			return if floor and floor > y then floor else y
 		end,
@@ -268,8 +279,11 @@ function TownAI.build(opts: Opts): World
 		bounds = bounds,
 		routes = routes,
 		queryBuffer = table.create(32),
-		way = function(x0: number, z0: number, x1: number, z1: number): { { number } }?
-			return (WalkWay.find(way, x0, z0, x1, z1, { maxNodes = TownAI.WAY_NODES }))
+		way = function(x0: number, z0: number, x1: number, z1: number): ({ { number } }?, boolean?)
+			-- (out of budget, the way as far as it got: the brain walks it and asks again from there)
+			local points, _, partial =
+				WalkWay.find(way, x0, z0, x1, z1, { maxNodes = TownAI.WAY_NODES, partial = true })
+			return points, partial
 		end,
 		clear = function(x0: number, z0: number, x1: number, z1: number): boolean
 			return WalkWay.clear(way, x0, z0, x1, z1)
@@ -299,6 +313,19 @@ function TownAI.build(opts: Opts): World
 		covered = {},
 		way = way,
 	}
+	-- can a player see (x, z)? One within SEEN, with no building or fence between at eye height
+	ctx.seen = function(x: number, z: number): boolean
+		local eye = ctx.groundAt(x, z) + TownAI.EYE
+		for _, f in (scheduler :: any).focus :: { BrainScheduler.Focus } do
+			if
+				(f.x - x) ^ 2 + (f.z - z) ^ 2 < TownAI.SEEN * TownAI.SEEN
+				and not Colliders.blocked(way.colliders, f.x, f.z, x, z, 1, eye)
+			then
+				return true
+			end
+		end
+		return false
+	end
 	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
 		TownAI.emit(world, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
 	end
@@ -334,6 +361,11 @@ function TownAI.build(opts: Opts): World
 		for _, piece in WalkWay.splitLane(way, lane) do
 			table.insert(lanes, piece)
 		end
+	end
+	-- the poles and tree trunks standing on them: stepped round (Brains/Pedestrian), never a cut in the lane
+	local posts = WalkWay.posts(data)
+	for _, lane in lanes do
+		lane.dodges = WalkWay.dodges(posts, lane)
 	end
 	table.sort(lanes, function(a, b) -- (as Nav.lanes: the core lanes, nearest the middle and longest, first)
 		local ca, cb = math.abs(a.fixed), math.abs(b.fixed)

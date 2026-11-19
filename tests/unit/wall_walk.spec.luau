@@ -1,47 +1,35 @@
 --!strict
--- Review of feat/no-wall-walk (cab30a1) merged onto w0-foundation 2343c1c: failing cases only (each states what
--- holds when it is fixed).
---   back      the combat duel's "back" order (Brains/Pedestrian state "duel") walks the person 4 studs straight
---             away from the rodent every think, by no way and no clear test: a person on a sidewalk lane with the
---             rodent in the street backs into the house behind them (the duel landed after the branch was cut, so
---             the branch's audit never ran it)
---   approach  the duel's "approach" walks straight at the rodent; CombatService only holds it back when a
---             building box blocks the sight line at the person's feet + 3, so a wall or fence a walker cannot pass
---             but can see over (LOW 1.5 to 3 studs tall) is walked through
---   chase     Common.toward asks for a new way whenever the spot moves more than 0.5 studs, before it looks at the
---             failed search's back-off: an officer chasing the rodent across the river (CombatService re-orders a
---             chase every 0.5 s and an officer in a duel every 0.1 s) runs a failing FootPath search, the dearest
---             kind, on every order
---   margin    WalkWay.clear skips a whole box when an end is inside its walls, and WalkWay.solidAt only counts a
---             point MARGIN (0.2) inside them: from a spot 0.1 studs inside a house's box the straight line through
---             the whole house is "clear"
---   standoff  (task item 4; not walls) an ambulance turning left off the west residential street onto the z = 5 road
---             stands for good with a dump truck following 9 studs behind it: AICarMotor's routeGap samples the
---             route from 1 stud ahead of the ambulance's centre, not its nose, and counts any body heading within
---             72 degrees of the route there whose capsule comes within both half widths + 0.5 studs (7.6 for a
---             truck 8.4 wide); mid-turn the follower's front end is 3 studs from those points, so room = 0; the
---             truck brakes for the emergency vehicle in front of it (bracesFor). Neither moves until the case is
---             given up (155 s in infection_service's "no way to walk" case at be30746, victim by (300, 300))
---   fencetop  (merge interaction) InfectionService now hands Combat/CombatService the town's WalkWay boxes as its sight
---             colliders (`infection.colliders` = way.colliders), and WalkWay added 1,384 fence pieces (1,379 of them
---             3.5+ studs tall) to that set: a rodent standing on a fence rail is inside a fence box, so inSight is
---             false for everyone: nobody squares up to it, and no blow lands on it (at 2343c1c a tough person 4
---             studs off fence_11 squares up to it on the rail)
---   alleyfront the CI spec's first run (seed 1, near) fails about 1 run in 6 on the merged tree: BrainScheduler's
---             4 ms think budget is wall-clock time, so the runs are not repeatable under load; the crossing it then
---             shows is real: an ambulance crew member bitten at the alley's front runs "along the first clear
---             line" (InfectionService.runWay, WalkWay.clear) from (1322, -334.5) to (1346.8, -351.4) into
---             BowlingAlley.Walls.FrontBase, then walks out through StreetFront.Bench2's back: the alley's box in
---             World/Colliders stops short of its baked front base and street-front furniture
---   rounds    (holds on the merged tree; kept as a guard) every Staff brain's round, the shop workers' new pavement
---             rounds included, misses every baked wall
---   audit     tools/sim/wall_audit --seeds 1,2 --minutes 30 crossed 3 walls on the merged tree: a shop worker walking
---             back to its quay round through the clock tower's plinth (the baked plinth stands past the lot's
---             footprint, the only box WalkWay has for it) and a rejoin along the river's south edge through the quay
---             wall (quay_willow_river is a "plate": no box; the river's closed box ends at the wall)
---   far       a body left on the east bank (the quay, the galleria: the way round the river is 1,500 to 3,300 studs,
---             past TownAI.WAY_NODES) or out past Height.worldClamp (inside TownAI's bounds, where a player can leave
---             it; the path-finder has no cells there) never walks again: no way, back-off to 64 s, forever
+-- Nobody walks through a wall: the cases (the no-wall-walk review of feat/no-wall-walk merged onto the duel; each case
+-- names what went wrong and holds it fixed; tests/unit/town_walls.spec walks the whole town on the bake).
+--   back       the duel's "back away" walks only along a clear line (World/WalkWay.clear): straight away, aslant or
+--              sideways; with none the person holds their ground (it walked 4 studs straight away every think, into
+--              the house behind a person on the sidewalk)
+--   approach   the duel's "close in" goes by the town's way (Brains/Common.toward): round a garden wall or a fence
+--              the person can see the rodent over, never over it
+--   chase      an officer chasing a rodent on the far bank of the river crosses by the bridge (World/WalkWay's bridge:
+--              a building with a door at each end, a FootPath link between them; the AI's ground is the deck), with
+--              at most one way search a second however often the chase re-orders (the way's end follows the rodent
+--              while the line to it is clear)
+--   nowhere    a spot in an area no way reaches (FootPath's connected areas, labelled at build): every search returns
+--              at once, and the failed search's wait holds while the spot moves about near where it was
+--   duel cost  two officers re-ordered ten times a second (Combat/CombatService's duel orders) round a house: at most
+--              one search a second each; the worst search's time is printed
+--   margin     from a spot just inside a house's wall, no straight line through the house is clear
+--   rounds     every staff round misses every baked wall (a guard)
+--   audit      the long audit's two runs that crossed a wall on the merged tree (the clock tower's plinth, the quay's
+--              embankment wall: both WalkWay boxes now)
+--   far        a body left on the east bank, or out past the old path-finder's bounds, walks back within two minutes
+--              with a player watching it (the bridge, the town AI's bounds, partial ways for a long walk)
+--   stuck      a body nobody sees that has no way at all (the top of the Lookout) is put back on its own ground
+--   standoff   an ambulance turning with a lorry close behind it drives on (AICarMotor.routeGap: a vehicle behind
+--              the centre is never in front)
+--   fencetop   a rodent on a fence rail is seen by the duel (sight is the buildings, not the fences a walker cannot
+--              pass)
+--   alleyfront WalkWay.clear never calls clear a line into the bowling alley's baked front (an end inside a
+--              building with ways' box, outside its ways, is in a wall)
+--   repeatable the audit's run gives the same report twice (WallAudit.run's think budget is fixed: BUDGET_MS)
+--   covered    every baked wall a walker's waist meets lies inside a WalkWay box (WallAudit.uncovered: no luck needed)
+--   props      the poles and tree trunks standing on a lane are stepped round (Brains/Pedestrian's lane dodges)
 -- Bakes first: lune run tools/bake/main.luau, attractions.luau and the expansion bakes (as tools/ci.sh).
 local Data = require("@shared/Data")
 local WalkWay = require("@shared/World/WalkWay")
@@ -210,68 +198,186 @@ return function(t)
 		t.eq(#bad, 0, table.concat(bad, "\n"))
 	end)
 
-	t.test("chase: an officer re-ordered after a rodent it has no way to does not search on every order", function()
-		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+	-- the town's way searches the brains make (ctx.way), counted and timed
+	local function countWays(world: any): { calls: number, none: number, ms: number, worst: number }
 		local ctx = world.ctx :: any
 		local inner = ctx.way
-		local calls, none, ms, worst = 0, 0, 0, 0
+		local c = { calls = 0, none = 0, ms = 0, worst = 0 }
 		ctx.way = function(x0: number, z0: number, x1: number, z1: number): any
 			local t0 = os.clock()
-			local out = inner(x0, z0, x1, z1)
+			local out, partial = inner(x0, z0, x1, z1)
 			local d = (os.clock() - t0) * 1000
-			calls += 1
-			none += if out == nil then 1 else 0
-			ms += d
-			worst = math.max(worst, d)
-			return out
+			c.calls += 1
+			c.none += if out == nil then 1 else 0
+			c.ms += d
+			c.worst = math.max(c.worst, d)
+			return out, partial
 		end
-		local cop, brain = nil, nil
+		return c
+	end
+
+	local function officer(world: any): (any, any)
 		for _, a in world.actors do
 			local b = world.brains[a.id] :: any
 			if b and b.kind == "Officer" then
-				cop, brain = a, b
-				break
+				return a, b
 			end
 		end
-		assert(cop and brain, "an officer")
-		-- the officer on the west bank, the rodent running about on the east bank (no walker crosses the river)
-		local function open(x0: number, x1: number, z: number): number
-			for x = x0, x1, if x1 > x0 then 2 else -2 do
-				if
-					WalkWay.solidAt(world.way, x, z) == nil
-					and WalkWay.roomAt(world.way, x, z) == nil
-					and WalkWay.clear(world.way, x, z, x + 0.5, z)
-				then
-					return x
+		error("no officer")
+	end
+
+	-- open ground along z from x0 toward x1 (2 studs at a time)
+	local function open(world: any, x0: number, x1: number, z: number): number
+		for x = x0, x1, if x1 > x0 then 2 else -2 do
+			if
+				WalkWay.solidAt(world.way, x, z) == nil
+				and WalkWay.roomAt(world.way, x, z) == nil
+				and WalkWay.clear(world.way, x, z, x + 0.5, z)
+			then
+				return x
+			end
+		end
+		error("no open ground")
+	end
+
+	t.test(
+		"chase: an officer chasing a rodent on the far bank crosses by the bridge, one search a second at most",
+		function()
+			local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+			local c = countWays(world)
+			local cop, brain = officer(world)
+			-- the officer on the west bank, the rodent running about on the east bank
+			local wz, ez = 150, 150
+			local wx, ex = open(world, 1960, 1700, wz), open(world, 2290, 2600, ez)
+			t.truthy(WalkWay.find(world.way, wx, wz, ex, ez) ~= nil, "a way over the river, by the bridge")
+			TownAI.suspend(world, cop.id)
+			TownAI.resume(world, cop.id, wx, Height.at(wx, wz) + cop.hip, wz)
+			local nextAt = 0
+			local crossedAt: number? = nil
+			local walls = walk(world, cop, 90, function(now: number)
+				-- CombatService.stepChases: every CHASE_EVERY (0.5 s), where the rodent is now (it runs 8 studs a second)
+				if now >= nextAt then
+					nextAt = now + 0.5
+					brain:onEvent({ type = "respond", x = ex + 8 * now % 40, z = ez, untilTime = now + 1 })
+				end
+				if crossedAt == nil and cop.x > WalkWay.BRIDGE.x1 then
+					crossedAt = now
+				end
+			end)
+			print(
+				string.format(
+					"      90 s: over the bridge at %s s; %d way searches (%d found none), %.0f ms in all, worst %.2f ms",
+					if crossedAt then string.format("%.0f", crossedAt) else "never",
+					c.calls,
+					c.none,
+					c.ms,
+					c.worst
+				)
+			)
+			t.truthy(crossedAt ~= nil, `the officer crossed the river (at ({cop.x}, {cop.z}))`)
+			t.eq(#walls, 0, table.concat(walls, "\n"))
+			t.truthy(c.calls <= 90, `{c.calls} searches in 90 s`)
+		end
+	)
+
+	-- the town's open ground is one area but for a few closed in (walled all round): the middle of the biggest such
+	local function closedIn(world: any): (number, number, number)
+		local foot = world.way.foot
+		local sizes, cellOf = {}, {}
+		local main, mainN = nil, 0
+		for iz, row in foot.rows :: any do
+			for i, a in row.area do
+				local n = row.ends[i] - row.starts[i] + 1
+				sizes[a] = (sizes[a] or 0) + n
+				cellOf[a] = cellOf[a] or { (row.starts[i] + row.ends[i]) // 2, iz }
+				if sizes[a] > mainN then
+					main, mainN = a, sizes[a]
 				end
 			end
-			error("no open ground")
 		end
-		local wz, ez = 300, 300
-		local wx, ex = open(1960, 1700, wz), open(2290, 2600, ez)
-		t.eq((WalkWay.find(world.way, wx, wz, ex, ez)), nil, "no way over the river on foot")
-		TownAI.suspend(world, cop.id)
-		TownAI.resume(world, cop.id, wx, Height.at(wx, wz) + cop.hip, wz)
+		local spot, best = nil, 0
+		for a, n in sizes do
+			if a ~= main and n > best then
+				spot, best = cellOf[a], n
+			end
+		end
+		assert(spot, "an area closed in")
+		return spot[1] * foot.cell, spot[2] * foot.cell, best
+	end
+
+	t.test("nowhere: a spot no way reaches costs a quick search per wait, however it moves near there", function()
+		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+		local c = countWays(world)
+		local cop, brain = officer(world)
+		local foot = world.way.foot
+		local sx, sz, best = closedIn(world)
+		print(string.format("      an area of %d cells closed in at (%.0f, %.0f)", best, sx, sz))
+		t.eq((WalkWay.find(world.way, cop.x, cop.z, sx, sz)), nil, "no way in")
 		local nextAt = 0
 		walk(world, cop, 30, function(now: number)
-			-- CombatService.stepChases: every CHASE_EVERY (0.5 s), where the rodent is now (it runs 8 studs a second)
+			-- (a chase's orders, ten a second, the spot wandering a few studs)
 			if now >= nextAt then
-				nextAt = now + 0.5
-				brain:onEvent({ type = "respond", x = ex + 8 * now % 40, z = ez, untilTime = now + 1 })
+				nextAt = now + 0.1
+				brain:onEvent({ type = "respond", x = sx + 3 * math.sin(now), z = sz, untilTime = now + 1 })
 			end
 		end)
-		print(
-			string.format(
-				"      30 s: %d way searches, %d found none, %.0f ms in all, worst %.1f ms",
-				calls,
-				none,
-				ms,
-				worst
-			)
-		)
-		-- (a failed search backs off 4 s doubling to 64 s: 4 or 5 in 30 s)
-		t.truthy(calls <= 6, `{calls} searches in 30 s`)
+		print(string.format("      30 s: %d way searches, %d found none, worst %.3f ms", c.calls, c.none, c.worst))
+		-- (a failed search waits 4 s, doubling: 4 in 30 s; each returns at once, without opening a cell)
+		t.truthy(c.calls <= 5, `{c.calls} searches in 30 s`)
+		t.truthy(foot.early >= c.calls, `{foot.early} searches returned at once`)
 	end)
+
+	t.test(
+		"duel cost: two officers re-ordered ten times a second round a house search once a second at most",
+		function()
+			local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+			local c = countWays(world)
+			local lot = data:lot("outer_home_07")
+			local b = nil
+			for _, box in world.way.colliders.boxes do
+				if box.id == lot.id then
+					b = box
+				end
+			end
+			assert(b, "the house's box")
+			-- the officers on the house's south side, the rodent running round its north side out of their line
+			local cops = {}
+			for _, a in world.actors do
+				local brain = world.brains[a.id] :: any
+				if brain and brain.kind == "Officer" and #cops < 2 then
+					local x = b.cx + (#cops - 0.5) * 6
+					local z = b.cz - b.hd - 6
+					TownAI.suspend(world, a.id)
+					TownAI.resume(world, a.id, x, Height.at(x, z) + a.hip, z)
+					table.insert(cops, { a = a, brain = brain })
+				end
+			end
+			local r = math.max(b.hw, b.hd) + 8
+			local nextAt = 0
+			local walls = walk(world, cops[1].a, 30, function(now: number)
+				if now >= nextAt then
+					nextAt = now + 0.1 -- (CombatService's order(): an officer in a duel, every tick it holds)
+					local ang = math.pi * 0.25 + 0.5 * math.sin(now * 0.4) * math.pi * 0.5
+					local x, z = b.cx + math.cos(ang) * r, b.cz + math.sin(ang) * r
+					for _, o in cops do
+						o.brain:onEvent({ type = "respond", x = x, z = z, untilTime = now + 0.6 })
+					end
+				end
+			end)
+			print(
+				string.format(
+					"      30 s, 2 officers: %d way searches (%.1f a second), %d found none, %.1f ms in all, worst %.2f ms",
+					c.calls,
+					c.calls / 30,
+					c.none,
+					c.ms,
+					c.worst
+				)
+			)
+			t.truthy(c.calls <= 62, `{c.calls} searches in 30 s by 2 officers`)
+			t.eq(#walls, 0, table.concat(walls, "\n"))
+		end
+	)
 
 	t.test("margin: no straight line from just inside a house's wall through the house is clear", function()
 		local way = WalkWay.new({ data = data })
@@ -476,14 +582,112 @@ return function(t)
 		t.eq(#bad, 0, table.concat(bad, "\n"))
 	end)
 
-	t.test(
-		"repeatable: the CI audit's run gives the same report twice (the scheduler's budget is wall-clock)",
-		function()
-			local tw = baked()
-			local a = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
-			local b = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
-			-- (WallAudit.run's budgetMs = 1e9 makes them equal; the real 4 ms budget does not)
-			t.eq(a.steps, b.steps, "the same steps")
+	t.test("repeatable: the audit's run gives the same report twice (a fixed think budget, not the clock's)", function()
+		local tw = baked()
+		local a = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
+		local b = WallAudit.run(tw, data, { seed = 1, minutes = 3, near = true })
+		t.eq(a.steps, b.steps, "the same steps")
+		t.eq(a.crossings, b.crossings, "the same crossings")
+	end)
+
+	t.test("stuck: a body nobody sees with no way at all (ground walled all round) is put back on its lane", function()
+		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+		local a, brain = person(world)
+		local sx, sz = closedIn(world)
+		local lane = brain.params.lanes[1]
+		local lx, lz =
+			if lane.axis == "x" then lane.min else lane.fixed, if lane.axis == "x" then lane.fixed else lane.min
+		t.eq((WalkWay.find(world.way, sx, sz, lx, lz)), nil, "no way down from there")
+		TownAI.suspend(world, a.id)
+		TownAI.resume(world, a.id, sx, Height.at(sx, sz) + a.hip, sz)
+		-- nobody near: the only player is far off
+		TownAI.setFocus(world, function()
+			return { { x = 1e5, z = 1e5 } }
+		end)
+		for _ = 1, math.floor(60 / DT) do
+			TownAI.stepFrame(world, DT)
 		end
-	)
+		local moved = math.sqrt((a.x - sx) ^ 2 + (a.z - sz) ^ 2)
+		local onLane = false
+		for _, l in brain.params.lanes do
+			local u, c = if l.axis == "x" then a.x else a.z, if l.axis == "x" then a.z else a.x
+			if math.abs(c - l.fixed) < 2 and u >= l.min - 1 and u <= l.max + 1 then
+				onLane = true
+			end
+		end
+		print(string.format("      from (%.0f, %.0f): now at (%.0f, %.0f), %s", sx, sz, a.x, a.z, brain.state))
+		t.truthy(moved > 50 and onLane, `still {moved} studs from there, on a lane: {onLane}`)
+	end)
+
+	t.test("covered: every baked wall a walker's waist meets lies inside a WalkWay box (static)", function()
+		local tw = baked()
+		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+		local gaps = WallAudit.uncovered(tw, world.way, world.ctx.groundAt)
+		local bad, known = {}, 0
+		for _, g in gaps do
+			-- (Lookout Hill's trail terrace, its benches and its seeded boulders: tools/bake/skylift/Approach lays
+			-- them by its own seeded dressing and survey of the hill, which the server does not repeat at boot)
+			if string.sub(g.part.path, 1, 17) == "xs_lift_approach." then
+				known += 1
+			else
+				table.insert(bad, string.format("%s at (%.1f, %.1f) y %.1f", g.part.path, g.x, g.z, g.y))
+			end
+		end
+		print(`      {#gaps} walls outside every WalkWay box, {known} of them on Lookout Hill's trail and dressing`)
+		t.eq(#bad, 0, table.concat(bad, "\n"))
+	end)
+
+	t.test("props: the poles and tree trunks standing on a lane are stepped round", function()
+		local tw = baked()
+		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+		local a, brain = person(world)
+		local tried, bad = 0, {}
+		for _, lane in brain.params.lanes do
+			for _, p in lane.dodges or {} do
+				for _, dir in { 1, -1 } do
+					local u0 = math.clamp(p[1] - dir * 12, lane.min, lane.max)
+					local u1 = math.clamp(p[1] + dir * 12, lane.min, lane.max)
+					if math.abs(u1 - u0) < 8 then
+						continue
+					end
+					tried += 1
+					local x, z =
+						if lane.axis == "x" then u0 else lane.fixed, if lane.axis == "x" then lane.fixed else u0
+					TownAI.suspend(world, a.id)
+					TownAI.resume(world, a.id, x, Height.at(x, z) + a.hip, z)
+					brain.lane, brain.state, brain.goal, brain.walkSpeed = lane, "walk", u1, 4
+					local soft = {}
+					TownAI.setFocus(world, function()
+						return { { x = a.x, z = a.z } }
+					end)
+					for _ = 1, math.floor(8 / DT) do
+						local ax, ay, az = a.x, a.y - a.hip, a.z
+						TownAI.stepFrame(world, DT)
+						local part = WallAudit.softCrossing(tw, ax, ay, az, a.x, a.y - a.hip, a.z)
+						if part and #soft < 2 then
+							table.insert(soft, part.path)
+						end
+						if (if lane.axis == "x" then a.x else a.z) * dir >= u1 * dir - 1 then
+							break
+						end
+					end
+					if #soft > 0 then
+						table.insert(
+							bad,
+							string.format(
+								"lane %s %.1f by u %.1f: %s",
+								lane.axis,
+								lane.fixed,
+								p[1],
+								table.concat(soft, ", ")
+							)
+						)
+					end
+				end
+			end
+		end
+		print(`      {tried} walks past a post on a lane`)
+		t.truthy(tried >= 3, `{tried} walks`)
+		t.eq(#bad, 0, table.concat(bad, "\n"))
+	end)
 end
