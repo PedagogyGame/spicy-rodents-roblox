@@ -105,8 +105,8 @@ export type Params = {
 	alertRadius: number,
 	alertTtl: number,
 	blockLen: number,
-	chaseBlocks: number,
-	leashBlocks: number,
+	policeSend: number,
+	policeLoseBlocks: number,
 	spotRange: number,
 	vigilanteShare: number,
 }
@@ -194,8 +194,8 @@ function CombatRules.params(): Params
 	p.alertRadius = g("alert.radiusU")
 	p.alertTtl = g("alert.ttl")
 	p.blockLen = g("alert.blockLenU")
-	p.chaseBlocks = g("alert.policeChaseBlocks")
-	p.leashBlocks = g("alert.policeLeashBlocks")
+	p.policeSend = g("alert.policeSend")
+	p.policeLoseBlocks = g("alert.policeLoseBlocks")
 	p.spotRange = g("human.spotRange")
 	p.vigilanteShare = g("human.vigilanteShare")
 	return (p :: any) :: Params

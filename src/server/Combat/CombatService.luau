@@ -28,9 +28,9 @@
 -- rodent, moves to kick it. `summon(x, z, r)` is the drone's call: flagged people within r head for the spot.
 -- THE AFTERMATH. Every bite opens an alert zone (alert.radiusU, alert.ttl) at the victim: in it every person's blows
 -- carry the hidden strength boost (alert.kickMult; also for a player's kick: `boost`), everyone swings and kicks more
--- (alert.swingBias), and a bite on anyone in it is multiplied by alert.bitePenalty (close to impossible). NPC officers
--- within alert.policeChaseBlocks blocks (alert.blockLenU) chase the biter while it stays within
--- alert.policeLeashBlocks blocks of the bite, for the zone's life.
+-- (alert.swingBias), and a bite on anyone in it is multiplied by alert.bitePenalty (close to impossible). The nearest
+-- alert.policeSend NPC officers, wherever they are, chase the biter until it is more than alert.policeLoseBlocks
+-- blocks (alert.blockLenU) from them or hides (owner 2026-11-19: no pursuit radius, two blocks to lose them).
 -- THE SCENE FIGHTS BACK (owner, second playtest: "none on the scene attacked me initially, i would like more of that").
 -- At a bite, everyone in sight of it within duel.sceneRadius turns on the rodent at once (CombatRules.rallyPick by
 -- duel.rally: vigilantes and most wary people square up and go for it, striking the moment it is in reach, for
@@ -108,7 +108,7 @@ type Rodent = {
 	lastZ: number,
 }
 
-type Chase = { zone: Zone, nextAt: number }
+type Chase = { zone: Zone, nextAt: number, acquired: boolean? }
 
 local CombatService = {}
 CombatService.__index = CombatService
@@ -620,31 +620,48 @@ local function openZone(self: Service, x: number, z: number, now: number, biter:
 	local zone: Zone = { x = x, z = z, at = now, untilT = now + P.alertTtl, biter = biter }
 	table.insert(self.alerts, zone)
 	self._stats.zones += 1
-	-- the officers within about two blocks give chase
-	local reach = P.chaseBlocks * P.blockLen
+	-- the nearest available officers give chase, wherever they are (owner 2026-11-19: no pursuit radius)
+	local free = {}
 	for _, a in self.world.actors do
 		local brain = self.world.brains[a.id] :: any
-		if a.post == "police" and brain and brain.kind == "Officer" and controllerOf(self, a.id) == "ai" then
-			if
-				(a.x - x) ^ 2 + (a.z - z) ^ 2 <= reach * reach and not (self.infection and self.infection:engaged(a.id))
-			then
-				self.chases[a.id] = { zone = zone, nextAt = now }
-				self._stats.chases += 1
-			end
+		if
+			a.post == "police"
+			and brain
+			and brain.kind == "Officer"
+			and controllerOf(self, a.id) == "ai"
+			and not (self.infection and self.infection:engaged(a.id))
+		then
+			table.insert(free, { a = a, d2 = (a.x - x) ^ 2 + (a.z - z) ^ 2 })
 		end
+	end
+	table.sort(free, function(p: any, q: any): boolean
+		return p.d2 < q.d2
+	end)
+	for i = 1, math.min(P.policeSend, #free) do
+		self.chases[free[i].a.id] = { zone = zone, nextAt = now }
+		self._stats.chases += 1
 	end
 end
 
 local function stepChases(self: Service, now: number)
 	local P = self.P
-	local leash = P.leashBlocks * P.blockLen
+	-- (an officer loses track of the rodent only once it is more than policeLoseBlocks from them: no leash round the
+	-- bite and no time limit; hiding still shakes them off: a drain, a hollow, the water gun's stun)
+	local lose = P.policeLoseBlocks * P.blockLen
 	for id, c in self.chases do
 		local zone = c.zone
 		local rod = self.world.actorsById[zone.biter]
 		local brain = self.world.brains[id] :: any
-		local live = now < zone.untilT and rod ~= nil and brain ~= nil and self.rods[zone.biter] ~= nil
+		local cop = self.world.actorsById[id]
+		local live = rod ~= nil and brain ~= nil and cop ~= nil and self.rods[zone.biter] ~= nil
 		if live then
-			live = (rod.x - zone.x) ^ 2 + (rod.z - zone.z) ^ 2 <= leash * leash
+			-- (one sent from further off is on the radio's word until it first comes within the two blocks; it gives up
+			-- with the zone if it never does)
+			local within = (rod.x - cop.x) ^ 2 + (rod.z - cop.z) ^ 2 <= lose * lose
+			if within then
+				c.acquired = true
+			end
+			live = (within or (not c.acquired and now < zone.untilT))
 				and not covered(self, zone.biter)
 				and controllerOf(self, id) == "ai"
 				and not (self.infection and self.infection:engaged(id))

@@ -372,7 +372,7 @@ return function(t)
 	end)
 
 	t.test(
-		"after a bite: the zone's hidden boost, a second bite there close to impossible, the police within two blocks give chase and stop past five",
+		"after a bite: the zone's hidden boost, a second bite there close to impossible, the nearest police give chase wherever they are and lose it two blocks off",
 		function()
 			local rig = BiteRig.new({ seed = 14, duelRand = dice(0.06) })
 			rig.step(20)
@@ -395,8 +395,32 @@ return function(t)
 			for _ in rig.combat.chases do
 				chasing += 1
 			end
-			t.truthy(chasing >= 1, "officers give chase")
-			print(`      {chasing} officers within two blocks give chase`)
+			local P = rig.combat.P
+			local officers = 0
+			for _, a in rig.world.actors do
+				if a.post == "police" and rig.world.brains[a.id].kind == "Officer" then
+					officers += 1
+				end
+			end
+			t.eq(chasing, math.min(P.policeSend, officers), "the nearest available officers give chase")
+			-- (owner 2026-11-19: no pursuit radius) the nearest, however far
+			local nearest, nearestD = nil, math.huge
+			for _, a in rig.world.actors do
+				if a.post == "police" and rig.world.brains[a.id].kind == "Officer" then
+					local d = dist(a, zone)
+					if d < nearestD then
+						nearest, nearestD = a, d
+					end
+				end
+			end
+			t.truthy(rig.combat.chases[(nearest :: any).id] ~= nil, "the nearest officer is one of them")
+			print(`      {chasing} of {officers} officers give chase (the nearest {math.floor(nearestD)} studs off)`)
+			rig.step(0.3)
+			local still = 0
+			for _ in rig.combat.chases do
+				still += 1
+			end
+			t.eq(still, chasing, "sent from any distance, still on it")
 			-- the officers head for the rodent
 			rig.step(1)
 			local brain = rig.world.brains[cop.id] :: any
@@ -405,6 +429,28 @@ return function(t)
 				t.truthy(brain.respondUntil > rig.world.now, "ordered after the rodent")
 				t.truthy(math.abs(brain.respondX - rod.x) < 40, "toward where it is")
 			end
+			-- no leash round the bite: far from it, but within two blocks of a chasing officer, the chase goes on
+			local lose = P.policeLoseBlocks * P.blockLen
+			local id0, chase0 = next(rig.combat.chases)
+			t.truthy(id0 ~= nil, "a chase still on")
+			local c0 = rig.world.actorsById[id0 :: number]
+			local awayX = if c0.x >= zone.x then 1 else -1
+			rig.put(rig.rodent, c0.x + awayX * (lose - 150), c0.z)
+			t.truthy(dist(rig.world.actorsById[rig.rodent], zone) > lose - 150, "far from the bite")
+			rig.step(0.3)
+			t.truthy(rig.combat.chases[id0 :: number] == chase0, "within two blocks of the officer: still chased")
+			-- more than two blocks from every officer: they lose track of it
+			local rod2 = rig.world.actorsById[rig.rodent]
+			rig.put(rig.rodent, rod2.x + awayX * 2 * lose, rod2.z)
+			rig.step(1)
+			for id, c in rig.combat.chases do
+				local cop2 = rig.world.actorsById[id]
+				t.truthy(
+					c.zone ~= zone or not c.acquired or dist(cop2, rig.world.actorsById[rig.rodent]) <= lose,
+					`officer {id} still chasing more than two blocks off`
+				)
+			end
+			rig.put(rig.rodent, zone.x + 20, zone.z)
 			-- a second bite inside the zone: 0.06 is no longer enough (x alert.bitePenalty)
 			local w = rig.calmNear(zone.x, zone.z, { [v.id] = true })
 			t.truthy(dist(w, zone) < 100, "a second person inside the zone")
@@ -414,12 +460,6 @@ return function(t)
 			local far = rig.calmNear(zone.x + 900, zone.z + 900)
 			t.truthy(dist(far, zone) > 120)
 			t.truthy(rig.lunge(far.id), "a bite far from the zone lands")
-			-- the rodent runs beyond five blocks: the chase is called off
-			rig.put(rig.rodent, zone.x + 5 * 440 + 100, zone.z)
-			rig.step(1)
-			for id, c in rig.combat.chases do
-				t.truthy(c.zone ~= zone, `officer {id} still chasing past the leash`)
-			end
 		end
 	)
 end

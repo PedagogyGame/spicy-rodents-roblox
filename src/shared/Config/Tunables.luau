@@ -50,7 +50,10 @@ Tunables.tree = {
 	          kickMult = { v = 1.25, src = "hidden strength boost; must stay below 1.82 (D33)" },
 	          swingBias = { v = 2.0, src = "response weights toward swing/kick" },
 	          bitePenalty = { v = 0.05, src = "second bite near a fresh one is close to impossible" },
-	          policeChaseBlocks = { v = 2 }, policeLeashBlocks = { v = 5 },
+	          -- owner 2026-11-19 (#11): "Do not limit their pursuit radius; instead, require a distance of two average blocks
+	          -- for them to lose track of you" (was: officers within 2 blocks chase, leashed 5 blocks round the bite)
+	          policeSend = { v = 2, src = "the nearest available NPC officers sent after the biter, wherever they are" },
+	          policeLoseBlocks = { v = 2, src = "an officer loses track of the rodent once it is more than this many blocks from them" },
 	          blockLenU = { v = 176, unit = "u", src = "Q16, measured: the town's grid roads are 440 studs apart (rd_001/004/007, rd_010/013/016)" } },
 	-- The duel between the rodent and a person (brief v2 §8 "Combat dynamics", "Vigilantes"; owner playtest 2026-11-18:
 	-- "people that are extra aggressive and extra successful in landing blows against you, and extra resistant of being
