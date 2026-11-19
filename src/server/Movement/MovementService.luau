@@ -30,8 +30,9 @@
 --     last moved (its updates held up); before an epoch's first packet, against the gate; for a while after a move
 --     (ignoredFor: a round trip, twice, and a second) the place before it, within what the pace covers in a round trip;
 --     never more than C.DRIFT_BASE and the fastest the squirrel goes since (C.DRIFT_LAG);
---   * walls: between two samples of the root once an epoch has settled, off the rails (the root itself near none), the
---     live wall rays (a client that stops sending still cannot walk through a house);
+--   * walls: between two samples of the root once an epoch has settled, the live wall rays (a client that stops sending
+--     still cannot walk through a house); a root by a rail (C.RAIL_NEAR: a trunk's bark, a downspout on a wall) only
+--     while no packet has the body on a rail within C.RAIL_RECENT of it (the root may lead the packets: it waits for one);
 --   * the air: while no packet is fresh, a root off the rails higher above any floor than a leap may only fall
 --     (C.HIGH_LAG of a held update, then gravity): no hanging, no flying while silent;
 --   * silence: a body that moves C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped
@@ -150,6 +151,8 @@ type Squirrel = {
 	pinned: boolean, -- a newly held body the server keeps (engine.pin) until its driver's first packet passes the gate
 	pinnedAt: number, -- server time it was first watched pinned (0: not yet)
 	pinAt: Gate?, -- where a pinned body is kept (the hand-off's place, or where the server moved it since)
+	railAt: number?, -- server time of the last accepted packet on a rail
+	wallAt: number?, -- the root passed a wall by a rail then, with no packet on a rail about then (yet)
 }
 
 export type Movement = {
@@ -196,8 +199,10 @@ MovementService.C = table.freeze({
 	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
 	-- studs: a root this near a rail's samples (the feet drawn on a big trunk's bark are up to 5.95 off them) is not judged
-	-- for walls or height
+	-- for height, nor for walls while the packets have the body on a rail ...
 	RAIL_NEAR = 6.5,
+	RAIL_RECENT = 1, -- ... one accepted within this many seconds of the root's crossing, before it or after it
+
 	DRIFT_FRESH_LAG = 0.1, -- seconds: what the root may lead the packets by beyond their arrivals' spread (the send rates)
 	DRIFT_DV = 55, -- studs/s: a leap's start from standing (the root may show it a moment before a packet does)
 	DRIFT_ACCEL = 80, -- studs/s^2: a fall's gain in speed (gravity) and a sprint's
@@ -382,6 +387,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.priorUntil = now + ignoredFor(self, id)
 		sq.toldAt = nil
 		sq.rootX = nil
+		sq.wallAt = nil
 		sq.highSince = nil
 		sq.overSince = nil
 		sq.epoch = nextEpoch(self)
@@ -799,24 +805,36 @@ function MovementService.new(deps: Deps): Movement
 			and sq.possessedAt ~= 0
 			and now - (sq.possessedAt :: number) < C.STREAM_GRACE
 		local px = sq.rootX
-		if
-			px
-			and settled
-			and not fresh
-			and not onRail
-			and now - sq.rootAt <= C.ROOT_STEP
-			and not (index and index:nearest(px, sq.rootY, sq.rootZ, reach) ~= nil)
-		then
+		-- (a wall the root passed by a rail with no packet on a rail about then: a rail packet may still come, the
+		-- root leading the packets; none within C.RAIL_RECENT of it, and it was a wall)
+		local wallAt = sq.wallAt
+		if wallAt then
+			if sq.railAt and (sq.railAt :: number) >= wallAt - C.RAIL_RECENT then
+				sq.wallAt = nil
+			elseif now - wallAt > C.RAIL_RECENT then
+				sq.wallAt = nil
+				return "wall"
+			end
+		end
+		-- a root by a rail (the feet drawn on a big trunk's bark, a downspout on a house's wall) may pass a wall's
+		-- collider: only while the packets have the body on a rail (one within C.RAIL_RECENT)
+		local byRail = onRail or (index and index:nearest(px or x, sq.rootY, sq.rootZ, reach) ~= nil)
+		local railed = byRail and sq.railAt ~= nil and now - (sq.railAt :: number) <= C.RAIL_RECENT
+		if px and settled and not fresh and not railed and now - sq.rootAt <= C.ROOT_STEP then
 			local y0, y1 = math.min(sq.rootY, y), math.max(sq.rootY, y)
 			-- (over the higher end, what a leap rises in the time between the samples)
 			local rise = MoveValidator.leapUpAllowance() * (now - sq.rootAt)
 			if world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise) then
-				return "wall"
+				if not byRail then
+					return "wall"
+				end
+				sq.wallAt = sq.wallAt or now
 			end
 			-- a jump of the root longer than a chord (its updates held up, or a hop): judged chord by chord, weighed as a
 			-- gap is (one may be a corner rounded unseen)
 			if
-				world.crossesLong
+				not byRail
+				and world.crossesLong
 				and dist(px, sq.rootY, sq.rootZ, x, y, z) > ValidatorWorld.C.MAX_CHORD
 				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise())
 				and (validator :: any):wallGap(actorId, now) >= 2
@@ -956,6 +974,10 @@ function MovementService.new(deps: Deps): Movement
 					sq.pounceAt = math.min(now, v.pounce + offsetFloor(sq, now))
 				end
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
+				local rid = snapshot.routeId
+				if type(rid) == "number" and rid >= 0 then
+					sq.railAt = now
+				end
 				if sq.since == nil then
 					sq.since = now
 					sq.priorUntil = math.max(sq.priorUntil, now + C.SETTLE)

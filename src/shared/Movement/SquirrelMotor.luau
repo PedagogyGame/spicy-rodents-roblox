@@ -2064,6 +2064,11 @@ function SquirrelMotor.envelope(
 				rise = math.min(launchUp * dt, rise + launchUp * launchUp / (2 * P.gravity))
 			end
 			upCap = math.max(prev.vy, 0) * dt + rise + E.posSlack
+			if dy > upCap and fromGroundOrRail and plausible() then
+				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
+				-- the grab having carried the body up to the rail)
+				upCap = math.max(prev.vy, 0) * dt + math.max(rise, launchUp * dt) + E.posSlack
+			end
 		end
 		-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
 		-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
