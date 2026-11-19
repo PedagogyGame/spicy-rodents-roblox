@@ -60,6 +60,7 @@ type Brain = Common.Brain & {
 	target: Perception.Target,
 	pctx: Perception.Ctx,
 	leg: Common.Leg, -- the town's way back onto the lane (rejoin) or over to a gathering
+	laneTryAt: number, -- when a rejoin with no way to its lane may try another lane
 }
 
 local Pedestrian = {}
@@ -78,6 +79,7 @@ local DAMP_WALK, DAMP_FLEE = 6.8, 10 -- lambda (L7138)
 local REJOIN_FAR = 6 -- studs off the lane: further than this the person walks back instead of sliding
 local REJOIN_NEAR = 1.5 -- studs: on the lane again
 local REJOIN_SPEED = Units.st(1.6)
+local REJOIN_TRY = 300 -- studs: the lanes a rejoin with no way to its own may try instead
 
 -- The v5.4 sidewalk lanes (humans_actors §4.2 table), in studs. 4 core lanes first.
 function Pedestrian.defaultLanes(): { Lane }
@@ -287,7 +289,23 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 			end
 			local tx, tz = Common.toward(leg, actor, ctx, x, z)
 			if tx == nil or tz == nil then
+				-- no way to the nearest lane (across the river from it, in a fenced yard): another lane nearby
+				-- next time, a while later
 				intent.mode = "stand"
+				if ctx.now >= self.laneTryAt then
+					self.laneTryAt = ctx.now + Common.LEG_RETRY * 2 ^ math.min(leg.misses, 4)
+					local near = {}
+					for _, l in self.params.lanes do
+						local lx = if l.axis == "x" then math.clamp(actor.x, l.min, l.max) else l.fixed
+						local lz = if l.axis == "x" then l.fixed else math.clamp(actor.z, l.min, l.max)
+						if l ~= lane and Common.dist2d(actor.x, actor.z, lx, lz) < REJOIN_TRY then
+							table.insert(near, l)
+						end
+					end
+					if #near > 0 then
+						self.lane = near[math.floor(self.params.rng() * #near) + 1]
+					end
+				end
 				return
 			end
 			intent.mode = "walk"
@@ -434,6 +452,7 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		target = { x = 0, y = 0, z = 0, groundY = 0, moveSpeed = 0, focus = false, inInterior = false },
 		pctx = { time = 0, hotHere = false, concealment = Perception.defaultConcealment() },
 		leg = Common.newLeg(),
+		laneTryAt = 0,
 	}, Methods)
 	-- start on the lane
 	if lane.axis == "x" then

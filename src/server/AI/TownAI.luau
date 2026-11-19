@@ -118,7 +118,7 @@ export type World = {
 local TownAI = {}
 
 TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
-TownAI.WAY_NODES = 1500 -- cells a brain's way search may open (World/FootPath): a brain thinks inside a frame
+TownAI.WAY_NODES = 1000 -- cells a brain's way search may open (World/FootPath): a brain thinks inside a frame
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins

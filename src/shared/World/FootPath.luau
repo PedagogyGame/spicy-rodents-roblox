@@ -49,6 +49,8 @@ export type Finder = {
 	maxNodes: number,
 	bounds: { minX: number, maxX: number, minZ: number, maxZ: number },
 	boxes: { Colliders.Box }, -- the obstacles
+	colliders: Colliders.Colliders, -- their spatial hash (clear asks it for the boxes near a line)
+	tall: { [Colliders.Box]: boolean }, -- the obstacles as a set
 	closed: { [number]: boolean }, -- cells a grown box touches
 	wet: { [number]: boolean }, -- cells isBlocked closes (remembered)
 	isBlocked: ((x: number, z: number) -> boolean)?,
@@ -81,6 +83,8 @@ function FootPath.new(opts: Opts): Finder
 		maxNodes = opts.maxNodes or FootPath.MAX_NODES,
 		bounds = opts.bounds,
 		boxes = {},
+		colliders = opts.colliders,
+		tall = {},
 		closed = {},
 		wet = {},
 		isBlocked = opts.isBlocked,
@@ -91,6 +95,7 @@ function FootPath.new(opts: Opts): Finder
 	for _, b in opts.colliders.boxes do
 		if b.eave - b.y0 >= minHeight then
 			table.insert(finder.boxes, b)
+			finder.tall[b] = true
 			-- a cell is the square of side `cell` round its centre (ix * cell, iz * cell)
 			local half = cell / 2
 			local ix0 = math.ceil((b.cx - b.hw - radius - half) / cell)
@@ -142,8 +147,9 @@ end
 -- walker who starts or ends inside one may cross that one's wall (pass the set to `clear` as `skip`)
 function FootPath.boxesAt(f: Finder, x: number, z: number): { [Colliders.Box]: boolean }?
 	local out: { [Colliders.Box]: boolean }? = nil
-	for _, b in f.boxes do
-		if math.abs(x - b.cx) < b.hw + f.radius and math.abs(z - b.cz) < b.hd + f.radius then
+	local r = f.radius
+	for _, b in Colliders.query(f.colliders, x - r, z - r, x + r, z + r) do
+		if f.tall[b] and math.abs(x - b.cx) < b.hw + r and math.abs(z - b.cz) < b.hd + r then
 			local set = out or {}
 			set[b] = true
 			out = set
@@ -208,8 +214,8 @@ function FootPath.clear(
 	local r = f.radius
 	local minX, maxX = math.min(x0, x1) - r, math.max(x0, x1) + r
 	local minZ, maxZ = math.min(z0, z1) - r, math.max(z0, z1) + r
-	for _, b in f.boxes do
-		if b.cx + b.hw < minX or b.cx - b.hw > maxX or b.cz + b.hd < minZ or b.cz - b.hd > maxZ then
+	for _, b in Colliders.query(f.colliders, minX, minZ, maxX, maxZ) do
+		if not f.tall[b] then
 			continue
 		end
 		if skip and skip[b] then

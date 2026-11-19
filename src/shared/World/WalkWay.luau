@@ -10,7 +10,8 @@
 --     alley) and, for walkers only, what else stands on the ground: the fence and parapet lines (the harvested
 --     fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own bakes that
 --     Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks (the
---     park's footbridge), the bowling alley's raised rear alley and its yard's house; any of them at least LOW
+--     park's footbridge), the bowling alley's raised rear alley and its yard's house, the farmland under the sky
+--     lift (Rides/SkyLiftCountry: hedges, walls, the farm); any of them at least LOW
 --     tall (a fountain's rim is a wall to a walker). The river is closed ground (World/FootPath).
 --   * A building people work in has its own ways inside and a door (`rooms`): the bowling alley (Attractions/
 --     AlleyWalk, out by its main doors), the hospital (Infection/HospitalLayout's lanes, out by its entrance), the
@@ -38,6 +39,7 @@ local AlleyStaff = require("../Attractions/AlleyStaff")
 local AlleyWalk = require("../Attractions/AlleyWalk")
 local HospitalLayout = require("../Infection/HospitalLayout")
 local StaffRounds = require("../Actors/StaffRounds")
+local SkyLiftCountry = require("../Rides/SkyLiftCountry")
 
 export type Room = {
 	id: string,
@@ -194,6 +196,53 @@ local function addAlleyNeighbours(c: Colliders.Colliders, alley: any)
 	)
 end
 
+-- The farmland under the sky lift's line (Rides/SkyLiftCountry: its hedges, walls, paddock, farm and hut): a line
+-- in pieces like a fence, a building as the box round its footprint however it is turned.
+local function addCountry(c: Colliders.Colliders): number
+	local ok, lines, blocks = pcall(SkyLiftCountry.obstacles)
+	if not ok then
+		return 0
+	end
+	local n = 0
+	local function box(id: string, x0: number, z0: number, x1: number, z1: number, half: number)
+		local y0 = math.min(Height.at(x0, z0), Height.at(x1, z1))
+		n += 1
+		Colliders.add(c, {
+			id = id,
+			cx = (x0 + x1) / 2,
+			cz = (z0 + z1) / 2,
+			hw = math.abs(x1 - x0) / 2 + half,
+			hd = math.abs(z1 - z0) / 2 + half,
+			y0 = y0,
+			eave = y0 + 2 * WalkWay.LOW,
+			peak = y0 + 2 * WalkWay.LOW,
+			ridge = nil,
+		})
+	end
+	for _, l in lines do
+		local ax, az = SkyLiftCountry.at(l.u0, l.v0)
+		local bx, bz = SkyLiftCountry.at(l.u1, l.v1)
+		local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+		local pieces = math.max(1, math.ceil(len / FENCE_PIECE))
+		for i = 0, pieces - 1 do
+			local t0, t1 = i / pieces, (i + 1) / pieces
+			box(
+				"lift_country",
+				ax + (bx - ax) * t0,
+				az + (bz - az) * t0,
+				ax + (bx - ax) * t1,
+				az + (bz - az) * t1,
+				l.w / 2 + 0.2
+			)
+		end
+	end
+	for _, b in blocks do
+		local x, z = SkyLiftCountry.at(b.u, b.v)
+		box("lift_country", x, z, x, z, math.max(b.w, b.d) / 2 * math.sqrt(2))
+	end
+	return n
+end
+
 -- the venues in BAKED_VENUES, as Colliders.addBuiltVenues boxes them
 local function addBakedVenues(c: Colliders.Colliders, data: any): number
 	local ex = data:module("Expansion") :: any
@@ -312,6 +361,7 @@ function WalkWay.new(opts: Opts): Way
 	WalkWay.addFences(c, data)
 	addDecks(c, data)
 	addBakedVenues(c, data)
+	addCountry(c)
 	local alleyPlace = AlleyStaff.placeOf(data)
 	if alleyPlace then
 		addAlleyNeighbours(c, alleyPlace)
@@ -477,7 +527,8 @@ function WalkWay.clear(way: Way, x0: number, z0: number, x1: number, z1: number)
 	return FootPath.clear(way.foot, x0, z0, x1, z1, skip)
 end
 
--- find: the way on foot from (x0, z0) to (x1, z1) (see the header), or nil
+-- find: the way on foot from (x0, z0) to (x1, z1) (see the header), or nil. A goal inside a solid box is taken
+-- to the nearest spot outside it (putBack): the way ends there.
 function WalkWay.find(
 	way: Way,
 	x0: number,
@@ -486,6 +537,10 @@ function WalkWay.find(
 	z1: number,
 	opts: FootPath.FindOpts?
 ): ({ { number } }?, number)
+	-- a goal inside a solid box (a spot by a fence that falls in its panel's box) is the nearest spot outside it
+	if WalkWay.roomAt(way, x1, z1) == nil and WalkWay.solidAt(way, x1, z1) then
+		x1, z1 = WalkWay.putBack(way, x1, z1)
+	end
 	local r0, r1 = WalkWay.roomAt(way, x0, z0), WalkWay.roomAt(way, x1, z1)
 	if r0 and r0 == r1 then
 		local inside = r0.within(x0, z0, x1, z1)

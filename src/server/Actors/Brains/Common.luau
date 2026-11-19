@@ -80,6 +80,7 @@ export type Leg = {
 	retry: number,
 	sx: number, -- where the body stood when the way was found (the first leg starts there)
 	sz: number,
+	misses: number, -- ways asked for in a row that were none (each wait before asking again is twice as long)
 }
 
 export type Snapshot = { [string]: any }
@@ -157,11 +158,12 @@ function Common.halt(actor: Actor)
 end
 
 function Common.newLeg(): Leg
-	return { tx = math.huge, tz = math.huge, points = nil, at = 1, retry = 0, sx = 0, sz = 0 }
+	return { tx = math.huge, tz = math.huge, points = nil, at = 1, retry = 0, sx = 0, sz = 0, misses = 0 }
 end
 
 Common.LEG_REACH = 1.2 -- studs: a point of a way counts as reached
-Common.LEG_RETRY = 4 -- seconds before a spot with no way is asked for again
+Common.LEG_RETRY = 4 -- seconds before a spot with no way is asked for again (doubled each time, to LEG_RETRY_MAX)
+Common.LEG_RETRY_MAX = 64
 Common.LEG_OFF = 3 -- studs off the way being walked: the body was taken off it (an order, a call): asked for again
 
 -- toward(leg, actor, ctx, tx, tz): the point to walk to now on the way to (tx, tz): the spot itself when the line
@@ -183,7 +185,12 @@ function Common.toward(leg: Leg, actor: Actor, ctx: Ctx, tx: number, tz: number)
 			else
 				leg.points = way(actor.x, actor.z, tx, tz)
 				if leg.points == nil then
-					leg.retry = ctx.now + Common.LEG_RETRY
+					-- (across the river from home, say: a search that finds nothing is the dearest, so it is not
+					-- repeated often)
+					leg.retry = ctx.now + math.min(Common.LEG_RETRY * 2 ^ leg.misses, Common.LEG_RETRY_MAX)
+					leg.misses += 1
+				else
+					leg.misses = 0
 				end
 			end
 		end
@@ -213,7 +220,7 @@ end
 
 -- forget(leg): the next toward() asks for the way again (the body was moved: a hand-back)
 function Common.forget(leg: Leg)
-	leg.tx, leg.tz, leg.points, leg.retry = math.huge, math.huge, nil, 0
+	leg.tx, leg.tz, leg.points, leg.retry, leg.misses = math.huge, math.huge, nil, 0, 0
 end
 
 -- Shortest signed angle from a to b.

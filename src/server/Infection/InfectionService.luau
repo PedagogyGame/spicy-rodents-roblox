@@ -648,8 +648,10 @@ end
 -- run, or nil when there is no room for one.
 --   Indoors (the wards, the police station's locker room, a shop floor: the point is inside a building) the run
 --   keeps to the building's own clear ways: along the person's own round (`round`: a Staff brain's points, which
---   the bake keeps clear), never straight across a room (desks, beds, the walls between rooms) and never out
---   through a wall. With no round there is no run.
+--   the bake keeps clear) or along the building's way toward its door (World/WalkWay's rooms: the hospital's
+--   lanes, the alley's ways, the way out from behind the corner store's till), stopping inside, whichever ends
+--   further from the threat; never straight across a room (desks, beds, the walls between rooms) and never out
+--   through a wall. In a building with neither there is no run.
 --   Outdoors: RUN studs along the first clear line (World/WalkWay.clear: no building, fence or closed ground),
 --   turning further from straight away at each try; with every line blocked, round the building in the way
 --   (WalkWay.find, a short search).
@@ -668,8 +670,41 @@ local function runWay(
 	end
 	dx, dz = dx / m, dz / m
 	local way = self.way
-	if WalkWay.roomAt(way, x, z) or WalkWay.solidAt(way, x, z) then
-		return if round then loopRun(round, x, z, fx, fz) else nil
+	local room = WalkWay.roomAt(way, x, z)
+	if room or WalkWay.solidAt(way, x, z) then
+		local runs = { if round then loopRun(round, x, z, fx, fz) else nil }
+		if room then
+			-- along the building's own way toward its door, as far as RUN and never out of it
+			local run: { { number } } = {}
+			local left, px, pz = InfectionService.RUN, x, z
+			for _, p in room.within(x, z, room.door[1], room.door[2]) do
+				if not room.inside(p[1], p[2]) then
+					break
+				end
+				local len = math.sqrt((p[1] - px) ^ 2 + (p[2] - pz) ^ 2)
+				if len >= left then
+					local f = left / len
+					table.insert(run, { px + (p[1] - px) * f, pz + (p[2] - pz) * f })
+					break
+				end
+				table.insert(run, p)
+				left -= len
+				px, pz = p[1], p[2]
+			end
+			if #run > 0 and FootPath.length(x, z, run) >= InfectionService.RUN_MIN then
+				table.insert(runs, run)
+			end
+		end
+		-- whichever ends further from the threat
+		local best, bestD = nil, -1
+		for _, r in runs do
+			local e = r[#r]
+			local d = (e[1] - fx) ^ 2 + (e[2] - fz) ^ 2
+			if d > bestD then
+				best, bestD = r, d
+			end
+		end
+		return best
 	end
 	local foot = self.foot
 	local run = InfectionService.RUN

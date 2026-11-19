@@ -97,7 +97,8 @@ function WallAudit.load(files: { string }?): Town
 end
 
 local function isTree(p: BakedWorld.Part): boolean
-	return string.find(p.path, "Tree_", 1, true) ~= nil or p.name == "Limb"
+	-- (the town's trees, and the trunks of the countryside's oaks and apple trees)
+	return string.find(p.path, "Tree_", 1, true) ~= nil or p.name == "Limb" or p.name == "Trunk"
 end
 
 function WallAudit.wall(p: BakedWorld.Part): boolean
@@ -321,12 +322,17 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 		heightAt = Height.at,
 		seed = opts.seed + 6,
 	})
+	local locked: { [number]: boolean } = {}
 	local svc = InfectionService.new({
 		world = world,
 		traffic = traffic,
 		data = data,
 		rand = function(): number
 			return rng.next()
+		end,
+		-- (a body the service has taken off the players, a crew member out on a call, is never handed to one)
+		setPossessable = function(id: number, value: boolean)
+			locked[id] = if value then nil else true
 		end,
 	})
 	-- which part of the service gave an order (for the report: the function names on the stack)
@@ -358,13 +364,16 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 	-- what the brains' ways cost (a brain asks inside a server frame)
 	local ctx = world.ctx :: any
 	local way = ctx.way
-	local ways, worstMs = 0, 0
+	local ways, worstMs, slow, none = 0, 0, 0, 0
 	if way then
 		ctx.way = function(x0: number, z0: number, x1: number, z1: number): any
 			local t0 = os.clock()
 			local out = way(x0, z0, x1, z1)
 			ways += 1
-			worstMs = math.max(worstMs, (os.clock() - t0) * 1000)
+			local ms = (os.clock() - t0) * 1000
+			worstMs = math.max(worstMs, ms)
+			slow += if ms > 4 then 1 else 0
+			none += if out == nil then 1 else 0
 			return out
 		end
 	end
@@ -457,7 +466,13 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 		if now >= nextHand then
 			nextHand = now + handBackEvery * (0.5 + rng.next())
 			local a = pick(humans)
-			if free(a) and held[a.id] == nil and a.post ~= "rider" and svc:stateOf(a.id) == nil then
+			if
+				free(a)
+				and held[a.id] == nil
+				and not locked[a.id]
+				and a.post ~= "rider"
+				and svc:stateOf(a.id) == nil
+			then
 				TownAI.suspend(world, a.id)
 				local s = spot()
 				a.x, a.z = s[1], s[2]
@@ -571,6 +586,8 @@ function WallAudit.run(town: Town, data: any, opts: RunOpts): Report
 		report.events[k] = v
 	end
 	report.events.brainWays = ways
+	report.events.brainWaysOver4ms = slow
+	report.events.brainWaysNone = none
 	report.events.brainWayWorstMs = math.floor(worstMs * 10 + 0.5) / 10
 	return report
 end
