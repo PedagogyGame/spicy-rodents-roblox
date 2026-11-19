@@ -172,6 +172,7 @@ type Actor = {
 	standY: number?, -- the height it last stood at off the rails (a grounded packet higher than this rose with its floor)
 	lastOffset: number, -- its arrival offset (server time - client clock)
 	lastRiver: boolean, -- the last accepted packet was a river landing (a landing never follows a landing)
+	lastGrab: number?, -- client clock of the last grab a short gap hid (SquirrelMotor.envelope: one per two frames)
 }
 
 export type MoveValidator = typeof(setmetatable(
@@ -577,7 +578,11 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
-		local found, launchUsed, pounceAgo, judged = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
+		local found, launchUsed, pounceAgo, judged =
+			SquirrelMotor.envelope(prev, next, dt, self.world, boosted, actor.lastGrab)
+		if judged.grab then
+			actor.lastGrab = judged.grab
+		end
 		launched = launchUsed
 		for _, v in found do
 			table.insert(violations, v)

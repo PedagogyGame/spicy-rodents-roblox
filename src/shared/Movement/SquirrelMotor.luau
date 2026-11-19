@@ -1565,7 +1565,8 @@ end
 --   landed: the body came down on a floor inside the gap and walked off its edge (on the ground, for the sprint meter);
 --   longWall: the straight line was too long for the short wall test and a chord of it went through a wall (the
 --       validator weighs it as a gap's: one may be a corner rounded unseen).
-export type Judged = { vy: number, xz: number, y: number?, landed: boolean, longWall: boolean }
+-- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
+export type Judged = { vy: number, xz: number, y: number?, landed: boolean, longWall: boolean, grab: number? }
 
 -- The motor packet, field by field (validator round 5: the round-4 review's worst hole came from a field nobody checked,
 -- the trunk normal): what bounds every field of Shared/Movement/SquirrelWire, so that no number the validator or the
@@ -1781,7 +1782,8 @@ function SquirrelMotor.envelope(
 	next: State,
 	dt: number,
 	world: World,
-	boosted: boolean
+	boosted: boolean,
+	lastGrab: number?
 ): ({ Violation }, boolean, number?, Judged)
 	local out: { Violation } = {}
 	local launchUsed = false
@@ -2602,6 +2604,115 @@ function SquirrelMotor.envelope(
 		pounce = pounceAgo(nil)
 		-- a launch: the vertical speed rose, or a pounce the window dates (it replaces the velocity, so it may lower it)
 		local launched = not next.grounded and (next.vy > prev.vy + P.gravity * 0.5 * P.substep or pounce ~= nil)
+		-- hidden(): a short gap (at most three motor frames) explained by grabs it hides, as the motor makes them
+		-- (validator round 7: "any sample within a grab" let a sample 8.5 st over the body beside a trunk carry it 135 st
+		-- up in 0.37 s): E in the air takes the NEAREST open rail sample within a grab of the body (Motion.nearestRoute)
+		-- and Space leaps off it in the same frame, at most once per two motor frames (lastGrab: the clock of the last
+		-- one, the validator's; E and Space every second frame is how the honest motor climbs a trunk, 29 st/s). Every
+		-- pattern of grabs the gap's frames allow is stepped as the motor steps (the body on its own arc, a grab snapping
+		-- it to the nearest sample over its drawn pose and leaping at the launch's speed); `next` within posSlack of the
+		-- highest any reaches is explained, the earliest last grab kept, the height kept no higher than that pattern's
+		local frames = math.max(1, math.ceil(dt / P.substep - 1e-6))
+		local hiddenMemo: boolean? = nil
+		local function hidden(): boolean
+			if hiddenMemo ~= nil then
+				return hiddenMemo
+			end
+			hiddenMemo = false
+			if not shortGap then
+				return false
+			end
+			local index = world.index :: any
+			local accept = Motion.openOnly(world)
+			local bestLast, bestTop = math.huge, -math.huge
+			local grabs: { boolean } = table.create(frames, false)
+			local function try(k: number)
+				if k >= frames then
+					-- (stepped as the motor steps: x, z the body's place to within r studs across; the first grab from
+					-- `prev` itself is exact, a later one may take any sample nearest to some point within r, which lies
+					-- no higher than the nearest sample's distance and r over the body)
+					local any = false
+					local x, y, z, vy, vx, vz = prev.x, prev.y, prev.z, prev.vy, prev.vx, prev.vz
+					local r = 0
+					local leapt = false
+					local last: number? = nil
+					for f = 0, frames - 1 do
+						if grabs[f + 1] then
+							local hit = index:nearest(x, y, z, C.airGrab + r + E.posSlack, nil, accept)
+							if hit == nil then
+								return
+							end
+							-- (from somewhere within r of (x, y, z): any sample no further from it than the nearest is
+							-- and 2r, the highest of them)
+							local top = hit
+							if r > 0 then
+								local band = hit.d + 2 * r
+								index:forEachNear(
+									x,
+									y,
+									z,
+									math.ceil(band / (index.cellSize or 20)),
+									function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
+										if
+											sy > top.y
+											and (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2 <= band * band
+											and (accept == nil or accept(id, tt))
+										then
+											top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+										end
+										return nil
+									end
+								)
+							end
+							local lift = 0
+							local route = reg:get(top.routeId)
+							if route then
+								local drawn =
+									Motion.visualPose(world, route, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
+								lift = math.max(0, drawn.y - top.y)
+							end
+							any = true
+							last = prev.clock + (f + 1) * P.substep
+							x, y, z = top.x, top.y + lift, top.z
+							r = if r > 0 then r + hit.d else 0
+							vy, vx, vz = launchUp, 0, 0
+							leapt = true
+							y += vy * P.substep
+							r += launchXZ * P.substep
+						else
+							vy = math.max(vy - P.gravity * P.substep, -P.terminalFall)
+							x, y, z = x + vx * P.substep, y + vy * P.substep, z + vz * P.substep
+							-- (the air's steering, accelAir; after a leap its push, any way across)
+							r += if leapt then launchXZ * P.substep else P.accelAir * launchXZ * P.substep * P.substep
+						end
+					end
+					if any and next.y <= y + E.posSlack then
+						local l = last :: number
+						if l < bestLast or (l == bestLast and y > bestTop) then
+							bestLast, bestTop = l, y
+						end
+					end
+					return
+				end
+				-- (no grab at frame k, or one: two motor frames after the last, the validator's or this pattern's)
+				grabs[k + 1] = false
+				try(k + 1)
+				local at = prev.clock + (k + 1) * P.substep
+				local free = (lastGrab == nil or at - lastGrab >= 2 * P.substep - 1e-6) and (k == 0 or not grabs[k])
+				if free then
+					grabs[k + 1] = true
+					try(k + 1)
+					grabs[k + 1] = false
+				end
+			end
+			try(0)
+			if bestLast < math.huge then
+				hiddenMemo = true
+				judged.grab = bestLast
+				judged.y = math.min(judged.y or next.y, bestTop)
+			end
+			return hiddenMemo :: boolean
+		end
 		local railPlausible: boolean? = nil
 		local function plausible(): boolean
 			if railPlausible == nil then
@@ -2730,7 +2841,7 @@ function SquirrelMotor.envelope(
 			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
 			-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
 			-- than that leap rises over that floor in the time left (landedIn)
-			fromGroundOrRail = landedIn(true) or (plausible() and railHigh())
+			fromGroundOrRail = landedIn(true) or (if shortGap then hidden() else (plausible() and railHigh()))
 			capUp = if fromGroundOrRail then launchUp else pounceUp
 			capXZ = if fromGroundOrRail then launchXZ else pounceXZ
 			if tramp then
@@ -2769,7 +2880,8 @@ function SquirrelMotor.envelope(
 					local hi = (prev.vy + next.vy) / 2 * dt + E.posSlack + gEps * dt
 					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
 					local dy = next.y - prev.y
-					if (dy > hi and not (plausible() and railHigh())) or (dy < lo and not plausible()) then
+					local visited = if shortGap then hidden() else plausible() and railHigh()
+					if (dy > hi and not visited) or (dy < lo and not plausible()) then
 						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
 					end
 					arcVy = expected
@@ -2783,7 +2895,7 @@ function SquirrelMotor.envelope(
 					-- (a body that came down on something inside the gap and went off its edge falls from rest, from no
 					-- higher than that floor)
 					judged.landed = true
-				elseif not (plausible() and railHigh()) then
+				elseif not (if shortGap then hidden() else plausible() and railHigh()) then
 					-- (a pounce is a launch above; a rail visit zeroes the speed and relaunches it)
 					add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
 				end
@@ -2831,9 +2943,9 @@ function SquirrelMotor.envelope(
 			then
 				upCap = dy
 			end
-			if dy > upCap and fromGroundOrRail and plausible() and railHigh() then
+			if dy > upCap and fromGroundOrRail and not shortGap and plausible() and railHigh() then
 				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
-				-- the grab having carried the body up to the rail)
+				-- the grab having carried the body up to the rail; in a short gap the grab is the motor's own: hidden)
 				upCap = before + math.max(rise, launchUp * dt) + E.posSlack
 			end
 		end
@@ -2861,34 +2973,9 @@ function SquirrelMotor.envelope(
 				and plausible()
 				and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
 				and (dy <= 0 or railHigh())
-			if not landing and not railVisit and shortGap and dy > 0 then
-				-- (a short gap hides a grab and a leap all the same: E and Space in one frame, every second frame, climbs
-				-- a trunk at 29 st/s. The rail grabbed is within a grab of where the body was, and the leap off it rises
-				-- no more than a launch does in the gap over that rail's drawn pose: validator round 6, motor-driven)
-				local tUp = math.min(dt, launchUp / P.gravity)
-				local over = launchUp * tUp
-					- 0.5 * P.gravity * tUp * tUp
-					+ math.max(C.visualBranchLift, C.visualLookoutLift)
-					+ samplePad
-					+ E.posSlack
-				local index = world.index :: any
-				local reach = C.airGrab + math.max(hypot2(prev.vx, prev.vz), pounceXZ) * dt + E.posSlack
-				index:forEachNear(
-					prev.x,
-					prev.y,
-					prev.z,
-					math.ceil(reach / (index.cellSize or 20)),
-					function(_id: number, _t: number, sx: number, sy: number, sz: number): boolean?
-						if
-							(sx - prev.x) ^ 2 + (sy - prev.y) ^ 2 + (sz - prev.z) ^ 2 <= reach * reach
-							and next.y <= sy + over
-						then
-							railVisit = true
-							return true
-						end
-						return nil
-					end
-				)
+			if not landing and not railVisit and dy > 0 and hidden() then
+				-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden)
+				railVisit = true
 			end
 			if not landing and not railVisit then
 				add(out, "teleport", 1, `vertical move {dy} st in {dt} s`)
