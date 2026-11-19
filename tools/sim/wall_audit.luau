@@ -8,8 +8,11 @@
 -- Usage (repo root; bake first: lune run tools/bake/main.luau, attractions.luau and the expansion bakes):
 --   lune run tools/sim/wall_audit.luau                       4 seeds x 30 simulated minutes, near and far
 --   lune run tools/sim/wall_audit.luau --seeds 1,2 --minutes 10 --far
---   (review) --combat (the duel round the rodent), --chase (the police chase after each bite), --soft (trees, props and
+--   --combat (the duel round the rodent), --chase (the police chase after each bite), --soft (trees, props and
 --   shoulder clips counted, not budgeted), --sewers (build/Sewers.rbxm's parts as walls too), --no-dogs
+-- Every run of a seed is the same run (WallAudit.BUDGET_MS: the brains' think budget is not the clock's). Each report
+-- ends with the brains' way searches (brainWays, brainWaysNone, brainWayWorstMs, brainWayWorstStepMs) and the bodies
+-- that stood 60 s or more for want of a way (noWayStand60s, noWayStandLongest).
 local process = require("@lune/process")
 local Data = require("@shared/Data")
 local WallAudit = require("@tests/lib/WallAudit")

@@ -18,7 +18,11 @@
 -- the brains ask it through ctx.way and ctx.clear): round the buildings and fences, in and out of the hospital, the
 -- police station, the corner store and the bowling alley by their doors. The lanes are the sidewalk strips cut where
 -- a building, a shelter or a fence stands on them; a shop worker's round is on the pavement before the shop's front;
--- a body a player lets go inside a shell is taken at the nearest spot outside it (resume: WalkWay.putBack).
+-- a body a player lets go inside a shell is taken at the nearest spot outside it (resume: WalkWay.putBack). The way
+-- covers the whole of the AI's bounds and crosses the river by the Quay's bridge (the AI's ground is its deck there);
+-- a search that runs out of budget gives the way as far as it got (the brain asks again from its end); a body nobody
+-- can see (ctx.seen: no player within SEEN with no building between) that has found no way twice is put on its own
+-- ground (Brains/Common.stuck). The poles and tree trunks standing on a lane are stepped round (WalkWay.dodges).
 -- tests/unit/town_walls.spec (tests/lib/WallAudit) walks the whole town on the baked one with a budget of 0.
 -- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
 -- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them, and each

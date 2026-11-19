@@ -20,11 +20,13 @@ local Nav = require("@server/Actors/Nav")
 local Town = require("@shared/World/Town")
 local WallAudit = require("@tests/lib/WallAudit")
 
--- the runs: seed, simulated minutes, whether a player is near (brains think at 10 Hz there; elsewhere at 1 Hz)
+-- the runs: seed, simulated minutes, whether a player is near (brains think at 10 Hz there; elsewhere at 1 Hz), and
+-- whether the duel runs round the rodent and the two nearest officers chase it after each bite (WallAudit's combat
+-- and chase). Each run is the same run every time (WallAudit.BUDGET_MS: the think budget is not the clock's).
 local RUNS = {
 	{ seed = 1, minutes = 8, near = true },
 	{ seed = 2, minutes = 8, near = false },
-	{ seed = 3, minutes = 8, near = true },
+	{ seed = 3, minutes = 8, near = true, combat = true, chase = true },
 }
 
 return function(t)
@@ -45,9 +47,25 @@ return function(t)
 
 	t.test("the whole town AI for 24 simulated minutes: 0 steps through a wall", function()
 		local tw = baked()
-		local total = { steps = 0, bites = 0, handBacks = 0, responds = 0, crowds = 0, dispatched = 0, walkIns = 0 }
+		local total = {
+			steps = 0,
+			bites = 0,
+			handBacks = 0,
+			responds = 0,
+			crowds = 0,
+			dispatched = 0,
+			walkIns = 0,
+			chaseOrders = 0,
+			duelWalkSteps = 0,
+		}
 		for _, run in RUNS do
-			local r = WallAudit.run(tw, data, { seed = run.seed, minutes = run.minutes, near = run.near })
+			local r = WallAudit.run(tw, data, {
+				seed = run.seed,
+				minutes = run.minutes,
+				near = run.near,
+				combat = run.combat,
+				chase = run.chase,
+			})
 			t.eq(r.crossings, 0, `seed {run.seed}:\n{WallAudit.format(r)}`)
 			total.steps += r.steps
 			for k in total do
@@ -63,6 +81,8 @@ return function(t)
 		t.truthy(total.responds >= 10, `{total.responds} police calls`)
 		t.truthy(total.dispatched >= 5, `{total.dispatched} ambulances`)
 		t.truthy(total.walkIns >= 3, `{total.walkIns} walk-ins`)
+		t.truthy(total.chaseOrders >= 100, `{total.chaseOrders} chase orders`)
+		t.truthy(total.duelWalkSteps >= 10, `{total.duelWalkSteps} steps walked in the duel`)
 	end)
 
 	t.test("the yard dogs keep inside their yards' fences, by day and at night", function()
