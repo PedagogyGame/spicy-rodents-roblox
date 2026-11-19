@@ -9,10 +9,13 @@
 --   guard    one forearm up across the body (backing off, or standing their ground)
 --   windup   a kick or a swing coming: the right leg drawn back, the arms out for balance
 --   flinch   both arms up over the face, the body leaning away
+--   point    (the body's Gesture attribute, while no Stance is set: Server/Stealth/OverheadService) the right arm up and
+--            forward, pointing at a squirrel overhead
 -- Nothing gory, no weapon: a stance. The bodies are R15s (the rounded townspeople keep the same Motor6Ds:
 -- Assets/PeopleArt); a body without the joints is left as it is.
 -- No service access at require time (Lune requires this module).
--- Interface: start(opts { bodies }) -> stop(); turns(stance) -> { [jointName]: { x, y, z } } (radians; pure); JOINTS
+-- Interface: start(opts { bodies }) -> stop(); turns(stance) -> { [jointName]: { x, y, z } } (radians; pure);
+--   effective(stance, gesture) -> pose (pure); JOINTS
 
 local StanceView = {}
 
@@ -43,13 +46,25 @@ local TURNS: { [string]: { [string]: { number } } } = {
 		RightElbow = { 1.3, 0, 0 },
 		LeftElbow = { 1.3, 0, 0 },
 	},
+	point = {
+		RightShoulder = { 2.5, 0, 0.15 },
+		RightElbow = { 0.15, 0, 0 },
+	},
 }
 
 function StanceView.turns(stance: any): { [string]: { number } }
 	return if type(stance) == "string" then (TURNS[stance] or {}) else {}
 end
 
-type Entry = { body: Model, conn: RBXScriptConnection, base: { [Motor6D]: CFrame } }
+-- the pose a body shows: the duel's Stance, else its Gesture (a stance always wins)
+function StanceView.effective(stance: any, gesture: any): any
+	if type(stance) == "string" then
+		return stance
+	end
+	return if gesture == "point" then gesture else nil
+end
+
+type Entry = { body: Model, conn: RBXScriptConnection, conn2: RBXScriptConnection?, base: { [Motor6D]: CFrame } }
 
 function StanceView.start(opts: { bodies: Instance }): () -> ()
 	local entries: { [Instance]: Entry } = {}
@@ -65,7 +80,8 @@ function StanceView.start(opts: { bodies: Instance }): () -> ()
 			j.C0 = c0
 		end
 		table.clear(e.base)
-		for name, r in StanceView.turns(e.body:GetAttribute("Stance")) do
+		local pose = StanceView.effective(e.body:GetAttribute("Stance"), e.body:GetAttribute("Gesture"))
+		for name, r in StanceView.turns(pose) do
 			local j = joint(e.body, name)
 			if j then
 				e.base[j] = j.C0
@@ -83,8 +99,11 @@ function StanceView.start(opts: { bodies: Instance }): () -> ()
 		e.conn = body:GetAttributeChangedSignal("Stance"):Connect(function()
 			apply(e)
 		end)
+		e.conn2 = body:GetAttributeChangedSignal("Gesture"):Connect(function()
+			apply(e)
+		end)
 		entries[child] = e
-		if body:GetAttribute("Stance") ~= nil then
+		if body:GetAttribute("Stance") ~= nil or body:GetAttribute("Gesture") ~= nil then
 			apply(e)
 		end
 	end
@@ -94,6 +113,9 @@ function StanceView.start(opts: { bodies: Instance }): () -> ()
 		if e then
 			entries[child] = nil
 			e.conn:Disconnect()
+			if e.conn2 then
+				e.conn2:Disconnect()
+			end
 			for j, c0 in e.base do
 				j.C0 = c0
 			end

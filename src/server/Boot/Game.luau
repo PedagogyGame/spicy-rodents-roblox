@@ -55,7 +55,8 @@
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
---   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
+--   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
+--   the town's people looking up at a squirrel overhead; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start),
 --   townIdOf(actorId), stop() };
@@ -95,6 +96,9 @@ local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
+local OverheadService = require("../Stealth/OverheadService")
+local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../../shared/Speech/SpeechRules"))
+local AreaPace = Import.shared("Speech/AreaPace") :: typeof(require("../../shared/Speech/AreaPace"))
 local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
@@ -494,8 +498,15 @@ function Game.start(opts: Opts?): any
 	local world = rt.world
 	local possession = rt.possession
 	local devices = rt.devices
+	-- the brains read a held squirrel's pace by its accepted motor packets, not the velocity its client reports
+	-- (Brains/Pedestrian: a creep behind someone is not noticed; a client saying 0 is not a creep)
+	world.ctx.paceOf = function(townId: number): number?
+		local actor = rt.byTownId[townId]
+		return if actor then movement:paceOf(actor.id) else nil
+	end
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
+	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
 	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
@@ -573,12 +584,22 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- the town's one speech pacing (Speech/SpeechRules: the per-person cooldown, the town window and the cap by place,
+	-- on the town's clock), shared by every service that makes people talk: the sequence, the drains (through
+	-- infection.speech), the alley's rafters and the overhead watch
+	local townSpeech = SpeechRules.new(nil, {
+		area = AreaPace.DEFAULTS,
+		clock = function(): number
+			return world.now
+		end,
+	})
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
 	local infectionFault: (where: string, err: any) -> ()
 	local okI, errI = pcall(function()
 		infection = InfectionService.new({
 			world = world,
+			speech = townSpeech,
 			traffic = traffic,
 			data = data,
 			controllerOf = controllerOfTown,
@@ -1349,25 +1370,40 @@ function Game.start(opts: Opts?): any
 				if actor == nil then
 					return nil
 				end
-				local snap, at, pounceAt = movement:motorOf(actor.id)
+				local snap, at, pounceAt, cleanAt = movement:motorOf(actor.id)
 				if snap == nil or at == nil then
 					return nil
 				end
 				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
-				return { age = t - at, launchAgo = if pounceAt then t - pounceAt else nil }
+				return {
+					age = t - at,
+					cleanAge = if cleanAt then t - cleanAt else math.huge,
+					launchAgo = if pounceAt then t - pounceAt else nil,
+				}
 			end,
-			-- the rodent's place by its last clean packet (a bite and a blow are judged there, not at the root its client
-			-- moves); the body's own when there is none (no packet yet, or the engine tests' own word on the motor)
+			-- the rodent's place by its last accepted packet while the packets are fresh (a bite and a blow are judged
+			-- there, not at the root its client moves; the round-3 review: by the last clean one, a run of packets each
+			-- with a violation too small to flag froze it); the body's own when there is none or they stopped (no packet
+			-- yet, a silent client, or the engine tests' own word on the motor)
 			poseOf = function(id: number): (number?, number?, number?)
 				local actor = rt.byTownId[id]
 				if o.motorOf or actor == nil then
 					return nil, nil, nil
 				end
-				local snap = movement:motorOf(actor.id)
-				if snap == nil then
+				local snap, at = movement:motorOf(actor.id)
+				if snap == nil or at == nil or workspace:GetServerTimeNow() - at > duelRules.motorFresh then
 					return nil, nil, nil
 				end
 				return snap.x :: number, snap.y :: number, snap.z :: number
+			end,
+			-- the rodent's pace by its accepted packets, on the server's clock (the duel hears a rodent faster than a creep);
+			-- its root's at the duel's steps when there are none
+			paceOf = function(id: number): number?
+				local actor = rt.byTownId[id]
+				if o.motorOf or actor == nil then
+					return nil
+				end
+				return movement:paceOf(actor.id)
 			end,
 			linkOf = function(id: number): number?
 				local actor = rt.byTownId[id]
@@ -1572,6 +1608,18 @@ function Game.start(opts: Opts?): any
 				warn(`[SpicyRodents] the rafter watch stopped: {errR}`)
 				pcall(rafters.stop, rafters)
 				rafters = nil
+			end
+		end
+		if overhead then
+			local okO, errO = pcall(overhead.step, overhead, dt)
+			if not okO then
+				warn(`[SpicyRodents] the overhead watch stopped: {errO}`)
+				pcall(overhead.stop, overhead)
+				overhead = nil
+				if combat then
+					combat.opts.overhead = nil
+					combat.opts.under = nil
+				end
 			end
 		end
 	end
@@ -1786,10 +1834,78 @@ function Game.start(opts: Opts?): any
 	-- 6b. the people under the alley's rafters spot a squirrel that does not creep (Attractions/RafterService:
 	-- addendum D9), and a guard's kick does not reach into the roof vent
 	local okR, errR = pcall(function()
-		rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire, attractions = attractions })
+		rafters = RafterService.start({
+			possession = possession,
+			runtime = rt,
+			fire = fire,
+			attractions = attractions,
+			speech = townSpeech,
+		})
 	end)
 	if not okR then
 		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
+	end
+
+	-- 6b''. the town's people notice, and talk about, a squirrel stalking above them on a wire, a fence, a branch or a
+	-- roof's edge (Stealth/OverheadService; owner playtest 2026-11-19); the rafters keep theirs. A person who has
+	-- pointed the rodent out above them meets it aware in the duel (Combat/CombatService opts.overhead)
+	local okO, errO = pcall(function()
+		overhead = OverheadService.new({
+			world = world,
+			speech = townSpeech,
+			infection = infection,
+			combat = combat,
+			groundAt = Height.at,
+			-- the held rodent's route and footing, from the validator's last clean packet (a stale one says nothing)
+			motorOf = function(id: number): any
+				local actor = rt.byTownId[id]
+				if actor == nil then
+					return nil
+				end
+				local snap, at = movement:motorOf(actor.id)
+				if snap == nil or at == nil or workspace:GetServerTimeNow() - at > 1 then
+					return nil
+				end
+				return { routeId = (snap :: any).routeId, grounded = (snap :: any).grounded == true }
+			end,
+			exclude = function(id: number): boolean
+				local actor = rt.byTownId[id]
+				return rafters ~= nil and actor ~= nil and rafters:watches(actor.id)
+			end,
+			setAttr = setTownAttr,
+			gaze = function(id: number, x: number?, y: number?, z: number?)
+				setTownAttr(id, "Gaze", if x and y and z then Vector3.new(x, y, z) else nil)
+			end,
+			-- the rodent's own eye: the player holding it (Client/UI/SneakMeter)
+			cue = function(id: number, meter: number?, seen: boolean?)
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				if driver ~= nil and driver ~= "ai" then
+					pcall(function()
+						driver:SetAttribute("OverheadMeter", meter)
+						driver:SetAttribute("OverheadSeen", seen)
+					end)
+				end
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+		})
+		if combat then
+			combat.opts.overhead = function(person: number, rodent: number): boolean
+				return overhead ~= nil and overhead:spotted(person, rodent)
+			end
+			combat.opts.under = function(person: number, rodent: number): (number?, number?)
+				if overhead == nil then
+					return nil, nil
+				end
+				return overhead:spotUnder(person, rodent)
+			end
+		end
+	end)
+	if not okO then
+		overhead = nil
+		warn(`[SpicyRodents] the overhead watch failed to start: {errO}`)
 	end
 
 	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
@@ -1939,6 +2055,7 @@ function Game.start(opts: Opts?): any
 		sewers = sewers,
 		skylift = skylift,
 		rafters = rafters,
+		overhead = overhead,
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
@@ -1961,6 +2078,9 @@ function Game.start(opts: Opts?): any
 			end
 			if rafters then
 				rafters:stop()
+			end
+			if overhead then
+				overhead:stop()
 			end
 			if lounge then
 				lounge:stop()

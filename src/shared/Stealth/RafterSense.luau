@@ -32,6 +32,7 @@ local AlleyRoof = require("../Attractions/AlleyRoof")
 local Curve = require("../Routes/Curve")
 local Enclosure = require("../Routes/Enclosure")
 local RafterWatch = require("./RafterWatch")
+local Pace = require("./Pace")
 
 local RafterSense = {}
 
@@ -39,7 +40,7 @@ RafterSense.C = {
 	across = 0.9, -- level distance from the route's line that still counts as on it (the drawn body eases after it)
 	updown = 1.0, -- vertical
 	step = 0.5, -- studs between the samples the lines are cut into
-	window = 0.1, -- seconds: the shortest stretch a sampled speed is measured over (six frames at 60 Hz)
+	window = Pace.C.window, -- seconds: the shortest stretch a sampled speed is measured over (Stealth/Pace)
 	-- the roof space over the lanes (AlleyRoof.HALL_ROOF), from under the light rails to the deck
 	airY0 = 8.5,
 	airY1 = AlleyRoof.HALL_ROOF.deckY0,
@@ -139,40 +140,21 @@ function RafterSense.inRoofSpace(X: number, Y: number, D: number): boolean
 end
 
 type Track = { X: number, Y: number, D: number, routeId: number?, beam: number? }
--- a body's frames since the last tick: its clock, the positions of the last C.window seconds (and the one before),
--- and the fastest stretch of C.window
-type Frames = { clock: number, at: { { number } }, peak: number? }
-export type State = { tracks: { [string]: Track }, frames: { [string]: Frames } }
+-- frames: each body's fastest stretch since the last tick (Stealth/Pace)
+export type State = { tracks: { [string]: Track }, frames: Pace.State }
 
 function RafterSense.new(): State
-	return { tracks = {}, frames = {} }
+	return { tracks = {}, frames = Pace.new() }
 end
 
 function RafterSense.forget(state: State, id: string)
 	state.tracks[id] = nil
-	state.frames[id] = nil
+	Pace.forget(state.frames, id)
 end
 
 -- sample(state, id, X, Y, D, dt): one frame of a body (any point that moves with it).
 function RafterSense.sample(state: State, id: string, X: number, Y: number, D: number, dt: number)
-	local f = state.frames[id]
-	if f == nil then
-		f = { clock = 0, at = {} }
-		state.frames[id] = f
-	end
-	f.clock += dt
-	local at = f.at
-	table.insert(at, { f.clock, X, Y, D })
-	-- keep the newest position at least C.window old, and everything after it
-	while #at >= 2 and at[2][1] <= f.clock - C.window do
-		table.remove(at, 1)
-	end
-	local o = at[1]
-	local span = f.clock - o[1]
-	if span >= C.window - 1e-9 then
-		local v = math.sqrt((X - o[2]) ^ 2 + (Y - o[3]) ^ 2 + (D - o[4]) ^ 2) / span
-		f.peak = math.max(f.peak or 0, v)
-	end
+	Pace.sample(state.frames, id, X, Y, D, dt)
 end
 
 -- sense(state, id, X, Y, D, dt): this tick's RafterWatch squirrel for the body `id` (feet at X, Y, D), or nil.
@@ -182,11 +164,7 @@ function RafterSense.sense(state: State, id: string, X: number, Y: number, D: nu
 	local air = routeId == nil and RafterSense.inRoofSpace(X, Y, D)
 	-- the beam it counts on: the one it is on, or in the air the one it left
 	local beam = if routeId and AlleyRoof.isRafter(routeId) then routeId elseif air and prev then prev.beam else nil
-	local frames = state.frames[id]
-	local peak = frames and frames.peak
-	if frames then
-		frames.peak = nil
-	end
+	local peak = Pace.take(state.frames, id)
 	if routeId == nil and beam == nil then
 		RafterSense.forget(state, id)
 		return nil

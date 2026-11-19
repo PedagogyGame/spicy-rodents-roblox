@@ -374,7 +374,8 @@ return function(t)
 			for _, line in
 				{
 					'local RafterService = require("../Attractions/RafterService")',
-					"rafters = RafterService.start({ possession = possession, runtime = rt, fire = fire, attractions = attractions })",
+					"rafters = RafterService.start({", -- (with the town's speech, Boot/Game's townSpeech)
+					"speech = townSpeech,",
 					"pcall(rafters.step, rafters, dt)",
 					"rafters:stop()",
 				}

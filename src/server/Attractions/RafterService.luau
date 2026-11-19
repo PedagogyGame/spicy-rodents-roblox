@@ -31,7 +31,8 @@
 -- The Town is what it needs from the game (start(game) builds it from Boot/Game's parts; specs pass a stub).
 -- Interface: TICK, C, WORDS, EYE_OVER_ROOT, BOWLER_EYE, DEFAULT_PLACE, SIGHT_GROUP; new(opts) -> Service; start(game) -> Service;
 --   covers(place) -> { Box }; callout(spicy, lane?) -> string; Service:step(dt); Service:stop();
---   Service:meter(id) -> (number, boolean); Service.stats { ticks, spotted, lines, callouts, alarms }
+--   Service:meter(id) -> (number, boolean); Service:watches(id) -> boolean; Service.stats { ticks, spotted, lines,
+--   callouts, alarms }
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -99,7 +100,9 @@ export type Opts = {
 	place: Place?,
 	now: () -> number, -- server time (SayAt, the glow's end)
 	canSee: ((eye: Vector3, aim: Vector3) -> boolean)?, -- default: a ray in the workspace
-	speech: any?, -- a Speech/SpeechRules.State on the same clock as `now` (default: its own)
+	-- a Speech/SpeechRules.State on the same clock as `now`, or with its own clock: the town's one (Boot/Game: shared
+	-- with the bite-to-hospital sequence, the drains and the overhead watch); default its own
+	speech: any?,
 	rand: (() -> number)?,
 }
 
@@ -367,9 +370,19 @@ function RafterService._spotted(self: any, body: Body, e: Event, tick: TickView)
 		if spoken >= C.speakers then
 			break
 		end
-		local line = SpeechRules.request(self.speech, now, c.id, situation, self.rand)
+		-- (the town's person: their cooldown is one across the town's speech; counted where it is said, in the town's
+		-- area cap, never held back by it)
+		local model = people[c.id].model
+		local root = rootOf(model)
+		local line = SpeechRules.request(
+			self.speech,
+			now,
+			(people[c.id] :: any).townId or c.id,
+			situation,
+			self.rand,
+			{ x = if root then root.Position.X else nil, z = if root then root.Position.Z else nil, unpaced = true }
+		)
 		if line then
-			local model = people[c.id].model
 			setAttr(model, SpeechRules.ATTR.Say, line)
 			setAttr(model, SpeechRules.ATTR.SayAt, now)
 			spoken += 1
@@ -456,6 +469,12 @@ function RafterService._publish(self: any, byId: { [string]: Body })
 		end
 		self.shown[player] = if w.meter == nil then nil else w
 	end
+end
+
+-- watches(id): is the squirrel with this body id on the rafters (watched at the last tick)? The town's overhead watch
+-- (Stealth/OverheadService) leaves such a one to this service.
+function RafterService.watches(self: any, id: string): boolean
+	return self.sampled[id] ~= nil
 end
 
 -- meter(id): the watch's meter and seen for a squirrel's body id.
@@ -583,6 +602,7 @@ function RafterService.start(game: { [string]: any }): any
 		end,
 		canSee = canSee,
 		rand = game.rand,
+		speech = game.speech, -- the town's one (Boot/Game)
 	})
 end
 

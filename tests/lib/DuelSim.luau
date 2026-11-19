@@ -6,7 +6,20 @@
 --               squared up like a vigilante (the stance, once a vigilante shows it: provoked) and chases a runner down at a sprint; against a
 --               vigilante zig-zags in to just outside the reach, backs out of a wind-up, pounces into a flinch or a
 --               recovery, feints (when the feint meter allows) or dips into reach to draw a blow. On the click it
---               steers straight at the person through the wind-up (the motor pounces along the body's heading).
+--               steers straight at the person through the wind-up (the motor pounces along the body's heading);
+--   "stalker":  a stalk on the ground from behind (owner playtest 2026-11-19; the combat review: "a well-stalked pounce
+--               lands on an UNAWARE person"): starts 30 studs behind the person (within 60 degrees of straight behind),
+--               walks in to 27 studs, creeps (the ground stalk, 4.1 studs/s: silent) to 9 and pounces; once the person
+--               has noticed it (its player sees them react) it plays on as "skilled";
+--   "dropper":  a drop from a wire 15 studs over the person's feet (2 to 4 studs to one side of them, along the way they
+--               face): creeps along it (the rail stalk, 3 studs/s) to over a spot 5 studs behind them, keeps still while
+--               that spot is in their view, drops onto it (a sideways hop under the creep line, gravity 75) and pounces
+--               on landing; the person's overhead watch (Stealth/OverheadWatch) runs while it is up there, and a spot
+--               there makes them aware. Then "skilled".
+-- THE PERSON in the stalker and dropper duels is about the town as the game has it: half of them stand (turning to a new
+-- facing every 4 to 8 s, up to 90 degrees), half walk on at 1.5 to 3 studs/s facing the way they go (and turn back at a
+-- lane's goal, about once a minute). They notice by Combat/Duel.notices: their view cone, a noise faster than a creep, a
+-- brush, or the overhead watch; aware, they face the rodent. (In the other duels they are aware of it from the start.)
 -- THE SERVER, as Server/Combat/CombatService runs it: the person thinks ten times a second (the duel's step), a blow is
 -- judged against where the server has the rodent then, and a bite is contact along the rodent's move since the last
 -- step inside the pounce's window (pounce.window + duel.rewind after the wind-up), judged by Duel.bitePhaseAt against
@@ -24,6 +37,8 @@
 -- Interface: run(opts) -> Result; batch(n, opts) -> Summary
 local CombatRules = require("@shared/Combat/CombatRules")
 local Duel = require("@shared/Combat/Duel")
+local OverheadWatch = require("@shared/Stealth/OverheadWatch")
+local Pace = require("@shared/Stealth/Pace")
 local Rng = require("@shared/Util/Rng")
 
 local DuelSim = {}
@@ -43,15 +58,26 @@ DuelSim.KNOCK = 6
 DuelSim.TURN = 13 -- the body's turn rate (SquirrelMotor turnRate)
 DuelSim.HOVER = 1.5 -- studs: a skilled rodent hovers this far outside a kick's reach (with the step-in)
 DuelSim.LOST = 80 -- studs: a person this far off is out of the rodent's sight
+DuelSim.CREEP = 4.1 -- the ground stalk (SquirrelMotor stalk 1.65 u/s)
+DuelSim.RAIL_CREEP = 3 -- the rail stalk (Motion railStalk 1.2 u/s)
+DuelSim.GRAVITY = 75 -- SquirrelMotor gravity 30 u/s^2
+DuelSim.WIRE = 15 -- the dropper's wire over the person's feet
+DuelSim.EYE = 4.6 -- a person's eye over their feet (root 3 + Server/Stealth/OverheadService EYE_OVER_ROOT 1.6)
 
 export type Options = {
 	temper: CombatRules.Temper,
-	rodent: string, -- "sprinter" | "skilled"
+	rodent: string, -- "sprinter" | "skilled" | "stalker" | "dropper"
 	seed: number,
 	lag: number?, -- the link's round trip, seconds (default 0)
 	boosted: boolean?, -- near a fresh bite
 	params: CombatRules.Params?,
 	trace: ((now: number, dist: number, phase: string, meter: number, flying: boolean) -> ())?,
+	-- the stalker's play (review of the overhead watch): the distance it pounces from (default 9) and its creep's
+	-- speed (default DuelSim.CREEP)
+	pounceFrom: number?,
+	creep: number?,
+	-- ... or its "creep" is tapping W (a macro): the walk for `on` seconds, then still for `off`, over and over
+	tap: { on: number, off: number }?,
 }
 
 export type Result = {
@@ -64,6 +90,9 @@ export type Result = {
 	strikes: number,
 	health: number,
 	landedOn: string?, -- the person's phase when the bite landed
+	bitPhase: string?, -- how the bite met them (CombatRules.BitePhase: "unaware" is a bite the person never saw coming)
+	noticedAt: number?, -- when the person first noticed the rodent (nil: never)
+	spottedOverhead: boolean?, -- the overhead watch spotted the dropper on its wire
 }
 
 export type Summary = {
@@ -78,6 +107,10 @@ export type Summary = {
 	feints: number,
 	hitsTaken: number,
 	landedOn: { [string]: number }, -- wins by the person's phase at the bite
+	unaware: number, -- wins on a person who never saw it coming (bite phase "unaware")
+	unawareRate: number, -- unaware / n
+	noticed: number, -- duels in which the person noticed the rodent before any bite
+	spottedOverhead: number, -- dropper duels in which the overhead watch spotted it on the wire
 }
 
 type Seen = { t: number, phase: string, stance: string?, x: number, z: number }
@@ -128,6 +161,47 @@ function DuelSim.run(opts: Options): Result
 	local serverAcc = DuelSim.SERVER_DT
 	local lastX, lastZ = rx, rz
 	local move, moveSpeed = "none", 0
+	-- THE STALKER AND THE DROPPER: the person's facing and pace, the rodent's start, the wire
+	local stealth = opts.rodent == "stalker" or opts.rodent == "dropper"
+	local pyaw = 0 -- the person's facing (HTML yaw: towards = (sin, cos))
+	local pace = 0
+	local turnAt = math.huge
+	local ry = 0 -- the rodent's height over the person's feet
+	local onWire = false
+	local falling = false
+	local fvx, fvz, fvy = 0, 0, 0
+	local wireX, wireZ, wireDX, wireDZ = 0, 0, 0, 0 -- a point on the wire and its direction
+	local stalking = stealth -- still unseen, by its own player's reading
+	local noticedAt: number? = nil
+	local overhead = OverheadWatch.new()
+	local spottedOverhead = false
+	if stealth then
+		pyaw = rand() * math.pi * 2
+		if rand() < 0.5 then
+			pace = 0
+			turnAt = 4 + rand() * 4
+		else
+			pace = 1.5 + rand() * 1.5
+		end
+		local fx, fz = math.sin(pyaw), math.cos(pyaw)
+		if opts.rodent == "stalker" then
+			local a = pyaw + math.pi + (rand() * 2 - 1) * math.rad(60)
+			rx, rz = math.sin(a) * 30, math.cos(a) * 30
+		else
+			local side = if rand() < 0.5 then -1 else 1
+			local lat = side * (2 + rand() * 2)
+			-- the wire runs the way they face; the rodent starts 22 studs along it (ahead of a walker; either way of one
+			-- standing)
+			local along = if pace > 0 or rand() < 0.5 then 22 else -22
+			wireX, wireZ = fz * lat, -fx * lat
+			wireDX, wireDZ = fx, fz
+			rx, rz = wireX + fx * along, wireZ + fz * along
+			ry = DuelSim.WIRE
+			onWire = true
+		end
+		yaw = math.atan2(-rx, -rz)
+		lastX, lastZ = rx, rz
+	end
 
 	-- what the rodent's player sees: the person `lag` ago (the stance a reaction time before that)
 	local function observed(): (string, number, number, string?)
@@ -176,8 +250,11 @@ function DuelSim.run(opts: Options): Result
 		return commitAt == nil and not flying and now >= recoverUntil and now >= cooldownUntil and now >= feintUntil
 	end
 
-	local function result(win: boolean, cause: string, landedOn: string?): Result
+	local function result(win: boolean, cause: string, landedOn: string?, bitPhase: string?): Result
 		return {
+			bitPhase = bitPhase,
+			noticedAt = noticedAt,
+			spottedOverhead = spottedOverhead,
 			win = win,
 			cause = cause,
 			secs = now,
@@ -201,6 +278,13 @@ function DuelSim.run(opts: Options): Result
 
 		-- the rodent decides, on the person as its player sees them
 		local ph, ox, oz, stance = observed()
+		if stalking and ph ~= "idle" and not falling then
+			stalking = false -- (seen: it plays the duel out as a skilled rodent)
+			if onWire then
+				onWire = false
+				ry = 0 -- (it comes down off the wire to fight)
+			end
+		end
 		local dx, dz = ox - rx, oz - rz
 		local d = math.sqrt(dx * dx + dz * dz)
 		local ux, uz = dx / math.max(d, 1e-6), dz / math.max(d, 1e-6) -- rodent -> person (as seen)
@@ -226,6 +310,44 @@ function DuelSim.run(opts: Options): Result
 			-- the wind-up: steering straight at the person
 			vx, vz = ux, uz
 			sprinting = d > 6
+		elseif falling then
+			vx, vz = fvx, fvz
+		elseif stalking and (opts.rodent == "stalker" or not onWire) then
+			-- walk in while it cannot be heard, then creep; pounce from 9 studs
+			local creep = d <= 27
+			local tap = opts.tap
+			local sp = if not creep
+				then DuelSim.WALK
+				elseif tap then (if now % (tap.on + tap.off) < tap.on then DuelSim.WALK else 0)
+				else (opts.creep or DuelSim.CREEP)
+			vx, vz = ux * sp, uz * sp
+			if d <= (opts.pounceFrom or 9) and canPounce() then
+				startPounce()
+			end
+		elseif stalking and opts.rodent == "dropper" then
+			-- along the wire to over a spot 5 studs behind them (as its player sees them), still while that spot is in
+			-- their view, then the drop
+			local fx, fz = math.sin(pyaw), math.cos(pyaw)
+			local lx, lz = ox - fx * 5, oz - fz * 5
+			local k = (lx - wireX) * wireDX + (lz - wireZ) * wireDZ
+			local px, pz = wireX + wireDX * k, wireZ + wireDZ * k
+			local ex, ez = px - rx, pz - rz
+			local e = math.sqrt(ex * ex + ez * ez)
+			if e > 1 then
+				local sp = math.min(DuelSim.RAIL_CREEP, e / dt)
+				vx, vz = ex / e * sp, ez / e * sp
+			elseif ph == "idle" then
+				-- the drop: a hop sideways onto the spot behind them, under the creep line
+				local fall = math.sqrt(2 * ry / DuelSim.GRAVITY)
+				local hx2, hz2 = lx - rx, lz - rz
+				local hd = math.sqrt(hx2 * hx2 + hz2 * hz2)
+				local hs = math.min(hd / fall, 7.5)
+				fvx, fvz = if hd > 1e-6 then hx2 / hd * hs else 0, if hd > 1e-6 then hz2 / hd * hs else 0
+				fvy = 0
+				falling = true
+				onWire = false
+				vx, vz = fvx, fvz
+			end
 		elseif opts.rodent == "sprinter" then
 			sprinting = true
 			vx, vz = ux, uz
@@ -300,7 +422,7 @@ function DuelSim.run(opts: Options): Result
 				vx, vz = vx / m * speed, vz / m * speed
 			end
 		end
-		if (opts.rodent == "sprinter" or commitAt) and not flying and not recovering then
+		if (opts.rodent == "sprinter" or commitAt) and not flying and not recovering and not falling then
 			local speed = if winded then DuelSim.WALK elseif sprinting then DuelSim.SPRINT else DuelSim.WALK
 			vx, vz = vx * speed, vz * speed
 		end
@@ -332,11 +454,39 @@ function DuelSim.run(opts: Options): Result
 		feintMeter = math.min(1, feintMeter + P.feintRefill * dt)
 		rx += vx * dt
 		rz += vz * dt
+		if falling then
+			fvy -= DuelSim.GRAVITY * dt
+			ry += fvy * dt
+			if ry <= 0 then
+				-- down behind them: the pounce at once, facing them
+				ry = 0
+				falling = false
+				local tx, tz = hx - rx, hz - rz
+				yaw = math.atan2(tx, tz)
+				if canPounce() then
+					startPounce()
+				end
+			end
+		end
 
 		-- the person's body follows the server's last order
 		dx, dz = hx - rx, hz - rz
 		d = math.sqrt(dx * dx + dz * dz)
 		local awayX, awayZ = dx / math.max(d, 1e-6), dz / math.max(d, 1e-6) -- away from the rodent
+		if stealth then
+			if g.aware then
+				pyaw = math.atan2(-awayX, -awayZ) -- (facing it, as the brain's duel orders turn them)
+			else
+				if now >= turnAt then
+					pyaw += (rand() * 2 - 1) * math.rad(90)
+					turnAt = now + 4 + rand() * 4
+				elseif pace > 0 and rand() < dt / 60 then
+					pyaw += math.pi -- (a new goal back along the lane)
+				end
+				hx += math.sin(pyaw) * pace * dt
+				hz += math.cos(pyaw) * pace * dt
+			end
+		end
 		if move == "flee" then
 			hx += awayX * DuelSim.FLEE * dt
 			hz += awayZ * DuelSim.FLEE * dt
@@ -359,12 +509,55 @@ function DuelSim.run(opts: Options): Result
 			if #history > 30 then
 				table.remove(history, 1)
 			end
+			local seenNow: boolean
+			local dy = 0
+			local sneaking = false
+			if stealth then
+				-- the rodent's flat pace by where the server had it (Server/Combat/CombatService paceOf: the fastest
+				-- Stealth/Pace.stretch of its track); in view by the facing
+				local n = #history
+				local speed = if n >= 2
+					then Pace.stretch(function(t: number): (number, number)
+						return Pace.along(history, t)
+					end, history[n].t, history[1].t)
+					else nil
+				local tx, tz = rx - hx, rz - hz
+				local inView = d > 0 and (tx * math.sin(pyaw) + tz * math.cos(pyaw)) / d >= 0.28
+				-- the overhead watch, while it is up on the wire
+				if onWire and not g.aware then
+					local sq: OverheadWatch.Squirrel = { id = "rodent", x = rx, y = ry, z = rz, speed = speed or 0 }
+					local o: OverheadWatch.Observer =
+						{ id = "p", x = hx, y = DuelSim.EYE, z = hz, faceX = math.sin(pyaw), faceZ = math.cos(pyaw) }
+					local r, imp, e = OverheadWatch.rate(sq, o)
+					local m = {}
+					if e > 0 then
+						m.p = { squirrel = "rodent", rate = r, impulse = imp, exposure = e, creep = (speed or 0) <= 8 }
+					end
+					OverheadWatch.step(overhead, now, DuelSim.SERVER_DT, m)
+					if OverheadWatch.spotted(overhead, "p", "rodent") then
+						spottedOverhead = true
+					end
+				end
+				dy = ry
+				sneaking = speed ~= nil and speed <= P.quietSpeed
+				seenNow = Duel.notices(P, g, {
+					dist = d,
+					dy = ry,
+					inView = inView,
+					speed = speed,
+					lunging = tell ~= nil and not tellFeint and now >= tell and (commitAt ~= nil or flying),
+					spottedOverhead = spottedOverhead,
+				})
+			else
+				seenNow = Duel.notices(P, g, { dist = d, inView = true })
+			end
 			local view: Duel.View = {
 				now = now,
 				dt = DuelSim.SERVER_DT,
 				dist = d,
-				dy = 0,
-				seen = Duel.notices(P, g, d, true),
+				dy = dy,
+				seen = seenNow,
+				sneaking = sneaking,
 				tell = tell,
 				tellFeint = tellFeint,
 				committed = flying,
@@ -374,6 +567,9 @@ function DuelSim.run(opts: Options): Result
 			}
 			local out = Duel.think(P, g, view, rand)
 			move, moveSpeed = out.move, out.speed
+			if g.aware and noticedAt == nil then
+				noticedAt = now
+			end
 			if opts.trace then
 				opts.trace(now, d, g.phase, meter, flying)
 			end
@@ -401,16 +597,17 @@ function DuelSim.run(opts: Options): Result
 			if not landed and now >= serverUntil then
 				landed = true
 			end
-			if not landed and commitAt == nil then
+			if not landed and commitAt == nil and ry <= P.contactHeight then
 				local cd = Duel.sweep(lastX, lastZ, rx, rz, hx, hz)
 				if cd <= P.contact then
-					local chance = CombatRules.biteChance(P, temper, Duel.bitePhaseAt(g, now, rewind, tell), boosted)
+					local bitPhase = Duel.bitePhaseAt(g, now, rewind, tell)
+					local chance = CombatRules.biteChance(P, temper, bitPhase, boosted)
 					landed = true
 					windowUntil = math.min(windowUntil, now)
 					flying = false
 					recoverUntil = now + P.pounceRecovery
 					if rand() < chance then
-						return result(true, "bite", g.phase)
+						return result(true, "bite", g.phase, bitPhase)
 					end
 					Duel.batted(g, now)
 					-- batted away: bounced back
@@ -441,15 +638,28 @@ function DuelSim.batch(n: number, opts: Options): Summary
 		feints = 0,
 		hitsTaken = 0,
 		landedOn = {},
+		unaware = 0,
+		unawareRate = 0,
+		noticed = 0,
+		spottedOverhead = 0,
 	}
 	for i = 1, n do
 		local o = table.clone(opts)
 		o.seed = opts.seed * 1000 + i
 		local r = DuelSim.run(o)
+		if r.noticedAt ~= nil then
+			s.noticed += 1
+		end
+		if r.spottedOverhead then
+			s.spottedOverhead += 1
+		end
 		if r.win then
 			s.wins += 1
 			local k = r.landedOn or "?"
 			s.landedOn[k] = (s.landedOn[k] or 0) + 1
+			if r.bitPhase == "unaware" then
+				s.unaware += 1
+			end
 		elseif r.cause == "knockout" then
 			s.knockouts += 1
 		elseif r.cause == "escaped" then
@@ -463,6 +673,7 @@ function DuelSim.batch(n: number, opts: Options): Summary
 		s.hitsTaken += r.hitsTaken / n
 	end
 	s.rate = s.wins / n
+	s.unawareRate = s.unaware / n
 	return s
 end
 

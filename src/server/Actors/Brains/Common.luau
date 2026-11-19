@@ -69,6 +69,9 @@ export type Ctx = {
 	-- test's bare world) every walk is straight.
 	way: ((x0: number, z0: number, x1: number, z1: number) -> { { number } }?)?,
 	clear: ((x0: number, z0: number, x1: number, z1: number) -> boolean)?,
+	-- optional: a held body's flat pace by its validated motor packets (Boot/Game: Movement/MovementService:paceOf);
+	-- nil for a body nobody holds (its `speed` is the brain's own). A held body's `speed` is what its client reports
+	paceOf: ((id: number) -> number?)?,
 }
 
 -- A walk to a spot that may be round a corner (Common.toward keeps it): the spot, the way there, the point on it

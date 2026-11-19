@@ -85,6 +85,14 @@ Tunables.tree = {
 	                     src = "brief: flinch, swing, kick, back away or flee by awareness and nerve; vigilantes never flee" },
 	         nerveJitter = { v = 0.15, src = "each person's nerve differs a little from their temperament's" },
 	         engage = { v = 30, unit = "st", src = "a person this close to a rodent they have seen takes part in the duel" },
+	         -- the duel's noticing is the town's perception (combat review, 19 Nov: "a person notices the rodent within 17
+	         -- studs whatever way they face"): seen in the view cone (human.spotRange x notice), heard when it moves faster
+	         -- than a creep, felt only when it brushes them; a rodent overhead is the overhead watch's (Stealth/OverheadWatch)
+	         quietSpeed = { v = 8, unit = "st/s", src = "a rodent no faster than this is silent (ground stalk 4.1, rail stalk 3; walk 18): Stealth/RafterWatch.C.stalkSpeed" },
+	         hear = { v = 21.5, unit = "st", src = "v5.4 noiseDist 8.6 u: a rodent moving faster than a creep is heard this near, x notice" },
+	         brush = { v = 4, unit = "st", src = "this near a person feels the rodent whatever it does (was v5.4 peripheral 6.8 u = 17 st)" },
+	         tellHeard = { v = { calm = 0.35, wary = 0.45, tough = 0.55 }, src = "the chance a person who has not noticed the rodent hears a pounce's wind-up within duel.threat and turns at the last moment (alarmed: Combat/Duel): a stalk is still possible, but harder" },
+	         overheadY = { v = 10, unit = "st", src = "v5.4 lowY 4 u: higher over a person's feet than this the duel does not see it (the overhead watch does)" },
 	         threat = { v = 13, unit = "st", src = "a tell further off than this does not make anyone react" },
 	         kickReach = { v = 6.6, unit = "st", src = "human.kickReach 2.65 u in studs" }, swingReach = { v = 5, unit = "st" },
 	         swingDamage = { v = 35, src = "a swat: less than a kick (rodent.kick 55)" }, swingWindupMult = { v = 0.7 },

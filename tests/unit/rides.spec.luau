@@ -256,6 +256,16 @@ return function(t)
 		local bike = byName(Placeholder.look("bike") :: any)
 		local c = VehicleKinds.kind("bike").color
 		t.near(bike.TopTube.color.r, c[1], 0.003, "the bike's frame is its colour")
+		-- the player's golf cart is the taller one (a seated head clears its canopy: vehicles_built); the traffic's carts
+		-- keep their 4.75 box and the canopy on top of it
+		local cart = VehicleKinds.kind("cart").size
+		t.near(cart[2], 6.25, 1e-9, "the player's cart is 6.25 tall")
+		t.truthy(cart[1] == 3.75 and cart[3] == 6.5, "and as wide and long as before")
+		local playerCanopy = byName(Placeholder.look("cart") :: any).Canopy
+		t.near(playerCanopy.pos[2] + playerCanopy.size[2] / 2, cart[2] / 2, 1e-6, "its canopy is the top of its box")
+		local traffic = byName(VehiclePuppet.spec("cart"))
+		t.near(traffic.RootPart.size[2], 4.75, 1e-9, "a traffic cart is still 4.75 tall")
+		t.near(traffic.Canopy.pos[2] + traffic.Canopy.size[2] / 2, 4.75 / 2, 1e-6, "under its own canopy")
 		-- the player-only kinds need a box (no traffic kind is drawn by accident)
 		t.falsy(pcall(VehiclePuppet.spec, "pickup"), "a pickup has no traffic box")
 		t.truthy(table.find(VehiclePuppet.KINDS, "pickup") == nil, "and is not a traffic kind")

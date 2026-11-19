@@ -21,12 +21,19 @@
 -- and z, speed, untilTime; or mode "end") has the person face the rodent, close in on it or back away from it until
 -- untilTime, then walk back to the lane; a medical order or a gathering is never interrupted by it. A flight in the
 -- duel is the ordinary flee ("witness").
+-- The overhead watch (Server/Stealth/OverheadService, Stealth/OverheadWatch): the event "overhead" (mode stand | approach
+-- | back as the duel's, at the squirrel's x and z, until untilTime; with faceX and faceZ, "approach" walks to x and z
+-- and stands there facing them: the service picks the spot, off the road; "hurry": walk on briskly away from x and z
+-- along the lane until untilTime, also once back on the lane after a rejoin; "end") is the same standing, closing in or
+-- backing away, looking up at a squirrel overhead. It never cuts into a duel's order (the duel's "duel" event does cut
+-- into it), a flight, a gathering or a medical order.
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
 
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../../shared/Config/Tunables"))
 local Common = require("./Common")
 local Directive = require("./Directive")
 local Perception = require("../Perception")
@@ -60,6 +67,10 @@ type Brain = Common.Brain & {
 	gatherZ: number,
 	gatherUntil: number,
 	duel: Duel?, -- an order from Combat/CombatService while the person faces the rodent
+	duelSource: string?, -- who gave the order: "duel" (Combat/CombatService) or "overhead" (the overhead watch)
+	hurryUntil: number, -- walking on briskly (the overhead watch's "hurry") until then ...
+	hurryX: number, -- ... away from here
+	hurryZ: number,
 	threat: Common.Actor?,
 	observer: Perception.Observer,
 	target: Perception.Target,
@@ -70,7 +81,7 @@ type Brain = Common.Brain & {
 
 -- What Server/Combat/CombatService has the person do while they face the rodent (Combat/Duel's move): stand facing it,
 -- close in, or back away from it, at `speed`, until `untilTime` (the service renews it every tick it still holds).
-type Duel = { mode: string, x: number, z: number, speed: number, untilTime: number }
+type Duel = { mode: string, x: number, z: number, speed: number, untilTime: number, faceX: number?, faceZ: number? }
 
 local Pedestrian = {}
 
@@ -89,6 +100,10 @@ local REJOIN_FAR = 6 -- studs off the lane: further than this the person walks b
 local REJOIN_NEAR = 1.5 -- studs: on the lane again
 local REJOIN_SPEED = Units.st(1.6)
 local REJOIN_TRY = 300 -- studs: the lanes a rejoin with no way to its own may try instead
+local QUIET_SPEED = Tunables.get("duel.quietSpeed") -- studs/s: no faster than this a squirrel is creeping
+local BRUSH = Tunables.get("duel.brush") -- studs: this near a person feels it whatever it does
+local HURRY_SPEED = Units.st(2.6) -- walking on briskly from under a squirrel (6.5 st/s; the walk is 2 to 4)
+local HURRY_STEP = Units.st(37) -- how far along the lane the brisk walk heads
 
 -- The v5.4 sidewalk lanes (humans_actors §4.2 table), in studs. 4 core lanes first.
 function Pedestrian.defaultLanes(): { Lane }
@@ -198,6 +213,14 @@ local function adopt(self: Brain): number
 	return bestD
 end
 
+-- The brisk walk on (the overhead watch's "hurry"): the goal along the lane away from (hurryX, hurryZ).
+local function hurryOn(self: Brain)
+	local u = along(self)
+	local tu = if self.lane.axis == "x" then self.hurryX else self.hurryZ
+	local away = if u >= tu then 1 else -1
+	self.goal = math.clamp(u + away * HURRY_STEP, self.lane.min, self.lane.max)
+end
+
 -- Adopt the nearest lane and walk onto it (state "rejoin"); when the person is on it already, just
 -- walk on.
 local function reseat(self: Brain)
@@ -207,7 +230,34 @@ local function reseat(self: Brain)
 	pickGoal(self)
 end
 
--- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted().
+-- A squirrel creeping (or keeping still) outside a person's view cone, and not brushing them, is not noticed just for
+-- being near: the v5.4 predicate's peripheral sense (spotted within 6.8 u = 17 studs whatever the facing) is for one that
+-- moves faster than a creep (the stalk, owner playtest 2026-11-19; the duel's own noticing is the same rule:
+-- Combat/Duel.notices, Tunables duel.quietSpeed and duel.brush). Actors/Perception.spotted itself is unchanged.
+-- `speed` is the squirrel's pace (speedOf: a held body's validated pace, not what its client reports).
+local function stalkedUnseen(actor: Common.Actor, threat: Common.Actor, speed: number): boolean
+	if speed > QUIET_SPEED then
+		return false
+	end
+	local dx, dz = threat.x - actor.x, threat.z - actor.z
+	local d = math.sqrt(dx * dx + dz * dz)
+	if d < BRUSH then
+		return false
+	end
+	local dot = (dx * math.sin(actor.yaw) + dz * math.cos(actor.yaw)) / d
+	return dot <= Perception.constants.inViewDot
+end
+
+-- How fast a squirrel is going: a held one's pace by its validated motor packets (ctx.paceOf), never the velocity its
+-- client reports (a client saying 0 would never be loud); anyone else's own speed
+local function speedOf(threat: Common.Actor, ctx: Common.Ctx): number
+	local f = ctx.paceOf
+	local v = if f then f(threat.id) else nil
+	return if v ~= nil then v else threat.speed
+end
+
+-- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted() (and is not stalking
+-- them unseen: stalkedUnseen).
 local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local actor = self.actor
 	local n = ctx.threats:query(actor.x, actor.z, SPOT_RADIUS, ctx.queryBuffer)
@@ -221,12 +271,13 @@ local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local bestD = math.huge
 	for i = 1, n do
 		local threat = ctx.actorsById[ctx.queryBuffer[i]]
-		if threat then
+		local speed = if threat then speedOf(threat, ctx) else 0
+		if threat and not stalkedUnseen(actor, threat, speed) then
 			local t = self.target
 			t.x, t.y, t.z = threat.x, threat.y, threat.z
 			t.groundY = ctx.groundAt(threat.x, threat.z)
-			t.moveSpeed = threat.speed
-			t.focus = threat.variant == "spicy" and threat.speed < Units.st(2.5)
+			t.moveSpeed = speed
+			t.focus = threat.variant == "spicy" and speed < Units.st(2.5)
 			if Perception.spotted(obs, t, self.pctx) then
 				local d = Common.dist2d(actor.x, actor.z, threat.x, threat.z)
 				if d < bestD then
@@ -291,7 +342,11 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 			intent.laneAxis, intent.laneCoord = nil, nil
 			intent.turnRate = 10
 			intent.damp = DAMP_FLEE
-			if o.mode == "approach" and o.speed > 0 then
+			local fx, fz = o.faceX, o.faceZ
+			if o.mode == "approach" and fx and fz and dx * dx + dz * dz < 1 then
+				intent.mode = "stand" -- (at the spot it was sent to: facing the squirrel)
+				intent.heading = Common.yawOf(fx - actor.x, fz - actor.z)
+			elseif o.mode == "approach" and o.speed > 0 then
 				intent.mode = "walk"
 				intent.tx, intent.tz = o.x, o.z
 				intent.speed = o.speed
@@ -313,6 +368,9 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		if d <= REJOIN_NEAR then
 			self.state = "walk"
 			pickGoal(self)
+			if ctx.now < self.hurryUntil then
+				hurryOn(self) -- (still hurrying on: away from it, not to a new goal)
+			end
 		else
 			local intent = actor.intent
 			-- by the town's way (from a back yard, a shop floor, the hospital: never through the walls between), to
@@ -390,7 +448,8 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	if math.abs(along(self) - self.goal) < GOAL_REACH then
 		pickGoal(self)
 	end
-	setWalkIntent(self, self.goal, self.walkSpeed, DAMP_WALK)
+	local speed = if ctx.now < self.hurryUntil then math.max(self.walkSpeed, HURRY_SPEED) else self.walkSpeed
+	setWalkIntent(self, self.goal, speed, DAMP_WALK)
 end
 
 function Methods.suspend(self: Brain): Common.Snapshot
@@ -428,6 +487,46 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
+	if evt.type == "overhead" then
+		-- (never into a duel's order, a flight, a gathering, a rejoin or an order from the medical sequence)
+		-- (a hurry on reaches someone walking back to the lane, too: they hurry on once there)
+		local rejoining = self.state == "rejoin" and evt.mode ~= "hurry"
+		if
+			Directive.active(self.directive)
+			or self.state == "gather"
+			or self.state == "flee"
+			or rejoining
+			or (self.state == "duel" and self.duelSource ~= "overhead")
+		then
+			return
+		end
+		if evt.mode == "end" or evt.mode == "hurry" then
+			if self.state == "duel" then
+				self.duel = nil
+				self.duelSource = nil
+				reseat(self)
+			end
+			if evt.mode == "hurry" then
+				-- on along the lane, away from it, briskly
+				self.hurryUntil = evt.untilTime
+				self.hurryX, self.hurryZ = evt.x, evt.z
+				hurryOn(self)
+			end
+			return
+		end
+		self.state = "duel"
+		self.duelSource = "overhead"
+		self.duel = {
+			mode = evt.mode,
+			x = evt.x,
+			z = evt.z,
+			speed = evt.speed or 0,
+			untilTime = evt.untilTime,
+			faceX = evt.faceX,
+			faceZ = evt.faceZ,
+		}
+		return
+	end
 	if evt.type == "duel" then
 		-- (an order from the medical sequence comes first: a patient, a bystander or someone walking home is left be)
 		if Directive.active(self.directive) or self.state == "gather" then
@@ -441,6 +540,7 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 			return
 		end
 		self.state = "duel"
+		self.duelSource = "duel"
 		self.duel = { mode = evt.mode, x = evt.x, z = evt.z, speed = evt.speed or 0, untilTime = evt.untilTime }
 		return
 	end
@@ -501,6 +601,10 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		gatherZ = 0,
 		gatherUntil = 0,
 		duel = nil,
+		duelSource = nil,
+		hurryUntil = 0,
+		hurryX = 0,
+		hurryZ = 0,
 		threat = nil,
 		observer = { x = 0, y = 0, z = 0, facing = 0, witnessUntil = 0 },
 		target = { x = 0, y = 0, z = 0, groundY = 0, moveSpeed = 0, focus = false, inInterior = false },
