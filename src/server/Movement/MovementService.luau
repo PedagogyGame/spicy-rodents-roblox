@@ -1397,7 +1397,8 @@ function MovementService.new(deps: Deps): Movement
 				local wallOnly = true
 				for _, x in v.violations do
 					table.insert(codes, x.code)
-					wallOnly = wallOnly and x.code == "wall"
+					-- (a slab too: a floor its client has not streamed in yet is none to its motor)
+					wallOnly = wallOnly and (x.code == "wall" or x.code == "slab")
 				end
 				local fresh = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
 				if wallOnly and fresh then

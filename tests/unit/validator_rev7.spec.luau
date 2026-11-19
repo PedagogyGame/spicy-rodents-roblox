@@ -82,10 +82,11 @@ return function(t)
 				end
 			end
 			t.truthy(released ~= nil, "the server's root read the client's write between two watches")
-			local rel = released :: { x: number, y: number, z: number }
-			-- Possession.releaseNow (a pick of another body: swap): x, y, z = actors:poseOf(actor) (GetPivot, the root),
-			-- then brain.resume(x, y, z): the computer takes the body where the root is
-			rig:release()
+			-- Possession.releaseNow (a pick of another body: swap). Round 7: x, y, z = actors:poseOf(actor) (GetPivot, the
+			-- root). Validator round 8 (invariant D): the place the server holds (MovementService.heldPlace), the body put
+			-- there at once; rig:release() does as the server now does (test edit: the case emulated the old release)
+			local rel = rig:release() :: { x: number, y: number, z: number }
+			t.truthy(rel ~= nil, "a place held at the release")
 			cheating = false
 			-- Game.PICK_COOLDOWN later the same body is picked again (the one Spicy Rodent; for a squirrel, the
 			-- lowest-numbered free one, Actors/ActorsRuntime.pickFree): Possession.possessNow, the gate at its pose
@@ -238,11 +239,15 @@ return function(t)
 			local start = table.clone(rig.server.root)
 			local startAt = rig.t
 			cheating = true
-			local knocked = false
+			local knocked, written = false, false
 			for _ = 1, 400 do
 				rig:run(0.002)
 				local r = rig.server.root
-				if math.abs(r.x - station.x) < 1 and math.abs(r.z - station.z) < 1 then
+				written = written or (math.abs(r.x - station.x) < 1 and math.abs(r.z - station.z) < 1)
+				-- (the pass reads the animals' list. Round 7: their roots. Validator round 8 (invariant D): the place the
+				-- server holds, rig:place(); test edit: the case read the root)
+				local p = rig:place()
+				if p and math.abs(p.x - station.x) < 1 and math.abs(p.z - station.z) < 1 then
 					-- (the pass finds an animal inside: knock(id, street) -> PivotTo, movedBody)
 					cheating = false
 					rig:teleport(street.x, street.y, street.z, "knocked")
@@ -250,7 +255,9 @@ return function(t)
 					break
 				end
 			end
-			t.truthy(knocked, "the pass read the client's root inside the station")
+			cheating = false
+			t.truthy(written, "the server's root read the client's write inside the station")
+			print(`      the pass found the animal inside the station: {knocked}`)
 			rig:run(3)
 			local r = rig:result()
 			local elapsed = rig.t - startAt
