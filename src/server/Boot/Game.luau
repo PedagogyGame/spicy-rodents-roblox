@@ -1349,22 +1349,28 @@ function Game.start(opts: Opts?): any
 				if actor == nil then
 					return nil
 				end
-				local snap, at, pounceAt = movement:motorOf(actor.id)
+				local snap, at, pounceAt, cleanAt = movement:motorOf(actor.id)
 				if snap == nil or at == nil then
 					return nil
 				end
 				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
-				return { age = t - at, launchAgo = if pounceAt then t - pounceAt else nil }
+				return {
+					age = t - at,
+					cleanAge = if cleanAt then t - cleanAt else math.huge,
+					launchAgo = if pounceAt then t - pounceAt else nil,
+				}
 			end,
-			-- the rodent's place by its last clean packet (a bite and a blow are judged there, not at the root its client
-			-- moves); the body's own when there is none (no packet yet, or the engine tests' own word on the motor)
+			-- the rodent's place by its last accepted packet while the packets are fresh (a bite and a blow are judged
+			-- there, not at the root its client moves; the round-3 review: by the last clean one, a run of packets each
+			-- with a violation too small to flag froze it); the body's own when there is none or they stopped (no packet
+			-- yet, a silent client, or the engine tests' own word on the motor)
 			poseOf = function(id: number): (number?, number?, number?)
 				local actor = rt.byTownId[id]
 				if o.motorOf or actor == nil then
 					return nil, nil, nil
 				end
-				local snap = movement:motorOf(actor.id)
-				if snap == nil then
+				local snap, at = movement:motorOf(actor.id)
+				if snap == nil or at == nil or workspace:GetServerTimeNow() - at > duelRules.motorFresh then
 					return nil, nil, nil
 				end
 				return snap.x :: number, snap.y :: number, snap.z :: number

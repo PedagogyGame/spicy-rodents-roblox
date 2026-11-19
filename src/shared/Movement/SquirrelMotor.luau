@@ -1475,6 +1475,14 @@ SquirrelMotor.envelopeParams = {
 	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
+	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
+	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
+	floorSlack = st(0.2),
+	-- a pounce slower than a lunge met a wall: within wallAhead (studs) along the move the server saw, when it moved at
+	-- least wallMoved; a body that hardly moved touches it (wallTouch along its heading: the body's half-width and a bit)
+	wallAhead = 3,
+	wallMoved = 0.25,
+	wallTouch = 1.5,
 }
 local E = SquirrelMotor.envelopeParams
 
@@ -1513,29 +1521,39 @@ function SquirrelMotor.launchCapXZ(boosted: boolean): number
 	)
 end
 
+-- What the envelope judged of `next`, for the validator's own baseline (the round-3 review: every number a later
+-- packet is judged by is the server's own or one a check has bounded, never one only the client claimed):
+--   vy: the vertical speed to keep (0 on the ground or a rail; gravity's after a plain arc, so the slack each packet
+--       may claim never adds up to a slower fall; else the claim held to the bounds it was judged against);
+--   xz: the most horizontal speed to keep (the cap the packet was judged against; 0 on a rail);
+--   landed: the body came down on a floor inside the gap and walked off its edge (on the ground, for the sprint meter);
+--   longWall: the straight line was too long for the short wall test and a chord of it went through a wall (the
+--       validator weighs it as a gap's: one may be a corner rounded unseen).
+export type Judged = { vy: number, xz: number, landed: boolean, longWall: boolean }
+
 -- Returns the violations; whether a launch (leap, pounce, a step off a rail) was needed to explain the move; how long
 -- before `next` the motor's pounce launched when the move holds one (a pounce-shaped launch the window dates; nil
--- otherwise); and, for a plain arc in the air, the vertical speed gravity gives at its end (the validator's baseline
--- takes it, so the slack each packet may claim never adds up to a slower fall).
+-- otherwise); and what it judged of `next` (Judged).
 function SquirrelMotor.envelope(
 	prev: State,
 	next: State,
 	dt: number,
 	world: World,
 	boosted: boolean
-): ({ Violation }, boolean, number?, number?)
+): ({ Violation }, boolean, number?, Judged)
 	local out: { Violation } = {}
 	local launchUsed = false
+	local judged: Judged = { vy = next.vy, xz = math.huge, landed = false, longWall = false }
 	if dt <= 0 then
 		add(out, "clock", 1, `non-positive dt {dt}`)
-		return out, false, nil, nil
+		return out, false, nil, judged
 	end
 	local reg = world.registry
 	local prevRoute = route(world, prev.routeId)
 	local nextRoute = route(world, next.routeId)
 	if next.routeId and not nextRoute then
 		add(out, "route", 1, `unknown route {next.routeId}`)
-		return out, false, nil, nil
+		return out, false, nil, judged
 	end
 	local groundCap = SquirrelMotor.groundCap(boosted) * E.speedTol
 	local launchXZ = SquirrelMotor.launchCapXZ(boosted) * E.launchTol
@@ -1717,12 +1735,28 @@ function SquirrelMotor.envelope(
 			return nil
 		end
 		if vxz < pounceMinXZ then
-			-- (slower than any lunge: only one that met a wall, which takes the speed off it substep by substep; the
-			-- wall is then just ahead along the body's heading)
+			-- (slower than any lunge: only one that met a wall, which takes the speed off it substep by substep, the body
+			-- sliding along it. The heading is the client's word (the round-3 review: any wall within reach of it would
+			-- do), so the server's own two places judge it: a body that moved went toward where it faces, and the wall
+			-- is within E.wallAhead ahead of it along that heading or along the move; one that hardly moved touches the
+			-- wall (E.wallTouch along its heading): no more than an honest point-blank pounce)
 			local crosses = world.crosses
-			local r = 3
-			local hx, hz = next.x + math.sin(next.yaw) * r, next.z + math.cos(next.yaw) * r
-			if crosses == nil or not crosses(next.x, next.z, hx, hz, next.y, next.y, 0) then
+			if crosses == nil then
+				return nil
+			end
+			local hx, hz = math.sin(next.yaw), math.cos(next.yaw)
+			local mx, mz = next.x - prev.x, next.z - prev.z
+			local m = hypot2(mx, mz)
+			local function wallAt(dx: number, dz: number, r: number): boolean
+				return crosses(next.x, next.z, next.x + dx * r, next.z + dz * r, next.y, next.y, 0)
+			end
+			local met
+			if m < E.wallMoved then
+				met = wallAt(hx, hz, E.wallTouch)
+			else
+				met = wallAt(mx / m, mz / m, E.wallAhead) or (mx * hx + mz * hz >= 0 and wallAt(hx, hz, E.wallAhead))
+			end
+			if not met then
 				return nil
 			end
 		end
@@ -1766,6 +1800,36 @@ function SquirrelMotor.envelope(
 		local reach = C.airGrab + math.max(groundCap, vPrev) * dt + E.posSlack
 		return world.index:nearest(prev.x, prev.y, prev.z, reach) ~= nil
 			or world.index:nearest(next.x, next.y, next.z, reach) ~= nil
+	end
+
+	-- wallTest(fx, fy, fz, rise, straight): the straight move from (fx, fy, fz) to `next` must not cross a wall collider,
+	-- over the higher end by `rise` at most (a leap over a fence is no wall). A line longer than the short test judges
+	-- (the world's maxChord) is judged chord by chord (crossesLong): a crossing is a wall when the move was `straight`
+	-- (a flight inside a short gap rounds no corner), else weighed by the validator as a gap's (judged.longWall: one may
+	-- be a corner rounded unseen)
+	local function wallTest(fx: number, fy: number, fz: number, rise: number, straight: boolean)
+		local crosses = world.crosses
+		if crosses == nil then
+			return
+		end
+		local lo, hi = math.min(fy, next.y), math.max(fy, next.y)
+		if crosses(fx, fz, next.x, next.z, lo, hi, rise) then
+			add(out, "wall", 1, "move crosses a wall collider")
+			return
+		end
+		local chord, long = world.maxChord, world.crossesLong
+		if
+			chord
+			and long
+			and hypot2(next.x - fx, next.z - fz) > chord
+			and long(fx, fz, next.x, next.z, lo, hi, rise)
+		then
+			if straight then
+				add(out, "wall", 1, "move crosses a wall collider")
+			else
+				judged.longWall = true
+			end
+		end
 	end
 
 	-- 2. Rail-to-rail: speed along the same route, or a legal transfer.
@@ -1926,12 +1990,16 @@ function SquirrelMotor.envelope(
 			+ E.posSlack
 			+ (if shortGap then 0 else C.airGrab)
 		local moved = math.sqrt((next.x - vis.x) ^ 2 + (next.y - vis.y) ^ 2 + (next.z - vis.z) ^ 2)
+		local fromX, fromY, fromZ = vis.x, vis.y, vis.z -- (the launch point the move is nearest to)
 		local prevSpec = prevRoute.enclosure
 		if prevSpec then
 			-- out of an enclosed run's mouth the launch starts outside the opening (Motion.launchPoint)
 			for _, m in prevSpec.mouths do
 				local lp = Motion.launchPoint(world, prevRoute, m)
-				moved = math.min(moved, math.sqrt((next.x - lp.x) ^ 2 + (next.y - lp.y) ^ 2 + (next.z - lp.z) ^ 2))
+				local d = math.sqrt((next.x - lp.x) ^ 2 + (next.y - lp.y) ^ 2 + (next.z - lp.z) ^ 2)
+				if d < moved then
+					moved, fromX, fromY, fromZ = d, lp.x, lp.y, lp.z
+				end
 			end
 		end
 		if moved > allowed then
@@ -1943,7 +2011,42 @@ function SquirrelMotor.envelope(
 		if next.vy > launchUp then
 			add(out, "launch", 1, `vertical launch {next.vy} st/s`)
 		end
+		-- every way off a rail (a leap, a pounce, a drop, a step out of a mouth) leaves it at a vertical speed of 0 or
+		-- more: by the end of the gap gravity has taken at most the gap's worth of it (a fall claimed off a rail is none)
+		if not next.grounded and next.vy < -P.gravity * dt - gEps then
+			add(out, "launch", 1, `left the rail falling at {-next.vy} st/s in {dt} s`)
+		end
+		-- walls (the round-3 review: a step off a trunk landed beyond a garden wall): the straight line from the launch
+		-- point, as off the rails (section 5), over the higher end by a leap's apex at most. Off an open rail the body may
+		-- have run along it first: the launch point is the visible pose at the point of the stretch it could run in the
+		-- gap nearest to where it came down (an enclosed run's is its mouth's, above)
+		if not prevSpec then
+			local reachT = railCap * E.railTol * dt / math.max(prevRoute.length, 1e-6)
+			local best, bestT = math.huge, prev.railT
+			for k = -4, 4 do
+				local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
+				local q = reg:pointAt(prevRoute, tt)
+				local d = (q.x - next.x) ^ 2 + (q.y - next.y) ^ 2 + (q.z - next.z) ^ 2
+				if d < best then
+					best, bestT = d, tt
+				end
+			end
+			if bestT ~= prev.railT then
+				local w = Motion.visualPose(
+					world,
+					prevRoute,
+					bestT,
+					reg:pointAt(prevRoute, bestT),
+					prev.trunkNormalX,
+					prev.trunkNormalZ
+				)
+				fromX, fromY, fromZ = w.x, w.y, w.z
+			end
+		end
+		wallTest(fromX, fromY, fromZ, launchUp * launchUp / (2 * P.gravity), shortGap)
 		pounce = pounceAgo(prevRoute)
+		judged.vy = if next.grounded then 0 else math.clamp(next.vy, -P.gravity * dt - gEps, launchUp)
+		judged.xz = launchXZ
 	end
 
 	-- 5. Off rail to off rail: ground and air motion.
@@ -1960,16 +2063,64 @@ function SquirrelMotor.envelope(
 			end
 			return railPlausible :: boolean
 		end
-		-- (the most the body can fall in the gap from where it was: a floor that near may have taken it inside the gap)
+		-- (the most the body can fall in the gap from where it was: a floor that near may have taken it inside the gap;
+		-- prev.vy is the validator's own, never a speed only the client claimed: Judged)
 		local fallReach = math.max(0, -prev.vy) * dt + 0.5 * P.gravity * dt * dt + E.posSlack
-		local function couldLand(): boolean
+		-- landedIn(leapt): could the body have come down on a floor inside the gap and be where `next` has it after?
+		-- (The round-3 review: a hover claimed a fall onto a floor every other packet, and leapt from the hover.) From
+		-- `prev` at its judged vertical speed the body falls onto a floor F no lower than gravity takes it in the gap (it
+		-- may rise to its apex first); the time left after that landing is all it has: off the floor's edge (`leapt`
+		-- false) it ends no higher than the floor (E.floorSlack: the client's own may be a little over the server's),
+		-- leapt from it no higher than a leap ending at the speed `next` shows rises in the time left, ((u^2 - v^2) / 2g,
+		-- u at most v + g * left). A higher floor leaves more time, so the lowest floor that explains `next` is found by
+		-- arithmetic, and one ray (under prev, else under next) asks whether a floor lies between it and the top. A body
+		-- standing at `prev` landed on its own floor (the vertical bounds below hold it to it).
+		local function landedIn(leapt: boolean): boolean
 			if prev.grounded then
 				return true
 			end
+			local g = P.gravity
+			local vy0 = prev.vy
+			local top = prev.y + math.max(vy0, 0) ^ 2 / (2 * g)
+			local bottom = prev.y + vy0 * dt - 0.5 * g * dt * dt - E.posSlack
+			local v = next.vy
+			-- the highest `next` can be after a landing on F
+			local function reach(f: number): number
+				if not leapt then
+					return f + E.floorSlack
+				end
+				local d = prev.y - (f + E.floorSlack) -- (the client's floor may be that much over the server's)
+				local tf = (vy0 + math.sqrt(math.max(0, vy0 * vy0 + 2 * g * d))) / g
+				local left = dt - tf + E.gravityEps
+				if left < 0 then
+					return -math.huge
+				end
+				local u = math.min(launchUp, v + g * left + gEps)
+				return f + E.floorSlack + math.max(0, (u * u - v * v) / (2 * g))
+			end
+			if reach(top) < next.y then
+				return false
+			end
+			local lo = bottom
+			if reach(lo) < next.y then
+				local hi = top
+				for _ = 1, 12 do
+					local mid = (lo + hi) / 2
+					if reach(mid) >= next.y then
+						hi = mid
+					else
+						lo = mid
+					end
+				end
+				lo = hi
+			end
 			local landable = world.landable
-			return if landable
-				then landable(prev.x, prev.y, prev.z, fallReach)
-				else prev.y - world.groundAt(prev.x, prev.z, prev.y) <= fallReach
+			if landable then
+				local depth = top - lo
+				return landable(prev.x, top, prev.z, depth) or landable(next.x, top, next.z, depth)
+			end
+			local f = math.max(world.groundAt(prev.x, prev.z, top), world.groundAt(next.x, next.z, top))
+			return f >= lo - 1e-6 and f <= top + 1e-6
 		end
 		-- a trampoline's bed (Movement/Trampoline) the body could have come down on inside the gap bounces it higher than a
 		-- leap, and pushes it on
@@ -1994,13 +2145,15 @@ function SquirrelMotor.envelope(
 		end
 		local fromGroundOrRail = false
 		local capUp = launchUp
+		local capXZ = groundCap
 		if launched then
 			launchUsed = true
 			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
-			-- the ground within the gap may have landed and leapt again in it (Space held through a landing)
-			fromGroundOrRail = couldLand() or plausible()
+			-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
+			-- than that leap rises over that floor in the time left (landedIn)
+			fromGroundOrRail = landedIn(true) or plausible()
 			capUp = if fromGroundOrRail then launchUp else pounceUp
-			local capXZ = if fromGroundOrRail then launchXZ else pounceXZ
+			capXZ = if fromGroundOrRail then launchXZ else pounceXZ
 			if tramp then
 				capUp = math.max(capUp, trampUp)
 				capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
@@ -2041,11 +2194,12 @@ function SquirrelMotor.envelope(
 						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
 					end
 					arcVy = expected
-				elseif
-					not (couldLand() and next.vy >= -P.gravity * dt - gEps and next.vy <= gEps) and not plausible()
-				then
-					-- (a body that came down on something inside the gap and went off its edge falls from rest; a pounce
-					-- is a launch above; a rail visit zeroes the speed and relaunches it)
+				elseif next.vy >= -P.gravity * dt - gEps and next.vy <= gEps and landedIn(false) then
+					-- (a body that came down on something inside the gap and went off its edge falls from rest, from no
+					-- higher than that floor)
+					judged.landed = true
+				elseif not plausible() then
+					-- (a pounce is a launch above; a rail visit zeroes the speed and relaunches it)
 					add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
 				end
 			end
@@ -2108,21 +2262,30 @@ function SquirrelMotor.envelope(
 			end
 		end
 		-- walls: the straight move must not cross a collider
-		local crosses = world.crosses
 		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall: never
 		-- higher than the highest launch here reaches, whatever speeds the packets claim)
 		local apexUp = if tramp then math.max(launchUp, trampUp) else launchUp
 		local rise =
 			math.min(math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt, apexUp * apexUp / (2 * P.gravity))
-		if
-			crosses
-			and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), rise)
-		then
-			add(out, "wall", 1, "move crosses a wall collider")
+		wallTest(prev.x, prev.y, prev.z, rise, false)
+		-- what the validator keeps: no vertical speed on the ground, gravity's after a plain arc, else the claim within
+		-- the bounds it was judged against (every way into the air leaves at 0 or more: a fall the gap cannot explain is
+		-- none); the horizontal cap it was judged against
+		if next.grounded then
+			judged.vy = 0
+		elseif arcVy then
+			judged.vy = arcVy :: number
+		else
+			judged.vy = math.clamp(next.vy, -P.gravity * dt - gEps, math.max(capUp, prev.vy, 0))
 		end
+		judged.xz = capXZ
+	end
+	if nextRoute then
+		-- (on a rail the motor's velocity is zero: the rail's own pace is judged by its parameter)
+		judged.vy, judged.xz = 0, 0
 	end
 
-	return out, launchUsed, pounce, arcVy
+	return out, launchUsed, pounce, judged
 end
 
 return SquirrelMotor

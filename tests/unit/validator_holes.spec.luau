@@ -369,8 +369,10 @@ return function(t)
 
 	-- an honest rodent pouncing as fast as the duel lets it, weaving across the open ground, its click's remote on its own
 	-- trip (a reliable remote: its own jitter, and a lost one resent about a round trip later): how many of the motor's
-	-- pounces does the server date and tie to their click (CombatService.tied on the click's clickAt)?
-	local function honestTies(link: any, seed: number, fps: number?): (number, number, number)
+	-- pounces does the server date and tie to their click (CombatService.tied on the click's clickAt)? (Validator round 3:
+	-- a click arriving after its launch by more than the link's jitter and a packet is no tell for it, so one resent after a
+	-- loss loses that pounce; returned: how many were resent)
+	local function honestTies(link: any, seed: number, fps: number?): (number, number, number, number)
 		local rng = Rng.new(seed)
 		local rig: any
 		rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = link, seed = seed, fps = fps })
@@ -383,6 +385,7 @@ return function(t)
 		local weave, weaveAt = 1, 0
 		local secs = 90
 		local made: { number } = {}
+		local resent: { number } = {}
 		rig:possess(town.startAt(rng), function(tt: number, state: State, events: { any }): SquirrelMotor.Input
 			for _, e in events do
 				if e.kind == "pounce" and tt < secs - 1 then -- (the last second's are still on their way)
@@ -413,6 +416,7 @@ return function(t)
 				local arrive = tt + link.latency + rng.next() * link.jitter
 				if rng.next() < link.loss then
 					arrive += 2 * link.latency + link.jitter + 0.2 -- (resent after a round trip and a timeout)
+					table.insert(resent, tt)
 				end
 				rig:at(arrive, function()
 					-- (as Boot/Game: a click before the first packet is dated on its arrival)
@@ -444,7 +448,13 @@ return function(t)
 				end
 			end
 		end
-		return pounces, dated, tied
+		local late = 0
+		for _, at in resent do
+			if at < secs - 1 then
+				late += 1
+			end
+		end
+		return pounces, dated, tied, late
 	end
 
 	for _, c in
@@ -462,17 +472,23 @@ return function(t)
 			},
 		}
 	do
-		t.test(`pounce: honest pounces on {c.name}: >= 99 % dated and tied to their click`, function()
-			local pounces, seen, tied = honestTies(c.link, c.seed, c.fps)
-			print(
-				`      {pounces} pounces, {seen} dated, {tied} tied to their click: {string.format(
-					"%.1f",
-					100 * (pounces - tied) / math.max(1, pounces)
-				)} % lost`
-			)
-			t.truthy(pounces >= 60, "pounces made")
-			t.truthy(tied >= 0.99 * pounces, "honest pounces bite when they land")
-		end)
+		t.test(
+			`pounce: honest pounces on {c.name}: >= 99 % dated and tied to their click (but resent clicks)`,
+			function()
+				local pounces, seen, tied, resent = honestTies(c.link, c.seed, c.fps)
+				print(
+					`      {pounces} pounces, {seen} dated, {tied} tied to their click: {string.format(
+						"%.1f",
+						100 * (pounces - tied) / math.max(1, pounces)
+					)} % lost; {resent} clicks resent after a loss (each loses its pounce by design), {string.format(
+						"%.1f",
+						100 * (pounces - resent - tied) / math.max(1, pounces - resent)
+					)} % of the rest lost`
+				)
+				t.truthy(pounces >= 60, "pounces made")
+				t.truthy(tied >= 0.99 * (pounces - resent), "honest pounces bite when they land")
+			end
+		)
 	end
 
 	-- a grounded packet's vertical speed is never judged, yet upCap (the rise allowed) and the wall test's `rise` (how

@@ -60,6 +60,7 @@ local MoveValidator = require("./MoveValidator")
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
+local Curve = Import.shared("Routes/Curve") :: typeof(require("../../shared/Routes/Curve"))
 
 local ValidatorWorld = require("./ValidatorWorld")
 
@@ -121,7 +122,9 @@ type Gate = { x: number, y: number, z: number, at: number, snapshot: { [string]:
 type Squirrel = {
 	epoch: number,
 	gate: Gate?,
-	good: { [string]: number | boolean }?, -- the last clean packet's snapshot
+	good: { [string]: number | boolean }?, -- the last clean packet's snapshot (a snap's target)
+	shot: { [string]: number | boolean }?, -- the last accepted packet's snapshot (where the duel has the rodent)
+	cleanAt: number?, -- server time of the last clean packet
 	lastAt: number?, -- server time of the last accepted packet
 	pounceAt: number?, -- server time of the last pounce launch a clean packet showed (the envelope saw the launch)
 	pounceClock: number?, -- its client clock
@@ -152,7 +155,12 @@ type Squirrel = {
 	pinnedAt: number, -- server time it was first watched pinned (0: not yet)
 	pinAt: Gate?, -- where a pinned body is kept (the hand-off's place, or where the server moved it since)
 	railAt: number?, -- server time of the last accepted packet on a rail
-	wallAt: number?, -- the root passed a wall by a rail then, with no packet on a rail about then (yet)
+	-- the recent accepted packets on a rail (their snapshots and arrival), C.RAIL_RECENT and a little back
+	rails: { { at: number, shot: { [string]: number | boolean } } },
+	-- the root's crossings of a wall by a rail not yet explained by a packet on a rail (their time and the root's far end)
+	crossings: { { at: number, x: number, y: number, z: number } },
+	-- the last click the duel dated (clickAt): its client clock, arrival, and the link's spread measured before it
+	click: { at: number, clock: number, spread: number }?,
 }
 
 export type Movement = {
@@ -169,9 +177,15 @@ export type Movement = {
 	suspend: (self: Movement, actorId: any, on: boolean) -> (),
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
+	_explained: (
+		self: Movement,
+		sq: Squirrel,
+		c: { at: number, x: number, y: number, z: number },
+		rail: any?
+	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
-	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?),
+	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
 	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
@@ -222,9 +236,17 @@ MovementService.C = table.freeze({
 	-- better moment
 	POUNCE_GAP = SquirrelWire.SEND_EVERY + SquirrelMotor.params.frameDtCap,
 	POUNCE_SPREAD_MAX = 0.3,
-	-- seconds: the most a click's own clock may put it before the remote carrying it arrived (a reliable remote resent
-	-- after a loss, a round trip and a timeout late; anything older is no click to tie a pounce to)
-	CLICK_EARLY = 1,
+	-- seconds: the most a click's own clock may put it before the remote carrying it arrived: the wind-up (0.12) and the
+	-- most jitter a pounce's date allows (POUNCE_SPREAD_MAX). (It was 1 s, for a remote resent after a loss; the round-3
+	-- review: a click sent once the lunge had reached the person, back-dated onto it, was tied. A click resent that late
+	-- now loses its pounce, logged)
+	CLICK_EARLY = 0.4,
+	-- seconds a click's measured spread stands for the pounce that follows it (the wind-up and the longest hold the tie
+	-- takes, with room)
+	CLICK_HOLD = 1,
+	RAIL_KEEP = 2, -- seconds of packets on a rail kept to explain a crossing of the root by a rail (RAIL_RECENT either side)
+	CROSSINGS_MAX = 4, -- unexplained crossings kept at once (a fifth is a wall at once)
+	RAILS_TRIED = 8, -- rail packets a new crossing is tried against (the newest)
 })
 local C = MovementService.C
 
@@ -343,6 +365,8 @@ function MovementService.new(deps: Deps): Movement
 				pinnedAt = 0,
 				paces = {},
 				offsets = {},
+				rails = {},
+				crossings = {},
 				overSince = nil,
 				rootMovedAt = 0,
 			}
@@ -388,7 +412,8 @@ function MovementService.new(deps: Deps): Movement
 		sq.priorUntil = now + ignoredFor(self, id)
 		sq.toldAt = nil
 		sq.rootX = nil
-		sq.wallAt = nil
+		table.clear(sq.crossings)
+		table.clear(sq.rails)
 		sq.highSince = nil
 		sq.overSince = nil
 		sq.epoch = nextEpoch(self)
@@ -399,6 +424,8 @@ function MovementService.new(deps: Deps): Movement
 		sq.lastAt = nil
 		sq.since = nil
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
+		sq.shot = nil
+		sq.cleanAt = nil
 		sq.pounceAt = nil
 		sq.pounceClock = nil
 		if self.deps.validator then
@@ -535,6 +562,15 @@ function MovementService.new(deps: Deps): Movement
 		return if hi >= lo then math.min(hi - lo, C.POUNCE_SPREAD_MAX) else 0
 	end
 
+	-- spreadOf(self, id, sq): the arrivals' spread (the link's jitter as the packets met it), never above the round trip
+	-- the engine measures (when it does: the spread is the client's clocks against the server's arrivals, which a client
+	-- can widen by running its clock unevenly; the round trip is the server's own)
+	local function spreadOf(self: Movement, id: any, sq: Squirrel): number
+		local spread = arrivalSpread(sq)
+		local ping = pingOf(self, id)
+		return if ping > 0 then math.min(spread, ping) else spread
+	end
+
 	-- offsetFloor(sq, now): the lowest arrival offset (server time - client clock) of the recent packets: the client clock
 	-- to server time with the link's latency and none of a packet's jitter (0 before any)
 	local function offsetFloor(sq: Squirrel, _now: number): number
@@ -602,21 +638,29 @@ function MovementService.new(deps: Deps): Movement
 		end
 	end
 
-	-- motorOf(actorId): the held squirrel's motor state as its last clean packet gave it (nil before one), the server
-	-- time the last packet came in, and the server time of the last pounce launch a clean packet showed (nil before
-	-- one). Combat/CombatService ties a bite to that launch: the motor's own, validated pounce, when the click said.
-	function m.motorOf(self: Movement, actorId: any): ({ [string]: number | boolean }?, number?, number?)
+	-- motorOf(actorId): the held squirrel's motor state as its last accepted packet gave it (nil before one: the place the
+	-- drift test holds the root to; the round-3 review: the last CLEAN one froze where a run of packets each with a
+	-- violation too small to flag left it), the server time that packet came in, the server time of the last pounce
+	-- launch a clean packet showed (nil before one), and the server time of the last clean packet. Combat/CombatService
+	-- ties a bite to that launch (the motor's own, validated pounce, when the click said) and judges bites and blows where
+	-- the packets have the rodent while they are fresh.
+	function m.motorOf(self: Movement, actorId: any): ({ [string]: number | boolean }?, number?, number?, number?)
 		local sq = self.squirrels[actorId]
 		if sq == nil then
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		end
-		return sq.good, sq.lastAt, sq.pounceAt
+		return sq.shot, sq.lastAt, sq.pounceAt, sq.cleanAt
 	end
 
 	-- clickAt(actorId, clock, now): the server time of a click the held squirrel's client made at motor clock `clock`
 	-- (the duel's tell carries it), on the packets' own mapping (offsetFloor): when it was made, not when the remote
-	-- carrying it got through (its own jitter, a resend). Never later than it arrived, and never more than C.CLICK_EARLY
-	-- before (an older clock is a stale or made-up one). Nil when the clock is no number or no packet came yet.
+	-- carrying it got through (its own jitter). Never later than it arrived, and never more than C.CLICK_EARLY before (an
+	-- older clock is a stale or made-up one). A click that says it came before the launch the server last dated, yet
+	-- arrived longer after that launch than the link's jitter (measured before it) and a packet explain, is no tell for
+	-- that launch: dated on its arrival (the round-3 review: the motor lunged untold and the click went once the lunge
+	-- had reached the person; an honest click resent after a loss is late the same way, and loses that one pounce,
+	-- logged). The click and the spread before it are kept for the pounce's date (packet). Nil when the clock is no
+	-- number or no packet came yet.
 	function m.clickAt(self: Movement, actorId: any, clock: any, now: number): number?
 		local sq = self.squirrels[actorId]
 		if sq == nil or sq.lastAt == nil or #sq.offsets == 0 then
@@ -625,7 +669,21 @@ function MovementService.new(deps: Deps): Movement
 		if type(clock) ~= "number" or not (math.abs(clock) < SquirrelWire.MAX_MAGNITUDE) then
 			return nil
 		end
-		return math.clamp(clock + offsetFloor(sq, now), now - C.CLICK_EARLY, now)
+		local spread = spreadOf(self, actorId, sq)
+		sq.click = { at = now, clock = clock, spread = spread }
+		local said = clock + offsetFloor(sq, now)
+		local at = math.clamp(said, now - C.CLICK_EARLY, now)
+		local launch = sq.pounceAt
+		if launch and said < launch and now - launch > spread + C.POUNCE_GAP then
+			self.log:every(
+				`clicklate:{actorId}`,
+				5,
+				"warn",
+				`{actorId}: a click arrived {now - launch} s after the launch it says it came before; dated on arrival`
+			)
+			return now
+		end
+		return at
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
@@ -779,6 +837,66 @@ function MovementService.new(deps: Deps): Movement
 		end
 	end
 
+	-- _explained(sq, c, rail?) -> boolean: the root's crossing of a wall by a rail, ending at c, is where a packet on a
+	-- rail has the body drawn (its feet on a big trunk's bark, a downspout on a wall): the packet's own drawn pose
+	-- (Motion.visualPose) within a chord of c and no wall between them (over the higher end by a leap's rise), the packet
+	-- within C.RAIL_RECENT of the crossing. `rail`: that packet only; else the newest C.RAILS_TRIED kept (sq.rails)
+	function m._explained(
+		self: Movement,
+		sq: Squirrel,
+		c: { at: number, x: number, y: number, z: number },
+		rail: any?
+	): boolean
+		local validator = self.deps.validator
+		local world = if validator then validator.world else nil
+		if world == nil or world.crosses == nil then
+			return true
+		end
+		local function one(r: { at: number, shot: { [string]: number | boolean } }): boolean
+			if math.abs(r.at - c.at) > C.RAIL_RECENT then
+				return false
+			end
+			local shot = r.shot
+			local route = world.registry:get(shot.routeId :: number)
+			if route == nil then
+				return false
+			end
+			local vis = Motion.visualPose(
+				world,
+				route,
+				shot.railT :: number,
+				Curve.vec3(shot.x :: number, shot.y :: number, shot.z :: number),
+				shot.trunkNormalX :: number,
+				shot.trunkNormalZ :: number
+			)
+			if
+				math.sqrt((vis.x - c.x) ^ 2 + (vis.z - c.z) ^ 2) > ValidatorWorld.C.MAX_CHORD
+				or math.abs(vis.y - c.y) > C.RAIL_NEAR
+			then
+				return false
+			end
+			return not world.crosses(
+				vis.x,
+				vis.z,
+				c.x,
+				c.z,
+				math.min(vis.y, c.y),
+				math.max(vis.y, c.y),
+				MoveValidator.leapRise()
+			)
+		end
+		if rail then
+			return one(rail)
+		end
+		local rails = sq.rails
+		for i = #rails, math.max(1, #rails - C.RAILS_TRIED + 1), -1 do
+			if one(rails[i]) then
+				return true
+			end
+		end
+		return false
+	end
+
 	-- _rootPath(actorId, sq, x, y, z, now) -> why?: the root's own path between two samples: no wall (once the epoch has
 	-- settled), and high in the air with no packet fresh only on a fall
 	function m._rootPath(
@@ -806,41 +924,46 @@ function MovementService.new(deps: Deps): Movement
 			and sq.possessedAt ~= 0
 			and now - (sq.possessedAt :: number) < C.STREAM_GRACE
 		local px = sq.rootX
-		-- (a wall the root passed by a rail with no packet on a rail about then: a rail packet may still come, the
-		-- root leading the packets; none within C.RAIL_RECENT of it, and it was a wall)
-		local wallAt = sq.wallAt
-		if wallAt then
-			if sq.railAt and (sq.railAt :: number) >= wallAt - C.RAIL_RECENT then
-				sq.wallAt = nil
-			elseif now - wallAt > C.RAIL_RECENT then
-				sq.wallAt = nil
+		-- (a wall the root passed by a rail that no packet on a rail has explained within C.RAIL_RECENT of it: a wall)
+		local crossings = sq.crossings
+		for _, c in crossings do
+			if now - c.at > C.RAIL_RECENT then
+				table.clear(crossings)
 				return "wall"
 			end
 		end
 		-- a root by a rail (the feet drawn on a big trunk's bark, a downspout on a house's wall) may pass a wall's
-		-- collider: only while the packets have the body on a rail (one within C.RAIL_RECENT)
+		-- collider where a packet on a rail has the body drawn: every crossing by a rail is kept until a packet on a rail
+		-- within C.RAIL_RECENT of it (before or after: the root may lead the packets) explains it (_explained). (The
+		-- round-3 review: any packet on a rail used to turn the test off for a second, and a root walked through a wall
+		-- in that second was never recorded)
 		local byRail = onRail or (index and index:nearest(px or x, sq.rootY, sq.rootZ, reach) ~= nil)
-		local railed = byRail and sq.railAt ~= nil and now - (sq.railAt :: number) <= C.RAIL_RECENT
-		if px and settled and not fresh and not railed and now - sq.rootAt <= C.ROOT_STEP then
+		if px and settled and not fresh and now - sq.rootAt <= C.ROOT_STEP then
 			local y0, y1 = math.min(sq.rootY, y), math.max(sq.rootY, y)
 			-- (over the higher end, what a leap rises in the time between the samples)
 			local rise = MoveValidator.leapUpAllowance() * (now - sq.rootAt)
-			if world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise) then
-				if not byRail then
-					return "wall"
-				end
-				sq.wallAt = sq.wallAt or now
-			end
+			local crossed = world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise)
 			-- a jump of the root longer than a chord (its updates held up, or a hop): judged chord by chord, weighed as a
 			-- gap is (one may be a corner rounded unseen)
 			if
-				not byRail
+				not crossed
 				and world.crossesLong
 				and dist(px, sq.rootY, sq.rootZ, x, y, z) > ValidatorWorld.C.MAX_CHORD
 				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise())
-				and (validator :: any):wallGap(actorId, now) >= 2
 			then
-				return "wall"
+				crossed = byRail or (validator :: any):wallGap(actorId, now) >= 2
+			end
+			if crossed then
+				if not byRail then
+					return "wall"
+				end
+				local c = { at = now, x = x, y = y, z = z }
+				if not self:_explained(sq, c, nil) then
+					if #crossings >= C.CROSSINGS_MAX then
+						return "wall"
+					end
+					table.insert(crossings, c)
+				end
 			end
 		end
 		-- the air, while no packet is fresh: a root higher above any floor than a leap may only fall
@@ -953,31 +1076,53 @@ function MovementService.new(deps: Deps): Movement
 				sq.gate = nil
 			end
 			unpin(self, actorId, sq, now)
+			-- (the link's spread and latency floor as the packets before this one showed them)
+			local spread0 = spreadOf(self, actorId, sq)
+			local floor0 = if #sq.offsets > 0 then offsetFloor(sq, now) else math.huge
 			local v = validator:accept(actorId, packet, now)
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
-				pace(self, actorId, sq, snapshot, now)
+				-- (its pace by the speeds the validator kept, never one only the client claimed)
+				pace(self, actorId, sq, validator:last(actorId) or snapshot, now)
 				-- a pounce the server believes: a clean move holding a pounce-shaped launch (MoveValidator's verdict.pounce:
 				-- the client clock it launched at, somewhere in the gap since the last packet) from a gap no longer than
-				-- C.POUNCE_GAP and the spread of the packets' arrivals (a packet lost, or overtaken: one later in the
-				-- gap would have shown it; a longer silence hides when the lunge went). Its server time is that clock on
-				-- the packets' own mapping (the lowest arrival offset of the last C.SPREAD_WINDOW: the link's latency
-				-- without this packet's jitter), never later than it arrived. Combat/CombatService ties the bite to it and
-				-- the click's own clock on the same mapping (clickAt), so a click and a lunge held back for a better moment
-				-- are not one pounce, and the link's jitter parts neither
-				if
-					v.ok
-					and not v.resync
-					and v.pounce
-					and (v.pounceGap or math.huge) <= C.POUNCE_GAP + arrivalSpread(sq)
-				then
+				-- C.POUNCE_GAP and the link's spread (a packet lost, or overtaken: one later in the gap would have shown it;
+				-- a longer silence hides when the lunge went). Its server time is that clock on the packets' own mapping
+				-- (the lowest arrival offset of the last C.SPREAD_WINDOW: the link's latency without this packet's
+				-- jitter), never later than it arrived. Combat/CombatService ties the bite to it and the click's own clock
+				-- on the same mapping (clickAt), so a click and a lunge held back for a better moment are not one pounce,
+				-- and the link's jitter parts neither. The spread is the one measured before the click (a client cannot
+				-- widen it while it holds the lunge), and this packet's own arrival offset dates the launch when it is
+				-- later than that spread above the floor explains (the round-3 review: a client that slowed its clock
+				-- while it held the lunge raised its offsets, and the old low one dated the late lunge back onto the
+				-- click; the click to the launch is then as long on the server's clock as on the client's)
+				local click = sq.click
+				local spread = spread0
+				if click and now - click.at <= C.CLICK_HOLD then
+					spread = math.min(spread, click.spread)
+				end
+				if v.ok and not v.resync and v.pounce and (v.pounceGap or math.huge) <= C.POUNCE_GAP + spread then
+					local off = now - (snapshot.clock :: number)
 					sq.pounceClock = v.pounce
-					sq.pounceAt = math.min(now, v.pounce + offsetFloor(sq, now))
+					sq.pounceAt = math.min(now, v.pounce + math.max(math.min(floor0, off), off - spread))
 				end
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
+				sq.shot = snapshot
 				local rid = snapshot.routeId
 				if type(rid) == "number" and rid >= 0 then
 					sq.railAt = now
+					local rails = sq.rails
+					table.insert(rails, { at = now, shot = snapshot })
+					while #rails > 0 and now - rails[1].at > C.RAIL_KEEP do
+						table.remove(rails, 1)
+					end
+					-- (a crossing of the root by a rail this packet's own drawn pose explains)
+					local crossings = sq.crossings
+					for i = #crossings, 1, -1 do
+						if self:_explained(sq, crossings[i], rails[#rails]) then
+							table.remove(crossings, i)
+						end
+					end
 				end
 				if sq.since == nil then
 					sq.since = now
@@ -986,6 +1131,7 @@ function MovementService.new(deps: Deps): Movement
 				if v.ok and not v.resync then
 					-- (a packet after a gap too long to judge move by move is never a snap target)
 					sq.good = snapshot
+					sq.cleanAt = now
 				end
 			end
 			if v.flagged then
