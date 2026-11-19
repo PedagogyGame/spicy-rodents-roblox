@@ -401,7 +401,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		local first = self._actors[actorId]
 		local gov = first.marks.gov
 		local govFaults: { Violation } = {}
-		self:_govern(
+		MoveValidator._govern(
+			self,
 			actorId,
 			first.marks,
 			first.last,
@@ -656,9 +657,9 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	-- the displacement governor over every window of accepted places (invariant B: whatever path the packet took). The
 	-- client's own river recovery puts the body on the quay: the governor starts afresh there
 	if riverLanding then
-		self:anchor(actorId, next.x, next.y, next.z, serverTime, nil)
+		MoveValidator.anchor(self, actorId, next.x, next.y, next.z, serverTime, nil)
 	else
-		self:_govern(actorId, actor.marks, next, dtEff, serverTime, swing, violations)
+		MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
 	end
 
 	local ok = #violations == 0
