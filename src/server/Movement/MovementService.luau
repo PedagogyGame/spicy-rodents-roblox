@@ -55,7 +55,8 @@
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
 --   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
---   number?; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:paceOf(actorId) -> number? (read
+--   number?; M:clickNew(actorId, seq) -> boolean (a click's number not taken yet: the first copy of a click to arrive,
+--   the Duel remote's or a motor packet's (verdict.click), is the one taken); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:paceOf(actorId) -> number? (read
 --   only: the flat pace of the accepted packets, Stealth/Pace.stretch); M:stats() -> Stats; C
 
 local Import = require("../Import")
@@ -170,6 +171,8 @@ type Squirrel = {
 	crossings: { { at: number, x: number, y: number, z: number } },
 	-- the last click the duel dated (clickAt): its client clock, arrival, and the link's spread measured before it
 	click: { at: number, clock: number, spread: number }?,
+	-- the newest click number taken (clickNew: the remote's and the packets' copies of one click count once)
+	clickSeq: number?,
 }
 
 export type Movement = {
@@ -194,6 +197,7 @@ export type Movement = {
 	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
+	clickNew: (self: Movement, actorId: any, seq: any) -> boolean,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
 	paceOf: (self: Movement, actorId: any) -> number?,
 	isPinned: (self: Movement, actorId: any) -> boolean,
@@ -711,6 +715,31 @@ function MovementService.new(deps: Deps): Movement
 		return at
 	end
 
+	-- clickNew(actorId, seq): is click number `seq` (1 to 255, round: Movement/SquirrelWire's clickSeq) newer than the
+	-- last one taken? Takes it if so. A click rides in the Duel remote and, as a copy, in every motor packet for
+	-- SquirrelWire.CLICK_COPY seconds (the round-4 review: a remote resent after a loss came too late to tie its pounce):
+	-- whichever arrives first is the click, through the same gate, dating and once-per-click count; an older or the
+	-- same number is a copy already taken (or one overtaken by a newer click). A remote with no number (nil) is always
+	-- new.
+	function m.clickNew(self: Movement, actorId: any, seq: any): boolean
+		if seq == nil then
+			return true
+		end
+		if type(seq) ~= "number" or seq < 1 or seq > 255 or seq ~= math.floor(seq) then
+			return false
+		end
+		local sq = squirrel(self, actorId)
+		local last = sq.clickSeq
+		if last ~= nil then
+			local d = (seq - last) % 256
+			if d < 1 or d >= 128 then
+				return false
+			end
+		end
+		sq.clickSeq = seq
+		return true
+	end
+
 	function m.epochOf(self: Movement, actorId: any): number
 		return squirrel(self, actorId).epoch
 	end
@@ -1129,11 +1158,41 @@ function MovementService.new(deps: Deps): Movement
 				end
 				if v.ok and not v.resync and v.pounce and (v.pounceGap or math.huge) <= C.POUNCE_GAP + spread then
 					local off = now - (snapshot.clock :: number)
-					sq.pounceClock = v.pounce
-					sq.pounceAt = math.min(now, v.pounce + math.max(math.min(floor0, off), off - spread))
+					-- (the click and the launch in the order their clocks say, whichever arrived first: a click that says
+					-- it came before this launch, yet arrived longer after the launch than the jitter and a packet explain,
+					-- is no tell for it, as clickAt judges a click that arrives after its launch was dated; the round-4
+					-- review held the lunge's packets back and sent the click ahead of them)
+					local launch = v.pounce + math.min(floor0, off)
+					local told = not (
+						click
+						and now - click.at <= C.CLICK_HOLD
+						and click.clock <= v.pounce
+						and click.at - launch > spread + C.POUNCE_GAP
+					)
+					if told then
+						sq.pounceClock = v.pounce
+						sq.pounceAt = math.min(now, v.pounce + math.max(math.min(floor0, off), off - spread))
+					else
+						self.log:every(
+							`clicklate:{actorId}`,
+							5,
+							"warn",
+							`{actorId}: a click arrived {(click :: any).at - launch} s after the launch it came before; untied`
+						)
+					end
 				end
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
 				sq.shot = snapshot
+				-- (a click's copy riding in the packet, newer than the last click taken: the caller takes it as it takes
+				-- the Duel remote's, clickNew counting it once; its motor clock is the packet's less its age)
+				local cs = snapshot.clickSeq
+				if type(cs) == "number" and cs ~= 0 then
+					local last = sq.clickSeq
+					local d = if last then (cs - last) % 256 else 1
+					if d >= 1 and d < 128 then
+						v.click = { seq = cs, clock = (snapshot.clock :: number) - ((snapshot.clickAgo :: number?) or 0) }
+					end
+				end
 				local rid = snapshot.routeId
 				if type(rid) == "number" and rid >= 0 then
 					sq.railAt = now

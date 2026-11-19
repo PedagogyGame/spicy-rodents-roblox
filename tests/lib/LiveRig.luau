@@ -78,6 +78,9 @@ export type Options = {
 	pingOf: ((t: number) -> number)?,
 	-- seconds the client spends loading a new body (the town streaming in round it) before its controller starts
 	loadSeconds: number?,
+	-- a click's copy a packet carried, not taken yet (verdict.click): as Boot/Game's Squirrel.State handler hands it to
+	-- the duel (its number, motor clock, and the server time it arrived)
+	onClick: ((seq: number, clock: number, t: number) -> ())?,
 }
 
 export type Result = {
@@ -242,6 +245,9 @@ function LiveRig.new(opts: Options): Rig
 			serverSeconds += os.clock() - c0
 			if v.accepted then
 				accepted += 1
+			end
+			if v.click and opts.onClick then
+				opts.onClick(v.click.seq, v.click.clock, rig.t)
 			end
 			for _, x in v.violations or {} do
 				if #violations < 40 then

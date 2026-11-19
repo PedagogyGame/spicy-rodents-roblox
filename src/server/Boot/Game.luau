@@ -827,6 +827,9 @@ function Game.start(opts: Opts?): any
 			task.delay(seconds, fn)
 		end,
 	})
+	-- the rodent's click as a copy in its motor packet (Movement/SquirrelWire clickSeq): taken by the duel as the Duel
+	-- remote's is, the first of the two to arrive (set where the duel is)
+	local clickCopy: ((player: any, clock: number, seq: number) -> ())? = nil
 	if net then
 		net:on("Squirrel.State", function(player: any, rec: any)
 			local actor = possession:actorOf(player)
@@ -834,12 +837,16 @@ function Game.start(opts: Opts?): any
 				return
 			end
 			local seq, epoch, snapshot = SquirrelWire.fromRecord(rec)
-			movement:packet(
+			local v = movement:packet(
 				actor.id,
 				actor.species,
 				{ seq = seq, epoch = epoch, snapshot = snapshot },
 				workspace:GetServerTimeNow()
 			)
+			local click = if type(v) == "table" then v.click else nil
+			if click and clickCopy then
+				clickCopy(player, click.clock, click.seq)
+			end
 		end)
 	end
 	-- a body the server itself moved (a minigame's knock, the lounge's door): its place is the validator's new
@@ -1476,20 +1483,25 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
-	-- the rodent's click (a pounce's tell, with the motor clock its client made it at) and F (a feint), from the PlayNet
-	-- "Duel" remote: CombatService.REMOTE_RATE calls a second heard, a refusal answered every REPLY_EVERY at most
-	local function duel(player: any, verb: any, clock: any)
+	-- the rodent's click (a pounce's tell, with the motor clock its client made it at, and its number) and F (a feint),
+	-- from the PlayNet "Duel" remote or, for a click, its copy in a motor packet (clickCopy): the first to arrive is the
+	-- click (MovementService.clickNew), CombatService.REMOTE_RATE calls a second heard, a refusal answered every
+	-- REPLY_EVERY at most
+	local function duel(player: any, verb: any, clock: any, seq: any)
 		if combat == nil or (verb ~= "pounce" and verb ~= "feint") then
 			return
 		end
 		local c = combat
-		if not c:remoteGate(player, now) then
-			return
-		end
 		local s = stateOf(player)
 		local actor = possession:actorOf(player)
 		local tid = if actor then townIdOf[actor.id] else nil
 		if s.role ~= "rodent" or actor == nil or actor.variant ~= "spicy" or tid == nil then
+			return
+		end
+		if verb == "pounce" and not movement:clickNew(actor.id, seq) then
+			return -- (a copy of a click already taken)
+		end
+		if not c:remoteGate(player, now) then
 			return
 		end
 		-- (the click's time on the movement packets' clock, as the duel's own: the remote's trip is no part of the tie)
@@ -1509,6 +1521,13 @@ function Game.start(opts: Opts?): any
 			-- (the client clicks on the motor's own cooldown, so this is a click the link bunched up: its lunge bites
 			-- nobody, and the player is told)
 			fire(player, { kind = "duel", what = "notyet" })
+		end
+	end
+
+	clickCopy = function(player: any, clock: number, seq: number)
+		local ok, err = pcall(duel, player, "pounce", clock, seq)
+		if not ok then
+			warn(`[SpicyRodents] duel click copy failed: {err}`)
 		end
 	end
 
@@ -1642,9 +1661,9 @@ function Game.start(opts: Opts?): any
 			warn(`[SpicyRodents] kick failed: {err}`)
 		end
 	end
-	local function onDuel(player: any, verb: any, clock: any)
+	local function onDuel(player: any, verb: any, clock: any, seq: any)
 		local ok, err = pcall(function()
-			duel(player, verb, clock)
+			duel(player, verb, clock, seq)
 		end)
 		if not ok then
 			warn(`[SpicyRodents] duel {verb} failed: {err}`)

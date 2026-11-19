@@ -82,6 +82,8 @@ export type Verdict = {
 	-- Movement/MovementService dates no pounce from a gap a silence may have made)
 	pounce: number?,
 	pounceGap: number?,
+	-- (Movement/MovementService) a click's copy the packet carried, not taken yet: its number and motor clock
+	click: { seq: number, clock: number }?,
 }
 
 export type Options = {

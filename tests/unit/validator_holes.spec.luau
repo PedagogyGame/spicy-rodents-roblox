@@ -306,7 +306,7 @@ return function(t)
 				end
 				if silent and pounced ~= nil and now >= launch and (snap.attackWindow :: number) > 0 then
 					local claimed = P.pounceWindow - (now - (click + windup))
-					snap.attackWindow = math.min(snap.attackWindow :: number, claimed)
+					snap.attackWindow = math.max(0, math.min(snap.attackWindow :: number, claimed))
 				end
 				return nil
 			end,
@@ -368,16 +368,31 @@ return function(t)
 	)
 
 	-- an honest rodent pouncing as fast as the duel lets it, weaving across the open ground, its click's remote on its own
-	-- trip (a reliable remote: its own jitter, and a lost one resent about a round trip later): how many of the motor's
-	-- pounces does the server date and tie to their click (CombatService.tied on the click's clickAt)? (Validator round 3:
-	-- a click arriving after its launch by more than the link's jitter and a packet is no tell for it, so one resent after a
-	-- loss loses that pounce; returned: how many were resent)
+	-- trip (a reliable remote: its own jitter, and a lost one resent about a round trip later) and its copy in every motor
+	-- packet for SquirrelWire.CLICK_COPY seconds (validator round 5: the first of the two to arrive is the click, as
+	-- Boot/Game takes it: MovementService.clickNew, then clickAt): how many of the motor's pounces does the server date
+	-- and tie to their click (CombatService.tied on the click's clickAt)? Returned: how many remotes were resent.
 	local function honestTies(link: any, seed: number, fps: number?): (number, number, number, number)
 		local rng = Rng.new(seed)
 		local rig: any
-		rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = link, seed = seed, fps = fps })
-		local pending: number? = nil
 		local dues: { number } = {}
+		-- (the duel's door, as Boot/Game: a click number taken once, then dated)
+		local function take(seq: number, clock: number, t: number)
+			local id = heldId(rig)
+			if (rig.movement :: any):clickNew(id, seq) then
+				local at = (rig.movement :: any):clickAt(id, clock, t)
+				table.insert(dues, (at or t) + windup)
+			end
+		end
+		rig = LiveRig.new({
+			world = town.world,
+			vworld = town.vworld,
+			link = link,
+			seed = seed,
+			fps = fps,
+			onClick = take,
+		})
+		local pending: number? = nil
 		local seen: { number } = {}
 		local lastSeen: number? = nil
 		local pounces = 0
@@ -413,6 +428,8 @@ return function(t)
 			pending = pend
 			if tell then
 				local k = state.clock
+				-- (as Controllers/Squirrel: the click's number from the link, whose packets carry its copy)
+				local seq = rig.client.link:click(k)
 				local arrive = tt + link.latency + rng.next() * link.jitter
 				if rng.next() < link.loss then
 					arrive += 2 * link.latency + link.jitter + 0.2 -- (resent after a round trip and a timeout)
@@ -420,8 +437,7 @@ return function(t)
 				end
 				rig:at(arrive, function()
 					-- (as Boot/Game: a click before the first packet is dated on its arrival)
-					local at = (rig.movement :: any):clickAt(heldId(rig), k, rig.t)
-					table.insert(dues, (at or rig.t) + windup)
+					take(seq, k, rig.t)
 				end)
 			end
 			input.pounce = now
@@ -462,31 +478,34 @@ return function(t)
 			{
 				name = "80 ms + 250 ms jitter, 2 % loss",
 				link = { latency = 0.08, jitter = 0.25, loss = 0.02 },
-				seed = 31,
+				seeds = { 31, 41, 51 },
 			},
 			{
 				name = "a slow phone at 300 ms",
 				link = { latency = 0.3, jitter = 0.1, loss = 0.02 },
 				fps = 20,
-				seed = 32,
+				seeds = { 32, 42, 52 },
 			},
 		}
 	do
 		t.test(
-			`pounce: honest pounces on {c.name}: >= 99 % dated and tied to their click (but resent clicks)`,
+			`pounce: honest pounces on {c.name}: under 0.5 % lost, resent clicks included (their copy rides in the packets)`,
 			function()
-				local pounces, seen, tied, resent = honestTies(c.link, c.seed, c.fps)
+				local all, allTied, allResent = 0, 0, 0
+				for _, seed in c.seeds do
+					local pounces, seen, tied, resent = honestTies(c.link, seed, c.fps)
+					print(
+						`      seed {seed}: {pounces} pounces, {seen} dated, {tied} tied to their click, {resent} of their remotes resent after a loss`
+					)
+					t.truthy(pounces >= 60, "pounces made")
+					all += pounces
+					allTied += tied
+					allResent += resent
+				end
 				print(
-					`      {pounces} pounces, {seen} dated, {tied} tied to their click: {string.format(
-						"%.1f",
-						100 * (pounces - tied) / math.max(1, pounces)
-					)} % lost; {resent} clicks resent after a loss (each loses its pounce by design), {string.format(
-						"%.1f",
-						100 * (pounces - resent - tied) / math.max(1, pounces - resent)
-					)} % of the rest lost`
+					`      {all} pounces, {allTied} tied: {string.format("%.2f", 100 * (all - allTied) / math.max(1, all))} % lost ({allResent} remotes resent)`
 				)
-				t.truthy(pounces >= 60, "pounces made")
-				t.truthy(tied >= 0.99 * (pounces - resent), "honest pounces bite when they land")
+				t.truthy(all - allTied < 0.005 * all, "honest pounces bite when they land")
 			end
 		)
 	end
