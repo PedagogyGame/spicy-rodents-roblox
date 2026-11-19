@@ -98,7 +98,9 @@ Tunables.tree = {
 	         approach = { v = 14, unit = "st/s", src = "a tough person closing on the rodent (v5.4 defend 5.6 u/s)" },
 	         backSpeed = { v = 6, unit = "st/s" },
 	         contact = { v = 3.5, unit = "st", src = "Combat/PlayRules BITE_RANGE" }, contactHeight = { v = 5, unit = "st" },
-	         rewind = { v = 0.15, unit = "s", src = "D20: a pounce's window widened by up to this for the link" } },
+	         rewind = { v = 0.15, unit = "s", src = "D20: a pounce's window widened by up to this for the link" },
+	         launchSlack = { v = 0.05, unit = "s", src = "one movement packet: the motor's launch may be seen this much (plus rewind) either side of when the click said" },
+	         motorFresh = { v = 0.2, unit = "s", src = "a motor state older than this bites nobody (the rodent's packets stopped)" } },
 	-- Power numbers live in Rodent/PowerRules.TABLE (brief v2 §15, verbatim v5.4; golden-tested). These
 	-- leaves are read-only mirrors for the tuning panel; PowerRules is the authority.
 	power = { bitePerson = { v = 100 }, bitePersonHigh = { v = 150 }, highAboveGroundU = { v = 1.6, src = "v5.4 uses absolute Y > 4; Q23" },

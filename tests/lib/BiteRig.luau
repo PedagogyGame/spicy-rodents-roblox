@@ -155,7 +155,7 @@ function BiteRig.new(opts: Options?): any
 				return if rig.players[rig.rodent] then { rig.rodent } else {}
 			end,
 			motorOf = if o.motorCheck
-				then function(id: number): { [string]: any }?
+				then function(id: number): any
 					return rig.motor[id]
 				end
 				else nil,
@@ -330,7 +330,7 @@ function BiteRig.new(opts: Options?): any
 		end
 		local t0 = rig.time
 		local P = rig.combat.P
-		rig.motor[rig.rodent] = { attackWindow = 0, attack = 0 }
+		rig.motor[rig.rodent] = { age = 0 }
 		local stop = t0 + P.pounceWindup + P.pounceWindow + 0.4
 		-- (in steps of a tenth, the duel's own: a runner moves 2 studs a step, inside the bite's reach)
 		local dt0 = rig.dt
@@ -340,7 +340,7 @@ function BiteRig.new(opts: Options?): any
 			rig.step(rig.dt, function()
 				local into = rig.time - t0 - P.pounceWindup
 				if into >= 0 and into <= P.pounceWindow then
-					rig.motor[rig.rodent] = { attackWindow = P.pounceWindow - into, attack = 0 }
+					rig.motor[rig.rodent] = { age = 0, launchAgo = into }
 					local tx, tz = v.x - r.x, v.z - r.z
 					local td = math.sqrt(tx * tx + tz * tz)
 					if td > 0.5 then
@@ -348,7 +348,7 @@ function BiteRig.new(opts: Options?): any
 						rig.put(rig.rodent, r.x + tx / td * step, r.z + tz / td * step)
 					end
 				else
-					rig.motor[rig.rodent] = { attackWindow = 0, attack = 0 }
+					rig.motor[rig.rodent] = { age = 0 }
 				end
 			end)
 			bitten = rig.combat:stats().bites > bites

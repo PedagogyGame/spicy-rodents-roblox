@@ -1328,9 +1328,17 @@ function Game.start(opts: Opts?): any
 			controllerOf = controllerOfTown,
 			rodents = rodentsInPlay,
 			-- the pounce the validator accepted (Movement/MovementService): a click alone bites nobody
-			motorOf = function(id: number): { [string]: any }?
+			motorOf = function(id: number): any
 				local actor = rt.byTownId[id]
-				return if actor then movement:motorOf(actor.id) :: any else nil
+				if actor == nil then
+					return nil
+				end
+				local snap, at, pounceAt = movement:motorOf(actor.id)
+				if snap == nil or at == nil then
+					return nil
+				end
+				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
+				return { age = t - at, launchAgo = if pounceAt then t - pounceAt else nil }
 			end,
 			setAttr = setTownAttr,
 			notify = function(id: number, payload: { [string]: any })

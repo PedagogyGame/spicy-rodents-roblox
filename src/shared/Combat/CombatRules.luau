@@ -80,6 +80,8 @@ export type Params = {
 	contact: number,
 	contactHeight: number,
 	rewind: number,
+	launchSlack: number,
+	motorFresh: number,
 	-- from the other branches
 	chanceUnaware: number,
 	pounceWindup: number,
@@ -157,6 +159,8 @@ function CombatRules.params(): Params
 			"contact",
 			"contactHeight",
 			"rewind",
+			"launchSlack",
+			"motorFresh",
 		}
 	do
 		p[k] = g("duel." .. k)

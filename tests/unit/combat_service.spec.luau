@@ -49,7 +49,7 @@ return function(t)
 		rig.holdRodent()
 		rig.put(rig.rodent, v.x + 6, v.z)
 		t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()))
-		rig.motor[rig.rodent] = { attackWindow = 0, attack = 0 }
+		rig.motor[rig.rodent] = { age = 0 }
 		rig.step(1.2, function()
 			rig.put(rig.rodent, v.x + 0.5, v.z)
 		end)
@@ -57,6 +57,46 @@ return function(t)
 		t.truthy(rig.combat:stats().noMotor > 0)
 		rig.step(1)
 		t.truthy(rig.lunge(v.id), "with the motor's pounce")
+	end)
+
+	t.test("the click and the lunge are one pounce: a lunge held back, or a motor gone quiet, bites nobody", function()
+		-- (review finding 1: the click, then the body waits out of reach, then a fresh motor pounce in contact)
+		local rig = BiteRig.new({ seed = 4, duelRand = dice(0), motorCheck = true })
+		rig.step(20)
+		local v = rig.calmNear(0, 0)
+		rig.holdRodent()
+		rig.dt = 0.1
+		local P = rig.combat.P
+		for _, late in { 0.5, 0.8 } do
+			rig.step(2)
+			rig.put(rig.rodent, v.x + 8, v.z)
+			t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()))
+			local t0 = rig.time
+			rig.motor[rig.rodent] = { age = 0 }
+			rig.step(late, function()
+				rig.put(rig.rodent, v.x + 8, v.z)
+			end)
+			-- the motor launches now, `late` seconds after the click (an honest one launches pounce.windup after it)
+			local launch = rig.time
+			rig.step(0.3, function()
+				rig.put(rig.rodent, v.x + 1, v.z)
+				rig.motor[rig.rodent] = { age = 0, launchAgo = rig.time - launch }
+			end)
+			t.eq(rig.combat:stats().bites, 0, `a lunge {late} s after the click ({rig.time - t0} s)`)
+		end
+		-- the motor's packets stopped a while ago: its last pounce is no proof of this one
+		rig.step(2)
+		rig.put(rig.rodent, v.x + 8, v.z)
+		t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()))
+		local t1 = rig.time
+		rig.step(0.3, function()
+			rig.put(rig.rodent, v.x + 1, v.z)
+			rig.motor[rig.rodent] = { age = P.motorFresh + 0.1, launchAgo = rig.time - t1 - P.pounceWindup }
+		end)
+		t.eq(rig.combat:stats().bites, 0, "a stale motor")
+		-- and the same pounce launched on time lands
+		rig.step(2)
+		t.truthy(rig.lunge(v.id), "a lunge when the click said")
 	end)
 
 	t.test("a vigilante: squares up on sighting, closes in, kicks; into the raised leg no bite lands", function()

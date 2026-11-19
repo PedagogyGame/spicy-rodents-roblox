@@ -57,7 +57,9 @@ export type Opts = {
 	rand: (() -> number)?,
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	rodents: () -> { number }, -- the player-held Spicy Rodents that can fight now
-	motorOf: ((id: number) -> { [string]: any }?)?, -- the rodent's last validated motor state (attackWindow)
+	-- the rodent's motor as the validator saw it: seconds since its last clean packet, and since the last pounce launch
+	-- a clean packet showed (Movement/MovementService:motorOf); nil before any packet
+	motorOf: ((id: number) -> Motor?)?,
 	setAttr: ((id: number, name: string, value: any) -> ())?,
 	notify: ((rodentId: number, payload: { [string]: any }) -> ())?, -- news for the player holding the rodent
 	hurt: ((rodentId: number, amount: number, cause: string, byId: number) -> ())?,
@@ -66,12 +68,15 @@ export type Opts = {
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
 }
 
+export type Motor = { age: number, launchAgo: number? }
+
 export type Zone = { x: number, z: number, at: number, untilT: number, biter: number }
 
 type Rodent = {
 	id: number,
 	tell: number?,
 	tellFeint: boolean,
+	launchDue: number, -- the motor's pounce is due then (the tell plus the wind-up)
 	commitAt: number,
 	windowUntil: number,
 	recoverUntil: number,
@@ -202,6 +207,7 @@ local function rodent(self: Service, id: number): Rodent
 			id = id,
 			tell = nil,
 			tellFeint = false,
+			launchDue = -math.huge,
 			commitAt = -math.huge,
 			windowUntil = -math.huge,
 			recoverUntil = -math.huge,
@@ -279,6 +285,7 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 		r.tell = now
 		r.tellFeint = false
 		r.commitAt = now + P.pounceWindup
+		r.launchDue = r.commitAt
 		r.windowUntil = r.commitAt + P.pounceWindow + P.rewind
 		r.cooldownUntil = r.commitAt + P.pounceCooldown - P.rewind -- (the motor's own 0.7 s, less the link's slack)
 		r.landed = false
@@ -615,10 +622,20 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		end
 		local motorOf = self.opts.motorOf
 		if motorOf then
-			local snap = motorOf(id)
-			if snap == nil or ((snap.attackWindow or 0) <= 0 and (snap.attack or 0) <= 0) then
+			-- the motor's own pounce, launched when the click said (within the link's slack), still in its window, and
+			-- a fresh packet: a click alone bites nobody, and neither does a lunge held back for a better moment
+			local m = motorOf(id)
+			local launchAt = if m and m.launchAgo then now - m.launchAgo else nil
+			local slack = P.rewind + P.launchSlack
+			if
+				m == nil
+				or m.age > P.motorFresh
+				or launchAt == nil
+				or math.abs(launchAt - r.launchDue) > slack
+				or now > launchAt + P.pounceWindow + P.rewind
+			then
 				self._stats.noMotor += 1
-				continue -- the motor has not shown the pounce (yet): no bite on a click alone
+				continue -- the motor has not shown this pounce (yet)
 			end
 		end
 		local ry = rod.y - rod.hip

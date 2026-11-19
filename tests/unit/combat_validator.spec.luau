@@ -5,7 +5,9 @@
 -- a real link, the server's MovementService with enforcement on), a rodent clicking as fast as the duel lets it, with
 -- feints' pauses and zig-zags between, across the town for a minute: 0 snaps, and the pounces really happen. (This
 -- found the envelope snapping a ground pounce seen only by a late packet: SquirrelMotor's vertical check now allows a
--- launch off the ground inside the gap.)
+-- launch off the ground inside the gap.) The server sees each pounce's launch (MovementService:motorOf's pounceAt,
+-- which Combat/CombatService ties the bite to) when the click said, give or take the link's jitter (not through a
+-- burst of packets held up or lost: a pounce in one does not bite).
 local Tunables = require("@shared/Config/Tunables")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local Squirrel = require("@client/Controllers/Squirrel")
@@ -55,11 +57,21 @@ return function(t)
 			local pending: number? = nil
 			local pounces, clicks = 0, 0
 			local weave, weaveAt = 1, 0
+			local clickTimes: { number } = {}
+			local seenLaunches: { number } = {}
+			local lastSeen: number? = nil
 			local heading = rng.next() * math.pi * 2
 			rig:possess(town.startAt(rng), function(tt: number, state: State, events: { any }): SquirrelMotor.Input
 				for _, e in events do
 					if e.kind == "pounce" then
 						pounces += 1
+					end
+				end
+				for _, sq in (rig.movement :: any).squirrels do
+					local at = sq.pounceAt
+					if at ~= nil and at ~= lastSeen then
+						lastSeen = at
+						table.insert(seenLaunches, at)
 					end
 				end
 				local input = SquirrelMotor.idleInput(heading + math.pi)
@@ -84,6 +96,7 @@ return function(t)
 				pending = pend
 				if tell then
 					clicks += 1
+					table.insert(clickTimes, tt)
 				end
 				input.pounce = now
 				return input
@@ -93,6 +106,36 @@ return function(t)
 			print(`      {LiveRig.describe(c.name, r)}; {clicks} clicks, {pounces} pounces`)
 			for _, v in r.violations do
 				print(`      VIOLATION {v}`)
+			end
+			-- each launch the server saw, against the click before it: the link's one way, give or take its jitter
+			local P = require("@shared/Combat/CombatRules").params()
+			local worst, tied = 0, 0
+			for _, at in seenLaunches do
+				local click: number? = nil
+				for _, ct in clickTimes do
+					if ct <= at then
+						click = ct
+					end
+				end
+				if click then
+					local off = at - (click :: number) - windup - (c.link :: any).latency
+					worst = math.max(worst, math.abs(off))
+					if math.abs(off) <= P.rewind + P.launchSlack then
+						tied += 1
+					end
+				end
+			end
+			print(
+				`      the server saw {#seenLaunches} launches; {tied} within {P.rewind + P.launchSlack} s of the click's (worst {string.format(
+					"%.3f",
+					worst
+				)} s)`
+			)
+			-- (a burst held up or lost hides a pounce's launch, or shows it late: no bite on it, as no bite on a lag spike)
+			local bursts = (c.link :: any).holdEvery ~= nil or (c.link :: any).dropEvery ~= nil
+			if not bursts then
+				t.truthy(#seenLaunches >= pounces - 3, "the server saw every pounce's launch")
+				t.truthy(tied >= #seenLaunches - 3, "and each when the click said")
 			end
 			t.eq(r.snaps, 0, "snaps")
 			t.truthy(pounces >= 40, `the pounces happened ({pounces})`)

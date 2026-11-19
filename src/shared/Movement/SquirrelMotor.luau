@@ -1830,6 +1830,7 @@ function SquirrelMotor.envelope(
 
 	-- 4. Off the rail (leap, drop, pounce, knockback): the launch point is the visible position.
 	if prevRoute and not nextRoute then
+		launchUsed = true
 		local vis = Motion.visualPose(
 			world,
 			prevRoute,
