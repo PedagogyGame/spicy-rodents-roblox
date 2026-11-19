@@ -7,6 +7,9 @@
 -- (the sequence's "med" news and the duel's events), and the ambulances' poses.
 -- The Spicy Rodent is the town's own rodent actor. `holdRodent()` makes it a player's (its brain stops, the test
 -- moves it), as Boot/Game's possession does; `hold(id)` does the same for a townsperson (a player-held victim).
+-- With opts.overhead the town's overhead watch runs too (Server/Stealth/OverheadService, wired as Boot/Game wires it:
+-- the duel asks it who has spotted the rodent overhead): rig.overhead, rig.gazes[id] (the point a head turns to), the
+-- rodent's eye in rig.eye[id] = { meter, seen }.
 -- Interface: new(opts?) -> Rig; Rig.step(secs, each?); Rig.runUntil(limit, done, each?) -> boolean;
 --   Rig.hold(id); Rig.let(id); Rig.put(id, x, z, yaw?); Rig.near(x, z, post?, skip?) -> actor; Rig.calmNear(x, z, skip?) -> actor; Rig.responders() -> { vehicle };
 --   Rig.saidBy(situation) -> { said }; Rig.dice(list) (the sequence's next dice); Rig.lunge(victimId, from?) ->
@@ -22,6 +25,7 @@ local TownAI = require("@server/AI/TownAI")
 local TrafficService = require("@server/Traffic/TrafficService")
 local InfectionService = require("@server/Infection/InfectionService")
 local CombatService = require("@server/Combat/CombatService")
+local OverheadService = require("@server/Stealth/OverheadService")
 
 local BiteRig = {}
 
@@ -38,6 +42,9 @@ export type Options = {
 	duelRand: (() -> number)?, -- the duel's dice (default: seeded)
 	biteRand: (() -> number)?, -- the dice for the bite itself (default: the duel's)
 	motorCheck: boolean?, -- the duel asks for the rodent's motor state (rig.motor[id]) before a bite
+	overhead: boolean?, -- run Server/Stealth/OverheadService (the people look up at a squirrel overhead), stepped every
+	-- rig step as Boot/Game steps it; a held squirrel's route is rig.route[id] (nil: it has sent nothing)
+	overheadRand: (() -> number)?, -- its dice (default: seeded)
 }
 
 local data: any = nil
@@ -176,6 +183,41 @@ function BiteRig.new(opts: Options?): any
 			end,
 		})
 	end
+	rig.route = {}
+	rig.gazes = {}
+	rig.eye = {}
+	if o.overhead then
+		local orng = Rng.new((o.seed or 1) + 202)
+		rig.overhead = OverheadService.new({
+			world = world,
+			infection = rig.infection,
+			combat = rig.combat,
+			motorOf = function(id: number): any
+				local r = rig.route[id]
+				return if r == nil then nil else { routeId = if r == false then nil else r }
+			end,
+			setAttr = function(id: number, name: string, value: any)
+				rig.setAttr(id, name, value)
+			end,
+			gaze = function(id: number, x: number?, y: number?, z: number?)
+				rig.gazes[id] = if x then { x, y, z } else nil
+			end,
+			cue = function(id: number, meter: number?, seen: boolean?)
+				rig.eye[id] = if meter == nil then nil else { meter = meter, seen = seen }
+			end,
+			serverTime = function(): number
+				return 5000 + rig.time
+			end,
+			rand = o.overheadRand or function(): number
+				return orng.next()
+			end,
+		})
+		if rig.combat then
+			rig.combat.opts.overhead = function(person: number, rodent: number): boolean
+				return rig.overhead:spotted(person, rodent)
+			end
+		end
+	end
 	local people = {}
 	local function trafficWorld()
 		table.clear(people)
@@ -206,6 +248,9 @@ function BiteRig.new(opts: Options?): any
 			TownAI.stepFrame(world, dt)
 			traffic:step(dt, trafficWorld())
 			rig.infection:step(dt)
+			if rig.overhead then
+				rig.overhead:step(dt)
+			end
 			if rig.combat then
 				duelAcc += dt
 				while duelAcc >= 0.1 - 1e-9 do

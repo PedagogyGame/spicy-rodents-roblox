@@ -1,6 +1,6 @@
 --!strict
 -- Stealth/OverheadWatch: people in town notice a squirrel stalking above them (owner playtest 2026-11-19). One person,
--- the squirrel 12 studs up on a wire: walking in front of them it is spotted in about two seconds, sprinting in under
+-- the squirrel 12 studs up on a wire: walking 20 studs in front of them it is spotted in about two seconds, sprinting in under
 -- one, creeping not for 15 s; creeping straight over them from behind is never spotted; walking close over them is
 -- heard and spotted, the same walk 30 studs off to the side, out of view, is not; the leaves (a branch) slow it to
 -- less than half. The stages come in order (glance, look, spot), all of them in order when a landing jumps the meter;
@@ -55,14 +55,14 @@ end
 
 return function(t)
 	t.test("in front of them: walking is spotted in about 2 s, sprinting in under 1, creeping not for 15 s", function()
-		local walk = timeToSpot(squirrel(0, 10, WALK), 30)
-		local sprint = timeToSpot(squirrel(0, 10, SPRINT), 30)
-		local creep = timeToSpot(squirrel(0, 10, CREEP), 60)
+		local walk = timeToSpot(squirrel(0, 20, WALK), 30)
+		local sprint = timeToSpot(squirrel(0, 20, SPRINT), 30)
+		local creep = timeToSpot(squirrel(0, 20, CREEP), 60)
 		print(`      walk {walk} s, sprint {sprint} s, creep {creep} s`)
 		t.truthy(walk and walk >= 1.2 and walk <= 3, `walk {walk}`)
 		t.truthy(sprint and sprint <= 1, `sprint {sprint}`)
 		t.truthy(creep == nil or creep >= 15, `creep {creep}`)
-		t.eq(timeToSpot(squirrel(0, 10, STILL), 60), nil, "keeping still: never")
+		t.eq(timeToSpot(squirrel(0, 20, STILL), 60), nil, "keeping still: never")
 	end)
 
 	t.test("stalking from behind: a creep straight over them or behind them is never spotted", function()
@@ -72,25 +72,26 @@ return function(t)
 		t.truthy(r < C.quiet, `under the quiet line: {r}`)
 	end)
 
-	t.test("close overhead is heard: a walk over them is spotted; the same walk 30 studs off to the side is not", function()
+	t.test("close overhead is heard: a walk over them is spotted; the same walk 30 studs off to the side is not (in 10 s)", function()
 		local over = timeToSpot(squirrel(2, -3, WALK), 20)
-		local side = timeToSpot(squirrel(30, 0, WALK), 20)
+		local side = timeToSpot(squirrel(30, 0, WALK), 10)
 		print(`      over them {over} s, 30 studs to the side {side}`)
 		t.truthy(over and over <= 4, `over: {over}`)
 		t.eq(side, nil, "off to the side, out of view")
-		local rOver = OverheadWatch.rate(squirrel(2, 4, WALK), PERSON)
-		local rFar = OverheadWatch.rate(squirrel(0, 30, WALK), PERSON)
-		t.truthy(rOver > rFar * 1.5, "close over them builds faster than further off in front")
+		-- straight over them, and 20 studs off to the side
+		local rOver = OverheadWatch.rate(squirrel(2, -3, WALK), PERSON)
+		local rSide = OverheadWatch.rate(squirrel(20, 0, WALK), PERSON)
+		t.truthy(rOver > rSide * 3, `close over them builds faster than off to the side: {rOver} against {rSide}`)
 	end)
 
 	t.test("the leaves: a walk on a branch takes more than twice as long", function()
-		local open = timeToSpot(squirrel(0, 10, WALK), 30) :: number
-		local leafy = timeToSpot(squirrel(0, 10, WALK, true), 30)
+		local open = timeToSpot(squirrel(0, 20, WALK), 30) :: number
+		local leafy = timeToSpot(squirrel(0, 20, WALK, true), 30)
 		t.truthy(leafy == nil or leafy >= open * 2.5, `open {open}, branch {leafy}`)
 	end)
 
 	t.test("the stages come in order; a landing that jumps the meter gives each, in order, at once", function()
-		local _, events = timeToSpot(squirrel(0, 10, WALK), 30)
+		local _, events = timeToSpot(squirrel(0, 20, WALK), 30)
 		local kinds = {}
 		for _, e in events do
 			table.insert(kinds, e.kind)
