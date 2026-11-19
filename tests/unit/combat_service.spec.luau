@@ -314,11 +314,41 @@ return function(t)
 			t.eq(rig.combat:guardOf(p.id), nil, "no duel for a player's body")
 			t.eq((rig.attrs[p.id] or {}).Stance, nil)
 			rig.step(1)
-			rig.combat:heldKick(p.id, rig.now() + 0.15)
+			-- (review finding 8) a kick at nothing, facing away from the rodent, raises no guard
+			t.falsy(rig.combat:heldKick(p.id, rig.now() + 0.15, -1, 0), "kicking at nothing")
+			t.truthy(rig.combat:heldKick(p.id, rig.now() + 0.15, 1, 0), "kicking at the rodent in front")
 			t.truthy(not rig.lunge(p.id, 4), "no bite into the player's kick")
 			t.eq(rig.duelNews[#rig.duelNews].payload.phase, "windup")
 			rig.step(1)
 			t.truthy(rig.lunge(p.id, 4), "without the kick it lands")
+		end
+	)
+
+	t.test(
+		"a player mashing F is not bite-proof, and their kick shares the duel's i-frames (review finding 8)",
+		function()
+			local rig = BiteRig.new({ seed = 10, duelRand = dice(0) })
+			rig.step(20)
+			local p = rig.calmNear(-300, 0)
+			rig.hold(p.id)
+			rig.holdRodent()
+			rig.put(rig.rodent, p.x + 9, p.z)
+			rig.step(0.5)
+			-- F every 0.7 s (the kick's cooldown), facing away: no raised leg, so a bite between kicks lands
+			for _ = 1, 3 do
+				t.falsy(rig.combat:heldKick(p.id, rig.now(), -1, 0))
+				rig.step(0.7)
+			end
+			t.truthy(rig.lunge(p.id, 4), "a bite on a person kicking at the air")
+			-- the i-frames: a blow lands, and a player's kick in the same instant glances off
+			local rig2 = BiteRig.new({ seed = 6, duelRand = dice(0) })
+			rig2.step(20)
+			rig2.holdRodent()
+			rig2.put(rig2.rodent, 900, 900)
+			rig2.step(0.2)
+			t.truthy(rig2.combat:takeBlow(rig2.rodent, rig2.now()), "the first blow lands")
+			t.falsy(rig2.combat:takeBlow(rig2.rodent, rig2.now() + 0.05), "a second inside rodent.iFrames does not")
+			t.truthy(rig2.combat:takeBlow(rig2.rodent, rig2.now() + rig2.combat.P.iFrames + 0.01), "after them it does")
 		end
 	)
 

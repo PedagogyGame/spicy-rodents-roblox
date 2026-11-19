@@ -19,9 +19,10 @@
 -- "witness" events, Officer "respond") and its stance into the body's Stance attribute (clients draw it; the vigilante's
 -- "squared" stance is the visible tell). A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
 -- blows); Boot/Game applies the health, the Power and the knock-out as it does for a player's kick. A person a player
--- holds is never ordered: they kick with F on their own timing (`heldKick`: a raised leg for HELD_GUARD seconds, no bite
--- lands into it), and a bite on them is "unaware" otherwise. A person the bite-to-hospital sequence has in hand
--- (Infection/InfectionService:engaged: a case, the crowd, the crew, the walk home) is left out of the duel.
+-- holds is never ordered: they kick with F on their own timing (`heldKick`: a kick aimed at the rodent raises a leg for
+-- HELD_GUARD seconds, no bite lands into it; their kick shares the duel's i-frames, `takeBlow`), and a bite on them is
+-- "unaware" otherwise. A person the bite-to-hospital sequence has in hand (Infection/InfectionService:engaged: a case,
+-- the crowd, the crew, the walk home) is left out of the duel.
 -- THE VIGILANTES. VigilanteRules keeps round(human.vigilanteShare x every human actor) flags, rebalanced once a second, on
 -- AI townspeople (the bodies whose brain can take the rodent on); a flagged person is tough and, on sighting the
 -- rodent, moves to kick it. `summon(x, z, r)` is the drone's call: flagged people within r head for the spot.
@@ -32,8 +33,10 @@
 -- alert.policeLeashBlocks blocks of the bite, for the zone's life.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt, now) ten times a second. `now` is the
 -- duel's own clock (Boot/Game's); the orders to brains are stamped on the town's (world.now), which the brains read.
--- Interface: new(opts) -> Service; :rodentAct(id, verb, now) -> (ok, why?); :heldKick(id, now); :step(dt, now);
---   :inAlert(x, z, now) -> boolean; :boost(x, z, now) -> number (the kick multiplier there); :temperOf(id) -> Temper;
+-- Interface: new(opts) -> Service; :rodentAct(id, verb, now) -> (ok, why?); :step(dt, now);
+--   :heldKick(id, now, lookX?, lookZ?) -> aimed; :takeBlow(rodentId, now) -> boolean (a player's kick, with the duel's
+--   i-frames); :inAlert(x, z, now) -> boolean; :boost(x, z, now) -> number (the kick multiplier there);
+--   :temperOf(id) -> Temper;
 --   :isVigilante(id) -> boolean; :summon(x, z, r); :zones() -> { Zone }; :guardOf(id) -> Guard?; :stats();
 --   :stop() (every order and stance let go); HELD_GUARD; CHASE_EVERY; SOUNDS (cue name -> id)
 -- Ids are TownAI actor ids. Positions in studs.
@@ -102,7 +105,8 @@ type Chase = { zone: Zone, nextAt: number }
 local CombatService = {}
 CombatService.__index = CombatService
 
-CombatService.HELD_GUARD = 0.5 -- s: a player's kick keeps a raised leg this long
+CombatService.HELD_GUARD = 0.3 -- s: a player's kick at the rodent keeps a raised leg this long
+CombatService.HELD_AIM = 4 -- studs beyond the kick's reach a player's kick still counts as aimed at the rodent
 CombatService.CHASE_EVERY = 0.5 -- s between a chasing officer's new orders
 CombatService.ORDER_SECS = 0.6 -- a duel order lasts this long unless renewed
 CombatService.REBALANCE_SECS = 1
@@ -343,9 +347,52 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 	return true
 end
 
--- A person a player holds kicked (F): a raised leg for HELD_GUARD seconds.
-function CombatService.heldKick(self: Service, id: number, now: number)
-	self.heldKicks[id] = now
+-- A person a player holds kicked (F), facing (lookX, lookZ) (default: the body's yaw): a raised leg for HELD_GUARD
+-- seconds, if the kick was aimed at a rodent in play (in front, within the reach and HELD_AIM): a kick at nothing
+-- raises no guard, so mashing F does not make a person bite-proof. True when it counted.
+function CombatService.heldKick(self: Service, id: number, now: number, lookX: number?, lookZ: number?): boolean
+	local a = self.world.actorsById[id]
+	if a == nil then
+		return false
+	end
+	local fx, fz = lookX or math.sin(a.yaw or 0), lookZ or math.cos(a.yaw or 0)
+	local fm = math.sqrt(fx * fx + fz * fz)
+	if fm < 1e-6 then
+		return false
+	end
+	fx, fz = fx / fm, fz / fm
+	local reach = self.P.kickReach + CombatService.HELD_AIM
+	for rid in self.rods do
+		local rod = self.world.actorsById[rid]
+		if rod then
+			local dx, dz = rod.x - a.x, rod.z - a.z
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d <= reach and (d < 1 or (dx * fx + dz * fz) / d >= 0.3) then
+				self.heldKicks[id] = now
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- A player's kick is about to land on the rodent `rodentId`: false while the rodent is inside the duel's i-frames (a
+-- blow just landed, from anyone), else the blow counts as the duel's own (its i-frames start, its pounce is spent).
+-- A body not in the duel always takes it.
+function CombatService.takeBlow(self: Service, rodentId: number, now: number): boolean
+	local r = self.rods[rodentId]
+	if r == nil then
+		return true
+	end
+	if now < r.iUntil then
+		return false
+	end
+	r.iUntil = now + self.P.iFrames
+	r.windowUntil = math.min(r.windowUntil, now)
+	r.commitAt = math.min(r.commitAt, now)
+	r.landed = true
+	r.recoverUntil = now + self.P.pounceRecovery
+	return true
 end
 
 -- The drone's call: the vigilantes within r of (x, z) head for the spot.

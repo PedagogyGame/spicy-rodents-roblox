@@ -1142,7 +1142,8 @@ function Game.start(opts: Opts?): any
 		local p = root.Position
 		local look = root.CFrame.LookVector
 		if combat and townIdOf[actor.id] then
-			combat:heldKick(townIdOf[actor.id], now)
+			-- (a raised leg only when the kick was at the rodent: Combat/CombatService.heldKick)
+			combat:heldKick(townIdOf[actor.id], now, look.X, look.Z)
 		end
 		local targets = {}
 		local byId: { [string]: any } = {}
@@ -1167,6 +1168,12 @@ function Game.start(opts: Opts?): any
 			return false
 		end
 		local target = byId[hitId]
+		-- (the duel's i-frames hold for a player's kick too: a blow from anyone a moment ago and this one glances off)
+		local targetTown = townIdOf[hitId]
+		if combat and targetTown and not combat:takeBlow(targetTown, now) then
+			fire(player, { kind = "kick", hit = false })
+			return false
+		end
 		-- (the hidden strength boost by a fresh bite is a player's too: Combat/CombatService)
 		local amount = CombatRules.damage(duelRules, "kick", combat ~= nil and combat:inAlert(p.X, p.Z, now))
 		local h, dead = hurtRodent(target, amount, "kick")
