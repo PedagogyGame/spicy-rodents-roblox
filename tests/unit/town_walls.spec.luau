@@ -151,6 +151,9 @@ return function(t)
 				end
 			end
 			t.truthy(staffed >= 1, "the corner store's till")
+			-- (the baked town is some hundreds of megabytes of solids: let it go for the specs after this one,
+			-- whose timings a full heap would slow)
+			town = nil
 		end
 	)
 
