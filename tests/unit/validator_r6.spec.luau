@@ -293,8 +293,10 @@ return function(t)
 				end
 			end
 		end
-		-- the steepest bough that is no trunk: a leap along it facing up, regrabbed above the body
-		local steep, steepS = nil, 0
+		-- the steepest bough that is no trunk, and the one nearest 45 degrees (the round-5 review's worry: a leap along a
+		-- rail steeper than the leap's own path, regrabbed above the body, at 3 packets a second): a leap along it facing
+		-- up, regrabbed after 6 to 24 frames, again and again
+		local steep, steepS, mid, midS = nil, 0, nil, math.huge
 		for _, r in world.registry:all() do
 			if r.kind ~= "trunk" and r.length > 30 then
 				local a, b = world.registry:pointAt(r, 0.2), world.registry:pointAt(r, 0.6)
@@ -302,37 +304,45 @@ return function(t)
 				if sl > steepS and sl < 3 then
 					steep, steepS = r, sl
 				end
-			end
-		end
-		local a, b = world.registry:pointAt(steep, 0.2), world.registry:pointAt(steep, 0.3)
-		local yaw = math.atan2(-(b.x - a.x), -(b.z - a.z))
-		if b.y < a.y then
-			yaw += math.pi
-		end
-		local bough = onRail(world, steep, 0.2, 0)
-		bough.tireless = true
-		for _, wait in { 6, 12, 18, 24 } do
-			for _, rate in { 2, 3, 4, 10, 20, 30 } do
-				local codes = drive(world, vworld, bough, function(f: number): SquirrelMotor.Input
-					local i = SquirrelMotor.idleInput(yaw)
-					i.fw = 1
-					local m = f % (wait + 6)
-					i.leap, i.grab = m == 0, m == wait
-					return i
-				end, 3, rate)
-				local c = {}
-				for code, n in codes do
-					table.insert(c, `{code}={n}`)
-				end
-				if #c > 0 then
-					table.insert(fails, `bough regrab after {wait} frames at {rate}/s: {table.concat(c, " ")}`)
+				if math.abs(sl - 1) < math.abs(midS - 1) then
+					mid, midS = r, sl
 				end
 			end
+		end
+		for _, case in { { r = steep, s = steepS }, { r = mid, s = midS } } do
+			local a, b = world.registry:pointAt(case.r, 0.2), world.registry:pointAt(case.r, 0.3)
+			local yaw = math.atan2(-(b.x - a.x), -(b.z - a.z))
+			if b.y < a.y then
+				yaw += math.pi
+			end
+			local bough = onRail(world, case.r, 0.2, 0)
+			bough.tireless = true
+			for _, wait in { 6, 12, 18, 24 } do
+				for _, rate in { 2, 3, 4, 10, 20, 30 } do
+					local codes = drive(world, vworld, bough, function(f: number): SquirrelMotor.Input
+						local i = SquirrelMotor.idleInput(yaw)
+						i.fw = 1
+						local m = f % (wait + 6)
+						i.leap, i.grab = m == 0, m == wait
+						return i
+					end, 3, rate)
+					local c = {}
+					for code, n in codes do
+						table.insert(c, `{code}={n}`)
+					end
+					if #c > 0 then
+						table.insert(
+							fails,
+							`bough {case.r.id} regrab after {wait} frames at {rate}/s: {table.concat(c, " ")}`
+						)
+					end
+				end
+			end
+			table.insert(rows, `bough {case.r.id}: {string.format("%.2f", case.s)} up per stud across, regrabbed clean`)
 		end
 		for _, row in rows do
 			print(`      {row}`)
 		end
-		print(`      the steepest bough {steep.id}: {string.format("%.2f", steepS)} up per stud across`)
 		t.eq(#fails, 0, `honest motor cases flagged: {table.concat(fails, "; ")}`)
 	end)
 
