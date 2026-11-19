@@ -169,9 +169,7 @@ local function driverOn(kindId: string, spec: PartBuilder.ModelSpec): Cockpit?
 	local x = if rule.across then byName[rule.across].pos[1] elseif rule.left then -W * rule.left else ref.pos[1]
 	local z0, z1 = ref.pos[3] - ref.size[3] / 2, ref.pos[3] + ref.size[3] / 2
 	local z = if rule.front then z0 + rule.front elseif rule.back then z1 - rule.back else ref.pos[3]
-	local top = if rule.on
-		then ref.pos[2] + ref.size[2] / 2
-		else ref.pos[2] - ref.size[2] / 2 - Placeholder.SEATED.head
+	local top = if rule.on then ref.pos[2] + ref.size[2] / 2 else ref.pos[2] - ref.size[2] / 2 - Placeholder.SEATED.head
 	return { seat = { x, top, z }, eye = { x, top + Placeholder.SEATED.eye, z } }
 end
 

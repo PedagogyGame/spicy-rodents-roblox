@@ -14,7 +14,8 @@
 --            this client's own body as a Body box, keeps off the root of a car drawn over it);
 --            solidify(model) (a ghost's collision: only its invisible RootPart, the logical box, is solid);
 --            solidFor(pose, hull, body?) (pure: does that root collide this frame: only a near-still car, never one
---            already over the body).
+--            already over the body); riderSlot(id, kind) (pure: who rides fleet motorcycle `id`);
+--            spec(id, entry) -> PartBuilder.ModelSpec (pure: the model `render` builds for fleet vehicle `id`).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
 -- clients take it from the ground they are given (traffic.md §13 "Terrain"; the game passes
@@ -25,6 +26,8 @@
 local Units = require("../Config/Units")
 local PartBuilder = require("../Avatar/PartBuilder")
 local VehiclePuppet = require("./VehiclePuppet")
+local Fleet = require("./Fleet")
+local RidePuppet = require("../Vehicles/RidePuppet")
 local Solid = require("./Solid")
 
 export type Pose = {
@@ -555,6 +558,33 @@ end
 -- the collision each ghost's root was last given (models are cached for the session; weak, so a destroyed one goes)
 local colliding: { [Model]: boolean } = setmetatable({} :: any, { __mode = "k" })
 
+-- riderSlot(id, kind): the Vehicles/RidePuppet slot of the person riding fleet vehicle `id`, or nil (not a motorcycle).
+-- Traffic/Fleet names its two motorcycles after their riders (ids 8 and 11: Morgan Rider, Alex Rider); a motorcycle not
+-- named after one carries a stranger (a motorcyclist's slot one lap past the cast: recoloured from the palette).
+function Ghost.riderSlot(id: number, kind: string): number?
+	if kind ~= "motorcycle" then
+		return nil
+	end
+	for _, e in Fleet.ENTRIES do
+		if e.id == id then
+			for slot, r in RidePuppet.RIDERS do
+				if r.name == e.name then
+					return slot
+				end
+			end
+		end
+	end
+	return #RidePuppet.RIDERS + 7 + id % 2
+end
+
+-- spec(id, entry): the model render builds for fleet vehicle `id` (its kind and colour): a motorcycle with its rider.
+function Ghost.spec(id: number, entry: { kind: string, color: string? }): PartBuilder.ModelSpec
+	return VehiclePuppet.spec(
+		entry.kind,
+		{ color = entry.color, name = `Ghost_{id}`, rider = Ghost.riderSlot(id, entry.kind) }
+	)
+end
+
 -- render(buffer, now, folder, kinds, heightAt, models, cars?, body?): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
@@ -581,10 +611,7 @@ function Ghost.render(
 		end
 		local model = models[id]
 		if not model then
-			-- the fleet's two motorcycles (ids 8 and 11) carry Morgan and Alex (RidePuppet slots 7 and 8)
-			local rider = if k.kind == "motorcycle" then 7 + id % 2 else nil
-			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}`, rider = rider })
-			local built = PartBuilder.instantiate(spec, lib) :: Model
+			local built = PartBuilder.instantiate(Ghost.spec(id, k), lib) :: Model
 			Ghost.solidify(built)
 			built.Parent = folder
 			models[id] = built

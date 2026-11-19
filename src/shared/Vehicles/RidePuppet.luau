@@ -14,7 +14,9 @@
 -- The riders are part-built and stay so: they have no Humanoid and no R15 joints (Actors/BodyFactory), so the rounded
 -- townspeople's art (Assets/PeopleArt) cannot be put on them. They are dressed instead in what that art would give them:
 -- Avatar/PeopleLooks' colours, hair style and hat for the role (mime or townsperson), and the same round build (a ball
--- head with eyes, a rounded body, round hands), seated in a riding pose a walking R15 clip could not give.
+-- head with eyes, a rounded body, round hands), seated in a riding pose a walking R15 clip could not give. The cast
+-- riders wear the cast's own shirts; where a shirt reads as skin (Avatar/RolePalettes.readsAsSkin: Ellie's orange,
+-- Riley's khaki) the shoulders under the chin are a darker shade of it, so the head does not run into the body.
 -- A rider faces -Z (RigSpec). Its root is the old rider's: an invisible 1 x 1 x 1 HumanoidRootPart 2.2 studs above the
 -- ground, the only part that can be queried or touched; every other part is welded to it and collides with nothing.
 -- Only the big parts (the body, the head, the tyres) cast shadows.
@@ -58,6 +60,11 @@ local hex = PartBuilder.hex
 local RidePuppet = {}
 
 RidePuppet.ROOT_HEIGHT = 2.2 -- the root above the ground (the old part-built rider's)
+RidePuppet.YOKE = 0.7 -- the shoulders' shade of a shirt that reads as skin
+
+local function shade(c: Rgb, f: number): Rgb
+	return { r = c.r * f, g = c.g * f, b = c.b * f }
+end
 
 -- The cast (data/authored/cast/cast.json, v5.4 L12199-12249 and L9563): skin, shirt or jacket, the ride's paint and
 -- the helmet. Pants and hair come from PeopleLooks (the townsperson palette), as for anyone else in town.
@@ -316,7 +323,11 @@ local function drawFigure(k: Kit, dress: PeopleLooks.Dress, r: Rider, pose: Pose
 	across(k, "Pelvis", hip, 1.0 * s, 0.36 * s, c.pants)
 	local shoulder = add3(hip, scale3(up, 1.25 * s))
 	seg(k, "Torso", add3(hip, scale3(up, 0.1 * s)), add3(hip, scale3(up, 1.2 * s)), 0.5 * s, c.shirt).castShadow = true
-	across(k, "Shoulders", shoulder, 1.25 * s, 0.33 * s, c.shirt)
+	-- the shoulders meet the head: a shirt that reads as skin is darker there (RidePuppet.YOKE of it)
+	local yoke = if not mime and RolePalettes.readsAsSkin(c.shirt, skin)
+		then shade(c.shirt, RidePuppet.YOKE)
+		else c.shirt
+	across(k, "Shoulders", shoulder, 1.25 * s, 0.33 * s, yoke)
 	if mime then
 		-- the striped top: two dark bands round the body, and the red scarf at the neck
 		for i, t in { 0.45, 0.8 } do
@@ -452,10 +463,10 @@ local function dressFor(slot: number, index: number?): (Rider, PeopleLooks.Dress
 	local skin, shirt = hex(r.skin), hex(r.shirt)
 	local who = index or i
 	if lap > 0 then
+		-- a stranger past the cast: the palette's colours, never a shirt that reads as bare skin
 		local look = RolePalettes.look("townsperson", who)
-		skin, shirt = look.skin, look.shirt
+		skin, shirt = look.skin, RolePalettes.clothed(look.shirt, look.skin, who)
 	end
-	shirt = if r.role == "mime" then shirt else RolePalettes.clothed(shirt, skin, who)
 	return r, PeopleLooks.dress(r.role, who, { skin = skin, shirt = shirt }), who
 end
 
