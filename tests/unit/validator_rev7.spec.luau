@@ -10,6 +10,10 @@ local MoveValidator = require("@server/Movement/MoveValidator")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local TestWorld = require("@tests/cheat/TestWorld")
 local LiveRig = require("@tests/lib/LiveRig")
+local BakedWorld = require("@tests/lib/BakedWorld")
+local Height = require("@shared/World/Height")
+local Data = require("@shared/Data")
+local fs = require("@lune/fs")
 
 type State = SquirrelMotor.State
 
@@ -103,6 +107,97 @@ return function(t)
 				moved <= bound,
 				`a release and a retake moved the body {math.floor(moved)} st in {elapsed} s, the governor's most {bound}`
 			)
+		end
+	)
+
+	-- slab -------------------------------------------------------------------------------------------------------------
+	t.test(
+		"slab: a squirrel stands on a roof, then falls straight down through it into the sealed storey under it",
+		function()
+			-- No rule judges a move through a horizontal slab: the wall test (ValidatorWorld.crosses) is horizontal and a
+			-- move shorter than C.MIN_CHORD across is no move at all; a fall straight down from a floor at gravity is an
+			-- honest walk off a ledge to the envelope; the floor check asks only that a grounded packet stand on a floor.
+			-- The client's motor never passes a roof (ClientWorld's ground): only a cheat does.
+			if not fs.isFile("build/Town.rbxm") then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			Height.configure(Data.default():module("TerrainExtensions"))
+			local town = BakedWorld.load("build/Town.rbxm")
+			local w = town:motorWorld(Data.default())
+			local wall, down, cover = BakedWorld.validatorRays(town)
+			local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
+			local P = SquirrelMotor.params
+			local rows, worst = {}, math.huge
+			for _, path in { "Lots.hospital_main.Roof", "Lots.west_police_station.Roof" } do
+				local roof: any = nil
+				for _, p in town.parts do
+					if p.path == path then
+						roof = p
+					end
+				end
+				t.truthy(roof ~= nil, path)
+				if roof == nil then
+					continue
+				end
+				local x, z = (roof.x0 + roof.x1) / 2, (roof.z0 + roof.z1) / 2
+				local top = town.groundAt(x, z, roof.y1 + 1)
+				local under = town.groundAt(x, z, roof.y0 - 1.6) -- (the slab under the roof: a ceiling's top)
+				for _, rate in { 20, 4 } do
+					local v = MoveValidator.new(vworld)
+					local s = SquirrelMotor.new(x, top, z)
+					s.grounded, s.clock = true, 1
+					v:accept("a", { seq = 0, snapshot = SquirrelMotor.serialize(s) }, 1)
+					local seq, now, n = 0, 1, 0
+					local function send(st: State)
+						seq += 1
+						now += 1 / rate
+						st.clock = now
+						local r = v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(st) }, now)
+						n += #r.violations
+					end
+					-- (a second on the roof, honestly)
+					for _ = 1, rate do
+						send(SquirrelMotor.new(x, top, z))
+					end
+					-- straight down at gravity, through the roof, onto the slab under it, then 8 st along it
+					local t0 = now
+					while true do
+						local tt = now + 1 / rate - t0
+						local y = top - 0.5 * P.gravity * tt * tt
+						local st = SquirrelMotor.new(x, math.max(y, under), z)
+						if y <= under then
+							st.grounded = true
+							send(st)
+							break
+						end
+						st.grounded, st.vy = false, -P.gravity * tt
+						send(st)
+					end
+					for k = 1, rate do
+						local st = SquirrelMotor.new(x + k * 8 / rate, under, z)
+						st.grounded = true
+						send(st)
+					end
+					worst = math.min(worst, n)
+					table.insert(
+						rows,
+						string.format(
+							"%s: from its top %.1f down through it to %.1f and along, %d packets/s: %d violations",
+							path,
+							top,
+							under,
+							rate,
+							n
+						)
+					)
+				end
+			end
+			Height.configure(nil) -- (the terrain as it was: later specs read World/Height unconfigured)
+			for _, r in rows do
+				print(`      {r}`)
+			end
+			t.truthy(worst > 0, `a fall straight through a roof is judged ({worst} violations at best)`)
 		end
 	)
 
