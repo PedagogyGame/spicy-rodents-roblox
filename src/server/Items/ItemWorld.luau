@@ -15,13 +15,17 @@
 --              is on); open: the umbrella's canopy
 --   playlist   the radio plays its cues one after another while it is on
 --   throw      a copy of the thing flies (the engine's physics: one loose part; a frisbee glides on a small lift)
---              and lands; E picks it up (it is yours then); a person it hits in flight catches it; left alone 2
---              minutes it goes back to the thrower. The newspaper is litter: gone after 20 s.
+--              and lands; E picks it up; a person it hits in flight catches it. It stays its buyer's (owner, D16
+--              #26; Items/Lending): the buyer has it back in their things, anyone else borrows it, in hand to throw
+--              back (opts.lendTool), never in their inventory, and it goes home when they keep it too long, walk
+--              off with it, change body or leave. Left lying Lending.C.groundSecs it goes home; the buyer gone, at
+--              once (into their record: theirs again if they come back). The newspaper is litter: gone after 20 s.
 --   write      the chalk's filtered words on the ground in front (5 minutes; 30 in the town at most)
 --   tape       a strip of duct tape on what is ahead (5 minutes; 40 at most)
 --   place      a lawn chair (sat in at once; E folds it back up, its owner's; one each: a second folds the first; left
 --              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
---              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up)
+--              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up: its
+--              owner's back in their things, whoever picks it up; left 10 minutes or its owner gone, it goes home)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
 --   calm_dog   a dog treat: the yard dog near (opts.dogs, Wildlife/YardHazards) sits and wags and ignores squirrels
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
@@ -31,8 +35,8 @@
 --              clamped and rate-limited here); reeled in on the next use or out of the zone. While it is up the
 --              flier (Player) carries KITE_ATTRIBUTE (Client/UI/KiteSteer plants the feet and reads the keys)
 -- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
---   body change: toggles off, kite reeled in), steer(player, x, y) -> boolean (taken), kiteOf(player) -> Flight?,
---   stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night) -> (brightness, range); relight(lit,
+--   body change: toggles off, kite reeled in, borrowed things home), steer(player, x, y) -> boolean (taken),
+--   kiteOf(player) -> Flight?, lending (Items/Lending's ledger), stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night) -> (brightness, range); relight(lit,
 --   night) -> count; chairs() -> ChairLedger; CHAIR; SOUNDS; KITE_ATTRIBUTE
 -- Engine only inside the functions; no side effects on require.
 
@@ -43,6 +47,7 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local KiteFlight = Import.shared("Items/KiteFlight") :: typeof(require("../../shared/Items/KiteFlight"))
 local ItemService = require("./ItemService")
+local Lending = require("./Lending")
 -- (KiteFlight's exported types do not cross the Import cast)
 type Flight = typeof(KiteFlight.new())
 type Bucket = typeof(KiteFlight.bucket())
@@ -92,6 +97,10 @@ export type StartOpts = {
 	-- the town's yard dogs (Wildlife/YardHazards): near(x, z, r) -> targets of kind "dog"; calm(id, secs)
 	dogs: { near: (x: number, z: number, r: number) -> { any }, calm: (id: any, secs: number) -> boolean }?,
 	heartbeat: boolean?,
+	-- a borrowed thing's Tool in `player`'s Backpack (Items/CornerStore: the shelf's model, no ItemId so it is never
+	-- counted as theirs); `use` throws it. nil: nobody else can take anything (it goes straight home)
+	lendTool: ((player: any, itemId: string, ownerName: string, use: () -> ()) -> any?)?,
+	now: (() -> number)?, -- seconds (default os.clock): the loans' and the ground's timers
 }
 
 export type World = {
@@ -101,6 +110,7 @@ export type World = {
 	putAway: (player: any) -> (),
 	steer: (player: any, x: any, y: any) -> boolean,
 	kiteOf: (player: any) -> Flight?,
+	lending: Lending.Ledger,
 	stop: () -> (),
 }
 
@@ -228,6 +238,9 @@ function ItemWorld.start(opts: StartOpts): World
 	local possession = opts.possession
 	local rt = opts.runtime
 	local conns: { RBXScriptConnection } = {}
+	local clockNow: () -> number = opts.now or os.clock
+	local service: ItemService.Service -- (made below, once act exists; a borrowed Tool's use goes through it)
+	local loans = Lending.ledger()
 
 	local function actorOf(player: any): any?
 		return possession and possession:actorOf(player)
@@ -336,8 +349,8 @@ function ItemWorld.start(opts: StartOpts): World
 			return
 		end
 		m:Destroy()
-		if back and owner.Parent == Players then
-			opts.inventory.add(owner, "lawn_chair")
+		if back then
+			opts.inventory.add(owner, "lawn_chair") -- (by UserId: an owner who left has it again if they come back)
 		end
 	end
 	-- whether a point is within CHAIR.promptClear of something with a prompt (a shelf, the till, a door, a game)
@@ -408,11 +421,96 @@ function ItemWorld.start(opts: StartOpts): World
 		return out
 	end
 
-	-- a thrown thing, flying then lying where it lands until someone picks it up
+	-- whose a thing is: the buyer (a Player), their Inventory key (UserId) and the name others read
+	local function userKey(player: any): any
+		local ok, id = pcall(function()
+			return (player :: any).UserId
+		end)
+		return if ok and id ~= nil then id else player
+	end
+	local function nameOf(player: any): string
+		local ok, n = pcall(function()
+			return (player :: any).DisplayName
+		end)
+		return if ok and type(n) == "string" and n ~= "" then n else "somebody"
+	end
+	local function present(player: any): boolean
+		return typeof(player) == "Instance" and (player :: Instance).Parent == Players
+	end
+	local function thingName(item: string): string
+		return (string.gsub(item, "_", " "))
+	end
+	local function distBetween(a: any, b: any): number?
+		local ra, rb = rootOf(a), rootOf(b)
+		if ra == nil or rb == nil then
+			return nil
+		end
+		return (ra.Position - rb.Position).Magnitude
+	end
+
+	-- a thing goes home: into its buyer's things (their record by UserId, whether or not they are here)
+	local function sendHome(thing: Lending.Thing)
+		opts.inventory.add(thing.owner, thing.item)
+	end
+
+	-- a loan ends: the borrowed Tool goes, the thing goes home, and both are told why
+	local function endLoan(loan: Lending.Loan, why: string)
+		if loans.take(loan.token) == nil then
+			return
+		end
+		local tool = loan.tool
+		if tool and tool.Parent then
+			tool:Destroy()
+		end
+		local thing = loan.thing
+		sendHome(thing)
+		local what = thingName(thing.item)
+		if present(thing.owner) then
+			notify(thing.owner, Lending.say(Lending.WORDS.home, what))
+		end
+		if present(loan.holder) then
+			local words = if why == "ownerGone" then Lending.WORDS.ownerLeft else Lending.WORDS.wentHome
+			notify(loan.holder, Lending.say(words, thing.ownerName, what))
+		end
+	end
+
+	-- somebody else's thing into `who`'s hand, to throw back (or straight home when no Tool can be made)
+	local function lend(who: any, thing: Lending.Thing, caught: boolean)
+		local loan = loans.lend(who, thing, clockNow(), distBetween(who, thing.owner))
+		local token = loan.token
+		local tool = if opts.lendTool
+			then opts.lendTool(who, thing.item, thing.ownerName, function()
+				if service then
+					service:use(who, thing.item, { lent = token })
+				end
+			end)
+			else nil
+		if tool == nil then
+			endLoan(loan, "noTool")
+			return
+		end
+		loan.tool = tool
+		local what = thingName(thing.item)
+		local words = if caught then Lending.WORDS.caught else Lending.WORDS.picked
+		notify(who, Lending.say(words, thing.ownerName, what, Lending.C.holdSecs))
+		if present(thing.owner) then
+			notify(thing.owner, Lending.say(Lending.WORDS.borrowed, nameOf(who), what))
+		end
+	end
+
+	-- things thrown and not yet picked up (each goes home after Lending.C.groundSecs, or at once with its buyer gone)
+	type Thrown = { model: Model, thing: Lending.Thing, at: number, taken: boolean, touch: RBXScriptConnection? }
+	local thrown: { Thrown } = {}
+
+	-- a thrown thing, flying then lying where it lands until someone picks it up; still its buyer's (Items/Lending)
 	local function throw(player: any, e: { [string]: any }): boolean
-		local tool = toolOf(player, e.item)
+		local loan = if e.lent ~= nil then loans.get(e.lent) else nil
+		if e.lent ~= nil and (loan == nil or (loan :: Lending.Loan).holder ~= player) then
+			return false
+		end
+		local tool: any = if loan then loan.tool else toolOf(player, e.item)
 		local root = rootOf(player)
-		if tool == nil or root == nil then
+		if tool == nil or tool.Parent == nil or root == nil then
 			return false
 		end
 		local model = Instance.new("Model")
@@ -473,51 +571,59 @@ function ItemWorld.start(opts: StartOpts): World
 			Debris:AddItem(model, 20)
 			return true
 		end
-		local owner = player
-		local taken = false
-		local function give(to: any)
-			if taken then
+		-- whose it is: a borrowed one is still its buyer's (the loan ends as it leaves the hand)
+		local thing: Lending.Thing = if loan
+			then loan.thing
+			else { item = e.item, owner = player, ownerKey = userKey(player), ownerName = nameOf(player) }
+		if loan then
+			loans.take(loan.token)
+		end
+		local t: Thrown = { model = model, thing = thing, at = clockNow(), taken = false, touch = nil }
+		table.insert(thrown, t)
+		local thrower = player
+		local function give(to: any, caught: boolean)
+			if t.taken then
 				return
 			end
-			taken = true
+			t.taken = true
+			if t.touch then
+				t.touch:Disconnect()
+			end
 			model:Destroy()
-			opts.inventory.add(to, e.item)
+			-- its buyer has it back; a thing the game gave is kept; anyone else borrows it
+			if Lending.pickUp(ItemRules.findersKeep(thing.item), thing.ownerKey, userKey(to)) == "lend" then
+				lend(to, thing, caught)
+			else
+				opts.inventory.add(to, thing.item)
+			end
 		end
-		-- a person it hits in flight catches it
-		local touch = m.Touched:Connect(function(other: BasePart)
-			if taken or m.AssemblyLinearVelocity.Magnitude < 4 then
+		-- a person it hits in flight catches it (not the one who just threw it; its buyer catching it has it back)
+		t.touch = m.Touched:Connect(function(other: BasePart)
+			if t.taken or m.AssemblyLinearVelocity.Magnitude < 4 then
 				return
 			end
 			local who = Players:GetPlayerFromCharacter(other:FindFirstAncestorOfClass("Model"))
-			if who and who ~= owner then
+			if who and who ~= thrower then
 				local a = actorOf(who)
 				if a and a.species == "human" then
-					notify(who, "Caught it!")
-					give(who)
+					if userKey(who) == thing.ownerKey then
+						notify(who, "Caught it!")
+					end
+					give(who, true)
 				end
 			end
 		end)
 		m.CanTouch = true
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.ActionText = "Pick up"
-		prompt.ObjectText = tool.Name
+		prompt.ObjectText = `{thing.ownerName}'s {thingName(thing.item)}`
 		prompt.RequiresLineOfSight = false
 		prompt.MaxActivationDistance = 8
 		prompt.Parent = m
 		prompt.Triggered:Connect(function(who: Player)
 			local a = actorOf(who)
 			if a and a.species == "human" then
-				give(who)
-			end
-		end)
-		task.delay(120, function()
-			touch:Disconnect()
-			if not taken and owner.Parent == Players then
-				give(owner)
-				notify(owner, "Your " .. string.lower(tool.Name) .. " is back in your hands.")
-			elseif not taken then
-				taken = true
-				model:Destroy()
+				give(who, false)
 			end
 		end)
 		return true
@@ -542,8 +648,24 @@ function ItemWorld.start(opts: StartOpts): World
 		end
 	end
 	-- whoopee cushions waiting for a sitter
-	type Cushion = { part: BasePart, owner: any, armed: boolean }
+	-- (each still its owner's: picked up by anyone it goes home; left CUSHION_SECS or its owner gone, too)
+	type Cushion = { part: BasePart, owner: any, armed: boolean, at: number }
 	local cushions: { Cushion } = {}
+	local CUSHION_SECS = 600
+	-- a whoopee cushion off the ground and back in its owner's things (`by`: who picked it up, if not its owner)
+	local function cushionHome(c: Cushion, by: any?)
+		if c.part.Parent == nil then
+			return
+		end
+		c.part:Destroy()
+		opts.inventory.add(c.owner, "whoopee_cushion")
+		if by ~= nil and present(by) then
+			notify(by, Lending.say(Lending.WORDS.returned, "whoopee cushion", nameOf(c.owner)))
+		end
+		if by ~= nil and present(c.owner) then
+			notify(c.owner, Lending.say(Lending.WORDS.placedHome, nameOf(by), "whoopee cushion"))
+		end
+	end
 	-- baits on the ground, and the birds at them
 	type Bait = { part: BasePart, birds: { BasePart }, untilT: number, t: number }
 	local baits: { Bait } = {}
@@ -860,22 +982,25 @@ function ItemWorld.start(opts: StartOpts): World
 				)
 				p.Shape = Enum.PartType.Cylinder
 				p.CFrame = CFrame.new(g + Vector3.new(0, 0.12, 0)) * CFrame.Angles(0, 0, math.pi / 2)
-				local c: Cushion = { part = p, owner = player, armed = true }
+				local c: Cushion = { part = p, owner = player, armed = true, at = clockNow() }
 				table.insert(cushions, c)
 				local prompt = Instance.new("ProximityPrompt")
 				prompt.ActionText = "Pick up"
-				prompt.ObjectText = "Whoopee cushion"
+				prompt.ObjectText = `{nameOf(player)}'s whoopee cushion`
 				prompt.RequiresLineOfSight = false
 				prompt.MaxActivationDistance = 6
 				prompt.Parent = p
 				prompt.Triggered:Connect(function(who: Player)
 					local a = actorOf(who)
 					if p.Parent and a and a.species == "human" then
-						p:Destroy()
-						opts.inventory.add(who, "whoopee_cushion")
+						if userKey(who) == userKey(c.owner) or ItemRules.findersKeep("whoopee_cushion") then
+							p:Destroy()
+							opts.inventory.add(who, "whoopee_cushion")
+						else
+							cushionHome(c, who) -- (somebody else's: it goes home, owner D16 #26)
+						end
 					end
 				end)
-				Debris:AddItem(p, 600)
 			end
 			playCue(ItemRules.CUES[if e.prop == "lawn_chair" then "lawn_chair" else "whoopee_cushion"], root)
 		elseif kind == "bait" then
@@ -987,8 +1112,13 @@ function ItemWorld.start(opts: StartOpts): World
 		return true
 	end
 
-	local service = ItemService.new({
+	service = ItemService.new({
 		inventory = opts.inventory,
+		lent = {
+			holds = function(player: any, id: string, token: any): boolean
+				return loans.holds(player, id, token)
+			end,
+		},
 		now = function(): number
 			return os.clock()
 		end,
@@ -1053,6 +1183,10 @@ function ItemWorld.start(opts: StartOpts): World
 				kiteDown(k)
 			end
 		end
+		-- borrowed things do not change bodies with their borrower: they go home
+		for _, loan in loans.of(player) do
+			endLoan(loan, "holderGone")
+		end
 	end
 
 	local relightIn = 0
@@ -1114,11 +1248,12 @@ function ItemWorld.start(opts: StartOpts): World
 		-- lawn chairs: an owner who left takes theirs along; one left empty long enough folds itself up
 		for _, owner in chairs.owners() do
 			local m = chairs.chairOf(owner)
-			if m == nil or m.Parent == nil or owner.Parent ~= Players then
+			if m == nil or m.Parent == nil then
 				chairs.remove(owner)
-				if m then
-					m:Destroy()
-				end
+				continue
+			end
+			if owner.Parent ~= Players then
+				foldChair(owner, m, true) -- (into their record: theirs again if they come back)
 				continue
 			end
 			local seat = m:FindFirstChild("Seat")
@@ -1128,9 +1263,55 @@ function ItemWorld.start(opts: StartOpts): World
 				notify(owner, "Your lawn chair folded itself up: it is back in your things.")
 			end
 		end
-		-- whoopee cushions: the next person within a stud and a half (not the one who put it down) sets it off
+		-- borrowed things: home when kept too long, walked off with, or either player gone (Items/Lending)
+		local tNow = clockNow()
+		for _, loan in loans.all() do
+			local tool = loan.tool
+			local holder = loan.holder
+			local a = actorOf(holder)
+			local holding = tool ~= nil
+				and tool.Parent ~= nil
+				and present(holder)
+				and a ~= nil
+				and a.species == "human"
+				and a.body ~= nil
+			local why = Lending.due(loan, tNow, {
+				ownerHere = present(loan.thing.owner),
+				holderHere = holding,
+				dist = distBetween(holder, loan.thing.owner),
+			})
+			if why then
+				endLoan(loan, why)
+			end
+		end
+		-- thrown things lying about: home after Lending.C.groundSecs, at once if the buyer has left
+		for i = #thrown, 1, -1 do
+			local th = thrown[i]
+			if th.taken or th.model.Parent == nil then
+				table.remove(thrown, i)
+				continue
+			end
+			local here = present(th.thing.owner)
+			if not here or tNow - th.at >= Lending.C.groundSecs then
+				th.taken = true
+				if th.touch then
+					th.touch:Disconnect()
+				end
+				th.model:Destroy()
+				table.remove(thrown, i)
+				sendHome(th.thing)
+				if here then
+					notify(th.thing.owner, Lending.say(Lending.WORDS.home, thingName(th.thing.item)))
+				end
+			end
+		end
+		-- whoopee cushions: the next person within a stud and a half (not the one who put it down) sets it off; one
+		-- left long enough, or whose owner left, goes home
 		for i = #cushions, 1, -1 do
 			local c = cushions[i]
+			if c.part.Parent ~= nil and (not present(c.owner) or tNow - c.at >= CUSHION_SECS) then
+				cushionHome(c, nil)
+			end
 			if c.part.Parent == nil then
 				table.remove(cushions, i)
 				continue
@@ -1215,6 +1396,7 @@ function ItemWorld.start(opts: StartOpts): World
 			end
 			return false
 		end,
+		lending = loans,
 		kiteOf = function(player: any): Flight?
 			for _, k in kites do
 				if k.player == player and k.reel == nil then
@@ -1229,6 +1411,24 @@ function ItemWorld.start(opts: StartOpts): World
 			end
 			for _, k in kites do
 				flierAttr(k.player, false) -- (the flier's controls come back)
+			end
+			for _, loan in loans.all() do
+				endLoan(loan, "stopped") -- (no borrowed Tool outlives the world; the thing goes home)
+			end
+			for _, th in thrown do
+				if not th.taken then
+					th.taken = true
+					sendHome(th.thing)
+				end
+			end
+			for _, c in cushions do
+				cushionHome(c, nil)
+			end
+			for _, owner in chairs.owners() do
+				local m = chairs.chairOf(owner)
+				if m then
+					foldChair(owner, m, true)
+				end
 			end
 			folder:Destroy()
 		end,

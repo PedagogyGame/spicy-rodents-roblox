@@ -347,7 +347,7 @@ local sheet: Machine.Sheet = {
 		[104] = "BOTH PODS FULL: SHOOT A RAMP",
 		[105] = "COUNTDOWN",
 		[106] = "LIFTOFF! MULTIBALL",
-		[107] = "JACKPOT",
+		[107] = "SUPER SHOT", -- owner 2026-11-19 (#14): no "JACKPOT" (the no-gambling rule)
 		[108] = "COMBO",
 		[109] = "RAMP",
 		[110] = "ORBIT",
@@ -536,7 +536,7 @@ local sheet: Machine.Sheet = {
 	end,
 	status = function(_m, t)
 		if t.multi == 1 then
-			return "MULTIBALL! EVERY RAMP AND ORBIT IS A JACKPOT"
+			return "MULTIBALL! EVERY RAMP AND ORBIT IS A SUPER SHOT"
 		elseif t.count > 0 then
 			return `LIFTOFF IN {math.ceil(t.count / 240)}`
 		elseif t.extraLit == 1 then

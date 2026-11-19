@@ -8,6 +8,9 @@
 -- State per player and item: a toggle (flashlight, umbrella, radio, kite), the newspaper read, uses so far.
 -- The water gun's rodent stun is once per player for as long as this server runs (Q11), by UserId.
 -- Words: a refusal is always said (deps.refuse); what an item does is said where it helps (deps.notify).
+-- Borrowed things (Items/Lending: somebody else's frisbee caught or picked up): used with payload.lent, the loan's
+-- token, which the server's own Tool wiring passes and deps.lent.holds checks against the ledger; it may only be
+-- thrown (back), and throwing it takes nothing from anyone's inventory (the world ends the loan).
 -- Interface: new(deps) -> Service { use(player, itemId, payload?) -> (ok, why?), state(player, itemId) -> State,
 --   forget(player), putAway(player) -> { itemId } (the toggles that were on, now off) };
 --   kiteZoneAt(zones, x, z) -> "park" | "beach" | nil; WORDS
@@ -20,6 +23,7 @@ local ItemService = {}
 
 ItemService.WORDS = table.freeze({
 	notOwned = "You have not got one.",
+	onlyThrow = "That is somebody else's: you can only throw it back.",
 	noBody = "Take a body first.",
 	animal = "Only people can use that.",
 	wait = "Give it a second.",
@@ -52,6 +56,8 @@ export type Deps = {
 	refuse: (player: any, words: string) -> (),
 	-- what an effect does in the world (Items/ItemWorld; a spec records them)
 	act: (player: any, effect: { [string]: any }, targets: { Target }?) -> boolean?,
+	-- the loans of other people's things (Items/Lending's ledger): whether `player` holds loan `token` of `id`
+	lent: { holds: (player: any, id: string, token: any) -> boolean }?,
 }
 
 -- (writing: the chalk's words are with the filter, which yields: a second send meanwhile is refused)
@@ -168,8 +174,14 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 		d.refuse(player, words)
 		return false, words
 	end
-	if def == nil or d.inventory.count(player, itemId) <= 0 then
+	-- somebody else's, borrowed: only if the ledger says this player holds that very loan
+	local lent = if payload then payload.lent else nil
+	local borrowing = lent ~= nil and d.lent ~= nil and d.lent.holds(player, itemId, lent)
+	if def == nil or (not borrowing and d.inventory.count(player, itemId) <= 0) then
 		return no(ItemService.WORDS.notOwned)
+	end
+	if borrowing and def.effect ~= "throw" then
+		return no(ItemService.WORDS.onlyThrow)
 	end
 	local species = d.speciesOf(player)
 	if species == nil then
@@ -288,8 +300,12 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 			d.act(player, e)
 			consumed = true
 		elseif k == "throw" then
-			-- it leaves the hand: whoever picks it up has it (the newspaper is litter, gone)
-			if d.act(player, e) ~= false then
+			-- it leaves the hand, still its buyer's (Items/Lending: whoever else picks it up borrows it; the
+			-- newspaper is litter, gone); a borrowed one thrown back takes nothing from anyone's inventory
+			if borrowing then
+				e.lent = lent
+				d.act(player, e)
+			elseif d.act(player, e) ~= false then
 				d.inventory.take(player, itemId)
 				local mine = self.states[keyOf(player)]
 				if mine then
