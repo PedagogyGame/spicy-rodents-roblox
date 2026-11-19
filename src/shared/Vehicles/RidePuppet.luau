@@ -16,7 +16,8 @@
 -- Avatar/PeopleLooks' colours, hair style and hat for the role (mime or townsperson), and the same round build (a ball
 -- head with eyes, a rounded body, round hands), seated in a riding pose a walking R15 clip could not give. The cast
 -- riders wear the cast's own shirts; where a shirt reads as skin (Avatar/RolePalettes.readsAsSkin: Ellie's orange,
--- Riley's khaki) the shoulders under the chin are a darker shade of it, so the head does not run into the body.
+-- Riley's khaki, Morgan's brown-grey jacket) the shoulders under the chin are a darker shade of it, so the head does
+-- not run into the body.
 -- A rider faces -Z (RigSpec). Its root is the old rider's: an invisible 1 x 1 x 1 HumanoidRootPart 2.2 studs above the
 -- ground, the only part that can be queried or touched; every other part is welded to it and collides with nothing.
 -- Only the big parts (the body, the head, the tyres) cast shadows.

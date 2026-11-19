@@ -2,9 +2,13 @@
 -- The bikes, novelty rides and their riders (owner playtest 2026-11-19: "i saw bikes and things that were basic colors,
 -- like earlier builds"): Shared/Vehicles/RidePuppet's eight street riders are the v5.4 cast on their rides (the mime on
 -- his unicycle, five kids on bicycles in helmets, two motorcyclists on scooters), drawn round like the townspeople from
--- PeopleLooks' colours, within a mobile part budget, collision-free but for the old 1 x 1 x 1 root at the old height;
--- the player's vehicles (Vehicles/Placeholder.look) are shaped in the traffic's style INSIDE their VehicleKinds boxes
--- (the box stays the collider); and the yard props the town bakes (worldgen Builders/Props) are drawn, not boxes.
+-- PeopleLooks' colours and in the cast's own shirts, within a mobile part budget, collision-free but for the old
+-- 1 x 1 x 1 root at the old height; in town (Server/AI/TownAI) the mime and the kids take the lanes, each in its own
+-- slot, and Morgan and Alex ride the traffic's two motorcycles (Traffic/Ghost), one of each person at once; a street
+-- rider is AI-only, never handed to a player (Actors/ActorsRuntime.pickFree; decision 21); the player's vehicles
+-- (Vehicles/Placeholder.look) are shaped in the traffic's style INSIDE their VehicleKinds boxes (the box stays the
+-- collider); and the yard props the town bakes (worldgen Builders/Props) are drawn, not boxes.
+-- (As built on engine stand-ins: tests/unit/vehicles_built.spec.luau, tests/unit/riders_built.spec.luau.)
 local roblox = require("@lune/roblox")
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
@@ -13,7 +17,13 @@ local RidePuppet = require("@shared/Vehicles/RidePuppet")
 local Placeholder = require("@shared/Vehicles/Placeholder")
 local VehicleKinds = require("@shared/Vehicles/VehicleKinds")
 local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
+local Ghost = require("@shared/Traffic/Ghost")
+local Fleet = require("@shared/Traffic/Fleet")
+local RolePalettes = require("@shared/Avatar/RolePalettes")
+local Data = require("@shared/Data")
 local Bake = require("@worldgen/Bake")
+local TownAI = require("@server/AI/TownAI")
+local ActorsRuntime = require("@server/Actors/ActorsRuntime")
 
 local lib = {
 	Instance = roblox.Instance,
@@ -284,6 +294,9 @@ return function(t)
 							"the shed's walls are still the solid box"
 						)
 						t.truthy(names.Slates, "under a roof of slates")
+						-- an overhang takes no queries: rays (and a body's ground probe) land on the walls' top
+						t.eq(names.Slates.canQuery, false, "the slates take no queries")
+						t.falsy(names.Slates.canCollide, "nor collide")
 					else
 						t.eq(body.transparency, 1, `{p.id}: the old box is unseen`)
 						t.falsy(body.canCollide or body.canQuery, `{p.id}: the old box blocks nothing`)
@@ -320,4 +333,92 @@ return function(t)
 			end
 		end
 	)
+	t.test("the riders wear the cast's shirts; a shirt that reads as skin is darker at the shoulders", function()
+		for slot, r in RidePuppet.RIDERS do
+			local p = byName(RidePuppet.rider(slot))
+			local shirt = PartBuilder.hex(r.shirt)
+			t.truthy(same(p.Torso.color, shirt), `{r.name}: the cast's shirt {r.shirt}`)
+			t.truthy(same(p.ArmL.color, shirt), `{r.name}: in its sleeves`)
+			local skinLike = r.role ~= "mime" and RolePalettes.readsAsSkin(shirt, PartBuilder.hex(r.skin))
+			if skinLike then
+				t.truthy(p.Shoulders.color.r < shirt.r * 0.8, `{r.name}: the shoulders darker under the chin`)
+			else
+				t.truthy(same(p.Shoulders.color, shirt), `{r.name}: the shoulders in the shirt`)
+			end
+		end
+		-- Ellie's orange, Riley's khaki and Morgan's brown-grey jacket are the ones that read as skin (the owner sheet
+		-- says so)
+		local skinLike = {}
+		for _, r in RidePuppet.RIDERS do
+			if r.role ~= "mime" and RolePalettes.readsAsSkin(PartBuilder.hex(r.shirt), PartBuilder.hex(r.skin)) then
+				table.insert(skinLike, r.name)
+			end
+		end
+		t.eq(table.concat(skinLike, ", "), "Ellie, Riley, Morgan Rider")
+	end)
+
+	t.test(
+		"in town the mime and the five kids ride the lanes, each in its own slot; Morgan and Alex ride the motorcycles",
+		function()
+			local world = TownAI.build({ data = Data.default(), seed = 5 })
+			local slots = {}
+			for _, a in world.actors do
+				if a.post == "rider" then
+					t.truthy(a.ride ~= nil, `rider {a.id} has a slot`)
+					t.eq(slots[a.ride], nil, `slot {a.ride} rides once`)
+					slots[a.ride] = true
+				end
+			end
+			for slot = 1, 6 do
+				t.truthy(slots[slot], `{RidePuppet.RIDERS[slot].name} rides in town`)
+			end
+			t.falsy(slots[7] or slots[8], "Morgan and Alex are not on the lanes too")
+			-- the traffic's motorcycles: each carries its own named rider, once
+			local onBikes = {}
+			for _, e in Fleet.ENTRIES do
+				if e.kind == "motorcycle" then
+					local slot = Ghost.riderSlot(e.id, e.kind) :: number
+					t.eq(RidePuppet.RIDERS[slot].name, e.name, `fleet {e.id} carries {e.name}`)
+					t.eq(onBikes[slot], nil, `{e.name} rides one motorcycle`)
+					onBikes[slot] = true
+					local p = byName(Ghost.spec(e.id, { kind = e.kind }))
+					t.truthy(p.RiderHead and p.RiderHelmet, `fleet {e.id}: the model render builds has its rider`)
+					t.truthy(same(p.RiderHelmet.color, PartBuilder.hex(RidePuppet.RIDERS[slot].helmet :: string)))
+				end
+			end
+			t.truthy(onBikes[7] and onBikes[8], "Morgan and Alex are on the motorcycles")
+			t.eq(Ghost.riderSlot(1, "sedan"), nil, "a car has no rider drawn")
+			t.eq(#Ghost.spec(1, { kind = "sedan" }).parts, #VehiclePuppet.spec("sedan").parts, "and is drawn as before")
+		end
+	)
+
+	t.test("a street rider is never handed to a player (AI-only, decision 21), however near the player is", function()
+		local world = TownAI.build({ data = Data.default(), seed = 5 })
+		local all = function(_a: any): boolean
+			return true
+		end
+		local riders = 0
+		for _, a in world.actors do
+			if a.post == "rider" then
+				riders += 1
+				-- a Townsperson pick right beside the rider gets a townsperson
+				local near = { X = a.x, Z = a.z } :: any
+				local got = ActorsRuntime.pickFree(world.actors, all, "human", nil, near)
+				t.truthy(got and got.post == "townsperson", `beside rider {a.id}: a {got and got.post}`)
+			end
+		end
+		t.truthy(riders >= 6, `{riders} riders in town`)
+		-- with only riders free, nobody is handed over (the fallback of any post skips them too)
+		local onlyRiders = function(a: any): boolean
+			return a.post == "rider"
+		end
+		t.eq(ActorsRuntime.pickFree(world.actors, onlyRiders, "human", nil, nil), nil, "no rider as a last resort")
+		t.truthy(ActorsRuntime.AI_ONLY.rider, "riders are AI-only")
+		-- the fallback still hands over a free person of another post
+		local onlyPolice = function(a: any): boolean
+			return a.post == "police"
+		end
+		local cop = ActorsRuntime.pickFree(world.actors, onlyPolice, "human", nil, nil)
+		t.truthy(cop and cop.post == "police", "a free officer when no townsperson is free")
+	end)
 end

@@ -129,52 +129,58 @@ return function(t)
 		t.truthy(seat.CFrame.Position.Z > wheel.CFrame.Position.Z, "and behind it, not in front")
 	end)
 
-	t.test("a seated R15 fits: hips on the seat, feet at the pedals or on the floor, head under a closed roof", function()
-		local S = Placeholder.SEATED
-		-- the module's seated figure agrees with the numbers the client and the sky lift keep
-		t.eq(S.root, AnimationDriver.SIT_SEAT, "the root over the seat (AnimationDriver.SIT_SEAT)")
-		t.eq(S.eye, SkyLift.EYE_ABOVE_SEAT, "the eyes over the seat (SkyLift.EYE_ABOVE_SEAT)")
-		for _, id in drawnKinds() do
-			local k = VehicleKinds.kind(id)
-			local m = Placeholder.build(id, id)
-			local seat = m:FindFirstChild("DriverSeat") :: any
-			local top = seatTop(seat)
-			local ground = -k.size[2] / 2
-			local feet = top + roblox.Vector3.new(0, -S.feetBelow, -S.feetAhead)
-			t.truthy(feet.Y >= ground, `{id}: the feet ({feet.Y}) above the ground ({ground})`)
-			if not k.interior.open then
-				-- drive on the right (owner decision 9): the driver on the left, the side DeviceService lets them out on
-				t.truthy(top.X < -0.5, `{id}: the driver on the left (x {top.X})`)
-				local roof = child(m, "Roof", seat)
-				local under = roof.CFrame.Position.Y - roof.Size.Y / 2
-				t.truthy(top.Y + S.head <= under + 1e-3, `{id}: the head ({top.Y + S.head}) under the roof ({under})`)
-				t.truthy(
-					math.abs(top.Z - roof.CFrame.Position.Z) <= roof.Size.Z / 2,
-					`{id}: the driver under the roof along`
-				)
-			elseif id == "bike" then
-				-- the feet near a pedal end (the cranks' two ends, seen from the side: a foot is out on its pedal's side),
-				-- and clear of the front wheel
-				local cranks = child(m, "Cranks", seat)
-				local half = cranks.CFrame.XVector * (cranks.Size.X / 2)
-				local function side(p: any): number
-					return math.sqrt((feet.Y - p.Y) ^ 2 + (feet.Z - p.Z) ^ 2)
+	t.test(
+		"a seated R15 fits: hips on the seat, feet at the pedals or on the floor, head under a closed roof",
+		function()
+			local S = Placeholder.SEATED
+			-- the module's seated figure agrees with the numbers the client and the sky lift keep
+			t.eq(S.root, AnimationDriver.SIT_SEAT, "the root over the seat (AnimationDriver.SIT_SEAT)")
+			t.eq(S.eye, SkyLift.EYE_ABOVE_SEAT, "the eyes over the seat (SkyLift.EYE_ABOVE_SEAT)")
+			for _, id in drawnKinds() do
+				local k = VehicleKinds.kind(id)
+				local m = Placeholder.build(id, id)
+				local seat = m:FindFirstChild("DriverSeat") :: any
+				local top = seatTop(seat)
+				local ground = -k.size[2] / 2
+				local feet = top + roblox.Vector3.new(0, -S.feetBelow, -S.feetAhead)
+				t.truthy(feet.Y >= ground, `{id}: the feet ({feet.Y}) above the ground ({ground})`)
+				if not k.interior.open then
+					-- drive on the right (owner decision 9): the driver on the left, the side DeviceService lets them out on
+					t.truthy(top.X < -0.5, `{id}: the driver on the left (x {top.X})`)
+					local roof = child(m, "Roof", seat)
+					local under = roof.CFrame.Position.Y - roof.Size.Y / 2
+					t.truthy(
+						top.Y + S.head <= under + 1e-3,
+						`{id}: the head ({top.Y + S.head}) under the roof ({under})`
+					)
+					t.truthy(
+						math.abs(top.Z - roof.CFrame.Position.Z) <= roof.Size.Z / 2,
+						`{id}: the driver under the roof along`
+					)
+				elseif id == "bike" then
+					-- the feet near a pedal end (the cranks' two ends, seen from the side: a foot is out on its pedal's side),
+					-- and clear of the front wheel
+					local cranks = child(m, "Cranks", seat)
+					local half = cranks.CFrame.XVector * (cranks.Size.X / 2)
+					local function side(p: any): number
+						return math.sqrt((feet.Y - p.Y) ^ 2 + (feet.Z - p.Z) ^ 2)
+					end
+					local near = math.min(side(cranks.CFrame.Position - half), side(cranks.CFrame.Position + half))
+					t.truthy(near <= 0.6, `bike: the feet {near} from a pedal`)
+					local wheel = child(m, "WheelF", seat)
+					local axle = wheel.CFrame.Position
+					local r = wheel.Size.Y / 2
+					local off = math.sqrt((feet.Y - axle.Y) ^ 2 + (feet.Z - axle.Z) ^ 2)
+					t.truthy(off >= r, `bike: the feet ({off} from the axle) clear the front wheel (radius {r})`)
+				else
+					-- on the cart's floor (the tub's top) or the jet ski's deck, within half a stud
+					local floor = if id == "cart" then child(m, "Body", seat) else child(m, "Deck", seat)
+					local floorTop = floor.CFrame.Position.Y + floor.Size.Y / 2
+					t.truthy(math.abs(feet.Y - floorTop) <= 0.5, `{id}: the feet ({feet.Y}) on the floor ({floorTop})`)
 				end
-				local near = math.min(side(cranks.CFrame.Position - half), side(cranks.CFrame.Position + half))
-				t.truthy(near <= 0.6, `bike: the feet {near} from a pedal`)
-				local wheel = child(m, "WheelF", seat)
-				local axle = wheel.CFrame.Position
-				local r = wheel.Size.Y / 2
-				local off = math.sqrt((feet.Y - axle.Y) ^ 2 + (feet.Z - axle.Z) ^ 2)
-				t.truthy(off >= r, `bike: the feet ({off} from the axle) clear the front wheel (radius {r})`)
-			else
-				-- on the cart's floor (the tub's top) or the jet ski's deck, within half a stud
-				local floor = if id == "cart" then child(m, "Body", seat) else child(m, "Deck", seat)
-				local floorTop = floor.CFrame.Position.Y + floor.Size.Y / 2
-				t.truthy(math.abs(feet.Y - floorTop) <= 0.5, `{id}: the feet ({feet.Y}) on the floor ({floorTop})`)
 			end
 		end
-	end)
+	)
 
 	t.test(
 		"as built: the box is the one solid, queryable, massed part; the drawing and the Seat hit nothing, weigh nothing",
