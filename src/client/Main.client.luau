@@ -36,6 +36,8 @@ local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
+local StanceView = require("./Render/StanceView")
+local DuelWords = require("./UI/DuelWords")
 local SpeechBubbles = require("./UI/SpeechBubbles")
 local WalletHud = require("./UI/WalletHud")
 local ItemClient = require("./UI/ItemClient")
@@ -133,6 +135,11 @@ task.spawn(function()
 	if not okS then
 		warn(`Client: SpeechBubbles failed: {errS}`)
 		menu.toast("Speech bubbles did not start: press F9 and send the red lines", 10)
+	end
+	-- the duel's stances (Server/Combat/CombatService: a vigilante squaring up, a raised arm, a kick coming)
+	local okSt, errSt = pcall(StanceView.start, { bodies = bodies :: Instance })
+	if not okSt then
+		warn(`Client: StanceView failed: {errSt}`)
 	end
 	local okV, errV = pcall(MedicalView.start, { bodies = bodies :: Instance })
 	if not okV then
@@ -275,6 +282,12 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		local st = client.state()
 		if st.species == "human" and st.device == nil then
 			kickRemote:FireServer()
+		elseif st.variant == "spicy" and st.device == nil then
+			-- the rodent's feint (Server/Combat/CombatService): a pretend lunge
+			local duel = playNet and playNet:FindFirstChild("Duel")
+			if duel and duel:IsA("RemoteEvent") then
+				duel:FireServer("feint")
+			end
 		elseif io.KeyCode == Enum.KeyCode.F then
 			menu.toast(
 				if st.device == "ride"
@@ -339,7 +352,12 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 			menu.toast("Kick missed: get right next to it, facing it", 1.5)
 		end
 	elseif kind == "hurt" then
-		menu.toast(`OUCH! You were kicked: {msg.health} health left`, 2.5)
+		menu.toast(`{DuelWords.hurt(msg.by)}: {msg.health} health left`, 2.5)
+	elseif kind == "duel" then
+		local words = DuelWords.news(msg.what, msg.zone == true)
+		if words then
+			menu.toast(words, 1.8)
+		end
 	elseif kind == "died" then
 		menu.banner(tostring(msg.title), tostring(msg.line), 3.5)
 		task.delay(3.5, function()

@@ -46,7 +46,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
+--   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
 
 local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
@@ -121,6 +121,8 @@ type Squirrel = {
 	gate: Gate?,
 	good: { [string]: number | boolean }?, -- the last clean packet's snapshot
 	lastAt: number?, -- server time of the last accepted packet
+	pounceAt: number?, -- server time of the last pounce launch a clean packet showed (the envelope saw the launch)
+	attackWindow: number, -- the last accepted packet's pounce window (a rise in it with a launch is a new pounce)
 	since: number?, -- server time of this epoch's first accepted packet
 	possessedAt: number?, -- server time of the first packet after the hand-off (0: the hand-off, none yet)
 	lastX: number,
@@ -164,6 +166,7 @@ export type Movement = {
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	epochOf: (self: Movement, actorId: any) -> number,
+	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?),
 	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
@@ -302,6 +305,8 @@ function MovementService.new(deps: Deps): Movement
 				gate = nil,
 				good = nil,
 				lastAt = nil,
+				pounceAt = nil,
+				attackWindow = 0,
 				since = nil,
 				lastX = 0,
 				lastY = 0,
@@ -377,6 +382,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.lastAt = nil
 		sq.since = nil
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
+		sq.pounceAt = nil
 		if self.deps.validator then
 			self.deps.validator:reset(id, nil)
 		end
@@ -556,6 +562,17 @@ function MovementService.new(deps: Deps): Movement
 			sq.prior = { x = at.x, y = at.y, z = at.z, at = now }
 			sq.priorUntil = math.max(sq.priorUntil, now + ignoredFor(self, id))
 		end
+	end
+
+	-- motorOf(actorId): the held squirrel's motor state as its last clean packet gave it (nil before one), the server
+	-- time the last packet came in, and the server time of the last pounce launch a clean packet showed (nil before
+	-- one). Combat/CombatService ties a bite to that launch: the motor's own, validated pounce, when the click said.
+	function m.motorOf(self: Movement, actorId: any): ({ [string]: number | boolean }?, number?, number?)
+		local sq = self.squirrels[actorId]
+		if sq == nil then
+			return nil, nil, nil
+		end
+		return sq.good, sq.lastAt, sq.pounceAt
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
@@ -875,6 +892,16 @@ function MovementService.new(deps: Deps): Movement
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				pace(self, actorId, sq, snapshot, now)
+				-- a pounce the server believes: the motor's window rose with a launch the envelope saw in this move;
+				-- it launched inside the gap since the last packet, as long ago as the window has run (Combat/CombatService
+				-- ties the bite to it, so a click and a lunge held back for a better moment are not one pounce)
+				local aw = snapshot.attackWindow
+				local window = if type(aw) == "number" then aw else 0
+				if v.ok and not v.resync and v.launched and window > sq.attackWindow + 1e-3 then
+					local gap = if sq.lastAt then now - (sq.lastAt :: number) else 0
+					sq.pounceAt = now - math.clamp(SquirrelMotor.params.pounceWindow - window, 0, math.max(0, gap))
+				end
+				sq.attackWindow = window
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
 				if sq.since == nil then
 					sq.since = now

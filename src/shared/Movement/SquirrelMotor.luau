@@ -1837,6 +1837,7 @@ function SquirrelMotor.envelope(
 
 	-- 4. Off the rail (leap, drop, pounce, knockback): the launch point is the visible position.
 	if prevRoute and not nextRoute then
+		launchUsed = true
 		local vis = Motion.visualPose(
 			world,
 			prevRoute,
@@ -1933,7 +1934,10 @@ function SquirrelMotor.envelope(
 				if math.abs(next.vy - expected) <= eps then
 					-- a plain arc: the height follows the vertical speed between the two (a body that claims to fall but
 					-- keeps its height is flying), unless a rail it could have visited in between explains it
-					local hi = math.max(prev.vy, next.vy) * dt + E.posSlack + eps * dt
+					-- (stepped semi-implicitly, an arc rises a little less than the mean of its end speeds times the
+					-- gap; the larger of the two let a client climbing every packet at its start speed reach twice a
+					-- leap's height at 15 Hz)
+					local hi = math.max(prev.vy + next.vy, 0) / 2 * dt + E.posSlack + eps * dt
 					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - eps * dt
 					local dy = next.y - prev.y
 					if (dy > hi or dy < lo) and not plausible() then
@@ -1963,6 +1967,23 @@ function SquirrelMotor.envelope(
 		-- vertical displacement: within what the start and end vertical speeds allow
 		local dy = next.y - prev.y
 		local upCap = math.max(prev.vy, next.vy, if launched then launchUp else 0, 0) * dt + E.posSlack
+		-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
+		-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
+		-- speed nor a landing; the duel pounces every second, and one in about thirty was snapped. Such a gap holds a
+		-- launch only if the end speed is one gravity could have brought a launch down to inside the gap, and the rise
+		-- is what that launch, ending at that speed, could make: (u^2 - v^2) / 2g, u the launch speed. It counts as the
+		-- launch, so the next packet cannot claim a second one stacked on it from a "ground" far below)
+		if not launched and prev.grounded and not next.grounded and dy > upCap then
+			local eps = P.gravity * E.gravityEps
+			if next.vy >= -P.gravity * dt - eps then
+				local u = math.min(launchUp, next.vy + P.gravity * dt + eps)
+				local rise = (u * u - next.vy * next.vy) / (2 * P.gravity)
+				if u > 0 and dy <= rise + E.posSlack then
+					upCap = dy
+					launchUsed = true
+				end
+			end
+		end
 		local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
 		if dy > upCap or dy < downCap then
 			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends

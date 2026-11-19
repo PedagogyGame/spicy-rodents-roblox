@@ -33,7 +33,11 @@
 -- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
--- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant?, link? };
+-- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
+-- (ctx.duel("pounce"): the tell everyone sees, Server/Combat/CombatService) and the motor's pounce follows windup seconds
+-- later, a move the validator accepts as it always has. A click while the motor is still on its cooldown is not sent.
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant?, link?, duel? };
+--   windup(pendingAt, clock, pressed, secs, ready) -> (pounceNow, pendingAt?, tell) (pure);
 --   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
 --   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
@@ -55,7 +59,33 @@ local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
 
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
+
 local Squirrel = {}
+
+-- The rodent's wind-up: a press starts it (tell: send it to the duel) when the motor is ready; the pounce goes to the
+-- motor `secs` later; presses during a wind-up are ignored.
+function Squirrel.windup(
+	pendingAt: number?,
+	clock: number,
+	pressed: boolean,
+	secs: number,
+	ready: boolean
+): (boolean, number?, boolean)
+	if pendingAt ~= nil then
+		if clock >= pendingAt then
+			return true, nil, false
+		end
+		return false, pendingAt, false
+	end
+	if pressed and ready then
+		if secs <= 0 then
+			return true, nil, true
+		end
+		return false, clock + secs, true
+	end
+	return false, nil, false
+end
 
 local HINTS: { [string]: string } = {
 	climbCloser = "Climb closer to the fork, then press E",
@@ -265,6 +295,8 @@ function Squirrel.start(
 	local lastSaid, lastText = -math.huge, ""
 	local shownStamina, shownWinded = -1, false
 	local spicy = (ctx.variant or payload.variant or body:GetAttribute("Variant")) == "spicy"
+	local windupSecs = Tunables.get("pounce.windup")
+	local pounceAt: number? = nil
 	local vision: NightVision.Handle? = nil
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
@@ -322,6 +354,14 @@ function Squirrel.start(
 			choose = if state.routeId then f.choose else 0,
 			pounce = f.pounce,
 		}
+		if spicy then
+			local now, pend, tell = Squirrel.windup(pounceAt, os.clock(), f.pounce, windupSecs, state.cooldown <= 0)
+			pounceAt = pend
+			mi.pounce = now
+			if tell and ctx.duel then
+				ctx.duel("pounce")
+			end
+		end
 		local any = f.fw ~= 0 or f.side ~= 0 or f.leap or f.drop or f.grab or f.pounce
 		if any then
 			holding = false

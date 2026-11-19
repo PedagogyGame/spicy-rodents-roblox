@@ -34,7 +34,18 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 	end
 
 	local t0 = os.clock()
-	local G = Game.start({ players = false, engine = engine, heartbeat = false })
+	-- the rodent's motor as the validator would report it (no client sends packets here): the test says when the motor
+	-- launched its pounce, and the duel ties a bite to that launch (Combat/CombatService)
+	local launchedAt: number? = nil
+	local duelClock = 0
+	local G = Game.start({
+		players = false,
+		engine = engine,
+		heartbeat = false,
+		motorOf = function(_townId: number): any
+			return { age = 0, launchAgo = if launchedAt then duelClock - launchedAt else nil }
+		end,
+	})
 	numbers.bootSeconds = os.clock() - t0
 	numbers.timings = G.timings
 	local rt = G.runtime
@@ -143,11 +154,31 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	if rodent and victim then
+		-- a pounce at the right moment, not a touch: beside them, the click over the Duel remote, the motor's launch
+		-- the wind-up later, the duel's dice set to land whatever can; again each second until it lands (up to 8 s)
 		local vr = (victim.body :: Model).PrimaryPart :: BasePart
-		local spot = vr.Position + Vector3.new(1.5, -1, 0)
-		rodent.body:PivotTo(CFrame.new(spot))
-		for _ = 1, 4 do
-			G.step(1 / 30)
+		local combat = G.combat
+		check(combat ~= nil, "the duel did not start")
+		if combat then
+			combat.rand = function(): number
+				return 0
+			end
+			local windup = combat.P.pounceWindup
+			local clickAt = -math.huge
+			local stopAt = duelClock + 8
+			while duelClock < stopAt and (player.attrs.Bites or 0) < 1 do
+				rodent.body:PivotTo(CFrame.new(vr.Position + Vector3.new(1.5, -1, 0)))
+				if duelClock - clickAt >= 1 then
+					G.remotes.Duel(player, "pounce")
+					clickAt = duelClock
+					launchedAt = nil
+				elseif launchedAt == nil and duelClock >= clickAt + windup then
+					launchedAt = duelClock
+				end
+				G.step(1 / 30)
+				duelClock += 1 / 30
+			end
+			launchedAt = nil
 		end
 		numbers.bites = player.attrs.Bites
 		numbers.powerAfterBite = player.attrs.Power

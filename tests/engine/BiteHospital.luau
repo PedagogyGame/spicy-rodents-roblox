@@ -13,7 +13,9 @@
 --   3. nothing is left behind (no order, no sunk body, no held ambulance) and the possession ledger
 --      still checks.
 -- NOT YET RUN: the session that wrote it (2026-11-11) had the cloud checks off limits. The Lune suite
--- (tests/unit/infection_service.spec.luau) covers the same service with the same seams.
+-- (tests/unit/infection_service.spec.luau) covers the same service with the same seams. Since the duel (2026-11-18) a
+-- bite is a pounce at the right moment, not a touch: the rodent clicks over the Duel remote and the test stands in
+-- for the validator's word on the motor's launch (Game opts.motorOf); also not yet run in the engine since.
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -40,7 +42,18 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 		player.Character = model
 	end
 
-	local G = Game.start({ players = false, engine = engine, heartbeat = false })
+	-- the rodent's motor as the validator would report it: no client sends packets here, so the test says when the
+	-- motor launched its pounce (the duel ties a bite to that launch: Combat/CombatService)
+	local launchedAt: number? = nil
+	local clock = 0
+	local G = Game.start({
+		players = false,
+		engine = engine,
+		heartbeat = false,
+		motorOf = function(_townId: number): any
+			return { age = 0, launchAgo = if launchedAt then clock - launchedAt else nil }
+		end,
+	})
 	local rt = G.runtime
 	local world = rt.world
 	local possession = rt.possession
@@ -54,7 +67,6 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 		}
 	end
 	local layout = infection.layout
-	local clock = 0
 	-- (the whole game is stepped many simulated minutes in a row: yield now and then, or the engine
 	-- stops a script that has run too long without one)
 	local lastYield = os.clock()
@@ -115,17 +127,36 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 		check(ok, `pick rodent: {why}`)
 		return possession:actorOf(rodentPlayer)
 	end
-	-- the rodent's body is put beside a person until the bite lands, then handed back to the AI
+	-- the rodent's body is put beside a person and pounces (the click over the Duel remote, the motor's launch the
+	-- wind-up later, the duel's dice set to land whatever can) until the bite lands, then handed back to the AI
 	local function biteThe(townId: number): boolean
 		local rodent = becomeRodent()
 		if rodent == nil then
 			return false
 		end
+		local combat = G.combat
+		check(combat ~= nil, "the duel did not start")
+		if combat == nil then
+			return false
+		end
+		combat.rand = function(): number
+			return 0
+		end
+		local windup = combat.P.pounceWindup
 		local root = bodyOf(townId).PrimaryPart :: BasePart
-		local landed = waitFor(3, function(): boolean
+		local clickAt = -math.huge
+		local landed = waitFor(8, function(): boolean
 			rodent.body:PivotTo(CFrame.new(root.Position + Vector3.new(1.5, -1, 0)))
+			if clock - clickAt >= 1 then
+				G.remotes.Duel(rodentPlayer, "pounce")
+				clickAt = clock
+				launchedAt = nil
+			elseif launchedAt == nil and clock >= clickAt + windup then
+				launchedAt = clock
+			end
 			return infection:isInfected(townId)
 		end)
+		launchedAt = nil
 		possession:release(rodentPlayer, "test")
 		G.stateOf(rodentPlayer).role = nil
 		return landed

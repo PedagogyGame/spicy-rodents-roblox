@@ -66,6 +66,7 @@ export type Verdict = {
 	resync: boolean, -- the gap was too long to judge; the packet was taken as the new baseline
 	baseline: boolean, -- the first packet of an unknown actor
 	snapped: boolean?, -- (Movement/MovementService) the body was snapped back for this packet
+	launched: boolean?, -- the move from the last packet holds a launch (a leap, a pounce, off a rail) the envelope saw
 }
 
 export type Options = {
@@ -433,6 +434,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local dtEff = math.min(dt, serverGap + math.max(0, actor.lastOffset - mark) + swing)
 
 	local resync = false
+	local launched = false
 	local boosted = self.boostOf(actorId)
 	local fastest = self:fastest(actorId)
 	local riverLanding = not next.routeId
@@ -459,6 +461,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
 		local found, launchUsed = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
+		launched = launchUsed
 		for _, v in found do
 			table.insert(violations, v)
 		end
@@ -525,7 +528,9 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	actor.lastAcceptedAt = serverTime
 	actor.lastOffset = offset
 	record(actor.history, next.clock, next.x, next.y, next.z)
-	return verdict(ok, true, violations, flagged, actor.bucket, correction, resync, false)
+	local v = verdict(ok, true, violations, flagged, actor.bucket, correction, resync, false)
+	v.launched = launched
+	return v
 end
 
 local function prune(times: { number }, now: number, window: number)

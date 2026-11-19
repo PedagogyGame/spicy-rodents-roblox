@@ -58,7 +58,7 @@
 -- In every one of these the person stays infected: the hospital is the only cure.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt) from its own loop.
 -- Interface: new(opts) -> Service; :bite(victimId, biterId?, by?) -> boolean (a new infection began);
---   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :stateOf(id) ->
+--   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :engaged(id); :stateOf(id) ->
 --   string?; :statusOf(id) -> string? (for the player holding `id`); :townPercent(); :trafficFlags(id)
 --   -> boolean; :cases() -> { [id]: Case }; :feared() -> { actor } (the squirrels people are afraid of now:
 --   the rodent and infected squirrels, not those hidden down a drain); :walkRoute(x, z) -> ({ {x, z} }?, length);
@@ -2030,6 +2030,12 @@ function InfectionService.biteable(self: Service, id: number): boolean
 	end
 	local a = actorOf(self, id)
 	return a ~= nil and a.species == "human" and (a.lift or 0) == 0
+end
+
+-- engaged: is this person part of the sequence now (a case of their own, at a scene in the crowd or the crew, or on the
+-- way home after it)? Combat/CombatService leaves such a person out of the duel: their orders are the sequence's.
+function InfectionService.engaged(self: Service, id: number): boolean
+	return self.records[id] ~= nil or self.busy[id] ~= nil or self.leaving[id] ~= nil
 end
 
 function InfectionService.stateOf(self: Service, id: number): string?

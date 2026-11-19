@@ -78,7 +78,7 @@ function InputMap.HINTS(role: string): string
 	if role == "human" then
 		return "WASD move · Shift run · Space jump · F kick · E get in a vehicle · V first person"
 	elseif role == "rodent" then
-		return "WASD run · Shift sprint · Space leap · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
+		return "WASD run · Shift sprint · Space leap · Click pounce · F feint · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
 	elseif role == "squirrel" then
 		return "WASD run · Shift sprint · Space leap · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
 	elseif role == "quadruped" then
