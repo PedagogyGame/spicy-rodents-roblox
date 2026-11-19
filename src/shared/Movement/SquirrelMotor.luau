@@ -191,6 +191,9 @@ SquirrelMotor.params = {
 	turnRateFocus = 11,
 	faceCameraRate = 11,
 	gravity = st(30), -- SQUIRREL_GRAVITY (L6472)
+	-- the fastest a body falls (studs/s; reached after two seconds of free fall, 150 studs: higher than any rail or roof
+	-- in the town, so no honest fall meets it). The envelope holds every claimed fall to it
+	terminalFall = st(60),
 	-- walk-in auto-grab (§9.1)
 	autoGrabMinSpeed = st(0.45),
 	-- out of an enclosed run's ground mouth: that mouth takes the body back once it is this far (studs, level) from it
@@ -1329,7 +1332,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 		if state.focus and not moving then
 			state.yaw = Motion.turnToward(state.yaw, camYaw + math.pi, P.faceCameraRate, dt)
 		end
-		state.vy -= P.gravity * dt
+		state.vy = math.max(state.vy - P.gravity * dt, -P.terminalFall)
 		state.x += state.vx * dt
 		state.y += state.vy * dt
 		state.z += state.vz * dt
@@ -1452,7 +1455,12 @@ end
 -- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
 -- of a mouth that opens to the outside (a hatch: from its lid at a sprint's pace and within its rise), gets off only
 -- at a mouth, and changes rail across the wall only where a mouth's links say (an authored link is a declared
--- junction, whatever gap the Graph sees).
+-- junction, whatever gap the Graph sees). Vertical speed (the combat re-review, 2026-11-19): off the rails a body on
+-- the ground has none and no fall passes P.terminalFall; every launch ends at a speed gravity could bring a launch
+-- down to in the gap, rises what that launch can reach ((u^2 - v^2) / 2g), and in the air only the motor's pounce
+-- launches, recognised by its window (the window rose to what it is a moment after a pounce, the body flies as that
+-- pounce: pounceAgo); a plain arc rises no more than the mean of its end speeds; the wall test's rise is a launch's
+-- apex at most.
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1464,8 +1472,9 @@ SquirrelMotor.envelopeParams = {
 	gravityEps = 0.03, -- seconds of gravity the vertical speed may deviate by
 	maxDt = 0.5, -- larger gaps are resynced, not judged
 	forkEnterMaxT = 0.06, -- a fork or sibling hop lands near the bough start (0.018 / 0.03)
-	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (launches in the air)
+	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
+	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 }
 local E = SquirrelMotor.envelopeParams
 
@@ -1504,26 +1513,29 @@ function SquirrelMotor.launchCapXZ(boosted: boolean): number
 	)
 end
 
--- Returns the violations and whether a launch (leap or pounce) was needed to explain the move.
+-- Returns the violations; whether a launch (leap, pounce, a step off a rail) was needed to explain the move; how long
+-- before `next` the motor's pounce launched when the move holds one (a pounce-shaped launch the window dates; nil
+-- otherwise); and, for a plain arc in the air, the vertical speed gravity gives at its end (the validator's baseline
+-- takes it, so the slack each packet may claim never adds up to a slower fall).
 function SquirrelMotor.envelope(
 	prev: State,
 	next: State,
 	dt: number,
 	world: World,
 	boosted: boolean
-): ({ Violation }, boolean)
+): ({ Violation }, boolean, number?, number?)
 	local out: { Violation } = {}
 	local launchUsed = false
 	if dt <= 0 then
 		add(out, "clock", 1, `non-positive dt {dt}`)
-		return out, false
+		return out, false, nil, nil
 	end
 	local reg = world.registry
 	local prevRoute = route(world, prev.routeId)
 	local nextRoute = route(world, next.routeId)
 	if next.routeId and not nextRoute then
 		add(out, "route", 1, `unknown route {next.routeId}`)
-		return out, false
+		return out, false, nil, nil
 	end
 	local groundCap = SquirrelMotor.groundCap(boosted) * E.speedTol
 	local launchXZ = SquirrelMotor.launchCapXZ(boosted) * E.launchTol
@@ -1657,6 +1669,66 @@ function SquirrelMotor.envelope(
 	local pounceUp = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMax)) * E.launchTol
 	local pounceUpMin = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMin)) / E.launchTol
 	local pounceXZ = P.pounceSpeedFast * (if boosted then P.pounceBoostMult else 1) * E.launchTol
+	-- the slowest a pounce lunges across (a slow one at the steepest pitch, or a winded one at a walk), with tolerance
+	local pounceMinXZ = math.min(P.walk, P.pounceSpeedSlow * math.cos(P.pouncePitchMax)) / E.launchTol
+	local gEps = P.gravity * E.gravityEps
+
+	-- 0b. Vertical speed off the rails, whatever the move: on the ground there is none (the motor's is exactly 0), and
+	-- no fall is faster than the motor's terminal speed. Every bound below that reads a vertical speed reads a judged one.
+	if not nextRoute then
+		if next.grounded and math.abs(next.vy) > E.groundVy then
+			add(out, "gravity", 1, `vertical speed {next.vy} on the ground`)
+		end
+		if next.vy < -P.terminalFall - gEps then
+			add(out, "gravity", 1, `falling at {-next.vy} st/s (terminal {P.terminalFall})`)
+		end
+	end
+
+	-- pounceAgo(fromRoute) -> seconds?: the move holds a pounce launched that long before `next` (a pounce-shaped launch:
+	-- the motor's window rose to what it is a moment after a pounce inside the gap, and the body flies as a pounce
+	-- launched then would: its vertical speed back then within a pounce's, its speed across a lunge's). The window falls
+	-- by each substep from the launch, as the vertical speed does by gravity, so the launch's own vertical speed is the
+	-- one now plus gravity times the window's fall. A hop, a leap or a fall claiming a window is no pounce. `fromRoute`:
+	-- the rail it left (an enclosed run's mouth with a `hop` makes a click a short hop: any lift up to its own)
+	local function pounceAgo(fromRoute: Registry.Route?): number?
+		if nextRoute or next.grounded or next.attackWindow <= prev.attackWindow + 1e-3 then
+			return nil
+		end
+		local ago = P.pounceWindow - next.attackWindow
+		if ago < -1e-3 or ago > dt + 1e-3 then
+			return nil
+		end
+		ago = math.clamp(ago, 0, dt)
+		local u = next.vy + P.gravity * ago
+		local vxz = hypot2(next.vx, next.vz)
+		local enc = if fromRoute then fromRoute.enclosure else nil
+		if enc then
+			local hopUp = 0
+			for _, m in enc.mouths do
+				hopUp = math.max(hopUp, m.hopUp or 0)
+			end
+			return if u >= -gEps
+					and u <= math.max(pounceUp, hopUp * E.launchTol) + gEps
+					and vxz <= launchXZ
+				then ago
+				else nil
+		end
+		if u < pounceUpMin - gEps or u > pounceUp + gEps or vxz > pounceXZ then
+			return nil
+		end
+		if vxz < pounceMinXZ then
+			-- (slower than any lunge: only one that met a wall, which takes the speed off it substep by substep; the
+			-- wall is then just ahead along the body's heading)
+			local crosses = world.crosses
+			local r = 3
+			local hx, hz = next.x + math.sin(next.yaw) * r, next.z + math.cos(next.yaw) * r
+			if crosses == nil or not crosses(next.x, next.z, hx, hz, next.y, next.y, 0) then
+				return nil
+			end
+		end
+		return ago
+	end
+	local pounce: number? = nil
 
 	-- 1. Position agreement with the claimed rail.
 	if nextRoute then
@@ -1871,12 +1943,16 @@ function SquirrelMotor.envelope(
 		if next.vy > launchUp then
 			add(out, "launch", 1, `vertical launch {next.vy} st/s`)
 		end
+		pounce = pounceAgo(prevRoute)
 	end
 
 	-- 5. Off rail to off rail: ground and air motion.
+	local arcVy: number? = nil
 	if not prevRoute and not nextRoute then
 		local vxz = hypot2(next.vx, next.vz)
-		local launched = next.vy > prev.vy + P.gravity * 0.5 * P.substep and not next.grounded
+		pounce = pounceAgo(nil)
+		-- a launch: the vertical speed rose, or a pounce the window dates (it replaces the velocity, so it may lower it)
+		local launched = not next.grounded and (next.vy > prev.vy + P.gravity * 0.5 * P.substep or pounce ~= nil)
 		local railPlausible: boolean? = nil
 		local function plausible(): boolean
 			if railPlausible == nil then
@@ -1884,37 +1960,50 @@ function SquirrelMotor.envelope(
 			end
 			return railPlausible :: boolean
 		end
+		-- (the most the body can fall in the gap from where it was: a floor that near may have taken it inside the gap)
+		local fallReach = math.max(0, -prev.vy) * dt + 0.5 * P.gravity * dt * dt + E.posSlack
+		local function couldLand(): boolean
+			if prev.grounded then
+				return true
+			end
+			local landable = world.landable
+			return if landable
+				then landable(prev.x, prev.y, prev.z, fallReach)
+				else prev.y - world.groundAt(prev.x, prev.z, prev.y) <= fallReach
+		end
+		-- a trampoline's bed (Movement/Trampoline) the body could have come down on inside the gap bounces it higher than a
+		-- leap, and pushes it on
+		local trampUp = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
+		local tramp = false
+		local tramps = world.trampolines
+		if tramps and #tramps > 0 then
+			local reach = Trampoline.C.radius + hypot2(prev.vx, prev.vz) * dt + E.posSlack
+			local over = math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) -- (it may rise first, then fall onto it)
+			for _, site in tramps do
+				if
+					(
+						hypot2(prev.x - site.x, prev.z - site.z) <= reach
+						or hypot2(next.x - site.x, next.z - site.z) <= reach
+					)
+					and prev.y + over - (site.surface + Trampoline.C.bedAbove) <= fallReach + P.gravity * dt * dt
+				then
+					tramp = true
+					break
+				end
+			end
+		end
+		local fromGroundOrRail = false
+		local capUp = launchUp
 		if launched then
 			launchUsed = true
 			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
 			-- the ground within the gap may have landed and leapt again in it (Space held through a landing)
-			local fromGroundOrRail = prev.grounded or plausible()
-			if not fromGroundOrRail then
-				local depth = math.max(0, -prev.vy) * dt + 0.5 * P.gravity * dt * dt + E.posSlack
-				local landable = world.landable
-				fromGroundOrRail = if landable
-					then landable(prev.x, prev.y, prev.z, depth)
-					else prev.y - world.groundAt(prev.x, prev.z, prev.y) <= depth
-			end
-			local capUp = if fromGroundOrRail then launchUp else pounceUp
+			fromGroundOrRail = couldLand() or plausible()
+			capUp = if fromGroundOrRail then launchUp else pounceUp
 			local capXZ = if fromGroundOrRail then launchXZ else pounceXZ
-			-- a trampoline's bed (Movement/Trampoline) bounces a falling body higher than a leap, and pushes it on
-			local tramps = world.trampolines
-			if tramps and #tramps > 0 then
-				local reach = Trampoline.C.radius + hypot2(prev.vx, prev.vz) * dt + E.posSlack
-				for _, site in tramps do
-					if
-						hypot2(prev.x - site.x, prev.z - site.z) <= reach
-						or hypot2(next.x - site.x, next.z - site.z) <= reach
-					then
-						capUp = math.max(
-							capUp,
-							(Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
-						)
-						capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
-						break
-					end
-				end
+			if tramp then
+				capUp = math.max(capUp, trampUp)
+				capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
 			end
 			if next.vy > capUp then
 				add(out, "launch", 1, `vertical launch {next.vy} st/s (cap {capUp})`)
@@ -1922,38 +2011,42 @@ function SquirrelMotor.envelope(
 			if vxz > capXZ then
 				add(out, "launch", 1, `horizontal launch {vxz} st/s (cap {capXZ})`)
 			end
+			-- every launch (a leap, a pounce, a drop, a bounce) starts going up: by the end of the gap gravity has taken at
+			-- most the gap's worth of it (a launch claimed on a fall is a fall)
+			if next.vy < -P.gravity * dt - gEps then
+				add(out, "launch", 1, `a launch ending at vy {next.vy} in {dt} s`)
+			end
+			-- with nothing within reach to push off, only the motor's pounce launches, and it shows in the window
+			if not fromGroundOrRail and not tramp and pounce == nil then
+				add(out, "launch", 1, `a launch in the air (vy {prev.vy} -> {next.vy}) that is no pounce`)
+			end
 		else
 			if vxz > groundCap then
 				add(out, "speed", math.min(1, vxz / groundCap - 1), `horizontal speed {vxz} st/s (cap {groundCap})`)
 			end
 			-- gravity: airborne at both ends and no launch -> vy drops by exactly g*dt (semi-implicit
-			-- Euler) unless a rail within reach could have been visited in between
+			-- Euler, down to the terminal speed) unless a rail within reach could have been visited in between
 			if not prev.grounded and not next.grounded then
-				local expected = prev.vy - P.gravity * dt
-				local eps = P.gravity * E.gravityEps
-				if math.abs(next.vy - expected) <= eps then
+				local expected = math.max(prev.vy - P.gravity * dt, -P.terminalFall)
+				if math.abs(next.vy - expected) <= gEps then
 					-- a plain arc: the height follows the vertical speed between the two (a body that claims to fall but
-					-- keeps its height is flying), unless a rail it could have visited in between explains it
-					-- (stepped semi-implicitly, an arc rises a little less than the mean of its end speeds times the
-					-- gap; the larger of the two let a client climbing every packet at its start speed reach twice a
-					-- leap's height at 15 Hz)
-					local hi = math.max(prev.vy + next.vy, 0) / 2 * dt + E.posSlack + eps * dt
-					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - eps * dt
+					-- keeps its height is flying), unless a rail it could have visited in between explains it. Stepped
+					-- semi-implicitly (and held at the terminal speed), an arc rises a little less than the mean of its end
+					-- speeds times the gap, rising or falling: no more than that, never a floor at 0 (a falling arc may
+					-- not rise at all)
+					local hi = (prev.vy + next.vy) / 2 * dt + E.posSlack + gEps * dt
+					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
 					local dy = next.y - prev.y
 					if (dy > hi or dy < lo) and not plausible() then
 						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
 					end
-				else
-					-- a mid-air pounce REPLACES the velocity (vy 2.37..5.09 u, |v_xz| <= 13.5 u x1.12) at any
-					-- tick inside the gap, so it can lower a rising vy; a rail visit zeroes and relaunches it
-					local pounce = next.vy <= pounceUp
-						and next.vy >= pounceUpMin - P.gravity * dt - eps
-						and vxz <= pounceXZ
-					if pounce then
-						launchUsed = true
-					elseif not plausible() then
-						add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
-					end
+					arcVy = expected
+				elseif
+					not (couldLand() and next.vy >= -P.gravity * dt - gEps and next.vy <= gEps) and not plausible()
+				then
+					-- (a body that came down on something inside the gap and went off its edge falls from rest; a pounce
+					-- is a launch above; a rail visit zeroes the speed and relaunches it)
+					add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
 				end
 			end
 		end
@@ -1966,7 +2059,27 @@ function SquirrelMotor.envelope(
 		end
 		-- vertical displacement: within what the start and end vertical speeds allow
 		local dy = next.y - prev.y
-		local upCap = math.max(prev.vy, next.vy, if launched then launchUp else 0, 0) * dt + E.posSlack
+		local upCap = math.max(prev.vy, next.vy, 0) * dt + E.posSlack
+		if launched then
+			-- a launch inside the gap rises what the body rose before it at its earlier speed and what the launch, ending
+			-- at the speed it shows, rose after it: (u^2 - v^2) / 2g, u the launch's own speed (the pounce's, which the
+			-- window dates; else no more than gravity takes in the gap above the speed now, and never above the cap). A
+			-- long gap from the ground or a rail may hide a whole leap before it (ledge to ledge), never more than the
+			-- launch speed over the gap. (Not the launch speed over the gap for every launch: a launch every packet
+			-- climbed at a leap's speed for as long as it liked)
+			local v = math.max(next.vy, 0)
+			local u = math.min(capUp, if pounce then next.vy + P.gravity * pounce else next.vy + P.gravity * dt + gEps)
+			local rise = if u > v then (u * u - v * v) / (2 * P.gravity) else 0
+			if fromGroundOrRail and not shortGap then
+				rise = math.min(launchUp * dt, rise + launchUp * launchUp / (2 * P.gravity))
+			end
+			upCap = math.max(prev.vy, 0) * dt + rise + E.posSlack
+			if dy > upCap and fromGroundOrRail and plausible() then
+				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
+				-- the grab having carried the body up to the rail)
+				upCap = math.max(prev.vy, 0) * dt + math.max(rise, launchUp * dt) + E.posSlack
+			end
+		end
 		-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
 		-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
 		-- speed nor a landing; the duel pounces every second, and one in about thirty was snapped. Such a gap holds a
@@ -1974,9 +2087,8 @@ function SquirrelMotor.envelope(
 		-- is what that launch, ending at that speed, could make: (u^2 - v^2) / 2g, u the launch speed. It counts as the
 		-- launch, so the next packet cannot claim a second one stacked on it from a "ground" far below)
 		if not launched and prev.grounded and not next.grounded and dy > upCap then
-			local eps = P.gravity * E.gravityEps
-			if next.vy >= -P.gravity * dt - eps then
-				local u = math.min(launchUp, next.vy + P.gravity * dt + eps)
+			if next.vy >= -P.gravity * dt - gEps then
+				local u = math.min(launchUp, next.vy + P.gravity * dt + gEps)
 				local rise = (u * u - next.vy * next.vy) / (2 * P.gravity)
 				if u > 0 and dy <= rise + E.posSlack then
 					upCap = dy
@@ -1997,8 +2109,11 @@ function SquirrelMotor.envelope(
 		end
 		-- walls: the straight move must not cross a collider
 		local crosses = world.crosses
-		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall)
-		local rise = math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt
+		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall: never
+		-- higher than the highest launch here reaches, whatever speeds the packets claim)
+		local apexUp = if tramp then math.max(launchUp, trampUp) else launchUp
+		local rise =
+			math.min(math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt, apexUp * apexUp / (2 * P.gravity))
 		if
 			crosses
 			and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), rise)
@@ -2007,7 +2122,7 @@ function SquirrelMotor.envelope(
 		end
 	end
 
-	return out, launchUsed
+	return out, launchUsed, pounce, arcVy
 end
 
 return SquirrelMotor

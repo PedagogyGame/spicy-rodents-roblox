@@ -36,6 +36,10 @@
 --   * Floors: a grounded body off the rails must have something under its feet (world.floorBelow, when the world
 --     has one: Movement/ValidatorWorld); "float", a third of a flag each, so a vehicle drawn a little behind the
 --     server's under a body on its roof is not a flag.
+--   * Pounces (the combat re-review, 2026-11-19): the envelope dates the motor's pounce by its window
+--     (verdict.pounce, the client clock it launched at, and verdict.pounceGap, the gap it lies in); two closer than
+--     the cooldown are a flag at any gap. A plain arc's baseline takes the vertical speed gravity gives, not the one
+--     the packet claims within the slack (claimed a little slower each packet, the slack added up to a slow fall).
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -67,6 +71,11 @@ export type Verdict = {
 	baseline: boolean, -- the first packet of an unknown actor
 	snapped: boolean?, -- (Movement/MovementService) the body was snapped back for this packet
 	launched: boolean?, -- the move from the last packet holds a launch (a leap, a pounce, off a rail) the envelope saw
+	-- the client clock the motor's pounce launched at, when the move holds a pounce-shaped launch (the window rose, the
+	-- body flies as that pounce: SquirrelMotor.envelope's pounce), and the client clock gap it lies in (somewhere in it:
+	-- Movement/MovementService dates no pounce from a gap a silence may have made)
+	pounce: number?,
+	pounceGap: number?,
 }
 
 export type Options = {
@@ -112,7 +121,7 @@ type Actor = {
 	history: History,
 	packets: number,
 	violations: number,
-	lastLaunch: number?, -- client clock of the last launch seen in the air (pounce rate)
+	lastPounce: number?, -- client clock of the last pounce's launch (the pounce rate)
 	drops: number,
 	resyncs: number,
 	lastAcceptedAt: number, -- server time of the last accepted packet
@@ -268,7 +277,7 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 		history = newHistory(),
 		packets = 0,
 		violations = 0,
-		lastLaunch = nil,
+		lastPounce = nil,
 		drops = 0,
 		resyncs = 0,
 		lastAcceptedAt = now,
@@ -435,6 +444,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 
 	local resync = false
 	local launched = false
+	local pounceAt: number? = nil
+	local arcBaseline: number? = nil
 	local boosted = self.boostOf(actorId)
 	local fastest = self:fastest(actorId)
 	local riverLanding = not next.routeId
@@ -460,29 +471,28 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
-		local found, launchUsed = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
+		local found, launchUsed, pounceAgo, arcVy = SquirrelMotor.envelope(prev, next, dt, self.world, boosted)
 		launched = launchUsed
 		for _, v in found do
 			table.insert(violations, v)
 		end
-		-- pounce rate: two launches in the air closer than the cooldown, between consecutive packets
-		-- with no rail within reach (nothing could have reset the cooldown)
-		local inAir = not next.routeId and not next.grounded and not prev.routeId and not prev.grounded
-		if inAir and launchUsed then
-			local lastLaunch = actor.lastLaunch
-			if lastLaunch and dt <= SquirrelMotor.envelopeParams.shortDt then
-				local gap = next.clock - lastLaunch
-				if gap < SquirrelMotor.envelopeParams.pounceMinInterval then
-					local reach = Motion.C.airGrab + math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2) * dt
-					if not self.world.index:nearest(prev.x, prev.y, prev.z, reach) then
-						table.insert(
-							violations,
-							{ code = "launch", severity = 1, detail = `two air launches {gap} s apart` }
-						)
-					end
-				end
+		-- the pounce rate: the motor pounces only once its cooldown is over, wherever the body is and however long the gap
+		-- (the window dates each launch exactly)
+		if pounceAgo then
+			local at = next.clock - pounceAgo
+			local lastPounce = actor.lastPounce
+			if lastPounce and at - lastPounce < SquirrelMotor.envelopeParams.pounceMinInterval then
+				table.insert(
+					violations,
+					{ code = "launch", severity = 1, detail = `two pounces {at - lastPounce} s apart` }
+				)
 			end
-			actor.lastLaunch = next.clock
+			actor.lastPounce = at
+			pounceAt = at
+		end
+		if arcVy then
+			-- (a plain arc: the baseline falls as gravity says, not as the packet claims within the slack)
+			arcBaseline = arcVy
 		end
 	end
 
@@ -524,12 +534,17 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		-- accumulate a growing gap (the service decides whether to enforce)
 		correction = SquirrelMotor.serialize(prev)
 	end
+	if arcBaseline then
+		next.vy = arcBaseline
+	end
 	actor.last = next
 	actor.lastAcceptedAt = serverTime
 	actor.lastOffset = offset
 	record(actor.history, next.clock, next.x, next.y, next.z)
 	local v = verdict(ok, true, violations, flagged, actor.bucket, correction, resync, false)
 	v.launched = launched
+	v.pounce = pounceAt
+	v.pounceGap = if pounceAt then dt else nil
 	return v
 end
 

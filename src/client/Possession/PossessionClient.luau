@@ -339,12 +339,13 @@ function PossessionClient.start(opts: Opts): Client
 			toast = toast,
 			meter = if hud then hud.meter else nil,
 			link = link,
-			-- the rodent's click goes to the duel first (Server/Combat/CombatService: the pounce's tell)
-			duel = function(verb: string)
+			-- the rodent's click goes to the duel first (Server/Combat/CombatService: the pounce's tell), with the motor
+			-- clock it was made at (the server ties the motor's pounce to it on the movement packets' own clock)
+			duel = function(verb: string, clock: number?)
 				local pn = ReplicatedStorage:FindFirstChild("PlayNet")
 				local r = if pn then pn:FindFirstChild("Duel") else nil
 				if r and r:IsA("RemoteEvent") then
-					r:FireServer(verb)
+					r:FireServer(verb, clock)
 				end
 			end,
 		}
