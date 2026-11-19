@@ -707,7 +707,7 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	local brain = world.brains[id]
 	local snap = brain:suspend()
 	-- re-enter from where the player left the body; rail brains keep their route and re-seat on it
-	snap.x, snap.z = x, z
+	snap.x, snap.y, snap.z = x, y - actor.hip, z
 	brain:resume(snap)
 	world.scheduler:register(id, brain, actor, world.now)
 end

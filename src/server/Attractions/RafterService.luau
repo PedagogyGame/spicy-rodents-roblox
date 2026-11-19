@@ -93,6 +93,9 @@ export type Town = {
 	send: (player: any, payload: { [string]: any }) -> (),
 	-- the Spicy Rodent's alarm in the AI town: the people in the hall run, an officer comes to the door
 	alarm: ((rodent: Body, people: { Body }, doorX: number, doorZ: number) -> ())?,
+	-- a player-held squirrel's pivot as the server holds it (Actors/ActorsRuntime.placeOf; invariant D, validator round
+	-- 8): where it is watched and sensed, never its root, which its client writes. nil: the root (specs' stubs)
+	placeOf: ((body: Body) -> Vector3?)?,
 }
 
 export type Opts = {
@@ -204,7 +207,7 @@ function RafterService.new(opts: Opts): any
 		glows = {} :: { [any]: number }, -- model -> server time its glow ends
 		shown = {} :: { [any]: { meter: number?, seen: boolean? } }, -- player -> what their attributes say
 		covers = {} :: { number },
-		sampled = {} :: { [string]: any }, -- body id -> model: the squirrels watched at the last tick
+		sampled = {} :: { [string]: any }, -- body id -> Body: the squirrels watched at the last tick
 		stats = { ticks = 0, spotted = 0, lines = 0, callouts = 0, alarms = 0 } :: Stats,
 	}, RafterService)
 	for _, box in RafterService.covers(place) do
@@ -224,12 +227,24 @@ local function near(X: number, D: number): boolean
 	return X >= -42 - C.near and X <= AlleyRoof.ANNEX.x1 + C.near and D >= -82 - C.near and D <= 102 + C.near
 end
 
+-- placeOf(self, body) -> Vector3?: where a body is judged: a player-held squirrel at the place the server holds for it
+-- (town.placeOf: invariant D), any other body at its root (the server's own, or a person's)
+local function placeOf(self: any, body: Body): Vector3?
+	local f = self.town.placeOf
+	if f and body.kind == "squirrel" and body.player ~= nil then
+		local ok, p = pcall(f, body)
+		return if ok then p else nil
+	end
+	local root = rootOf(body.model)
+	return if root then root.Position else nil
+end
+
 function RafterService.step(self: any, dt: number)
 	self.acc += dt
-	for id, model in self.sampled do
-		local root = rootOf(model)
-		if root then
-			local X, Y, D = local3(self, root.Position)
+	for id, body in self.sampled do
+		local p = placeOf(self, body)
+		if p then
+			local X, Y, D = local3(self, p)
 			RafterSense.sample(self.sense, id, X, Y, D, dt)
 		end
 	end
@@ -252,10 +267,11 @@ function RafterService._tick(self: any, dt: number)
 	table.clear(self.sampled)
 	for _, body in self.town.bodies() do
 		local root = rootOf(body.model)
-		if root == nil then
+		local at = placeOf(self, body)
+		if root == nil or at == nil then
 			continue
 		end
-		local X, Y, D = local3(self, root.Position)
+		local X, Y, D = local3(self, at)
 		if not near(X, D) then
 			continue
 		end
@@ -277,7 +293,7 @@ function RafterService._tick(self: any, dt: number)
 			local s = RafterSense.sense(self.sense, body.id, X, feet, D, dt)
 			if s then
 				table.insert(squirrels, s)
-				self.sampled[body.id] = body.model
+				self.sampled[body.id] = body
 			end
 		end
 	end
@@ -592,6 +608,17 @@ function RafterService.start(game: { [string]: any }): any
 	return RafterService.new({
 		town = {
 			bodies = bodies,
+			placeOf = if rt.placeOf
+				then function(body: Body): Vector3?
+					local tid = (body :: any).townId
+					local actor = if tid then rt.byTownId[tid] else nil
+					if actor == nil then
+						return nil
+					end
+					local x, y, z = rt.placeOf(actor)
+					return Vector3.new(x, y, z)
+				end
+				else nil,
 			bowlers = bowlers,
 			send = game.fire,
 			alarm = alarm,

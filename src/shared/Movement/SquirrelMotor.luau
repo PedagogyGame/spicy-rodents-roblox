@@ -2970,7 +2970,13 @@ function SquirrelMotor.envelope(
 		if prev.grounded then
 			-- (the ground glue carried a grounded body down each frame before it left the ground: off a bough's round
 			-- cylinder, down a kerb; validator round 7, a walk along a bough after a drop)
-			downCap -= frames * math.max(P.glueMin, P.glueSlope * groundCap * P.substep)
+			-- (validator round 8, the round-7 review's LOW: never more than a body that kept the ground could follow down
+			-- in the gap: the ground's slope over the distance moved, and one kerb; a frame's allowance each was 22.5 st
+			-- beyond gravity in a 0.5 s gap)
+			downCap -= math.min(
+				frames * math.max(P.glueMin, P.glueSlope * groundCap * P.substep),
+				P.glueMin + P.glueSlope * hypot2(next.x - prev.x, next.z - prev.z)
+			)
 		end
 		if dy > upCap or dy < downCap then
 			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
