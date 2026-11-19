@@ -112,7 +112,7 @@ export type World = {
 	listeners: { (ev: Event) -> () }, -- told of every event as it is emitted
 	covers: { Cover }, -- what hides squirrels (addCover), in the order added
 	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
-	way: WalkWay.Way, -- the town's way on foot (every walk that is not a lane or a round goes by it)
+	way: any, -- World/WalkWay.Way: the town's way on foot (every walk that is not a lane or a round goes by it)
 }
 
 local TownAI = {}
@@ -159,7 +159,7 @@ end
 
 -- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant. A shop is a solid
 -- box (nobody walks in): its worker's round is in front of it, on the pavement before its front wall.
-local function shopSites(data: any, way: WalkWay.Way): { { number } }
+local function shopSites(data: any, way: any): { { number } }
 	local out = {}
 	for _, lot in data:lots() do
 		local t = lot.type

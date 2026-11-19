@@ -342,7 +342,8 @@ local function boxRoom(id: string, box: Colliders.Box, chain: { { number } }, ro
 	for i = 1, #chain - 1 do
 		table.insert(legs, { chain[i][1], chain[i][2], chain[i + 1][1], chain[i + 1][2] })
 	end
-	for _, round in rounds or {} do
+	local list: { { { number } } } = rounds or {}
+	for _, round in list do
 		for i, p in round do
 			local q = round[i % #round + 1]
 			table.insert(legs, { p[1], p[2], q[1], q[2] })

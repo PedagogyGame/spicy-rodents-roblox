@@ -672,7 +672,11 @@ local function runWay(
 	local way = self.way
 	local room = WalkWay.roomAt(way, x, z)
 	if room or WalkWay.solidAt(way, x, z) then
-		local runs = { if round then loopRun(round, x, z, fx, fz) else nil }
+		local runs: { { { number } } } = {}
+		local looped = if round then loopRun(round, x, z, fx, fz) else nil
+		if looped then
+			table.insert(runs, looped)
+		end
 		if room then
 			-- along the building's own way toward its door, as far as RUN and never out of it
 			local run: { { number } } = {}
