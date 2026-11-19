@@ -10,9 +10,14 @@
 --   spotted   the eye full and red, "Spotted!" over it, and the same advice under it
 -- The server's Attractions/RafterService decides and writes the player attributes RafterMeter (0..1, nil when not
 -- watched) and RafterSeen (true while seen); this only draws them.
--- Interface: WORDS; WATCH; CALM; look(meter?, seen?, wasWatched?) -> Look (pure); start(opts?) -> Handle { stop(),
---   gui } (opts.player: whose attributes, default the local player; opts.parent: where the ScreenGui goes, default
---   their PlayerGui)
+-- The same eye out in town (owner playtest 2026-11-19: people notice a squirrel stalking above them): the server's
+-- Stealth/OverheadService writes OverheadMeter and OverheadSeen while the held squirrel is overhead on a wire, a fence,
+-- a branch or a roof's edge (the highest meter of anyone watching it, and whether anyone has pointed it out); the eye
+-- shows whichever of the two is fuller, with the town's own words ("They're looking up: ...").
+-- Interface: WORDS; WATCH; CALM; look(meter?, seen?, wasWatched?, where?) -> Look (pure; where "rafters" (default) or
+--   "overhead"); pick(rafterMeter?, rafterSeen?, overMeter?, overSeen?) -> (meter?, seen?, where) (pure);
+--   start(opts?) -> Handle { stop(), gui } (opts.player: whose attributes, default the local player; opts.parent:
+--   where the ScreenGui goes, default their PlayerGui)
 -- No side effects on require.
 
 local SneakMeter = {}
@@ -20,6 +25,7 @@ local SneakMeter = {}
 SneakMeter.WORDS = {
 	spotted = "Spotted!",
 	watching = "They're watching: creep (hold Ctrl) or get back in the vent",
+	overhead = "They're looking up: creep (hold Ctrl) or get out of sight",
 }
 SneakMeter.WATCH = 0.35 -- the eye this full says they are watching ...
 SneakMeter.CALM = 0.25 -- ... until it falls back under this
@@ -43,12 +49,28 @@ end
 
 local AMBER, ORANGE, RED = { 236, 196, 70 }, { 245, 130, 40 }, { 214, 52, 44 }
 
--- look(meter, seen, wasWatched): how the eye is drawn. `wasWatched`: the last look was "watched" (the words stay
--- up until the eye has emptied back under CALM, so they do not flicker at the line).
-function SneakMeter.look(meter: number?, seen: boolean?, wasWatched: boolean?): Look
+-- pick(rafterMeter, rafterSeen, overMeter, overSeen): the eye to show, the rafters' or the town's (the fuller one; a
+-- spotted one first), and which.
+function SneakMeter.pick(rm: number?, rs: boolean?, om: number?, os: boolean?): (number?, boolean?, string)
+	if om == nil then
+		return rm, rs, "rafters"
+	elseif rm == nil then
+		return om, os, "overhead"
+	end
+	if (os == true and rs ~= true) or (os == rs and om > rm) then
+		return om, os, "overhead"
+	end
+	return rm, rs, "rafters"
+end
+
+-- look(meter, seen, wasWatched, where): how the eye is drawn. `wasWatched`: the last look was "watched" (the words
+-- stay up until the eye has emptied back under CALM, so they do not flicker at the line). `where`: "rafters" (the
+-- default) or "overhead" (the town), for the words.
+function SneakMeter.look(meter: number?, seen: boolean?, wasWatched: boolean?, where: string?): Look
 	if meter == nil then
 		return { visible = false, state = "hidden", fill = 0, color = AMBER }
 	end
+	local advice = if where == "overhead" then SneakMeter.WORDS.overhead else SneakMeter.WORDS.watching
 	local m = math.clamp(meter, 0, 1)
 	if seen then
 		return {
@@ -57,7 +79,7 @@ function SneakMeter.look(meter: number?, seen: boolean?, wasWatched: boolean?): 
 			fill = 1,
 			color = RED,
 			shout = SneakMeter.WORDS.spotted,
-			words = SneakMeter.WORDS.watching,
+			words = advice,
 		}
 	end
 	local watched = m >= SneakMeter.WATCH or (wasWatched == true and m >= SneakMeter.CALM)
@@ -67,7 +89,7 @@ function SneakMeter.look(meter: number?, seen: boolean?, wasWatched: boolean?): 
 			state = "watched",
 			fill = m,
 			color = mix(ORANGE, RED, (m - SneakMeter.CALM) / (1 - SneakMeter.CALM)),
-			words = SneakMeter.WORDS.watching,
+			words = advice,
 		}
 	end
 	return { visible = true, state = "calm", fill = m, color = mix(AMBER, ORANGE, m / SneakMeter.WATCH) }
@@ -103,7 +125,8 @@ local function label(name: string, parent: Instance, size: number): TextLabel
 	return l
 end
 
--- start(opts?): the eye on the screen, following the player's RafterMeter and RafterSeen attributes.
+-- start(opts?): the eye on the screen, following the player's RafterMeter and RafterSeen attributes (and OverheadMeter
+-- and OverheadSeen).
 export type Opts = { player: Instance?, parent: Instance? }
 
 function SneakMeter.start(opts: Opts?): Handle
@@ -155,8 +178,15 @@ function SneakMeter.start(opts: Opts?): Handle
 
 	local watched = false
 	local function draw()
-		local m, seen = player:GetAttribute("RafterMeter"), player:GetAttribute("RafterSeen")
-		local look = SneakMeter.look(if type(m) == "number" then m else nil, seen == true, watched)
+		local rm, rs = player:GetAttribute("RafterMeter"), player:GetAttribute("RafterSeen")
+		local om, os = player:GetAttribute("OverheadMeter"), player:GetAttribute("OverheadSeen")
+		local m, seen, where = SneakMeter.pick(
+			if type(rm) == "number" then rm else nil,
+			rs == true,
+			if type(om) == "number" then om else nil,
+			os == true
+		)
+		local look = SneakMeter.look(m, seen == true, watched, where)
 		watched = look.state == "watched"
 		gui.Enabled = look.visible
 		if not look.visible then
@@ -174,6 +204,8 @@ function SneakMeter.start(opts: Opts?): Handle
 	local conns = {
 		player:GetAttributeChangedSignal("RafterMeter"):Connect(draw),
 		player:GetAttributeChangedSignal("RafterSeen"):Connect(draw),
+		player:GetAttributeChangedSignal("OverheadMeter"):Connect(draw),
+		player:GetAttributeChangedSignal("OverheadSeen"):Connect(draw),
 	}
 	draw()
 	return {

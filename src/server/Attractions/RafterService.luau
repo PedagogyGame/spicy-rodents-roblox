@@ -31,7 +31,8 @@
 -- The Town is what it needs from the game (start(game) builds it from Boot/Game's parts; specs pass a stub).
 -- Interface: TICK, C, WORDS, EYE_OVER_ROOT, BOWLER_EYE, DEFAULT_PLACE, SIGHT_GROUP; new(opts) -> Service; start(game) -> Service;
 --   covers(place) -> { Box }; callout(spicy, lane?) -> string; Service:step(dt); Service:stop();
---   Service:meter(id) -> (number, boolean); Service.stats { ticks, spotted, lines, callouts, alarms }
+--   Service:meter(id) -> (number, boolean); Service:watches(id) -> boolean; Service.stats { ticks, spotted, lines,
+--   callouts, alarms }
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -456,6 +457,12 @@ function RafterService._publish(self: any, byId: { [string]: Body })
 		end
 		self.shown[player] = if w.meter == nil then nil else w
 	end
+end
+
+-- watches(id): is the squirrel with this body id on the rafters (watched at the last tick)? The town's overhead watch
+-- (Stealth/OverheadService) leaves such a one to this service.
+function RafterService.watches(self: any, id: string): boolean
+	return self.sampled[id] ~= nil
 end
 
 -- meter(id): the watch's meter and seen for a squirrel's body id.
