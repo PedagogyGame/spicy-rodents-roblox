@@ -9,7 +9,9 @@
 --     mode) -> brain:resume(last validated pose). On PlayerRemoving it runs before anything else.
 --   swap(player, toActor): stream to the new body, then release + possess in one server step.
 --   recover(player): the Roblox menu's Reset, routed here; never kills or respawns a body; refused (false) for
---   a body riding the sky lift (its Ride attribute).
+--   a body riding the sky lift (its Ride attribute), and at most once per RECOVER_EVERY seconds a player (validator
+--   round 7: a Reset every 0.6 s climbed a held squirrel 3 st a time into the air, and each was a teleport and a
+--   Correction the server sent back; the rest are dropped, unanswered).
 -- Players are anything with `UserId` (and, in the engine, a real Player): the S2 soak drives the
 -- same code with PlayerLike stubs through an injected `Engine`.
 -- W1 hooks (`onHandoff`): SweptCollision.markTeleported(actor), MoveValidator.reset(actor),
@@ -61,6 +63,7 @@ export type Deps = {
 	onTeleport: ((actor: Actor, x: number, y: number, z: number, why: string) -> ())?,
 	-- Recovery target for a body (default: where it stands, lifted 3 studs).
 	safePose: ((actor: Actor) -> (number, number, number, number))?,
+	recoverEvery: number?, -- seconds between two recovers a player may ask for (default RECOVER_EVERY)
 }
 
 export type Stats = {
@@ -79,6 +82,7 @@ export type Service = {
 	engine: Engine,
 	ledger: { byActor: { [string]: number }, byDriver: { [number]: string } },
 	drivers: { [number]: any }, -- userId -> player
+	recoveredAt: { [number]: number }, -- userId -> engine.now() of the last recover done
 	owners: { [string]: number }, -- actorId -> userId whose SetNetworkOwner succeeded (bookkeeping)
 	stats: Stats,
 	possess: (self: Service, player: any, actor: Actor) -> (boolean, string?),
@@ -91,6 +95,9 @@ export type Service = {
 }
 
 local Possession = {}
+
+-- seconds: the most often a player's Reset (recover) moves the body
+Possession.RECOVER_EVERY = 3
 
 -- Engine implementation (real Players and Instances).
 function Possession.engine(): Engine
@@ -152,6 +159,7 @@ function Possession.new(deps: Deps): Service
 		engine = engine,
 		ledger = PossessionState.newLedger(),
 		drivers = {},
+		recoveredAt = {},
 		owners = {},
 		stats = {
 			possessed = 0,
@@ -332,6 +340,14 @@ function Possession.new(deps: Deps): Service
 		if okRide and ride ~= nil then
 			return false
 		end
+		-- (at most once per RECOVER_EVERY: the rest dropped, no teleport, no Correction)
+		local key = keyOf(player)
+		local t = engine.now()
+		local last = self.recoveredAt[key]
+		if last and t - last < (deps.recoverEvery or Possession.RECOVER_EVERY) then
+			return false
+		end
+		self.recoveredAt[key] = t
 		local x, y, z, yaw
 		if deps.safePose then
 			x, y, z, yaw = deps.safePose(actor)

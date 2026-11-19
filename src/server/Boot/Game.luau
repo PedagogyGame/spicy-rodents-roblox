@@ -158,7 +158,8 @@ export type MovementDeps = {
 	data: any, -- Shared/Data (its routes: the harvest's, the alley's, the drains', the hollows')
 	swept: any?, -- Traffic/SweptCollision (TrafficService): markTeleported on every hand-off
 	wall: ValidatorWorld.Ray?, -- the wall ray (ValidatorWorld.engineRays in the engine)
-	down: ValidatorWorld.Ray?, -- the floor ray
+	down: ValidatorWorld.Ray?, -- the floor ray (a tree's bough cylinders are floor)
+	cover: ValidatorWorld.Ray?, -- the down ray the roof check casts (past the bough cylinders); default `down`
 	cars: ValidatorWorld.Cars?, -- the cars' boxes the rays meet as well (TrafficService.solids)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of a squirrel's chili rush
 }
@@ -169,7 +170,8 @@ export type MovementDeps = {
 -- wiring to it.
 function Game.movement(deps: MovementDeps): any
 	local rail = RailWorld.get(deps.data, Height.at)
-	local world = ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down, cars = deps.cars })
+	local world =
+		ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down, cover = deps.cover, cars = deps.cars })
 	local validator = MoveValidator.new(world, { boostOf = deps.boostOf })
 	return MovementService.new({ swept = deps.swept, validator = validator })
 end
@@ -401,8 +403,9 @@ function Game.start(opts: Opts?): any
 	stage(0.52, "Putting 25 cars on the roads")
 	local traffic = TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 7 })
 	-- the walls and floors the validator's rays meet are the baked town's, built once the bodies' folder exists
-	local rays: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }? = nil
-	local function engineRays(): { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+	type Rays = { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray, cover: ValidatorWorld.Ray }
+	local rays: Rays? = nil
+	local function engineRays(): Rays
 		if rays == nil then
 			local exclude: { Instance } = {}
 			for _, name in { "Bodies", "Vehicles" } do
@@ -411,10 +414,10 @@ function Game.start(opts: Opts?): any
 					table.insert(exclude, f)
 				end
 			end
-			local wall, down = ValidatorWorld.engineRays(exclude)
-			rays = { wall = wall, down = down }
+			local wall, down, cover = ValidatorWorld.engineRays(exclude)
+			rays = { wall = wall, down = down, cover = cover }
 		end
-		return rays :: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+		return rays :: Rays
 	end
 	local movement = Game.movement({
 		data = data,
@@ -426,6 +429,9 @@ function Game.start(opts: Opts?): any
 		end,
 		down = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 			return engineRays().down(ox, oy, oz, dx, dy, dz)
+		end,
+		cover = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return engineRays().cover(ox, oy, oz, dx, dy, dz)
 		end,
 	})
 	local net: any? = nil

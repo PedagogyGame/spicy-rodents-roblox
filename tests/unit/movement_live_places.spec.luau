@@ -3,9 +3,11 @@
 -- storm drains at the pipe pace (Tunables sewer.speedMult 1.25, sewer.sprintMult 1.04), every hollow tree and the
 -- fallen log, the bowling alley's ball returns (every pair), its roof route (the yard house's ridge, the leap to the
 -- bough, the vent, the rafters and the light rails), each run by the real motor with scripted keys through a 300 ms
--- link with jitter, loss and held-up bursts, judged by the server with enforcement on and the live wall and floor rays
--- over the baked parts (the bough cylinders looked past, as on the server). Every run: 0 snaps.
+-- link with jitter, loss and held-up bursts, judged by the server with enforcement on and the live wall, floor and cover
+-- rays over the baked parts (BakedWorld.validatorRays: the server's own rule). Every run: 0 snaps.
+local fs = require("@lune/fs")
 local process = require("@lune/process")
+local Height = require("@shared/World/Height")
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
@@ -23,30 +25,12 @@ local FAST = process.env.SPICY_FAST ~= nil
 
 type State = SquirrelMotor.State
 
--- the live rays over a baked world: walls are colliding parts the squirrel's queries meet, past the bough cylinders,
--- never the terrain; floors are those parts or the terrain
-local function rays(baked: BakedWorld.World): (ValidatorWorld.Ray, ValidatorWorld.Ray)
-	local function solid(p: BakedWorld.Part): boolean
-		if not p.squirrelSolid then
-			return false
-		end
-		local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
-		return not ValidatorWorld.isBough(p.name, parentName)
-	end
-	local function colliding(p: BakedWorld.Part): boolean
-		return p.squirrelSolid
-	end
-	local function wall(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-		return baked.raycast(ox, oy, oz, dx, dy, dz, solid) ~= nil
-	end
-	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-		if baked.raycast(ox, oy, oz, dx, dy, dz, colliding) ~= nil then
-			return true
-		end
-		local g = baked.terrainAt(ox, oz)
-		return g >= oy + dy and g <= oy
-	end
-	return wall, down
+-- the live rays over a baked world: the server's own (ValidatorWorld.engineRays by the same rule, BakedWorld.validatorRays:
+-- walls past the bough cylinders, never the terrain; floors every colliding part, the bough cylinders included, the
+-- terrain, the water and the ground plates; the roof check's cover past the bough cylinders)
+local function vworldOf(baked: BakedWorld.World, w: SquirrelMotor.World): any
+	local wall, down, cover = BakedWorld.validatorRays(baked)
+	return ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
 end
 
 local LINKS: { { name: string, link: LiveRig.Link } } = {
@@ -103,8 +87,7 @@ return function(t)
 		local layout = SewerLayout.default() :: SewerLayout.Layout
 		local baked = SewerStandIn.world(layout)
 		local w = baked:motorWorld(data)
-		local wall, down = rays(baked)
-		local vworld = ValidatorWorld.build(w, { wall = wall, down = down })
+		local vworld = vworldOf(baked, w)
 		local runs = { { "P1.NW", "P1.SE" }, { "P2.W", "P2.E" }, { "P3.S", "P3.N" }, { "P3.N", "P3.S" } }
 		for _, run in runs do
 			local a, b = layout.mouth(run[1]) :: SewerLayout.Mouth, layout.mouth(run[2]) :: SewerLayout.Mouth
@@ -134,8 +117,7 @@ return function(t)
 		local model = HollowShell.build(roblox, layout)
 		local baked = BakedWorld.fromModel(model)
 		local w = baked:motorWorld(data)
-		local wall, down = rays(baked)
-		local vworld = ValidatorWorld.build(w, { wall = wall, down = down })
+		local vworld = vworldOf(baked, w)
 		for _, h in layout.hollows do
 			local hole: HollowLayout.Mouth? = nil
 			for _, m in h.mouths do
@@ -169,8 +151,7 @@ return function(t)
 	t.test("the bowling alley: every ball return, the roof route, the vent, the rafters: 0 snaps", function()
 		local baked, place = BakedWorld.bakeAlley()
 		local w = baked:motorWorld(data)
-		local wall, down = rays(baked)
-		local vworld = ValidatorWorld.build(w, { wall = wall, down = down })
+		local vworld = vworldOf(baked, w)
 		local reg = w.registry
 		local function camAlong(dX: number, dD: number): number
 			local dx, dz = AlleyLayout.dirToWorld(place, dX, dD)
@@ -243,4 +224,60 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"drops (Q) off branches and wires across the baked town, standing on the bough cylinders: 0 snaps",
+		function()
+			-- validator round 6: Q off a branch stood the body on its bough's cylinder, which the live floor ray looked past, and
+			-- every grounded packet after it was a whole "float" (515 of 766 drops snapped). The real motor on build/Town.rbxm,
+			-- a branch or wire taken every so often across the town, Q at 0.4 s, then idle and a few steps along it
+			if not fs.isFile("build/Town.rbxm") then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			Height.configure(data:module("TerrainExtensions"))
+			local town = BakedWorld.load("build/Town.rbxm")
+			local w = town:motorWorld(data)
+			local vworld = vworldOf(town, w)
+			local routes = {}
+			for _, r in w.registry:all() do
+				if r.kind ~= "trunk" and not r.enclosure then
+					table.insert(routes, r)
+				end
+			end
+			table.sort(routes, function(a: any, b: any): boolean
+				return a.id < b.id
+			end)
+			local every = math.max(1, math.floor(#routes / (if FAST then 6 else 24)))
+			local drops, onBough = 0, 0
+			for i = 1, #routes, every do
+				local r = routes[i]
+				local tt = 0.3 + 0.4 * ((i * 0.618) % 1)
+				local landed: string? = nil
+				play(t, `Q off route {r.id} ({r.kind}) at t {string.format("%.2f", tt)}`, w, vworld, function(): State
+					local q = w.registry:pointAt(r, tt)
+					local s = SquirrelMotor.new(q.x, q.y, q.z)
+					s.grounded = false
+					s.routeId, s.railT, s.railDir = r.id, tt, 1
+					return s
+				end, function(now: number, st: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					if st.routeId == nil and st.grounded and landed == nil then
+						local _, part = town.groundPart(st.x, st.z, st.y)
+						landed = if part then part.path else "terrain"
+					end
+					return BakedWorld.keys(
+						math.sin(now) * 2,
+						{ drop = now > 0.4 and now < 0.5, fw = if now > 3 then 1 else 0 }
+					)
+				end, 5)
+				drops += 1
+				if landed and string.find(landed, "%.R%d") then
+					onBough += 1
+				end
+			end
+			Height.configure(nil)
+			print(`      {drops} drops, {onBough} of them stood on a bough's cylinder`)
+			t.truthy(onBough > 0, "some drops stood on a bough's cylinder")
+		end
+	)
 end

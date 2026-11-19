@@ -8,7 +8,8 @@
 -- the 50th-arrival turn-away) and the device fleet (Actors/DeviceService). Every Heartbeat: TownAI
 -- steps brains and AI motors, then one workspace:BulkMoveTo over the AI bodies' roots (rule 4);
 -- possessed bodies are the players'. Reset routes to Possession.recover (Movement/Recovery picks the
--- quay or the last safe position).
+-- quay or the last safe position; for a held squirrel, Movement/MovementService.safeTarget: the places its accepted
+-- clean grounded packets stood on a floor).
 -- The one call Main.server needs: ActorsRuntime.start({}) (after WorldBoot). The S2 test place keeps
 -- its own harness.
 -- Interface: start(opts) -> Runtime { world, actors, possession, roles, devices, pickBody(player, rung),
@@ -211,6 +212,20 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		end,
 		safePose = function(actor: any): (number, number, number, number)
 			local x, y, z, yaw = actors:poseOf(actor)
+			local okH, hip = pcall(function()
+				return actor.body:GetAttribute("HipHeight")
+			end)
+			local lift = if okH and type(hip) == "number" then hip else 0
+			if movement and movement.safeTarget and (actor.species == "squirrel" or actor.species == "rodent") then
+				-- a held squirrel: only where the validator accepted a clean grounded packet over a floor (the server's
+				-- own ray), the feet on that floor, never 3 st over it; or the river's quay (validator round 7: the raw
+				-- root was recorded as safe, and a Reset put the body 3 st over it, again and again, into the air)
+				local fx, fy, fz = movement:safeTarget(actor.id)
+				if fx and fy and fz then
+					return fx, fy + lift, fz, yaw
+				end
+				return x, y, z, yaw -- (no place the server holds: left where it is, no lift)
+			end
 			local h = history[actor.id]
 			local rx, ry, rz = x, y + 3, z
 			if h then

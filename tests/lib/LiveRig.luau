@@ -21,7 +21,8 @@
 -- The server pins a new body (engine.pin, as Boot/Game: anchored, its own) until the first packet passes the gate: the
 -- client's root updates are not taken while it is pinned; it is not handed back while it rides (Movement/BodyPin).
 -- Interface: new(opts) -> Rig; Rig:possess(state, keys); Rig:run(seconds); Rig:at(t, fn); Rig:teleport(x, y, z,
---   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:unreported(x, y, z);
+--   why); Rig:reset() -> boolean (the Reset button as the server does it: Actors/Possession.recover's rate limit,
+--   Actors/ActorsRuntime.safePose's target from MovementService.safeTarget, then the teleport); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:unreported(x, y, z);
 --   Rig:result() -> Result;
 --   town() -> Town (the rig's town: the S3 world with houses, its validator world, honest drivers); describe(name, r)
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
@@ -36,6 +37,7 @@ local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local Driver = require("@tests/cheat/Driver")
 local Harness = require("@tests/cheat/Harness")
 local TestWorld = require("@tests/cheat/TestWorld")
+local Possession = require("@server/Actors/Possession")
 
 local LiveRig = {}
 
@@ -112,6 +114,7 @@ export type Rig = {
 	at: (self: Rig, t: number, fn: () -> ()) -> (),
 	possess: (self: Rig, state: State, keys: Keys) -> (),
 	teleport: (self: Rig, x: number, y: number, z: number, why: string) -> (),
+	reset: (self: Rig) -> boolean,
 	board: (self: Rig) -> (),
 	alight: (self: Rig, x: number, y: number, z: number) -> (),
 	handoff: (self: Rig, state: State, keys: Keys) -> (),
@@ -468,6 +471,21 @@ function LiveRig.new(opts: Options): Rig
 		write(function()
 			client.write = w
 		end)
+	end
+	-- the Reset button (the remote `recover`): at most once per Possession.RECOVER_EVERY, to MovementService.safeTarget
+	-- (else where the root is), as Possession.recover and ActorsRuntime.safePose do; false when dropped
+	local resetAt = -math.huge
+	rig.reset = function(self: any): boolean
+		if rig.t - resetAt < Possession.RECOVER_EVERY then
+			return false
+		end
+		resetAt = rig.t
+		local x, y, z = movement:safeTarget(actorKey())
+		if not (x and y and z) then
+			x, y, z = server.root.x, server.root.y, server.root.z
+		end
+		self:teleport(x :: number, y :: number, z :: number, "reset")
+		return true
 	end
 	-- a move of the body the server makes and tells the validator nothing of (what every server move must not be)
 	rig.unreported = function(_self: any, x: number, y: number, z: number)

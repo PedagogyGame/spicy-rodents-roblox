@@ -23,6 +23,8 @@
 --   world.containing(x, y, z, filter?) -> { Part }       the solids holding a point
 --   world.overlapBox(cx, cy, cz, axes, half, filter?) -> { Part }   solids overlapping an oriented box
 --   world:motorWorld(data) -> SquirrelMotor.World        the callbacks above plus the rail world of `data`
+--   BakedWorld.validatorRays(world) -> (wall, down, cover)  the live server's three rays (ValidatorWorld.engineRays)
+--                                over these parts, by the same rule (ValidatorWorld.stops) and the same hops
 -- Clearance. BakedWorld.clearance(world, registry, route, opts?) sweeps the animal's section (Enclosure.BODY width,
 -- headroom BODY.height, or the record's crawl height where the record declares a crawl) along a route in slices of
 -- `step` studs and reports every part it passes through: { name, path, collide, visible, t0, t1, studs }, merged
@@ -47,6 +49,8 @@ local Height = require("@shared/World/Height")
 local RailWorld = require("@shared/Movement/RailWorld")
 local Registry = require("@shared/Routes/Registry")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local GroundPlate = require("@shared/World/GroundPlate")
+local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 
 local BakedWorld = {}
 
@@ -718,6 +722,90 @@ function BakedWorld.bakeAlley(attraction: any?): (World, AlleyLayout.Place, any)
 	local root = GameBakes.siteModel(roblox, "BowlingAlley", a.id, place)
 	Alley.build(kit, root, a)
 	return BakedWorld.fromModel(root, { adjust = BakedWorld.alleyRuntime }), place, root
+end
+
+-- validatorRays(world) -> (wall, down, cover): ValidatorWorld.engineRays over the baked parts, so a spec judges with
+-- what the server sees. Each ray meets the colliding parts in the squirrel's group (squirrelSolid) and passes the ones
+-- ValidatorWorld.stops says it looks past (a tree's bough cylinders, for the wall and the cover), at most four hits in
+-- all, as the engine's loop; `down` and `cover` also meet the terrain (World/Height under the carves), the river's
+-- water, and the town's ground plates (Shared/World/GroundPlate: non-colliding parts of Town.Lots / Town.Roads, the
+-- first part of a path; four hits, as the engine's plate ray). The terrain and the water are met by vertical rays only
+-- (every down ray ValidatorWorld casts is vertical).
+function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorWorld.Ray, ValidatorWorld.Ray)
+	local HOPS = 4
+	local function colliding(p: Part): boolean
+		return p.squirrelSolid
+	end
+	local inFolders: { [string]: boolean } = {}
+	for _, n in GroundPlate.FOLDERS do
+		inFolders[n] = true
+	end
+	local function inPlateFolder(p: Part): boolean
+		return inFolders[string.match(p.path, "^([^%.]+)") or ""] == true
+	end
+	-- (the parts along the segment in order, `filter`ed, at most HOPS; `stop` decides at each)
+	local function walk(
+		ox: number,
+		oy: number,
+		oz: number,
+		dx: number,
+		dy: number,
+		dz: number,
+		filter: Filter,
+		stop: (p: Part) -> boolean
+	): boolean
+		local from = 0
+		for _ = 1, HOPS do
+			local sx, sy, sz = ox + dx * from, oy + dy * from, oz + dz * from
+			local left = 1 - from
+			if left <= 1e-6 then
+				return false
+			end
+			local tt, part = world.raycast(sx, sy, sz, dx * left, dy * left, dz * left, filter)
+			if tt == nil or part == nil then
+				return false
+			end
+			if stop(part) then
+				return true
+			end
+			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+			from += tt * left + (if len > 0 then 0.02 / len else 1)
+		end
+		return false
+	end
+	local function solidRay(kind: string): ValidatorWorld.Ray
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return walk(ox, oy, oz, dx, dy, dz, colliding, function(p: Part): boolean
+				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
+				return ValidatorWorld.stops(kind, p.name, parentName)
+			end)
+		end
+	end
+	local function plate(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return walk(ox, oy, oz, dx, dy, dz, inPlateFolder, function(p: Part): boolean
+			return not p.collide and GroundPlate.like(p.name, p.hy * 2, p.transparency)
+		end)
+	end
+	local function ground(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		if math.abs(dx) > 1e-9 or math.abs(dz) > 1e-9 then
+			return false
+		end
+		local lo, hi = math.min(oy, oy + dy), math.max(oy, oy + dy)
+		local g = world.terrainAt(ox, oz)
+		if g >= lo and g <= hi then
+			return true
+		end
+		return Height.insideRiverWater(ox, oz) and Height.WATER_Y >= lo and Height.WATER_Y <= hi
+	end
+	local wall = solidRay("wall")
+	local solidDown, solidCover = solidRay("floor"), solidRay("cover")
+	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return solidDown(ox, oy, oz, dx, dy, dz) or ground(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	end
+	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz) or ground(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	end
+	return wall, down, cover
 end
 
 -- Clearance ---------------------------------------------------------------------------------------------------------
