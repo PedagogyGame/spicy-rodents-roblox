@@ -12,6 +12,9 @@
 --     withholding packets ~0.4 s lets a lunge held back 0.28 s after the click be dated at the click
 --   5 honest refusals: the click's own jitter (and a resent reliable click) is not in the 0.2 s tie; on a 250 ms
 --     jitter, 2 % loss link a few % of honest pounces are untied and bite nobody, silently
+--   6, 7 a grounded packet's vy is never judged, but the rise allowed (upCap) and the wall test's `rise` trust it: one
+--     packet onto a 14-stud roof; packets through a house (only the root's own wall test, off near any rail, sees it)
+--   8 an honest mid-air pounce whose vy happens to match the arc is taken as a plain arc: no launch, no bite
 local Tunables = require("@shared/Config/Tunables")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local Squirrel = require("@client/Controllers/Squirrel")
@@ -362,4 +365,49 @@ return function(t)
 			t.truthy(#r.violations >= 1, "the envelope flags a packet through the wall")
 		end
 	)
+	-- an honest pounce in the air whose new vertical speed happens to lie within gravityEps of the arc's (the envelope
+	-- takes the move as a plain arc, sees no launch): the server never dates it, and it bites nobody
+	t.test("REVIEW 8: every honest mid-air pounce (leap, then pounce 0.1-0.75 s later) is seen as a launch", function()
+		local unseen, tried = {}, 0
+		for k = 0, 26 do
+			local delay = 0.1 + k * 0.025
+			local leapAt, pounceAt = CHEAT_AT, CHEAT_AT + delay
+			local pounced: number? = nil
+			local rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = QUIET, seed = 40 + k })
+			rig:possess(
+				town.openStart(),
+				function(now: number, s: State, events: { SquirrelMotor.Event }): SquirrelMotor.Input
+					for _, e in events do
+						if e.kind == "pounce" and pounced == nil then
+							pounced = now
+						end
+					end
+					local inp = SquirrelMotor.idleInput(-math.pi / 2)
+					inp.fw = 1
+					inp.leap = now >= leapAt and now < leapAt + 0.05 and s.grounded
+					inp.pounce = now >= pounceAt and pounced == nil and not s.grounded
+					return inp
+				end
+			)
+			rig:run(CHEAT_AT + 2)
+			local seenAt: number? = nil
+			for _, sq in (rig.movement :: any).squirrels do
+				seenAt = sq.pounceAt
+			end
+			if pounced ~= nil then
+				tried += 1
+				if seenAt == nil then
+					table.insert(unseen, string.format("%.3f", delay))
+				end
+			end
+		end
+		print(
+			`      {tried} mid-air pounces, {#unseen} never seen as a launch (after the leap by: {table.concat(
+				unseen,
+				", "
+			)} s)`
+		)
+		t.truthy(tried >= 20, "pounces made")
+		t.eq(#unseen, 0, "unseen honest pounces")
+	end)
 end
