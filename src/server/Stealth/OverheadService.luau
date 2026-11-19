@@ -22,7 +22,8 @@
 --   * the reactions, in OverheadWatch's stages (the body's Gaze is the point their head turns to, Client/Render/GazeView;
 --     Gesture "point" raises the arm, Client/Render/StanceView):
 --       glance  the head turns up to it;
---       look    they stop and look up (Pedestrian "overhead" stand; a member of staff pauses);
+--       look    they stop and look up (Pedestrian "overhead" stand; a member of staff pauses); at a creep, either may
+--               come with a murmur ("overheadUneasy": "Did you hear something?");
 --       spot    they point and say an "overhead" line, and tell the nearest person within C.tellRadius who has not
 --               seen it: that one looks up at once and answers ("overheadReply") a moment later: the two-person
 --               exchange (OverheadWatch.tell);
@@ -140,6 +141,7 @@ export type Stats = {
 	looks: number,
 	spots: number,
 	exchanges: number,
+	uneasy: number, -- murmurs at a creep
 	replies: number,
 	wary: number,
 	lost: number,
@@ -186,6 +188,7 @@ function OverheadService.new(opts: Opts): any
 			looks = 0,
 			spots = 0,
 			exchanges = 0,
+			uneasy = 0,
 			replies = 0,
 			wary = 0,
 			lost = 0,
@@ -482,6 +485,13 @@ local function point(self: any, id: number)
 	setAttr(self, id, "Gesture", "point")
 end
 
+-- a creep that made them glance or look up: a murmur ("Did you hear something?"), under the caps
+local function uneasy(self: any, id: number, s: Overhead)
+	if s.speed <= OverheadWatch.C.stalkSpeed and say(self, id, "overheadUneasy") then
+		self._stats.uneasy += 1
+	end
+end
+
 -- one event of the watch, acted on
 local function act(self: any, e: Event, byId: { [number]: Overhead })
 	local id = e.person :: number
@@ -492,12 +502,14 @@ local function act(self: any, e: Event, byId: { [number]: Overhead })
 		st.glances += 1
 		if s then
 			gaze(self, id, s)
+			uneasy(self, id, s)
 		end
 	elseif kind == "look" then
 		st.looks += 1
 		if s then
 			gaze(self, id, s)
 			order(self, id, "stand", s, C.lookSecs)
+			uneasy(self, id, s)
 		end
 	elseif kind == "spot" then
 		st.spots += 1

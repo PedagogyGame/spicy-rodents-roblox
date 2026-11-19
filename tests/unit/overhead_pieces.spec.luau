@@ -30,7 +30,7 @@ return function(t)
 	end)
 
 	t.test("the overhead line groups: 6 to 10 lines each", function()
-		for _, g in { "overhead", "overheadReply", "overheadWary", "overheadLost" } do
+		for _, g in { "overhead", "overheadUneasy", "overheadReply", "overheadWary", "overheadLost" } do
 			local n = #Lines.of(g)
 			t.truthy(n >= 6 and n <= 10, `{g}: {n} lines`)
 		end

@@ -54,22 +54,26 @@ local function timeToSpot(s: OverheadWatch.Squirrel, limit: number): (number?, {
 end
 
 return function(t)
-	t.test("in front of them: walking is spotted in about 2 s, sprinting in under 1, creeping not for 15 s", function()
+	t.test("in front of them: walking is spotted in about 2 s, sprinting in under 1, creeping not for 10 s", function()
 		local walk = timeToSpot(squirrel(0, 20, WALK), 30)
 		local sprint = timeToSpot(squirrel(0, 20, SPRINT), 30)
 		local creep = timeToSpot(squirrel(0, 20, CREEP), 60)
 		print(`      walk {walk} s, sprint {sprint} s, creep {creep} s`)
 		t.truthy(walk and walk >= 1.2 and walk <= 3, `walk {walk}`)
 		t.truthy(sprint and sprint <= 1, `sprint {sprint}`)
-		t.truthy(creep == nil or creep >= 15, `creep {creep}`)
+		t.truthy(creep == nil or creep >= 10, `creep {creep}`)
 		t.eq(timeToSpot(squirrel(0, 20, STILL), 60), nil, "keeping still: never")
 	end)
 
-	t.test("stalking from behind: a creep straight over them or behind them is never spotted", function()
-		t.eq(timeToSpot(squirrel(0, -2, CREEP), 120), nil, "creeping right overhead")
-		t.eq(timeToSpot(squirrel(0, -10, CREEP), 120), nil, "creeping behind")
-		local r = OverheadWatch.rate(squirrel(0, -2, CREEP), PERSON)
-		t.truthy(r < C.quiet, `under the quiet line: {r}`)
+	t.test("a creep lingering right over them is sensed: uneasy glances, a spot only after a long linger", function()
+		local over, events = timeToSpot(squirrel(0, -2, CREEP), 60)
+		print(`      creeping right over them (behind): spotted after {over} s`)
+		t.truthy(over and over >= 10 and over <= 20, `a spot after a 10 to 20 s linger: {over}`)
+		t.eq(events[1].kind, "glance", "an uneasy glance first")
+		t.eq(timeToSpot(squirrel(0, -20, CREEP), 120), nil, "creeping behind them, 20 studs off: never")
+		local walkOver = OverheadWatch.rate(squirrel(0, -2, WALK), PERSON)
+		local creepOver = OverheadWatch.rate(squirrel(0, -2, CREEP), PERSON)
+		t.truthy(walkOver > creepOver * 4, "walking over them is far louder than creeping")
 	end)
 
 	t.test(

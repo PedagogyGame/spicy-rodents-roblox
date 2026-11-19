@@ -64,6 +64,7 @@ SpeechRules.CHANCE = table.freeze({
 	-- the overhead watch (Stealth/OverheadWatch): the one who points it out speaks most times, the neighbour they
 	-- told answers (a forced line, so the exchange is not cut in half), the wary and the lost now and then
 	overhead = 0.85,
+	overheadUneasy = 0.8,
 	overheadReply = 1,
 	overheadWary = 0.6,
 	overheadLost = 0.5,

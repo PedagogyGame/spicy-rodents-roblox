@@ -5,7 +5,8 @@
 -- a powerline or branch etc."
 --   * the headless sim: the player's rodent walks a powerline 42 studs over the busiest crossing for a minute: it draws
 --     looks, pointing and chatter (two-person exchanges among it), and its own eye fills; creeping along the same wire
---     for a minute it is noticed rarely (the numbers are printed);
+--     for a minute, lingering over whoever passes under it (as a stalking player does), it draws uneasy glances and
+--     murmurs ("Did you hear something?") and is pointed out rarely (the numbers are printed);
 --   * the stages on the bodies: a head turns up (Gaze) before an arm points (Gesture);
 --   * the chatter caps: no one says two lines within the per-person cooldown (but an answer, which is forced), no more
 --     than AreaPace's lines in an area's window, no line twice running, and every answer follows a line from someone
@@ -20,12 +21,15 @@ local AreaPace = require("@shared/Speech/AreaPace")
 
 local WIRE = 163 -- an east-side utility wire over the town's busiest crossing (x 41, z -41 to 41; 42 studs up)
 local SECS = 60
-local OVERHEAD = { overhead = true, overheadReply = true, overheadWary = true, overheadLost = true }
+local OVERHEAD =
+	{ overhead = true, overheadUneasy = true, overheadReply = true, overheadWary = true, overheadLost = true }
 
 type Log = { t: number, id: number, what: string, value: any }
 
--- the rodent held by a player on the wire, back and forth along it at `speed` studs/s for `secs`
-local function onWire(rig: any, speed: number, secs: number, each: (() -> ())?)
+-- the rodent held by a player on the wire at `speed` studs/s for `secs`: back and forth along it, or (`prowl`) as a
+-- stalking player does, along it to over the nearest townsperson within PROWL studs of it, lingering over them
+local PROWL = 40
+local function onWire(rig: any, speed: number, secs: number, each: (() -> ())?, prowl: boolean?)
 	local world = rig.world
 	local r = world.routes.byId(WIRE)
 	local pts = r.points
@@ -53,11 +57,29 @@ local function onWire(rig: any, speed: number, secs: number, each: (() -> ())?)
 	end
 	place()
 	rig.step(secs, function()
-		s += dir * speed * rig.dt
-		if s > L then
-			s, dir = L, -1
-		elseif s < 0 then
-			s, dir = 0, 1
+		local goal: number? = nil
+		if prowl then
+			local bestD = PROWL
+			for _, a in world.actors do
+				if a.species == "human" and a.post == "townsperson" and not rig.players[a.id] then
+					for i = 1, #pts do
+						local d = math.sqrt((pts[i][1] - a.x) ^ 2 + (pts[i][3] - a.z) ^ 2)
+						if d < bestD then
+							bestD, goal = d, cum[i]
+						end
+					end
+				end
+			end
+		end
+		if goal then
+			s += math.clamp(goal - s, -speed * rig.dt, speed * rig.dt)
+		else
+			s += dir * speed * rig.dt
+			if s > L then
+				s, dir = L, -1
+			elseif s < 0 then
+				s, dir = 0, 1
+			end
 		end
 		place()
 		if each then
@@ -97,10 +119,10 @@ return function(t)
 	local walkSpotters: { [number]: boolean } = {}
 
 	t.test(
-		"a rodent walking a powerline over a busy street draws looks and chatter; creeping, it is noticed rarely",
+		"a rodent walking a powerline over a busy street draws looks and chatter; prowling at a creep, uneasy glances and murmurs, rarely pointed out",
 		function()
 			local rows = {}
-			for _, mode in { { name = "walk", speed = 18 }, { name = "creep", speed = 3 } } do
+			for _, mode in { { name = "walk", speed = 18 }, { name = "creep", speed = 3, prowl = true } } do
 				local rig, log = rigWithLog(1)
 				local eye = 0
 				local spotters: { [number]: boolean } = {}
@@ -114,7 +136,7 @@ return function(t)
 							spotters[id] = true
 						end
 					end
-				end)
+				end, mode.prowl)
 				local st = rig.overhead:stats()
 				local lines = 0
 				for _, said in rig.said do
@@ -125,7 +147,7 @@ return function(t)
 				rows[mode.name] = { st = st, eye = eye, spotters = count(spotters), lines = lines }
 				print(
 					string.format(
-						"      %s along the wire for %d s: %d glances, %d stop and look, %d point it out (%d people), %d exchanges, %d wary, %d lost; %d lines (%d held back by the caps); the rodent's eye up to %.2f; a busy tick %.3f ms on average, %.3f at worst",
+						"      %s along the wire for %d s: %d glances, %d stop and look, %d point it out (%d people), %d exchanges, %d wary, %d lost; %d lines, %d of them uneasy murmurs (%d held back by the caps); the rodent's eye up to %.2f; a busy tick %.3f ms on average, %.3f at worst",
 						mode.name,
 						SECS,
 						st.glances,
@@ -136,6 +158,7 @@ return function(t)
 						st.wary,
 						st.lost,
 						lines,
+						st.uneasy,
 						st.refused,
 						eye,
 						st.busyMs / math.max(1, st.busyTicks),
@@ -152,9 +175,12 @@ return function(t)
 			t.truthy(w.lines >= 4, `and talked about: {w.lines} lines`)
 			t.truthy(w.st.exchanges >= 1, "with a two-person exchange")
 			t.truthy(w.eye >= 0.99, "the walking rodent's eye fills")
-			t.truthy(c.spotters <= 1, `creeping is noticed rarely: {c.spotters} people`)
-			t.truthy(c.st.glances <= 2, `creeping draws hardly a glance: {c.st.glances}`)
-			t.truthy(c.eye < 0.3, `the creeping rodent's eye stays low: {c.eye}`)
+			-- creeping (prowling over people): uneasy glances and murmurs, rarely pointed out
+			t.truthy(c.st.glances >= 2 and c.st.glances <= 12, `creeping draws uneasy glances: {c.st.glances}`)
+			t.truthy(c.st.uneasy >= 1, `and murmurs: {c.st.uneasy}`)
+			t.truthy(c.spotters <= 1, `creeping is pointed out rarely: {c.spotters} people`)
+			t.truthy(c.eye >= 0.3, `the creeping rodent's eye rises: {c.eye}`)
+			t.truthy(w.st.spots >= 3 * math.max(1, c.st.spots), "creeping is clearly the better stealth")
 		end
 	)
 
@@ -272,7 +298,7 @@ return function(t)
 
 	t.test("the duel: a creep up behind someone bites them unaware; a run straight at them is noticed first", function()
 		local stalked, ran = 0, 0
-		local cases = 6
+		local cases = 10
 		for case = 1, cases do
 			-- every bite that is not on someone unaware fails (0.9 is above every other phase's chance)
 			local rig = BiteRig.new({
@@ -308,7 +334,8 @@ return function(t)
 			end
 			local g = rig.combat:guardOf(v.id)
 			local unaware = g == nil or not g.aware
-			if unaware and rig.lunge(v.id, 8) then
+			local bit = unaware and rig.lunge(v.id, 8)
+			if bit then
 				stalked += 1
 			end
 			-- the same person, the rodent running at them from 20 studs behind
@@ -333,7 +360,8 @@ return function(t)
 		print(
 			`      {stalked}/{cases} creeps from behind bit unaware; {ran}/{cases} runs from behind were noticed first`
 		)
-		t.truthy(stalked >= cases - 1, "a creep from behind bites unaware")
+		-- (some hear the wind-up and turn at the last moment: duel.tellHeard, a calm person's 0.35; 4 in 10 here)
+		t.truthy(stalked >= cases * 0.3, "a creep from behind often bites unaware")
 		t.truthy(ran >= cases - 1, "a run from behind is heard")
 	end)
 

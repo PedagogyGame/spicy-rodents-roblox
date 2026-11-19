@@ -17,14 +17,16 @@
 --   view    1 inside the person's view cone (C.viewHalfAngle either side of where they face, the v5.4 cone) and no more
 --           than C.lookUp above their eye line (nobody stares straight up); else C.behind. A squirrel moving faster than
 --           a creep within C.hear studs level (C.hearUp in all) is heard (a wire twangs, a branch rustles): at least
---           C.heard, whatever the facing
+--           C.heard, whatever the facing; one creeping close over them (within C.senseLevel level) is sensed: at least
+--           C.sensed (an uneasy glance up, "Did you hear something?")
 --   over    C.overMult when it is close over them (within C.overhead studs level), else 1
 --   cover   C.canopy on a branch or a trunk (the leaves), else 1
 -- A landing off a leap on a route near them (squirrel.landed) adds C.land x range x max(view, C.heard) x over x cover
 -- to the meter at once.
 -- THE METER (0..1, one per person, on the squirrel they rate highest) rises by the rate a second (an impulse at once),
 -- and while the rate is under C.quiet falls by C.decay a second. Creeping is slow and never a sure thing: a person who
--- faces a squirrel creeping within C.near needs C.spot / C.stalk = 20 s; one walking there is seen in about 2 s.
+-- faces a squirrel creeping within C.near needs C.spot / C.stalk = 12.5 s, one it lingers right over (sensed, over) about
+-- 15 s; one walking there is seen in about 1.5 s.
 -- THE STAGES, always in this order (a jump past several in one tick gives every event between, in order):
 --   glance  (meter C.glance)  the head turns up to it for C.glanceSecs ("glance")
 --   look    (meter C.look)    they stop and look up at it ("look")
@@ -48,7 +50,7 @@ local RafterWatch = require("./RafterWatch")
 local OverheadWatch = {}
 
 OverheadWatch.C = {
-	stalk = 0.05, -- per second, creeping: 20 s of a near person's full attention
+	stalk = 0.08, -- per second, creeping: 12.5 s of a near person's full attention
 	walk = 0.8, -- about 1.3 s
 	sprint = 1.5, -- under a second
 	stalkSpeed = RafterWatch.C.stalkSpeed, -- studs/s: the same creep line as the rafters (8; rail stalk 3, walk 18)
@@ -65,12 +67,14 @@ OverheadWatch.C = {
 	hear = 15, -- studs level (and no more than hearUp in all): a squirrel moving faster than a creep is heard
 	hearUp = 55,
 	heard = 0.5,
+	sensed = 0.8, -- a creep close over them (within C.senseLevel level) is sensed, whatever the facing: an uneasy feeling
+	senseLevel = 16,
 	overhead = 12, -- studs level: "close over them"
 	overMult = 1.4,
 	canopy = 0.35,
 	quiet = 0.02,
 	decay = 0.08,
-	glance = 0.3,
+	glance = 0.25,
 	look = 0.6,
 	spot = 1,
 	away = 0.18, -- a glance or a look that empties back under this is over
@@ -169,6 +173,8 @@ function OverheadWatch.rate(s: Squirrel, o: Observer): (number, number, number)
 	local loud = s.speed > C.stalkSpeed and inEar
 	if loud then
 		view = math.max(view, C.heard)
+	elseif s.speed >= C.stillSpeed and level <= C.senseLevel then
+		view = math.max(view, C.sensed) -- (creeping right over them: "Did you hear something?")
 	end
 	local over = if level <= C.overhead then C.overMult else 1
 	local cover = if s.canopy then C.canopy else 1

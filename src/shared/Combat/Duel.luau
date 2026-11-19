@@ -288,9 +288,11 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 				apply(params, g, "flee", now)
 			end
 		elseif view.tell ~= nil and view.tell ~= g.lastTell and view.dist <= params.threat then
-			-- the wind-up's hiss right behind them: one roll a tell (params.tellHeard) to turn at the last moment (alarmed,
+			-- the wind-up's hiss right behind them: one roll a tell and person (params.tellHeard) to turn at the last moment (alarmed,
 			-- as above); else the pounce meets them unaware
-			if rand() < params.tellHeard[g.temper] then
+			-- (the roll is the person's and the tell's own, not the dice's: the server lets an idle person's Guard go
+			-- between its steps, and a tell is rolled for once however many steps its wind-up spans)
+			if CombatRules.hash(`heard:{tostring(g.id)}:{view.tell}`) < params.tellHeard[g.temper] then
 				-- (turned round by it, they cry out and turn on it as a scene does: Duel.rally)
 				g.alarmed = true
 				Duel.rally(params, g, now, CombatRules.rallyPick(params, g.temper, g.nerve, boosted, rand()))

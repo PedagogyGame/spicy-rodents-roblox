@@ -12,7 +12,7 @@
 -- squirrel in the rafters over the lanes), drain (someone who saw a squirrel go down a storm drain, BRIEF_ADDENDUM
 -- D8), stakeout (the officer standing over the grate the rodent went down); overhead (a person in town who looks up
 -- and sees a squirrel stalking above them on a wire, fence, branch or roof edge: Stealth/OverheadWatch, owner playtest
--- 2026-11-19), overheadReply (the neighbour they told answers), overheadWary (keeping an eye on it: stepping back,
+-- 2026-11-19), overheadUneasy (a creep lingering over them: they feel watched), overheadReply (the neighbour they told answers), overheadWary (keeping an eye on it: stepping back,
 -- calling others over), overheadLost (it has gone from sight).
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
@@ -115,6 +115,15 @@ Lines.GROUPS = table.freeze({
 		"Why is that squirrel staring at me?",
 		"Hey, is that the red one? Up in the tree!",
 	}),
+	-- a creep lingering over them: they feel watched before they see anything
+	overheadUneasy = table.freeze({
+		"Did you hear something?",
+		"Something's up there...",
+		"I feel like I'm being watched.",
+		"Was that a rustle up there?",
+		"Hmm. Funny feeling about this street.",
+		"Is something following us?",
+	}),
 	overheadReply = table.freeze({
 		"Where? Oh! I see it.",
 		"Don't make eye contact.",
@@ -156,6 +165,7 @@ Lines.SITUATIONS = table.freeze({
 	"drain",
 	"stakeout",
 	"overhead",
+	"overheadUneasy",
 	"overheadReply",
 	"overheadWary",
 	"overheadLost",
