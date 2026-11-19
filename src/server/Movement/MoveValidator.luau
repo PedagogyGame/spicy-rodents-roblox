@@ -36,6 +36,10 @@
 --   * Floors: a grounded body off the rails must have something under its feet (world.floorBelow, when the world
 --     has one: Movement/ValidatorWorld); "float", a third of a flag each, so a vehicle drawn a little behind the
 --     server's under a body on its roof is not a flag.
+--   * Pounces (the combat re-review, 2026-11-19): the envelope dates the motor's pounce by its window
+--     (verdict.pounce, the client clock it launched at, and verdict.pounceGap, the gap it lies in); two closer than
+--     the cooldown are a flag at any gap. A plain arc's baseline takes the vertical speed gravity gives, not the one
+--     the packet claims within the slack (claimed a little slower each packet, the slack added up to a slow fall).
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))

@@ -32,7 +32,7 @@
 --     never more than C.DRIFT_BASE and the fastest the squirrel goes since (C.DRIFT_LAG);
 --   * walls: between two samples of the root once an epoch has settled, the live wall rays (a client that stops sending
 --     still cannot walk through a house); a root by a rail (C.RAIL_NEAR: a trunk's bark, a downspout on a wall) only
---     while no packet has the body on a rail within C.RAIL_RECENT of it (the root may lead the packets: it waits for one);
+--     while no packet has the body on a rail within C.RAIL_RECENT of it (the root may lead the packets: it waits);
 --   * the air: while no packet is fresh, a root off the rails higher above any floor than a leap may only fall
 --     (C.HIGH_LAG of a held update, then gravity): no hanging, no flying while silent;
 --   * silence: a body that moves C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped
@@ -217,8 +217,9 @@ MovementService.C = table.freeze({
 	-- slower link is no reason to let the root sit further off for longer
 	PING_MAX = 1,
 	-- seconds of client clock: a pounce is dated only from a packet that follows the last one taken by no more than this
-	-- (a send interval and the longest frame: a lost packet at 60 frames a second), and the arrivals' spread (a packet overtaken by a later
-	-- one is dropped) up to POUNCE_SPREAD_MAX: a longer silence may hide a lunge held back for a better moment
+	-- (a send interval and the longest frame: a lost packet at 60 frames a second) and the arrivals' spread (a packet
+	-- overtaken by a later one is dropped) up to POUNCE_SPREAD_MAX: a longer silence may hide a lunge held back for a
+	-- better moment
 	POUNCE_GAP = SquirrelWire.SEND_EVERY + SquirrelMotor.params.frameDtCap,
 	POUNCE_SPREAD_MAX = 0.3,
 	-- seconds: the most a click's own clock may put it before the remote carrying it arrived (a reliable remote resent

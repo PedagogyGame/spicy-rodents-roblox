@@ -104,7 +104,11 @@ end
 
 -- the validator alone on open ground: an honest leap packet by packet at `dt` to its apex, then `after(s, dt)` edits each
 -- packet for `secs`; returns the violations' codes after the apex and the height over the ground at the end
-local function envelopeRun(dt: number, secs: number, after: (s: State, dt: number) -> ()): ({ [string]: number }, number)
+local function envelopeRun(
+	dt: number,
+	secs: number,
+	after: (s: State, dt: number) -> ()
+): ({ [string]: number }, number)
 	local world = TestWorld.build({ loaders = {} })
 	local v = MoveValidator.new(world)
 	local s = SquirrelMotor.new(-1400, world.groundHeight, -1000)
@@ -337,24 +341,31 @@ return function(t)
 		return sq.pounceAt, clickAt, r.snaps
 	end
 
-	t.test("pounce: a lunge held 0.28 s behind a packet gap, or a forward-dated click, is not tied to the click", function()
-		for _, c in
-			{
-				{ name = "behind a silence", silent = true, forward = false },
-				{ name = "packets flowing", silent = false, forward = false },
-				{ name = "the click's clock forward-dated", silent = false, forward = true },
-			}
-		do
-			local pounceAt, clickAt, snaps = heldLunge(24, 0.28, c.silent, c.forward)
-			t.truthy(clickAt ~= nil and (clickAt :: number) > 0, `{c.name}: the click was dated`)
-			t.eq(snaps, 0, `{c.name}: (nothing else wrong with it)`)
-			local tied = pounceAt ~= nil and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup)
-			t.falsy(tied, `{c.name}: a lunge 0.28 s late is not tied (launch {pounceAt})`)
+	t.test(
+		"pounce: a lunge held 0.28 s behind a packet gap, or a forward-dated click, is not tied to the click",
+		function()
+			for _, c in
+				{
+					{ name = "behind a silence", silent = true, forward = false },
+					{ name = "packets flowing", silent = false, forward = false },
+					{ name = "the click's clock forward-dated", silent = false, forward = true },
+				}
+			do
+				local pounceAt, clickAt, snaps = heldLunge(24, 0.28, c.silent, c.forward)
+				t.truthy(clickAt ~= nil and (clickAt :: number) > 0, `{c.name}: the click was dated`)
+				t.eq(snaps, 0, `{c.name}: (nothing else wrong with it)`)
+				local tied = pounceAt ~= nil
+					and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup)
+				t.falsy(tied, `{c.name}: a lunge 0.28 s late is not tied (launch {pounceAt})`)
+			end
+			-- and on time it is
+			local pounceAt, clickAt = heldLunge(25, 0, false, false)
+			t.truthy(
+				pounceAt ~= nil and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup),
+				"on time"
+			)
 		end
-		-- and on time it is
-		local pounceAt, clickAt = heldLunge(25, 0, false, false)
-		t.truthy(pounceAt ~= nil and CombatService.tied(CP, pounceAt :: number, (clickAt :: number) + windup), "on time")
-	end)
+	)
 
 	-- an honest rodent pouncing as fast as the duel lets it, weaving across the open ground, its click's remote on its own
 	-- trip (a reliable remote: its own jitter, and a lost one resent about a round trip later): how many of the motor's
@@ -438,8 +449,17 @@ return function(t)
 
 	for _, c in
 		{
-			{ name = "80 ms + 250 ms jitter, 2 % loss", link = { latency = 0.08, jitter = 0.25, loss = 0.02 }, seed = 31 },
-			{ name = "a slow phone at 300 ms", link = { latency = 0.3, jitter = 0.1, loss = 0.02 }, fps = 20, seed = 32 },
+			{
+				name = "80 ms + 250 ms jitter, 2 % loss",
+				link = { latency = 0.08, jitter = 0.25, loss = 0.02 },
+				seed = 31,
+			},
+			{
+				name = "a slow phone at 300 ms",
+				link = { latency = 0.3, jitter = 0.1, loss = 0.02 },
+				fps = 20,
+				seed = 32,
+			},
 		}
 	do
 		t.test(`pounce: honest pounces on {c.name}: >= 99 % dated and tied to their click`, function()
@@ -540,47 +560,55 @@ return function(t)
 		t.truthy(wall, "a wall")
 	end)
 
-	t.test("ground: a silent client's root walked through a garden wall beside a tree is a wall (the rail no excuse)", function()
-		-- (the server's own root wall test was off within MovementService.C.RAIL_NEAR of any rail; now only while the
-		-- packets have the body on a rail)
-		local base = TestWorld.build()
-		local trunk = Driver.targetsAround(base, 0, 0, 200)[1]
-		local foot = base.registry:foot(trunk)
-		local box = { minX = foot.x + 2, maxX = foot.x + 3, minZ = foot.z - 6, maxZ = foot.z + 6, top = 14 }
-		local world = TestWorld.build({ boxes = { box } })
-		local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
-			return TestWorld.segmentCrossesBox({ box }, ox, oz, ox + dx, oz + dz, oy)
-		end
-		local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
-			local lo = oy + dy
-			if lo <= 0 and oy >= 0 then
-				return true
+	t.test(
+		"ground: a silent client's root walked through a garden wall beside a tree is a wall (the rail no excuse)",
+		function()
+			-- (the server's own root wall test was off within MovementService.C.RAIL_NEAR of any rail; now only while the
+			-- packets have the body on a rail)
+			local base = TestWorld.build()
+			local trunk = Driver.targetsAround(base, 0, 0, 200)[1]
+			local foot = base.registry:foot(trunk)
+			local box = { minX = foot.x + 2, maxX = foot.x + 3, minZ = foot.z - 6, maxZ = foot.z + 6, top = 14 }
+			local world = TestWorld.build({ boxes = { box } })
+			local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
+				return TestWorld.segmentCrossesBox({ box }, ox, oz, ox + dx, oz + dz, oy)
 			end
-			return ox > box.minX and ox < box.maxX and oz > box.minZ and oz < box.maxZ and box.top >= lo and box.top <= oy
-		end
-		local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
-		local z = foot.z + 3
-		local rig = LiveRig.new({
-			world = world,
-			vworld = vworld,
-			link = QUIET,
-			seed = 28,
-			silent = function(tt: number): boolean
-				return tt >= CHEAT_AT
-			end,
-			rootCheat = function(p: { x: number, y: number, z: number }, tt: number, _s: State)
-				if tt >= CHEAT_AT then
-					p.x, p.z = math.min(foot.x - 3 + 15 * (tt - CHEAT_AT), foot.x + 6), z
+			local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
+				local lo = oy + dy
+				if lo <= 0 and oy >= 0 then
+					return true
 				end
-			end,
-		})
-		rig:possess(SquirrelMotor.new(foot.x - 3, world.groundHeight, z), idle())
-		rig:run(CHEAT_AT + 3)
-		local r = rig:result()
-		print(`      {LiveRig.describe("through a wall by a tree", r)}; first snap {r.firstSnap}`)
-		t.truthy((r.reasons.wall or 0) >= 1, "a wall")
-		t.truthy((r.firstSnap or math.huge) <= CHEAT_AT + 2, "within a rail packet's wait")
-	end)
+				return ox > box.minX
+					and ox < box.maxX
+					and oz > box.minZ
+					and oz < box.maxZ
+					and box.top >= lo
+					and box.top <= oy
+			end
+			local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
+			local z = foot.z + 3
+			local rig = LiveRig.new({
+				world = world,
+				vworld = vworld,
+				link = QUIET,
+				seed = 28,
+				silent = function(tt: number): boolean
+					return tt >= CHEAT_AT
+				end,
+				rootCheat = function(p: { x: number, y: number, z: number }, tt: number, _s: State)
+					if tt >= CHEAT_AT then
+						p.x, p.z = math.min(foot.x - 3 + 15 * (tt - CHEAT_AT), foot.x + 6), z
+					end
+				end,
+			})
+			rig:possess(SquirrelMotor.new(foot.x - 3, world.groundHeight, z), idle())
+			rig:run(CHEAT_AT + 3)
+			local r = rig:result()
+			print(`      {LiveRig.describe("through a wall by a tree", r)}; first snap {r.firstSnap}`)
+			t.truthy((r.reasons.wall or 0) >= 1, "a wall")
+			t.truthy((r.firstSnap or math.huge) <= CHEAT_AT + 2, "within a rail packet's wait")
+		end
+	)
 
 	-- an honest pounce in the air whose new vertical speed happens to lie within gravityEps of the arc's (the envelope
 	-- took the move as a plain arc, saw no launch): the server never dated it, and it bit nobody
@@ -662,46 +690,56 @@ return function(t)
 		t.truthy(all, "a click every 0.4 s")
 	end)
 
-	t.test("duel: a bite and a blow are judged where the validated motor state has the rodent, not at its root", function()
-		local rig = BiteRig.new({ seed = 4, duelRand = function(): number
-			return 0
-		end, motorCheck = true })
-		local poses: { [number]: { number } } = {}
-		rig.combat.opts.poseOf = function(id: number): (number?, number?, number?)
-			local p = poses[id]
-			if p then
-				return p[1], p[2], p[3]
+	t.test(
+		"duel: a bite and a blow are judged where the validated motor state has the rodent, not at its root",
+		function()
+			local rig = BiteRig.new({
+				seed = 4,
+				duelRand = function(): number
+					return 0
+				end,
+				motorCheck = true,
+			})
+			local poses: { [number]: { number } } = {}
+			rig.combat.opts.poseOf = function(id: number): (number?, number?, number?)
+				local p = poses[id]
+				if p then
+					return p[1], p[2], p[3]
+				end
+				return nil, nil, nil
 			end
-			return nil, nil, nil
-		end
-		rig.step(20)
-		local v = rig.calmNear(0, 0)
-		rig.holdRodent()
-		local rod = rig.world.actorsById[rig.rodent]
-		-- the root in contact all through the pounce, the packets 12 studs off: no bite
-		local far = function()
-			rig.put(rig.rodent, v.x + 0.5, v.z)
-			poses[rig.rodent] = { v.x + 12, rod.y - rod.hip, v.z }
-		end
-		far()
-		t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()))
-		local t0 = rig.time
-		rig.step(1.2, function()
+			rig.step(20)
+			local v = rig.calmNear(0, 0)
+			rig.holdRodent()
+			local rod = rig.world.actorsById[rig.rodent]
+			-- the root in contact all through the pounce, the packets 12 studs off: no bite
+			local far = function()
+				rig.put(rig.rodent, v.x + 0.5, v.z)
+				poses[rig.rodent] = { v.x + 12, rod.y - rod.hip, v.z }
+			end
 			far()
-			local into = rig.time - t0 - CP.pounceWindup
-			rig.motor[rig.rodent] = { age = 0, launchAgo = if into >= 0 then into else nil }
-		end)
-		t.eq(rig.combat:stats().bites, 0, "a root flicked onto the person bites nobody")
-		-- the packets with it: the bite lands
-		poses[rig.rodent] = nil
-		rig.step(1)
-		t.truthy(rig.lunge(v.id), "a pounce the packets show lands")
-	end)
+			t.truthy(rig.combat:rodentAct(rig.rodent, "pounce", rig.now()))
+			local t0 = rig.time
+			rig.step(1.2, function()
+				far()
+				local into = rig.time - t0 - CP.pounceWindup
+				rig.motor[rig.rodent] = { age = 0, launchAgo = if into >= 0 then into else nil }
+			end)
+			t.eq(rig.combat:stats().bites, 0, "a root flicked onto the person bites nobody")
+			-- the packets with it: the bite lands
+			poses[rig.rodent] = nil
+			rig.step(1)
+			t.truthy(rig.lunge(v.id), "a pounce the packets show lands")
+		end
+	)
 
 	t.test("duel: a blow lands where the validated motor state has the rodent, not on its root", function()
-		local rig = BiteRig.new({ seed = 6, duelRand = function(): number
-			return 0
-		end })
+		local rig = BiteRig.new({
+			seed = 6,
+			duelRand = function(): number
+				return 0
+			end,
+		})
 		local poses: { [number]: { number } } = {}
 		rig.combat.opts.poseOf = function(id: number): (number?, number?, number?)
 			local p = poses[id]

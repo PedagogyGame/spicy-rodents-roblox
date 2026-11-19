@@ -1455,7 +1455,12 @@ end
 -- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
 -- of a mouth that opens to the outside (a hatch: from its lid at a sprint's pace and within its rise), gets off only
 -- at a mouth, and changes rail across the wall only where a mouth's links say (an authored link is a declared
--- junction, whatever gap the Graph sees).
+-- junction, whatever gap the Graph sees). Vertical speed (the combat re-review, 2026-11-19): off the rails a body on
+-- the ground has none and no fall passes P.terminalFall; every launch ends at a speed gravity could bring a launch
+-- down to in the gap, rises what that launch can reach ((u^2 - v^2) / 2g), and in the air only the motor's pounce
+-- launches, recognised by its window (the window rose to what it is a moment after a pounce, the body flies as that
+-- pounce: pounceAgo); a plain arc rises no more than the mean of its end speeds; the wall test's rise is a launch's
+-- apex at most.
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1702,7 +1707,9 @@ function SquirrelMotor.envelope(
 			for _, m in enc.mouths do
 				hopUp = math.max(hopUp, m.hopUp or 0)
 			end
-			return if u >= -gEps and u <= math.max(pounceUp, hopUp * E.launchTol) + gEps and vxz <= launchXZ
+			return if u >= -gEps
+					and u <= math.max(pounceUp, hopUp * E.launchTol) + gEps
+					and vxz <= launchXZ
 				then ago
 				else nil
 		end
@@ -1974,7 +1981,10 @@ function SquirrelMotor.envelope(
 			local over = math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) -- (it may rise first, then fall onto it)
 			for _, site in tramps do
 				if
-					(hypot2(prev.x - site.x, prev.z - site.z) <= reach or hypot2(next.x - site.x, next.z - site.z) <= reach)
+					(
+						hypot2(prev.x - site.x, prev.z - site.z) <= reach
+						or hypot2(next.x - site.x, next.z - site.z) <= reach
+					)
 					and prev.y + over - (site.surface + Trampoline.C.bedAbove) <= fallReach + P.gravity * dt * dt
 				then
 					tramp = true
@@ -2102,10 +2112,8 @@ function SquirrelMotor.envelope(
 		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall: never
 		-- higher than the highest launch here reaches, whatever speeds the packets claim)
 		local apexUp = if tramp then math.max(launchUp, trampUp) else launchUp
-		local rise = math.min(
-			math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt,
-			apexUp * apexUp / (2 * P.gravity)
-		)
+		local rise =
+			math.min(math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt, apexUp * apexUp / (2 * P.gravity))
 		if
 			crosses
 			and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), rise)

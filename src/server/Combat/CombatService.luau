@@ -9,7 +9,11 @@
 -- attribute), then the motor launches it (the commit) and its window runs pounce.window, widened by duel.rewind for
 -- the link (D20). A bite needs contact in that window (duel.contact studs, the person's root to the rodent's, not
 -- through a Combat/Cover wall) AND, when `motorOf` is given, the rodent's own validated motor state showing the pounce
--- (attackWindow): a click with no real pounce bites nobody, and a pounce with no click bites nobody either. After the
+-- (attackWindow): a click with no real pounce bites nobody, and a pounce with no click bites nobody either. The two are
+-- tied on the movement packets' own clock (the click carries its motor clock, Movement/MovementService:clickAt; the
+-- launch is dated by the packets, motorOf): late by duel.launchLate at most, so neither the remote's jitter nor a resend
+-- parts them, and a lunge held back is no pounce. Bites and blows are judged where the rodent's validated motor state
+-- has it (opts.poseOf), not at the root its client moves. After the
 -- window, with or without contact, the rodent recovers for pounce.recovery (blows land more surely). One bite a pounce,
 -- the nearest person in contact. A feint (`rodentAct(id, "feint")`, F) is a tell with no pounce: it costs
 -- duel.feintCost of a feint meter that refills at duel.feintRefill a second, and no pounce follows for feintRecover.
@@ -40,7 +44,9 @@
 -- a bite batted away by one of a group. Running, climbing, a hollow or the sewer still gets the rodent away.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt, now) ten times a second. `now` is the
 -- duel's own clock (Boot/Game's); the orders to brains are stamped on the town's (world.now), which the brains read.
--- Interface: new(opts) -> Service; :rodentAct(id, verb, now) -> (ok, why?); :step(dt, now);
+-- Interface: new(opts) -> Service; :rodentAct(id, verb, now, clickAt?) -> (ok, why?); :step(dt, now);
+--   :remoteGate(key, now) -> heard; :mayReply(key, now) -> boolean (the Duel remote's rate: REMOTE_RATE, REPLY_EVERY);
+--   tied(P, launchAt, due) -> boolean (the pounce tie);
 --   :heldKick(id, now, lookX?, lookZ?) -> aimed; :takeBlow(rodentId, now) -> boolean (a player's kick, with the duel's
 --   i-frames); :inAlert(x, z, now) -> boolean; :boost(x, z, now) -> number (the kick multiplier there);
 --   :temperOf(id) -> Temper;
