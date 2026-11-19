@@ -24,6 +24,8 @@ return function(t)
 			}
 			local m = MovementService.new({ validator = MoveValidator.new(world), swept = swept, enforce = false })
 			local s = SquirrelMotor.new(10, world.groundHeight, 10)
+			-- (a body's first packet is judged from a place the server holds: validator round 6)
+			m:teleported("sq", s.x, s.y, s.z, "spawn", 0)
 			local inp = SquirrelMotor.idleInput(0)
 			inp.fw = 1
 			for i = 0, 60 do
@@ -57,6 +59,7 @@ return function(t)
 			m:onHandoff({ id = "sq" }, nil, "release")
 			t.eq(swept.marked[#swept.marked], "sq")
 			t.eq(m:pose("sq", 1), nil)
+			m:teleported("sq", s.x, s.y, s.z, "spawn", 2)
 			local fresh = m:packet("sq", "squirrel", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 2)
 			t.truthy(fresh.baseline) -- the next packet is the new baseline
 			t.eq(m:stats().handoffs, 1)
