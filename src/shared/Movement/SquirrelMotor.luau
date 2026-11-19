@@ -1587,7 +1587,7 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	x = "against the last packet: rail speed, transfer, grab, launch, speed and teleport bounds, walls (envelope)",
 	y = "against the last packet: gravity, launch rise, landing, climb and floor (envelope, MoveValidator)",
 	z = "as x",
-	railT = "[0, 1] (fieldCheck); on a rail the body at that point (envelope 1) and its pace (envelope 2)",
+	railT = "[0, 1], and on a rail the body at that point or on its transfer (fieldCheck, every packet); its pace (envelope 2)",
 	clock = "rises (dt > 0), never ahead of the arrivals (MoveValidator's clock check); a gap over maxDt is a hop",
 	vx = "horizontal speed within the fastest cap on any packet (fieldCheck), each move's own cap off a rail (envelope)",
 	vy = "within [-terminal, a trampoline's bounce] on any packet (fieldCheck); 0 on the ground, gravity, launch bounds (envelope)",
@@ -1605,7 +1605,7 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	stamina = "[0, 1] (fieldCheck); the server keeps its own meter",
 	emergedEnd = "enum 0 or 1 (fieldCheck)",
 	emergedFw = "[-1, 1] (fieldCheck)",
-	routeId = "-1 or a route of the world (envelope: unknown route); near the route it claims (MoveValidator.hop)",
+	routeId = "-1 or a route of the world, the body where its railT says (fieldCheck, every packet)",
 	pendingFork = "-1 or a route of the world (fieldCheck)",
 	selectedJunction = "-1 or a route of the world (fieldCheck)",
 	emergedFrom = "-1 or a route of the world (fieldCheck)",
@@ -2275,6 +2275,7 @@ function SquirrelMotor.envelope(
 		-- grab. The grab point is the nearest of the index's samples (samplePad), and at a rail's end the nearest point is
 		-- the end itself (any direction): no along test there
 		local alongOk = true
+		local alongBy = ""
 		local tan = reg:tangentAt(nextRoute, math.clamp(next.railT, 0, 1))
 		local tl = math.sqrt(tan.x * tan.x + tan.y * tan.y + tan.z * tan.z)
 		local endPad = (2 * samplePad + E.posSlack) / math.max(nextRoute.length, 1e-6)
@@ -2288,6 +2289,18 @@ function SquirrelMotor.envelope(
 			local cap = SquirrelMotor.routeCap(nextRoute, boosted)
 			local run = cap * E.railTol * dt + cap * P.substep
 			alongOk = along <= math.max(span, run) + samplePad
+			if not alongOk then
+				alongBy = string.format(
+					"%.2f st along (reach %.2f) in %.3f s, t %.3f of %s %d, from %s",
+					along,
+					math.max(span, run) + samplePad,
+					dt,
+					next.railT,
+					nextRoute.kind,
+					nextRoute.id,
+					if prev.grounded then "the ground" else string.format("the air (vy %.1f)", prev.vy)
+				)
+			end
 		end
 		if outside > C.airGrab or not alongOk then
 			-- a long gap can hide a first rail B: grabbed within reach of prev, related to the new route,
@@ -2326,7 +2339,7 @@ function SquirrelMotor.envelope(
 					1,
 					if alongOk
 						then `grabbed a rail {gap} st away (> 3.4 u + travel)`
-						else `grabbed a rail further along it than the body could reach (the nearest point is the grab)`
+						else `grabbed a rail further along it than the body could reach: {alongBy}`
 				)
 			end
 		end
@@ -2439,13 +2452,37 @@ function SquirrelMotor.envelope(
 		end
 		-- a ledge the launch came down on and launched from again (Space held: the client's ground probe lifts the feet onto
 		-- a surface a step over them, so a rafter's beam over a light rail is a floor a leap reaches in a frame): the floor
-		-- a ray finds under `next`, no higher than the launch rises in the gap and a step, no lower than a launch off it
-		-- explains `next` (in any gap; it explains the rise, not the distance)
+		-- a ray finds under `next` (in any gap; it explains the rise, not the distance). The two launches share the gap
+		-- (validator round 6, the round-5 review's LOW: each took the whole of it): landed at t1, the floor is no higher
+		-- than the climb and the first launch reach by t1 and a step (fTop), no lower than the second launch, ending at
+		-- `next`'s speed in the time left, explains `next` (fLow). Both rise with t1, and their gap is concave in it, so the
+		-- floors that do lie between fLow at the first t1 where the two meet and fTop at the last: arithmetic over t1,
+		-- then the one ray
 		local landable = world.landable
 		if overUp and not overXZ and landable then
-			local fTop = topY + riseInDt + Units.st(1.4) + E.floorSlack
-			local fLow = next.y - riseNext - E.floorSlack - E.posSlack
-			if fLow <= fTop and landable(next.x, fTop, next.z, fTop - fLow) then
+			local base = if prevSpec then topY else visualPosition(prev, world).y
+			local capT = if prevSpec then 0 else railCap * E.railTol
+			local head = topY - base
+			local function reachBy(t1: number): number
+				local best = 0
+				local tStar = math.clamp((hopUp - capT) / P.gravity, 0, t1)
+				for _, tau in { 0, t1, tStar, math.clamp(t1 - head / math.max(capT, 1e-6), 0, t1) } do
+					local tu = math.min(tau, hopUp / P.gravity)
+					best = math.max(best, math.min(head, capT * (t1 - tau)) + hopUp * tu - 0.5 * P.gravity * tu * tu)
+				end
+				return base + best + Units.st(1.4) + E.floorSlack
+			end
+			local lowest, highest = math.huge, -math.huge
+			local samples = 16
+			for i = 0, samples do
+				local t1 = dt * i / samples
+				local fTop = reachBy(t1)
+				local fLow = next.y - launched(dt - t1) - E.floorSlack - E.posSlack
+				if fLow <= fTop then
+					lowest, highest = math.min(lowest, fLow), math.max(highest, fTop)
+				end
+			end
+			if lowest <= highest and landable(next.x, highest, next.z, highest - lowest) then
 				overUp = false
 			end
 		end

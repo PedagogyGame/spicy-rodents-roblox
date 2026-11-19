@@ -46,6 +46,11 @@
 --     that crosses a wall is weighed as a gap's (wallGap); a grounded packet higher than where the body last stood needs
 --     a floor just under its feet (world.floorNear: no creeping up posSlack a packet); a landing the gap hid counts as
 --     ground for the sprint meter.
+--   * Round 6 (2026-11-19), two invariants whatever path a packet takes: (A) every packet's rail claim agrees with its
+--     x, y, z (SquirrelMotor.fieldCheck), and a packet with no baseline is judged from a place the server holds (the
+--     service's gate, root or last accepted place: never taken where it says); (B) the displacement governor (_govern):
+--     every window of up to C.GOV_WINDOW of accepted places stays within the motor's honest pace across and up
+--     (governorBounds), its history kept across a snap (anchor). Every grounded packet off the rails needs floorNear.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -609,11 +614,9 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		violations
 	)
 
-	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's).
-	-- One higher than where it last stood off the rails rose with the floor (up a slope, a kerb, onto a ledge it leapt
-	-- to): it stands on one just under its feet (world.floorNear), never on air a slack at a time (the round-3 review: a
-	-- standing body crept up posSlack a packet, on the ground or every other packet in the air, to FLOOR_DEPTH over the
-	-- floor and stood there): a whole flag
+	-- floors: a grounded body off the rails stands on a floor just under its feet (world.floorNear), never on air a
+	-- slack at a time (the round-3 review: a body crept up posSlack a packet to FLOOR_DEPTH over the floor; round 5: one
+	-- walked on level off a ledge): a whole flag, a third on a car's roof the client draws a little behind the server's
 	local floorBelow = self.world.floorBelow
 	local standY = actor.standY
 	if next.routeId then
@@ -626,11 +629,12 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
 	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
 		local floorNear = self.world.floorNear
-		-- (where it last stood is unknown after a rail, a gap too long to judge or a hop: the round-4 review stood 3
-		-- studs over open ground from there on, FLOOR_DEPTH being all floorBelow asks)
+		-- (validator round 6, the round-5 review's LOW: a level packet was held only to floorBelow, FLOOR_DEPTH, so from
+		-- a ledge a body walked on level over open ground: every grounded packet off the rails stands on a floor just
+		-- under its feet, the motor's ground glue keeping the feet on it)
 		local unknown = resync or standY == nil
 		local rose = not unknown and next.y > (standY :: number) + 1e-3
-		if (rose or unknown) and floorNear then
+		if floorNear then
 			if not floorNear(next.x, next.y, next.z) then
 				-- (a car's roof the client draws a little behind or off the server's box, on a slope or a bump: a third)
 				local carFloor = self.world.carFloor
@@ -641,7 +645,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 					severity = if onCar then 0.34 else 1,
 					detail = if rose
 						then `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`
-						else "grounded where it last stood is unknown, with no floor just under the feet",
+						else "grounded with no floor just under the feet",
 				})
 			end
 		elseif not floorBelow(next.x, next.y, next.z) then

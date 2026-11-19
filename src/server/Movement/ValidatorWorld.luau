@@ -73,6 +73,10 @@ ValidatorWorld.C = table.freeze({
 	-- the down rays that bisect the cover over the far end of a wall a leap's rise cleared (cover): its height to an
 	-- eighth of the rise
 	COVER_RAYS = 3,
+	-- the most walls of one long line asked for the cover over their far ends (crossesLong; validator round 6: one per
+	-- line let a second wall cleared over its top into a roofed house go unasked). A line within the chord bound meets
+	-- two or three; a further one cleared over its top is a crossing. Cost: (COVER_RAYS + 1 + 3) rays each
+	COVER_WALLS = 3,
 })
 local C = ValidatorWorld.C
 
@@ -104,9 +108,10 @@ function ValidatorWorld.cover(down: Ray): (number, number, number, number) -> nu
 	end
 end
 
--- chordTest(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?, useCover) -> (crossed, coverSpent): one chord
--- of at most C.MAX_CHORD by the six rays (crosses), the cover over its far end asked only when `useCover` (C.COVER_RAYS
--- + 1 down rays and three more wall rays: 13 rays at most)
+-- chordTest(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?, useCover) -> (crossed, coverSpent, unasked): one
+-- chord of at most C.MAX_CHORD by the six rays (crosses), the cover over its far end asked only when `useCover`
+-- (C.COVER_RAYS + 1 down rays and three more wall rays: 13 rays at most); `unasked`: cleared over its top where a cover
+-- could have been asked but `useCover` was off
 local function chordTest(
 	wall: Ray,
 	down: Ray?
@@ -120,7 +125,7 @@ local function chordTest(
 	number?,
 	number?,
 	boolean
-) -> (boolean, boolean)
+) -> (boolean, boolean, boolean)
 	local covered = if down then ValidatorWorld.cover(down) else nil
 	return function(
 		x0: number,
@@ -132,11 +137,11 @@ local function chordTest(
 		rise: number?,
 		endY: number?,
 		useCover: boolean
-	): (boolean, boolean)
+	): (boolean, boolean, boolean)
 		local dx, dz = x1 - x0, z1 - z0
 		local len = math.sqrt(dx * dx + dz * dz)
 		if len < C.MIN_CHORD or len > C.MAX_CHORD then
-			return false, false
+			return false, false, false
 		end
 		local px, pz = -dz / len * C.SIDE, dx / len * C.SIDE
 		local low = yLow + C.CORE
@@ -146,30 +151,31 @@ local function chordTest(
 		for _, side in { 0, 1, -1 } do
 			local ox, oz = x0 + px * side, z0 + pz * side
 			if not wall(ox, low, oz, dx, 0, dz) then
-				return false, false
+				return false, false, false
 			end
 			if not over and not wall(ox, high, oz, dx, 0, dz) then
-				if not roofable then
-					return false, false
-				end
 				over = true
 			end
 		end
 		if not over then
-			return true, false
+			return true, false, false
+		end
+		if not roofable then
+			-- (cleared over its top; `unasked`: a cover could have been asked, but the caller has none left)
+			return false, false, covered ~= nil and endY ~= nil and not useCover
 		end
 		-- (cleared over the top: only as high as the far end is open above, the body coming down under its cover)
 		local open = (covered :: any)(x1, z1, endY :: number, high)
 		if open == nil then
-			return false, true
+			return false, true, false
 		end
 		local capped = math.max(low, open)
 		for _, side in { 0, 1, -1 } do
 			if not wall(x0 + px * side, capped, z0 + pz * side, dx, 0, dz) then
-				return false, true
+				return false, true, false
 			end
 		end
-		return true, true
+		return true, true, false
 	end
 end
 
@@ -199,9 +205,9 @@ function ValidatorWorld.crosses(
 end
 
 -- crossesLong(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?): the straight line of a gap too long for
--- crosses, judged chord by chord (each at most C.MAX_CHORD, each by the six rays; the cover over a chord's far end, at
--- the feet the line has there, for the first chord cleared over its top only, so a line costs one cover at most): did
--- any chord go through a wall? (An honest body may have gone round a corner in the gap: the caller weighs it as such.)
+-- crosses, judged chord by chord (each at most C.MAX_CHORD, each by the six rays; the cover over each chord's far end
+-- cleared over its top, at the feet the line has there, for C.COVER_WALLS walls at most, a further one cleared over its
+-- top being a crossing): did any chord go through a wall? (An honest body may have gone round a corner in the gap: the caller weighs it as such.)
 -- A line longer than C.MAX_CHORDS chords is judged by that many chords spread evenly along it: the cost is bounded (a
 -- line that long, 64 studs, is over a second at the fastest, judged on its reach first).
 function ValidatorWorld.crossesLong(
@@ -233,12 +239,12 @@ function ValidatorWorld.crossesLong(
 		local spread = if n > 1 then (1 - step) / (n - 1) else 0
 		-- (the feet at the start: the end that is not endY)
 		local startY = if endY then yLow + (yHigh or yLow) - endY else nil
-		local coverLeft = true
+		local coversLeft = C.COVER_WALLS
 		for i = 1, n do
 			local a = (i - 1) * spread
 			local b = a + step
 			local y = if endY and startY then startY + (endY - startY) * b else nil
-			local crossed, spent = one(
+			local crossed, spent, unasked = one(
 				x0 + (x1 - x0) * a,
 				z0 + (z1 - z0) * a,
 				x0 + (x1 - x0) * b,
@@ -247,12 +253,17 @@ function ValidatorWorld.crossesLong(
 				yHigh,
 				rise,
 				y,
-				coverLeft
+				coversLeft > 0
 			)
 			if crossed then
 				return true
 			end
-			coverLeft = coverLeft and not spent
+			if spent then
+				coversLeft -= 1
+			elseif unasked then
+				-- (a further wall cleared only over its top, with no cover left to ask: a crossing)
+				return true
+			end
 		end
 		return false
 	end

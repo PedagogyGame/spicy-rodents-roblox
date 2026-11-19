@@ -492,7 +492,12 @@ return function(t)
 							pace <= honest * 1.01 + 0.5,
 							`{r.kind} at {rate}/s x{k}: {pace} st/s within the honest bound`
 						)
-						t.eq(bad, 0, `{r.kind} at {rate}/s x{k}: the greedy packets pass`)
+						-- (validator round 6: a clock run slow while the body moves in real time is no honest client, whose motor
+						-- clock and physics advance together; by its own clock it ran each packet's substep slack, up to twice the
+						-- rail's pace at 60 a second, and the displacement governor may flag it. The real-time gain is still none)
+						if k == 1 then
+							t.eq(bad, 0, `{r.kind} at {rate}/s x{k}: the greedy packets pass`)
+						end
 					else
 						-- a clock run fast is the clock check's: the gain is the clock's, and flagged
 						t.truthy(
