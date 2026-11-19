@@ -488,6 +488,10 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			table.insert(violations, v)
 		end
 		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
+		if judged.y then
+			-- (a plain arc: the baseline no higher than the arc, whatever slack the packet took)
+			next.y = judged.y :: number
+		end
 		if judged.longWall then
 			-- a line too long for the short wall test went through a wall: weighed as a gap's (one may be a corner)
 			local n = self:wallGap(actorId, serverTime)

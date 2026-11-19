@@ -20,6 +20,7 @@ local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local TestWorld = require("@tests/cheat/TestWorld")
 local LiveRig = require("@tests/lib/LiveRig")
 local Driver = require("@tests/cheat/Driver")
+local Rng = require("@tests/cheat/Rng")
 
 type State = SquirrelMotor.State
 
@@ -466,6 +467,11 @@ return function(t)
 	-- ===================================================================================================================
 
 	local apex = (P.leapUp * E.launchTol) ^ 2 / (2 * g)
+	-- (what a packet may sit over the arc and the floor: the arc's own slack, posSlack and gravityEps of speed over the gap,
+	-- and the client's floor over the server's)
+	local function arcSlack(dt: number): number
+		return E.floorSlack + E.posSlack + gEps * dt + 0.05
+	end
 
 	-- the validator's view of a copy of `s` (what MoveValidator keeps: Judged)
 	local function copy(s: State): State
@@ -474,12 +480,13 @@ return function(t)
 
 	-- A greedy hover: every packet the highest height that passes the envelope from what the validator kept, of a
 	-- walk-off claiming a landing hidden in the gap (the most fall the gap allows), a leap off such a landing (vertical
-	-- speed one over the last kept) and a plain arc, walking east at a walk. `rate` packets a second of server time, the
-	-- client's clock running `clockRate` times as fast. Returns the highest point over the ground, the mean height, and
-	-- the validator's violations (the clock's among them).
-	local function greedyHover(rate: number, clockRate: number, secs: number): (number, number, number)
+	-- speed one over the last kept), a launch at 30 st/s up and a plain arc (and one falling as slowly as the slack lets
+	-- it), walking east at a walk. `rate` packets a
+	-- second of server time, the client's clock running `clockRate` times as fast; from the open ground or `start`.
+	-- Returns the highest point over the ground, the mean height, and the validator's violations (the clock's among them).
+	local function greedyHover(rate: number, clockRate: number, secs: number, start: State?): (number, number, number)
 		local v = MoveValidator.new(town.vworld)
-		local s = town.openStart()
+		local s = start or town.openStart()
 		local ground = town.world.groundHeight
 		v:accept("g", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 0)
 		local dt = 1 / rate
@@ -492,13 +499,18 @@ return function(t)
 			seq += 1
 			local prev = v:last("g") :: State
 			local best: State? = nil
-			for _, kind in { "walk", "leap", "arc" } do
+			for _, kind in { "walk", "leap", "jump", "arc", "slowArc" } do
 				local c = copy(prev)
 				c.clock = clock
 				c.grounded, c.committedAirborne = false, true
 				c.x, c.vx, c.vz = prev.x + P.walk * cdt, P.walk, 0
-				c.vy = if kind == "walk" then -g * cdt elseif kind == "leap" then prev.vy + 1 else prev.vy - g * cdt
-				local top = prev.y + 12
+				c.vy = if kind == "walk"
+					then -g * cdt
+					elseif kind == "leap" then prev.vy + 1
+					elseif kind == "jump" then 30
+					elseif kind == "slowArc" then prev.vy - g * cdt + 0.95 * gEps
+					else prev.vy - g * cdt
+				local top = prev.y + 25
 				local y = top
 				while y >= ground do
 					c.y = y
@@ -534,10 +546,49 @@ return function(t)
 					mean
 				)} st on average (a leap's apex {string.format("%.2f", apex)}); {bad} violations`
 			)
-			t.truthy(peak <= apex + E.floorSlack + E.posSlack + 0.1, `{rate}/s: never above a leap over the floor`)
+			t.truthy(peak <= apex + arcSlack(1 / rate), `{rate}/s: never above a leap over the floor`)
 			t.truthy(mean <= apex, `{rate}/s: no hover at a leap's top`)
 		end
 	end)
+
+	t.test(
+		"attack (a rail within reach): beside a trunk the greediest climber stays within a leap of its rails",
+		function()
+			-- (a rail visit hidden in a gap may climb what a grab and the rail's pace explain: the tree's own height, never
+			-- over it by more than a leap)
+			for _, seed in { 5, 6 } do
+				local start = town.startAt(Rng.new(seed))
+				local top = -math.huge
+				local index = town.world.index :: any
+				index:forEachNear(
+					start.x,
+					start.y,
+					start.z,
+					4,
+					function(_id: number, _t: number, sx: number, sy: number, sz: number): boolean?
+						if (sx - start.x) ^ 2 + (sz - start.z) ^ 2 <= 50 * 50 then
+							top = math.max(top, sy)
+						end
+						return nil
+					end
+				)
+				for _, rate in { 2, 10 } do
+					local peak, mean, bad = greedyHover(rate, 1, 4, copy(start))
+					local ground = town.world.groundHeight
+					print(
+						`      tree {seed}, {rate} packets/s: peak {string.format("%.1f", peak)} st (the rails' top {string.format(
+							"%.1f",
+							top - ground
+						)}), mean {string.format("%.1f", mean)}; {bad} violations`
+					)
+					t.truthy(
+						peak <= top - ground + apex + 1,
+						`tree {seed} at {rate}/s: never over the tree by more than a leap`
+					)
+				end
+			end
+		end
+	)
 
 	t.test("attack (hidden landing): a slow clock buys no height, a fast one is a clock violation", function()
 		for _, k in { 0.5, 0.8, 1.15, 1.3 } do
@@ -548,7 +599,7 @@ return function(t)
 					mean
 				)} st; {bad} violations`
 			)
-			t.truthy(peak <= apex + E.floorSlack + E.posSlack + 0.1, `clock x{k}: never above a leap over the floor`)
+			t.truthy(peak <= apex + arcSlack(k / 4), `clock x{k}: never above a leap over the floor`)
 			if k > 1.1 then
 				t.truthy(bad >= 1, `clock x{k}: the clock shows`)
 			end
