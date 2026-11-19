@@ -17,10 +17,14 @@
 --   days; otherwise it lapses
 --   the meter decays `decayPerDay` of capacity each game day (nuts eaten and spoiled), so an abandoned tree empties
 --   taking nuts out (withdraw): the owner always may; another squirrel only while the tree is unclaimed
--- Interface: new() -> Claim; meter(c, capacity); deposit(c, who, n, day, capacity, ownAt, margin) -> stored (taken
---   from the n carried); visit(c, who, day); withdraw(c, who, n) -> taken; update(c, day, capacity, ownAt,
---   visitDays, decayPerDay, margin) -> changed (decay and lapse up to `day`); owned(c) -> owner?; carry(carried, n,
---   max) -> (carried, taken). `day` is fractional game days. No side effects on require.
+--   one tree each (owner, D16 #21 "a squirrel may claim only one tree"): a squirrel that holds a tree brings no nuts
+--   into any other (they stay carried), so it never claims a second; its claim moves only once the first has
+--   lapsed. The caller says which tree it holds (heldBy over every claim) as `elsewhere`
+-- Interface: new() -> Claim; meter(c, capacity); deposit(c, who, n, day, capacity, ownAt, margin, elsewhere?) ->
+--   stored (taken from the n carried); visit(c, who, day); withdraw(c, who, n) -> taken; update(c, day, capacity,
+--   ownAt, visitDays, decayPerDay, margin) -> changed (decay and lapse up to `day`); owned(c) -> owner?;
+--   heldBy(claims, who) -> key? (the tree `who` holds, keyed as in `claims`); carry(carried, n, max) -> (carried,
+--   taken). `day` is fractional game days. No side effects on require.
 
 local HollowClaim = {}
 
@@ -63,8 +67,18 @@ function HollowClaim.visit(c: Claim, who: Who, day: number)
 	end
 end
 
+-- heldBy: the key (in `claims`) of the tree `who` owns, nil when it owns none
+function HollowClaim.heldBy<K>(claims: { [K]: Claim }, who: Who): K?
+	for k, c in claims do
+		if c.owner == who then
+			return k
+		end
+	end
+	return nil
+end
+
 -- deposit: `who` brings n nuts in on `day`; returns how many were stored (the rest stays carried: the tree is full,
--- or it is another squirrel's)
+-- or it is another squirrel's, or `elsewhere`: `who` already holds another tree, and a squirrel keeps one)
 function HollowClaim.deposit(
 	c: Claim,
 	who: Who,
@@ -72,9 +86,13 @@ function HollowClaim.deposit(
 	day: number,
 	capacity: number,
 	ownAt: number,
-	margin: number
+	margin: number,
+	elsewhere: boolean?
 ): number
 	if c.owner ~= nil and c.owner ~= who then
+		return 0
+	end
+	if elsewhere and c.owner ~= who then
 		return 0
 	end
 	local room = math.max(0, capacity - c.stored)

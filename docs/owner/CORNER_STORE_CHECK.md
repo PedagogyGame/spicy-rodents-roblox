@@ -38,11 +38,11 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 | Bubbles | Bubbles stream out for a few seconds (30 to a bottle) |
 | Flashlight | On and off; a strong beam at night, faint by day |
 | Newspaper | First use: you read a headline. Second use: you throw it away |
-| Frisbee, football | Thrown ahead; the frisbee glides. Anyone can pick it up with E, or catch it if it hits them. Left alone for 2 minutes, it comes back to you |
+| Frisbee, football | Thrown ahead; the frisbee glides. Anyone can pick it up with E, or catch it if it hits them, but it stays yours (your D16 #26): they only borrow it to throw back. Left lying for a minute, it comes back to you. See `OWNERSHIP_CHECK.md` |
 | Peanuts, bird seed | A pile at your feet: squirrels nearby come to it and stay. Bird seed reaches further and brings three birds |
 | Dog treats | On the third gondola, 4c for a box of three. Stand within 12 studs of a yard dog and use one: the nearest dog sits down and wags its tail, and leaves squirrels alone for two minutes. With no dog near you read "No dog near enough to give a treat to." and nothing is used |
 | Duct tape | A strip of tape on whatever is in front of you (10 strips) |
-| Whoopee cushion | Put down in front of you; the next person who steps on it sets it off. E picks it back up |
+| Whoopee cushion | Put down in front of you; the next person who steps on it sets it off. E picks it back up; if someone else presses E, it goes back into your things |
 | Lawn chair | Set down in front of you and you sit in it, anywhere but right by a shelf, the till or a door. E (held) folds it back up; one each (a second folds the first); left empty for 3 minutes it folds itself; nobody bumps into it |
 | Radio | On and off; it plays a playlist of library music (silent until the lead picks the tracks) |
 | Chalk | A box asks what to write (up to 20 letters); it appears on the ground in front of you, checked by Roblox's filter like any chat |

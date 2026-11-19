@@ -276,7 +276,7 @@ return function(t)
 			t.truthy(use(r, "frisbee"))
 			t.eq(r.acts[4].kind, "throw")
 			t.eq(r.acts[4].item, "frisbee")
-			t.eq(r.inv.count(r.player, "frisbee"), 0, "in the air: whoever picks it up has it")
+			t.eq(r.inv.count(r.player, "frisbee"), 0, "in the air (still its buyer's: Items/Lending)")
 			t.truthy(use(r, "football"))
 			t.eq(r.inv.count(r.player, "football"), 0)
 		end
