@@ -28,7 +28,7 @@
 -- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, dist, inView) -> boolean;
 --   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase;
 --   bitePhaseAt(g, now, rewind, tell?) -> CombatRules.BitePhase; batted(g, now) (a bite failed on them: back to ready
---   unless striking); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
+--   unless striking); rally(params, g, now, mode) (the scene turns on the rodent); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
 -- Pure; studs and seconds. No side effects on require.
 
 local CombatRules = require("./CombatRules")
@@ -55,6 +55,7 @@ export type Guard = {
 	running: boolean, -- startle: the tell came at their back while they ran
 	inReach: boolean, -- the rodent was within striking range last tick
 	fleeFrom: number, -- when the flight began
+	rallyUntil: number, -- turned on the rodent (a bite, a group set on) until then: closes in, strikes on reaching it
 	strikes: number,
 	hits: number,
 	trail: { Sample }, -- how a bite would have met them, think by think (the last TRAIL_SECS)
@@ -117,6 +118,7 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 		running = false,
 		inReach = false,
 		fleeFrom = 0,
+		rallyUntil = 0,
 		strikes = 0,
 		hits = 0,
 		trail = {},
@@ -188,7 +190,7 @@ local function stanceOf(g: Guard): string?
 	elseif g.phase == "back" then
 		return "guard"
 	elseif g.phase == "ready" or g.phase == "recover" then
-		return if g.temper == "tough" then "squared" else "guard"
+		return if g.temper == "tough" or g.rallyUntil > 0 then "squared" else "guard"
 	end
 	return nil
 end
@@ -313,10 +315,16 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 	-- and now and then at one that stays there
 	local reachNow = params.kickReach + params.stepIn[g.temper] * params.windup[g.temper]
 	local inReach = view.dist <= reachNow
+	local charging = g.phase == "ready" and now < g.rallyUntil
+	if g.rallyUntil > 0 and now >= g.rallyUntil then
+		g.rallyUntil = 0
+	end
 	if g.phase == "ready" and inReach then
 		local boost = if view.boosted then params.swingBias else 1
-		local p = if g.inReach
-			then params.strikeRate[g.temper] * boost * view.dt
+		-- (one who turned on the rodent strikes the moment it is in reach)
+		local p = if charging
+			then 1
+			elseif g.inReach then params.strikeRate[g.temper] * boost * view.dt
 			else math.min(1, params.entryStrike[g.temper] * boost)
 		if rand() < p then
 			startStrike(params, g, now, if rand() < 0.4 then "swing" else "kick", false)
@@ -331,7 +339,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		out.move, out.speed = "back", params.backSpeed
 	elseif g.phase == "windup" then
 		out.move, out.speed = "approach", params.stepIn[g.temper]
-	elseif g.phase == "ready" and g.temper == "tough" and view.dist > params.kickReach * 0.9 then
+	elseif g.phase == "ready" and (g.temper == "tough" or charging) and view.dist > params.kickReach * 0.9 then
 		out.move, out.speed = "approach", params.approach
 	else
 		out.move = "stand"
@@ -398,6 +406,26 @@ function Duel.sweep(ax: number, az: number, bx: number, bz: number, px: number, 
 	local k = if len2 > 1e-9 then math.clamp(((px - ax) * dx + (pz - az) * dz) / len2, 0, 1) else 0
 	local cx, cz = ax + dx * k, az + dz * k
 	return math.sqrt((px - cx) ^ 2 + (pz - cz) ^ 2)
+end
+
+-- The scene turns on the rodent (a bite they saw, the rodent setting on their group): `mode` "attack" squares them up
+-- and sends them at it, striking as soon as it is in reach, for params.rallySecs; "back" backs them off with an arm up
+-- (they shout); "flee" runs. Whatever they were doing, they are aware of it now and not caught unready.
+function Duel.rally(params: Params, g: Guard, now: number, mode: string)
+	g.aware = true
+	g.awareAt = now - Duel.STARTLED_SECS
+	g.pending = nil
+	if mode == "attack" then
+		if g.phase ~= "windup" then
+			ready(g)
+		end
+		g.rallyUntil = now + params.rallySecs
+	elseif mode == "flee" and g.temper ~= "tough" then
+		apply(params, g, "flee", now)
+	else
+		g.phase = "back"
+		g.untilT = now + params.backSecs
+	end
 end
 
 -- A bite failed on this person ("Batted away"): they square up again unless a blow is on its way or they are running.

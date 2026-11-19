@@ -219,7 +219,14 @@ return function(t)
 			rig.dice({ 0, 0 }) -- each of the three collapses at once: three scenes, three calls
 			t.truthy(biteBeside(rig, a))
 			rig.step(2)
-			local b = rig.calmNear(a.x, a.z, { [a.id] = true })
+			-- (the next person off the first scene: everyone on it has turned on the rodent, Combat/CombatService)
+			local onScene: { [number]: boolean } = { [a.id] = true }
+			for _, p in rig.world.actors do
+				if (p.x - a.x) ^ 2 + (p.z - a.z) ^ 2 <= (rig.combat.P.sceneRadius + 5) ^ 2 then
+					onScene[p.id] = true
+				end
+			end
+			local b = rig.calmNear(a.x, a.z, onScene)
 			rig.dice({ 0, 0 })
 			t.truthy(biteBeside(rig, b), "a second person bitten two seconds later")
 			-- the far one: the townsperson furthest from the hospital

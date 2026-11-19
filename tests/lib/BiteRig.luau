@@ -36,6 +36,7 @@ export type Options = {
 	dt: number?,
 	duel: boolean?, -- run Combat/CombatService (default true)
 	duelRand: (() -> number)?, -- the duel's dice (default: seeded)
+	biteRand: (() -> number)?, -- the dice for the bite itself (default: the duel's)
 	motorCheck: boolean?, -- the duel asks for the rodent's motor state (rig.motor[id]) before a bite
 }
 
@@ -148,6 +149,7 @@ function BiteRig.new(opts: Options?): any
 			rand = o.duelRand or function(): number
 				return drng.next()
 			end,
+			biteRand = o.biteRand,
 			controllerOf = function(id: number): string
 				return if rig.players[id] then "player" else "ai"
 			end,

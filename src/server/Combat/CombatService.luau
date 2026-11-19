@@ -31,6 +31,12 @@
 -- (alert.swingBias), and a bite on anyone in it is multiplied by alert.bitePenalty (close to impossible). NPC officers
 -- within alert.policeChaseBlocks blocks (alert.blockLenU) chase the biter while it stays within
 -- alert.policeLeashBlocks blocks of the bite, for the zone's life.
+-- THE SCENE FIGHTS BACK (owner, second playtest: "none on the scene attacked me initially, i would like more of that").
+-- At a bite, everyone in sight of it within duel.sceneRadius turns on the rodent at once (CombatRules.rallyPick by
+-- duel.rally: vigilantes and most wary people square up and go for it, striking the moment it is in reach, for
+-- duel.rallySecs; most calm people back off shouting, some run, and some lash out, more readily in the zone's boost).
+-- The same when the rodent sets on a group: its pounce starting among duel.groupMin people within duel.groupRadius, or
+-- a bite batted away by one of a group. Running, climbing, a hollow or the sewer still gets the rodent away.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt, now) ten times a second. `now` is the
 -- duel's own clock (Boot/Game's); the orders to brains are stamped on the town's (world.now), which the brains read.
 -- Interface: new(opts) -> Service; :rodentAct(id, verb, now) -> (ok, why?); :step(dt, now);
@@ -59,6 +65,7 @@ export type Opts = {
 	infection: any?, -- Infection/InfectionService (biteable, engaged)
 	params: Params?,
 	rand: (() -> number)?,
+	biteRand: (() -> number)?, -- the dice for the bite itself (default: rand; a spec can land bites and keep the rest)
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	rodents: () -> { number }, -- the player-held Spicy Rodents that can fight now
 	-- the rodent's motor as the validator saw it: seconds since its last clean packet, and since the last pounce launch
@@ -86,6 +93,7 @@ type Rodent = {
 	id: number,
 	tell: number?,
 	tellFeint: boolean,
+	groupTell: number?, -- the last tell the group check saw
 	launchDue: number, -- the motor's pounce is due then (the tell plus the wind-up)
 	commitAt: number,
 	windowUntil: number,
@@ -117,7 +125,8 @@ CombatService.SOUNDS = table.freeze({
 	["Duel.Strike"] = "", -- a person's kick or swing comes down: a whoosh
 	["Duel.Blow"] = "", -- the blow lands on the rodent: a soft thump and a squeak (no crunch)
 	["Duel.Batted"] = "", -- a bite batted away: a slap and a yelp
-	["Duel.Squareup"] = "", -- a vigilante squares up: a grunt ("Hey!")
+	["Duel.Squareup"] = "", -- someone squares up to the rodent (a vigilante, or the scene turning on it): a grunt ("Hey!")
+	["Duel.Shout"] = "", -- someone on the scene backs off shouting ("Get away!"): a short shout, no words needed
 }) :: { [string]: string }
 
 export type Service = typeof(setmetatable(
@@ -134,6 +143,7 @@ export type Service = typeof(setmetatable(
 		flags: { [any]: boolean },
 		tempers: { [number]: Temper },
 		heldKicks: { [number]: number },
+		rallied: { [number]: number },
 		alerts: { Zone },
 		chases: { [number]: Chase },
 		rebalanceAt: number,
@@ -156,6 +166,7 @@ function CombatService.new(opts: Opts): Service
 		flags = {},
 		tempers = {},
 		heldKicks = {},
+		rallied = {},
 		alerts = {},
 		chases = {},
 		rebalanceAt = -math.huge,
@@ -171,6 +182,8 @@ function CombatService.new(opts: Opts): Service
 			zones = 0,
 			chases = 0,
 			noMotor = 0,
+			rallied = 0,
+			rallyAttack = 0,
 		},
 	}, CombatService)
 	return self
@@ -494,6 +507,74 @@ local function fighter(self: Service, a: any): boolean
 	return true
 end
 
+-- The people on a scene turn on the rodent `rodId`: every AI fighter within `radius` of (x, z) who can see the rodent
+-- (no housing or building between), except `skip`, once `minCount` of them are there; each picks attack, back (with
+-- a shout) or flee by CombatRules.rallyPick (near a fresh bite attack comes more readily). Someone who turned on it a
+-- moment ago is left to it. Returns how many attack.
+local function rally(
+	self: Service,
+	x: number,
+	z: number,
+	radius: number,
+	minCount: number,
+	rodId: number,
+	now: number,
+	skip: number?
+): number
+	local P = self.P
+	local rod = self.world.actorsById[rodId]
+	if rod == nil or covered(self, rodId) then
+		return 0
+	end
+	local scene = {}
+	for _, a in self.world.actors do
+		if
+			a.id ~= skip
+			and (a.x - x) ^ 2 + (a.z - z) ^ 2 <= radius * radius
+			and fighter(self, a)
+			and inSight(self, a, rod)
+		then
+			table.insert(scene, a)
+		end
+	end
+	if #scene < minCount then
+		return 0
+	end
+	local attackers = 0
+	for _, a in scene do
+		local last = self.rallied[a.id]
+		if last == nil or now - last >= P.rallySecs then
+			self.rallied[a.id] = now
+			local temper = self:temperOf(a.id)
+			local g = self.guards[a.id]
+			if g == nil or g.temper ~= temper then
+				if g then
+					release(self, a.id)
+				end
+				g = Duel.new(
+					P,
+					a.id,
+					temper,
+					CombatRules.nerve(P, a.id, temper),
+					if a.post == "police" then "baton" else "kick"
+				)
+				self.guards[a.id] = g
+			end
+			local mode = CombatRules.rallyPick(P, temper, g.nerve, self:inAlert(a.x, a.z, now), self.rand())
+			Duel.rally(P, g, now, mode)
+			self._stats.rallied += 1
+			if mode == "attack" then
+				attackers += 1
+				self._stats.rallyAttack += 1
+				cue(self, a.id, "Duel.Squareup")
+			elseif mode == "back" then
+				cue(self, a.id, "Duel.Shout")
+			end
+		end
+	end
+	return attackers
+end
+
 local function order(self: Service, a: any, rod: any, out: any)
 	local brain = self.world.brains[a.id] :: any
 	if brain.kind == "Officer" then
@@ -763,10 +844,12 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		end
 		local chance = CombatRules.biteChance(P, temper, phase, self:inAlert(victim.x, victim.z, now))
 		endPounce(self, r, now)
-		if self.rand() < chance then
+		if (self.opts.biteRand or self.rand)() < chance then
 			self._stats.bites += 1
 			release(self, vid)
 			openZone(self, victim.x, victim.z, now, id)
+			-- everyone in sight of the bite turns on the rodent (in the zone just opened: the hidden boost)
+			rally(self, victim.x, victim.z, P.sceneRadius, 1, id, now, vid)
 			local f = self.opts.bitten
 			if f then
 				f(vid, id)
@@ -778,6 +861,8 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 			if g then
 				Duel.batted(g, now)
 			end
+			-- set on one of a group: the rest of it turns on the rodent
+			rally(self, victim.x, victim.z, P.groupRadius, P.groupMin - 1, id, now, vid)
 			notify(self, id, {
 				kind = "duel",
 				what = "batted",
@@ -814,6 +899,15 @@ function CombatService.step(self: Service, dt: number, now: number)
 	for id in self.rods do
 		if not live[id] then
 			self.rods[id] = nil -- (let go, knocked out, or another body: a fresh start next time)
+		end
+	end
+	-- a pounce (or a feint) started among a group: they turn on the rodent together
+	for id in live do
+		local r = self.rods[id]
+		local rod = self.world.actorsById[id]
+		if r and rod and r.tell ~= nil and r.tell ~= r.groupTell then
+			r.groupTell = r.tell
+			rally(self, rod.x, rod.z, P.groupRadius, P.groupMin, id, now, nil)
 		end
 	end
 	stepGuards(self, now, dt, live)

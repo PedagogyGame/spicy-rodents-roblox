@@ -102,7 +102,14 @@ Tunables.tree = {
 	         rewind = { v = 0.15, unit = "s", src = "D20: a pounce's window widened by up to this for the link" },
 	         launchSlack = { v = 0.05, unit = "s", src = "one movement packet: the motor's launch may be seen this much (plus rewind) either side of when the click said" },
 	         motorFresh = { v = 0.2, unit = "s", src = "a motor state older than this bites nobody (the rodent's packets stopped)" },
-	         lagMax = { v = 0.2, unit = "s", src = "a bite is judged against the person as the rodent's player saw them, up to this far back (the link's round trip)" } },
+	         lagMax = { v = 0.2, unit = "s", src = "a bite is judged against the person as the rodent's player saw them, up to this far back (the link's round trip)" },
+	         -- owner 2026-11-18 (second playtest): "none on the scene attacked me initially, i would like more of that"
+	         rally = { v = { calm = { attack = 0.15, back = 0.6, flee = 0.25 }, wary = { attack = 0.7, back = 0.3, flee = 0 }, tough = { attack = 1 } },
+	                   src = "how people on the scene of a bite (or a group the rodent sets on) turn on it: wary and tough attack, calm mostly back off and shout; near a fresh bite attack is alert.swingBias times as likely" },
+	         rallySecs = { v = 8, unit = "s", src = "one who turned on the rodent goes after it this long, striking as soon as it is in reach" },
+	         sceneRadius = { v = 35, unit = "st", src = "the people in sight of a bite this near the victim turn on the rodent" },
+	         groupRadius = { v = 12, unit = "st", src = "a group: people this near the one the rodent sets on (or where its pounce starts)" },
+	         groupMin = { v = 3, src = "this many in a group and they turn on the rodent together" } },
 	-- Power numbers live in Rodent/PowerRules.TABLE (brief v2 §15, verbatim v5.4; golden-tested). These
 	-- leaves are read-only mirrors for the tuning panel; PowerRules is the authority.
 	power = { bitePerson = { v = 100 }, bitePersonHigh = { v = 150 }, highAboveGroundU = { v = 1.6, src = "v5.4 uses absolute Y > 4; Q23" },

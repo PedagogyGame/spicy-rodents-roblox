@@ -84,6 +84,11 @@ export type Params = {
 	launchSlack: number,
 	motorFresh: number,
 	lagMax: number,
+	rally: { [string]: { [string]: number } }, -- by temperament: attack | back | flee
+	rallySecs: number,
+	sceneRadius: number,
+	groupRadius: number,
+	groupMin: number,
 	-- from the other branches
 	chanceUnaware: number,
 	pounceWindup: number,
@@ -165,6 +170,11 @@ function CombatRules.params(): Params
 			"launchSlack",
 			"motorFresh",
 			"lagMax",
+			"rally",
+			"rallySecs",
+			"sceneRadius",
+			"groupRadius",
+			"groupMin",
 		}
 	do
 		p[k] = g("duel." .. k)
@@ -248,6 +258,26 @@ function CombatRules.weights(
 		out[r] = if temper == "tough" and r == "flee" then 0 else w
 	end
 	return out
+end
+
+-- How a person on the scene turns on the rodent (a bite they saw, their group set on): "attack", "back" (with a shout)
+-- or "flee", by their temperament's duel.rally weights, the fight in them by nerve, and near a fresh bite (boosted)
+-- swingBias times as ready to attack. Vigilantes always attack.
+function CombatRules.rallyPick(params: Params, temper: Temper, nerve: number, boosted: boolean, r: number): string
+	if temper == "tough" then
+		return "attack"
+	end
+	local w = params.rally[temper]
+	local attack = (w.attack or 0) * (0.5 + nerve) * (if boosted then params.swingBias else 1)
+	local back = w.back or 0
+	local flee = (w.flee or 0) * (1.5 - nerve)
+	local x = r * (attack + back + flee)
+	if x < attack then
+		return "attack"
+	elseif x < attack + back then
+		return "back"
+	end
+	return "flee"
 end
 
 -- The response the weights give for a uniform draw r in [0, 1).
