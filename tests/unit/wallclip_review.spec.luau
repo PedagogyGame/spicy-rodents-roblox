@@ -15,6 +15,13 @@
 --   margin    WalkWay.clear skips a whole box when an end is inside its walls, and WalkWay.solidAt only counts a
 --             point MARGIN (0.2) inside them: from a spot 0.1 studs inside a house's box the straight line through
 --             the whole house is "clear"
+--   standoff  (task item 4; not walls) an ambulance turning left off the west residential street onto the z = 5 road
+--             stands for good with a dump truck following 9 studs behind it: AICarMotor's routeGap samples the
+--             route from 1 stud ahead of the ambulance's centre, not its nose, and counts any body heading within
+--             72 degrees of the route there whose capsule comes within both half widths + 0.5 studs (7.6 for a
+--             truck 8.4 wide); mid-turn the follower's front end is 3 studs from those points, so room = 0; the
+--             truck brakes for the emergency vehicle in front of it (bracesFor). Neither moves until the case is
+--             given up (155 s in infection_service's "no way to walk" case at be30746, victim by (300, 300))
 --   rounds    (holds on the merged tree; kept as a guard) every Staff brain's round, the shop workers' new pavement
 --             rounds included, misses every baked wall
 --   audit     tools/sim/wall_audit --seeds 1,2 --minutes 30 crossed 3 walls on the merged tree: a shop worker walking
@@ -31,6 +38,8 @@ local Colliders = require("@shared/World/Colliders")
 local Height = require("@shared/World/Height")
 local TownAI = require("@server/AI/TownAI")
 local WallAudit = require("@tests/lib/WallAudit")
+local TrafficService = require("@server/Traffic/TrafficService")
+local LaneMath = require("@shared/Traffic/LaneMath")
 
 local DT = 1 / 30
 
@@ -354,4 +363,45 @@ return function(t)
 			t.eq(#stuck, 0, table.concat(stuck, "\n"))
 		end
 	)
+
+	t.test("standoff: an ambulance turning with a lorry close behind it drives on", function()
+		local traffic =
+			TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 7 })
+		-- the route at be30746 (from the bay: the hospital road, the trunk west, down x -445 and east along z 5), and
+		-- the moment it stood: 1176.59 studs along it, turning left at (-445, 5); the dump truck 9 studs behind it
+		local amb = traffic:dispatchResponder(
+			{ 212.979, 0 },
+			{ hold = true, route = { { -890, 707.5 }, { -450, 707.5 }, { -450, 0 }, { 212.979, 0 } } }
+		)
+		assert(amb, "a responder")
+		-- (its trip at be30746 turned at x -440 and stood at (-437.7, 9.5) with the truck in the lane beside the
+		-- corner; here the corner is at x -450 so that the ambulance stands where it stood)
+		-- (as it stood at be30746: heading 2.258 rad, half way round the corner)
+		local bestS, bestD = 0, math.huge
+		for k = 0, 600 do
+			local q = LaneMath.pointAt(amb.route, 1150 + k * 0.1, 1)
+			local d = math.abs(q.yaw - 2.2583) + (if q.z < 30 then 0 else 100)
+			if d < bestD then
+				bestS, bestD = 1150 + k * 0.1, d
+			end
+		end
+		amb.s, amb.speed, amb.dir = bestS, 0, 1
+		local truck = nil
+		for _, v in traffic.vehicles do
+			if v.kind == "dump_truck" then
+				truck = v
+			end
+		end
+		assert(truck, "the dump truck")
+		truck.lane = traffic.lanes["res_west_ns_x-180_northbound~back"]
+		assert(truck.lane, "its lane")
+		truck.s, truck.dir, truck.speed, truck.visible = 606.2715, -1, 0, true
+		traffic:step(1 / 30, { people = {} })
+		print(
+			string.format("      ambulance at (%.1f, %.1f), the truck at (%.1f, %.1f)", amb.x, amb.z, truck.x, truck.z)
+		)
+		local s0 = amb.s
+		traffic:step(10, { people = {} })
+		t.truthy(amb.s > s0 + 20, `the ambulance drove {amb.s - s0} studs in 10 s (the truck {truck.speed} st/s)`)
+	end)
 end
