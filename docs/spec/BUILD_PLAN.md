@@ -756,7 +756,7 @@ return {
 	          kickMult = { v = 1.25, src = "hidden strength boost; must stay below 1.82 (D33)" },
 	          swingBias = { v = 2.0, src = "response weights toward swing/kick" },
 	          bitePenalty = { v = 0.05, src = "second bite near a fresh one is close to impossible" },
-	          policeChaseBlocks = { v = 2 }, policeLeashBlocks = { v = 5 }, blockLenU = { v = "measured from roads.json", src = "Q16" } },
+	          policeSend = { v = 2 }, policeLoseBlocks = { v = 2 }, blockLenU = { v = 176, unit = "u", src = "Q16, measured" } }, -- owner D15 (2026-11-19): no reach limit, lost only past 2 blocks
 	power = { -- brief v2 §15 table, verbatim v5.4 (squirrel_abilities §12); real ACTIVE seconds, never the game clock (rule 11)
 	          bitePerson = { v = 100 }, bitePersonHigh = { v = 150 }, highAboveGroundU = { v = 1.6, src = "v5.4 uses absolute Y > 4; Q23" },
 	          biteOfficer = { v = 130 }, convertSquirrel = { v = 90 }, batonHit = { v = -19 }, pedestrianKick = { v = -19, src = "v5.4 same function; Q23" },
@@ -2512,7 +2512,7 @@ The requirement text is the delta's quotation of brief v2, shortened where long;
 | V2-40 | Bite aftermath: the vicinity goes on high alert | `CombatService.alertZone`, Tunables `alert.*`, W4 #1 | COVERED |  |
 | V2-41 | Humans nearby get a hidden strength boost (not shown on any meter) | Tunables `alert.kickMult` (hidden, below 1.82), D33, W4 #1 | COVERED |  |
 | V2-42 | are far more likely to swing | Tunables `alert.swingBias`, W4 #1 | COVERED |  |
-| V2-43 | NPC police within about two blocks will chase up to five blocks | Tunables `alert.policeChaseBlocks`, `policeLeashBlocks`, W4 #1-#2 | COVERED* | item 43 (a block measured from `roads.json`) |
+| V2-43 | NPC police within about two blocks will chase up to five blocks (superseded by the owner, D15: the 2 nearest free officers are sent from anywhere and lose the rodent only past 2 blocks) | Tunables `alert.policeSend`, `alert.policeLoseBlocks`, Server/Combat/CombatService | COVERED* | item 43 (a block measured from `roads.json`) |
 | V2-44 | The ambulance sequence plays out | W4 #3 ambulances | COVERED |  |
 | V2-45 | Biting again near a fresh bite should be close to impossible | Tunables `alert.bitePenalty`, W4 #1 | COVERED |  |
 | V2-46 | The rodent therefore needs refuges between bites: hollows, the sewer, poles and trees. Treat them as rodent cover,... | `concealment.json` unseen volumes, `HollowService` rodent rest, W3b #11, W4 #1, §5.5 | COVERED |  |

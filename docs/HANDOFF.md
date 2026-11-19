@@ -1,8 +1,12 @@
 # HANDOFF — read this first in any new session
 
-Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-18.
+Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-19.
 
 ## 0. State on 2026-11-18 (read this before anything below; older sections are history where they differ)
+- **19 November (not published):**
+  - **Combat duel** (merge `f23d8ff`, branch `feat/combat-duel`; owner playtests 18-19 Nov): bites by pounce only, tied server-side to the motor's real launch (0.2 s) and judged with a 0.2 s lag rewind; tough people tougher; the scene within 35 studs turns on the rodent at a bite; police (2 nearest, any range, lost past 2 blocks) and vigilante tell (hidden; 3 shown at 40 % bitten) per D15. Duel table and the owner's check sheet: `docs/owner/COMBAT_CHECK.md`. Engine tests now bite by pounce (not run: the key's Luau Execution permission is still off). Re-review of its validator changes running (`review/combat-validator`).
+  - **Owner answers D15** (`d30e6ba`): cars brake for people only, Spicy buck as a 4 S$/Robux rate tier (not live until money is saved), CHILI PEPPER GRILL.
+  - **Running:** wall-crossing audit of all town walkers (`feat/no-wall-walk`), bikes/riders/greybox art (`feat/bikes-art`), overhead awareness + chatter + rewarded stalking (`feat/overhead-watch`). Remote branch `backup/combat-duel-wip` is a mistaken backup of an old commit: ignore it (`backup/combat-duel-live` is the real one, superseded by the merge).
 - **Landed on `w0-foundation` on 18 November (not published; each publish needs the owner's go), each reviewed independently, its findings fixed with specs, `tools/ci.sh` green:**
   - **Pinball art** (merge `382afdf`, fixes `c7d63db`, ids `59b49d3`): ChatGPT's 21 GLBs as 8 Models, uploaded and Approved (ids in `data/art/pinball.json`); `Server/Assets/PinballArt` puts them on the baked machines at boot (Boot/Game). The painted words moved off each other (`tests/unit/pinball_art_words.spec.luau`), boards redrawn (`tools/blender/pinball/boards.py`), backglasses rebuilt without stripes (`backglass.py`). Not yet seen in the engine: the FBX axes, whether the board texture arrives (if not, the baked painted board stays), MeshPart scaling of the bumpers.
   - **Whack-a-mole, the tenth game** (merge `8550f58`, art `8161987`): the owner's rules, one player and watchers, in the games room; the game version of his model (12,168 triangles, 42 pieces, FREE PLAY plate) uploaded and Approved, put on at boot by `WhackArt.startIn` (Boot/Game). Check sheet `docs/owner/WHACK_A_MOLE_CHECK.md`. The registry spec's pinned list is now 29 stations.
