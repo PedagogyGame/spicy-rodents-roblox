@@ -165,13 +165,32 @@ return function(t)
 		end
 	)
 
-	local cheats = {
+	type CheatCase = {
+		kind: string,
+		variant: string?,
+		label: string,
+		link: { packetEvery: number, jitter: number, loss: number }?,
+	}
+	local cheats: { CheatCase } = {
 		{ kind = "speed2", variant = nil, label = "speed x2 (sprinting speed hack)" },
 		{ kind = "speed2_clock", variant = nil, label = "speed x2 as a time hack" },
 		{ kind = "teleport30", variant = nil, label = "30-stud teleport" },
 		{ kind = "leap20", variant = "snap", label = "illegal 20-stud leap onto a rail" },
 		{ kind = "leap20", variant = "superjump", label = "illegal leap at twice the launch speed" },
 		{ kind = "wallpass", variant = nil, label = "wall pass" },
+		-- (on a quiet link: the cheat needs its one claimed fall to arrive in order)
+		{
+			kind = "stacklaunch",
+			variant = "2",
+			label = "a leap stacked on a launch claimed as a fall, 30 Hz",
+			link = { packetEvery = 2, jitter = 0.01, loss = 0 },
+		},
+		{
+			kind = "stacklaunch",
+			variant = "12",
+			label = "a leap stacked on a launch claimed as a fall, 5 Hz",
+			link = { packetEvery = 12, jitter = 0.01, loss = 0 },
+		},
 		{ kind = "hop", variant = nil, label = "non-adjacent route hop" },
 	}
 	for _, c in cheats do
@@ -181,6 +200,9 @@ return function(t)
 				episodes = if FAST then 10 else 40,
 				seed = 777 + #c.kind,
 				variant = c.variant,
+				packetEvery = c.link and c.link.packetEvery,
+				jitter = c.link and c.link.jitter,
+				loss = c.link and c.link.loss,
 			})
 			local codes: { string } = {}
 			for k, n in result.codes do

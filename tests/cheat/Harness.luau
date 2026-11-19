@@ -423,6 +423,38 @@ local function makeEpisode(kind: string, variant: string?, world: TestWorld.Worl
 				end
 			end,
 		}
+	elseif kind == "stacklaunch" then
+		-- a leap stacked on a launch: one packet rises off the ground at a leap's speed while claiming a fall (no
+		-- launch seen), the next leaps "from the ground" up there; a launch's rise has to end at a speed gravity could
+		-- have brought it to inside the gap, so the claimed fall gives it away. The variant names the packet gap in
+		-- ticks ("2": 30 Hz, "12": 5 Hz); each phase lasts exactly one packet
+		local gap = tonumber(variant) or 2
+		local s = groundStart(world, rng)
+		local yaw = openHeading(rng)
+		local P = SquirrelMotor.params
+		local launchUp = P.leapUp * SquirrelMotor.envelopeParams.launchTol
+		local ticks = 0
+		return {
+			state = s,
+			driver = nil,
+			warmup = 1.0,
+			cheatSeconds = 2 * gap * TICK,
+			follow = 1.5,
+			ignoreWalls = false,
+			input = function(_state, _t)
+				return SquirrelMotor.idleInput(yaw)
+			end,
+			tickCheat = function(state, _inp, _w, _t, first)
+				if first then
+					ticks = 0
+				end
+				ticks += 1
+				state.y += launchUp * TICK
+				state.grounded = false
+				state.committedAirborne = true
+				state.vy = if ticks <= gap then -60 else launchUp
+			end,
+		}
 	elseif kind == "wallpass" then
 		-- start 4 u west of the first box, sprint east through it
 		local box = world.boxes[1]
