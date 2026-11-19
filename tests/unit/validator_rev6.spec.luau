@@ -251,6 +251,7 @@ return function(t)
 					)
 				end
 			end
+			Height.configure(nil) -- (the terrain as it was: later specs read World/Height unconfigured)
 			for _, row in rows do
 				print("      " .. row)
 			end
