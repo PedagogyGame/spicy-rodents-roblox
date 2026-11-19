@@ -486,8 +486,8 @@ return function(t)
 				t0 += every
 				local x = if isLate(k) and #track > 0 then track[#track].x else pos(t0)
 				table.insert(track, { t = t0, x = x, z = 0 })
-				local v = Pace.stretch(function(t: number): (number, number)
-					return Pace.along(track, t)
+				local v = Pace.stretch(function(at: number): (number, number)
+					return Pace.along(track, at)
 				end, t0, track[1].t)
 				if v then
 					most = math.max(most, v)
@@ -495,8 +495,8 @@ return function(t)
 			end
 			return most
 		end
-		local creep = function(t: number): number
-			return 4.1 * t
+		local creep = function(at: number): number
+			return 4.1 * at
 		end
 		local never = function(_: number): boolean
 			return false
@@ -511,9 +511,9 @@ return function(t)
 		local hitched = loudest(creep, 0.1, 10, hitch)
 		local packets = loudest(creep, 0.05, 10, bunched)
 		-- tapping W: the walk (18) for 0.18 s, still for 0.23 s: 7.9 studs/s on average
-		local tap = function(t: number): number
-			local n = math.floor(t / 0.41)
-			local r = t - n * 0.41
+		local tap = function(at: number): number
+			local n = math.floor(at / 0.41)
+			local r = at - n * 0.41
 			return n * 18 * 0.18 + 18 * math.min(r, 0.18)
 		end
 		local tapped = loudest(tap, 0.05, 10, never)
