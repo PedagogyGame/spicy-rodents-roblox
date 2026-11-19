@@ -415,7 +415,9 @@ function MovementService.new(deps: Deps): Movement
 	-- a new epoch from `target`: the validator forgets, the first packet of the epoch is gated there; the place before
 	-- the move (the root last seen, else the last packet) still counts for the drift a while
 	-- (`snapped`: the root was judged, so the place before is the last packet's, or the gate's, never the root's)
-	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate, snapped: boolean?)
+	-- (`keepUntil`, a snap's: the server time the body held the target place; the displacement governor keeps its history
+	-- up to then. nil: a move the server made, the governor starts afresh at the target: MoveValidator.anchor)
+	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate, snapped: boolean?, keepUntil: number?)
 		local now = target.at
 		local gate = sq.gate
 		if sq.rootX and not snapped then
@@ -444,8 +446,10 @@ function MovementService.new(deps: Deps): Movement
 		sq.cleanAt = nil
 		sq.pounceAt = nil
 		sq.pounceClock = nil
-		if self.deps.validator then
-			self.deps.validator:reset(id, nil)
+		local validator = self.deps.validator
+		if validator then
+			validator:reset(id, nil)
+			validator:anchor(id, target.x, target.y, target.z, now, keepUntil)
 		end
 		if self.deps.swept then
 			self.deps.swept:markTeleported(id)
@@ -475,12 +479,18 @@ function MovementService.new(deps: Deps): Movement
 	local function snap(self: Movement, id: any, why: string, now: number, target: Gate?)
 		local sq = squirrel(self, id)
 		local to = target
+		-- (the server time the body held the target: the governor's history is kept to then)
+		local keepUntil: number? = if target then (if target.at > 0 then target.at else now) else nil
 		if to == nil then
 			local good = sq.good
 			if good then
 				to = { x = good.x :: number, y = good.y :: number, z = good.z :: number, at = now, snapshot = good }
+				keepUntil = sq.cleanAt or now
+			elseif sq.gate then
+				to = sq.gate
+				keepUntil = if (sq.gate :: Gate).at > 0 then (sq.gate :: Gate).at else now
 			else
-				to = sq.gate or anchorOf(sq)
+				to = anchorOf(sq) -- (a place the server saw: the governor starts afresh there)
 			end
 		end
 		if to == nil then
@@ -489,7 +499,7 @@ function MovementService.new(deps: Deps): Movement
 		end
 		local t = to :: Gate
 		local gate: Gate = { x = t.x, y = t.y, z = t.z, at = now, snapshot = t.snapshot }
-		rebase(self, id, sq, gate, true)
+		rebase(self, id, sq, gate, true, keepUntil)
 		tell(self, id, sq, gate, why, now)
 	end
 
@@ -1117,7 +1127,12 @@ function MovementService.new(deps: Deps): Movement
 				sq.gate = gate
 				if gate == nil then
 					self._stats.stale += 1
-					self.log:every(`anchor:{actorId}`, 5, "warn", `{actorId}: a first packet with no place to judge it from`)
+					self.log:every(
+						`anchor:{actorId}`,
+						5,
+						"warn",
+						`{actorId}: a first packet with no place to judge it from`
+					)
 					return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
 				end
 			end
@@ -1166,6 +1181,10 @@ function MovementService.new(deps: Deps): Movement
 					return { ok = false, accepted = false, violations = violations, flagged = true }
 				end
 				sq.gate = nil
+				if not validator:hasAnchor(actorId) then
+					-- (a new body: the governor judges from where the server had it)
+					validator:anchor(actorId, gate.x, gate.y, gate.z, gate.at, nil)
+				end
 			end
 			unpin(self, actorId, sq, now)
 			-- (the link's spread and latency floor as the packets before this one showed them)

@@ -42,6 +42,8 @@ export type HonestOptions = LinkOptions & {
 	seed: number,
 	center: { x: number, z: number }?, -- studs; targets within radius of it
 	radius: number?,
+	-- the clients' motors run this many times real time, their clocks with them (a slow phone: 0.8; default 1)
+	clockRate: number?,
 }
 
 export type HonestResult = {
@@ -58,6 +60,9 @@ export type HonestResult = {
 	validatorPerPacketMs: number,
 	motorSeconds: number,
 	flagged: number,
+	-- the displacement governor's closest calls over every squirrel (MoveValidator.governorPeak: studs over its
+	-- allowance, below 0 within it; across in windows up to 0.25 / 1 / 3 s, then up)
+	governorPeak: { number },
 }
 
 type Packet = { seq: number, snapshot: SquirrelMotor.Snapshot, sendTime: number, arrival: number, actor: number }
@@ -121,14 +126,16 @@ function Harness.honest(opts: HonestOptions): HonestResult
 		validatorPerPacketMs = 0,
 		motorSeconds = 0,
 		flagged = 0,
+		governorPeak = table.create(6, -math.huge),
 	}
+	local rate = opts.clockRate or 1
 	local totalTicks = math.floor(opts.minutes * 60 / TICK + 0.5)
 	local now = 0
 	for tick = 1, totalTicks do
 		local motorStart = os.clock()
 		for i, s in states do
 			local inp = drivers[i]:input(s, lastEvents[i], TICK)
-			local _, events = SquirrelMotor.step(s, inp, TICK, world)
+			local _, events = SquirrelMotor.step(s, inp, TICK * rate, world)
 			lastEvents[i] = events
 			for _, e in events do
 				result.events[e.kind] = (result.events[e.kind] or 0) + 1
@@ -182,7 +189,9 @@ function Harness.honest(opts: HonestOptions): HonestResult
 		for k, v in d.log do
 			result.events[`driver.{k}`] = (result.events[`driver.{k}`] or 0) + v
 		end
-		local _ = i
+		for k, v in validator:governorPeak(i) or {} do
+			result.governorPeak[k] = math.max(result.governorPeak[k], v)
+		end
 	end
 	return result
 end
