@@ -205,6 +205,32 @@ end
 
 -- gameSeconds(serverTime, epoch, base, rate): the game clock as Boot/DayClock publishes it (and as
 -- Shared/Time/Clock reads it on every client): what the wallet's passes are timed on.
+-- animals(townActors, byTownId, placeOf) -> { { id, kind, x, y, z } }: every squirrel-family body for the minigames
+-- (the paintball pass, a bowling lane in play, a pool shot: they knock an animal found on them), each where the server
+-- holds it (placeOf: Actors/ActorsRuntime.placeOf; invariant D, validator round 8: a root written inside the station or
+-- on a lane between two watches knocks nobody anywhere). Pure
+function Game.animals(
+	townActors: { any },
+	byTownId: { [number]: any },
+	placeOf: (actor: any) -> (number, number, number)
+): { { [string]: any } }
+	local out = {}
+	for _, a in townActors do
+		local other = byTownId[a.id]
+		if other and (other.species == "squirrel" or other.species == "rodent") then
+			local qx, qy, qz = placeOf(other)
+			table.insert(out, {
+				id = other.id,
+				kind = if other.variant == "spicy" then "rodent" else "squirrel",
+				x = qx,
+				y = qy,
+				z = qz,
+			})
+		end
+	end
+	return out
+end
+
 function Game.gameSeconds(serverTime: number, epoch: number, base: number, rate: number): number
 	return base + (serverTime - epoch) * rate
 end
@@ -981,18 +1007,16 @@ function Game.start(opts: Opts?): any
 		end)
 	end
 	-- a body the server itself moved (a minigame's knock, the lounge's door): its place is the validator's new
-	-- baseline, under a new motor epoch the driver is told of
-	local function movedBody(body: any, why: string)
+	-- baseline, under a new motor epoch the driver is told of. `at`: the pivot the server put it at (invariant D: the
+	-- rule's own place); nil: read back in the same thread as the server's own PivotTo, before its client can write
+	local function movedBody(body: any, why: string, at: Vector3?)
 		local id = body and body:GetAttribute(PossessionState.ATTR.ActorId)
 		local actor, driver = heldBy(id)
 		if actor == nil or driver == nil or not isSquirrelFamily(actor) then
 			return
 		end
-		local root = (body :: Model).PrimaryPart
-		if root then
-			local p = root.Position
-			movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, why, workspace:GetServerTimeNow())
-		end
+		local p = at or (body :: Model):GetPivot().Position
+		movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, why, workspace:GetServerTimeNow())
 	end
 	-- fifteen times a second: the server's own view of every held squirrel's root (MovementService.watch), and the sky
 	-- lift's riders (attribute Ride) left alone until the platform puts them down
@@ -1315,12 +1339,10 @@ function Game.start(opts: Opts?): any
 		for _, a in world.actors do
 			local other = rt.byTownId[a.id]
 			if isSquirrelFamily(other) then
-				local r = (other.body :: Model).PrimaryPart
-				if r then
-					local q = r.Position
-					table.insert(targets, { id = other.id, x = q.X, y = q.Y, z = q.Z })
-					byId[other.id] = other
-				end
+				-- (where the server holds it: a held squirrel's validated place, never the root its client writes)
+				local qx, qy, qz = rt.placeOf(other)
+				table.insert(targets, { id = other.id, x = qx, y = qy, z = qz })
+				byId[other.id] = other
 			end
 		end
 		local hitId = PlayRules.kickTarget(
@@ -1891,14 +1913,19 @@ function Game.start(opts: Opts?): any
 						local body = actor and actor.body :: Model?
 						local r = body and body.PrimaryPart
 						if actor and r then
+							-- (a held squirrel where the server holds it: invariant D; a person at its root)
 							local q = r.Position
+							local qx, qy, qz = q.X, q.Y, q.Z
+							if isSquirrelFamily(actor) then
+								qx, qy, qz = rt.placeOf(actor)
+							end
 							table.insert(out, {
 								key = player,
 								name = if player.DisplayName ~= "" then player.DisplayName else player.Name,
 								species = actor.species,
-								x = q.X,
-								y = q.Y,
-								z = q.Z,
+								x = qx,
+								y = qy,
+								z = qz,
 							})
 						end
 					end
@@ -1925,24 +1952,7 @@ function Game.start(opts: Opts?): any
 			end,
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
-				local out = {}
-				for _, a in world.actors do
-					local other = rt.byTownId[a.id]
-					if other and isSquirrelFamily(other) then
-						local r = (other.body :: Model).PrimaryPart
-						if r then
-							local q = r.Position
-							table.insert(out, {
-								id = other.id,
-								kind = if other.variant == "spicy" then "rodent" else "squirrel",
-								x = q.X,
-								y = q.Y,
-								z = q.Z,
-							})
-						end
-					end
-				end
-				return out
+				return Game.animals(world.actors, rt.byTownId, rt.placeOf)
 			end,
 			knock = function(id: any, x: number, y: number, z: number, text: string)
 				local townId = townIdOf[id]
@@ -1954,8 +1964,9 @@ function Game.start(opts: Opts?): any
 				if driver ~= "ai" and driver ~= nil then
 					-- a player's body: put it there (its controller restarts where it finds itself) and say why
 					local body = target.body :: Model
-					body:PivotTo(CFrame.new(x, y + 0.6, z) * body:GetPivot().Rotation)
-					movedBody(body, "knocked")
+					local at = Vector3.new(x, y + 0.6, z)
+					body:PivotTo(CFrame.new(at) * body:GetPivot().Rotation)
+					movedBody(body, "knocked", at)
 					fire(driver, { kind = "notice", text = text })
 				else
 					local a = world.actorsById[townId]

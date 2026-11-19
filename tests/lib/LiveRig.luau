@@ -21,8 +21,10 @@
 -- The server pins a new body (engine.pin, as Boot/Game: anchored, its own) until the first packet passes the gate: the
 -- client's root updates are not taken while it is pinned; it is not handed back while it rides (Movement/BodyPin).
 -- Interface: new(opts) -> Rig; Rig:possess(state, keys); Rig:run(seconds); Rig:at(t, fn); Rig:teleport(x, y, z,
---   why); Rig:reset() -> boolean (the Reset button as the server does it: Actors/Possession.recover's rate limit,
---   Actors/ActorsRuntime.safePose's target from MovementService.safeTarget, then the teleport); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:unreported(x, y, z);
+--   why); Rig:place() -> the place every server system reads for the held body (MovementService.heldPlace: invariant D);
+--   Rig:reset() -> boolean (the Reset button as the server does it: Actors/Possession.recover's rate limit,
+--   Actors/ActorsRuntime.safePose's target from MovementService.safeTarget, then the teleport); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release() -> the place it was let go at (as Possession does: the held place);
+--   Rig:unreported(x, y, z);
 --   Rig:result() -> Result;
 --   town() -> Town (the rig's town: the S3 world with houses, its validator world, honest drivers); describe(name, r)
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
@@ -118,7 +120,8 @@ export type Rig = {
 	board: (self: Rig) -> (),
 	alight: (self: Rig, x: number, y: number, z: number) -> (),
 	handoff: (self: Rig, state: State, keys: Keys) -> (),
-	release: (self: Rig) -> (),
+	release: (self: Rig) -> { x: number, y: number, z: number }?,
+	place: (self: Rig) -> { x: number, y: number, z: number }?,
 	unreported: (self: Rig, x: number, y: number, z: number) -> (),
 	server: any,
 	result: (self: Rig) -> Result,
@@ -456,12 +459,28 @@ function LiveRig.new(opts: Options): Rig
 		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "release")
 		self:possess(state, keys)
 	end
-	rig.release = function(_self: any)
+	-- (as Actors/Possession.releaseNow does: the body let go at the place the server holds for it, MovementService.heldPlace,
+	-- and put there at once; never its root. Returns that place: the AI's from then on)
+	rig.release = function(self: any): { x: number, y: number, z: number }?
+		local held = self:place()
+		if held then
+			server.root = table.clone(held)
+			server.rootSent = rig.t
+		end
 		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "release")
 		server.actor = 0 -- (no body: packets still arriving are dropped, as Boot/Game does)
 		reliable(function()
 			client.running = false
 		end)
+		return held
+	end
+	-- the place every server system reads for the held body (invariant D: MovementService.heldPlace, never the root)
+	rig.place = function(_self: any): { x: number, y: number, z: number }?
+		local x, y, z = movement:heldPlace(actorKey())
+		if x and y and z then
+			return { x = x, y = y, z = z }
+		end
+		return nil
 	end
 	rig.teleport = function(_self: any, x: number, y: number, z: number, why: string)
 		server.root = { x = x, y = y, z = z }

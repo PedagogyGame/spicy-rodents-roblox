@@ -79,6 +79,42 @@ local function nearestS(route: RouteLike, x: number, z: number): (number, number
 	return bestS, bestD
 end
 
+-- nearest3(route, x, y, z) -> (s, d): the distance along a route of its point nearest to (x, y, z) in space, and how far
+local function nearest3(route: RouteLike, x: number, y: number, z: number): (number, number)
+	local bestS, bestD = 0, math.huge
+	local s = 0
+	local pts = route.points
+	for i = 1, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local ex, ey, ez = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+		local l2 = ex * ex + ey * ey + ez * ez
+		local len = math.sqrt(l2)
+		local u = if l2 > 1e-9 then math.clamp(((x - a[1]) * ex + (y - a[2]) * ey + (z - a[3]) * ez) / l2, 0, 1) else 0
+		local d = math.sqrt((x - a[1] - ex * u) ^ 2 + (y - a[2] - ey * u) ^ 2 + (z - a[3] - ez * u) ^ 2)
+		if d < bestD then
+			bestD, bestS = d, s + len * u
+		end
+		s += len
+	end
+	if s > 0 then
+		bestS = bestS * route.length / s
+	end
+	return bestS, bestD
+end
+
+-- Squirrel.reseat(routes, x, y, z) -> (route, s)?: the rail nearest to where a player let the body go (validator round
+-- 8: a release puts a plain squirrel back where the server held it, not on the route point it was taken from)
+function Squirrel.reseat(routes: { RouteLike }, x: number, y: number, z: number): (RouteLike?, number)
+	local best, bestS, bestD = nil, 0, math.huge
+	for _, r in routes do
+		local s, d = nearest3(r, x, y, z)
+		if d < bestD then
+			best, bestS, bestD = r, s, d
+		end
+	end
+	return best, bestS
+end
+
 local function railSpeed(route: RouteLike, sprint: boolean): number
 	local base = if sprint then RAIL_SPRINT else RAIL_WALK
 	return if WOOD[route.kind] then base * WOOD_MULT else base
@@ -192,12 +228,21 @@ end
 
 function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	local route = self.params.routes.byId(snapshot.routeId)
+	local s = snapshot.s
+	-- (let go by a player: on the rail nearest where the server held the body, never the old route point)
+	local x, y, z = snapshot.x, snapshot.y, snapshot.z
+	if type(x) == "number" and type(y) == "number" and type(z) == "number" then
+		local near, ns = Squirrel.reseat(self.params.routes.routes, x, y, z)
+		if near then
+			route, s = near, ns
+		end
+	end
 	if route then
 		self.route = route
 		local intent = self.actor.intent
 		intent.mode = "rail"
 		intent.routeId = route.id
-		intent.s = snapshot.s
+		intent.s = s
 		intent.dir = snapshot.dir
 		self.sprint = snapshot.sprint == true
 		intent.speed = railSpeed(route, self.sprint)

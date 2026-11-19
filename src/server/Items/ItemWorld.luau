@@ -398,9 +398,15 @@ function ItemWorld.start(opts: StartOpts): World
 				local p = playerOfTown(a.id)
 				local px, py, pz = a.x, a.y, a.z
 				if p then
-					local root = rootOf(p)
-					if root then
-						px, py, pz = root.Position.X, root.Position.Y, root.Position.Z
+					local held = actorOf(p)
+					if held and rt and rt.placeOf and (held.species == "squirrel" or held.species == "rodent") then
+						-- (a held squirrel where the server holds it, never the root its client writes: invariant D)
+						px, py, pz = rt.placeOf(held)
+					else
+						local root = rootOf(p)
+						if root then
+							px, py, pz = root.Position.X, root.Position.Y, root.Position.Z
+						end
 					end
 				end
 				table.insert(out, { kind = kind, id = a.id, x = px, y = py, z = pz, player = p })
@@ -434,12 +440,23 @@ function ItemWorld.start(opts: StartOpts): World
 	local function thingName(item: string): string
 		return (string.gsub(item, "_", " "))
 	end
+	-- where a player's body is judged: a held squirrel where the server holds it (rt.placeOf: invariant D, validator
+	-- round 8: a lender who has become a squirrel cannot send a loan home by writing its root far off), else its root
+	local function placeOfPlayer(player: any): Vector3?
+		local held = actorOf(player)
+		if held and rt and rt.placeOf and (held.species == "squirrel" or held.species == "rodent") then
+			local x, y, z = rt.placeOf(held)
+			return Vector3.new(x, y, z)
+		end
+		local r = rootOf(player)
+		return if r then r.Position else nil
+	end
 	local function distBetween(a: any, b: any): number?
-		local ra, rb = rootOf(a), rootOf(b)
-		if ra == nil or rb == nil then
+		local pa, pb = placeOfPlayer(a), placeOfPlayer(b)
+		if pa == nil or pb == nil then
 			return nil
 		end
-		return (ra.Position - rb.Position).Magnitude
+		return (pa - pb).Magnitude
 	end
 
 	-- a thing goes home: into its buyer's things (their record by UserId, whether or not they are here)

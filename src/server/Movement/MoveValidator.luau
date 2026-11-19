@@ -126,6 +126,20 @@ type Marks = {
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
 	govPeak: { number }?,
+	-- client clock of the last grab a short gap hid (SquirrelMotor.envelope: one per two frames); in the marks so a reset
+	-- (a snap, a teleport, a Reset) does not give a fresh one (validator round 8, the round-7 review's LOW)
+	lastGrab: number?,
+}
+
+-- What a body keeps of its last driver when no one drives it (forget), for the next (takeOver): the constraints, never
+-- spare allowance (invariant C, validator round 8): the governor's history, the server's sprint meter (refilled by the
+-- server's own time since), and the recent gaps and wall gaps
+type Parked = {
+	gov: Gov,
+	stamina: number,
+	staminaAt: number,
+	gaps: { number },
+	wallGaps: { number },
 }
 
 -- The displacement governor (validator round 6, invariant B; _govern): the newest accepted place, the running sums it is
@@ -172,7 +186,6 @@ type Actor = {
 	standY: number?, -- the height it last stood at off the rails (a grounded packet higher than this rose with its floor)
 	lastOffset: number, -- its arrival offset (server time - client clock)
 	lastRiver: boolean, -- the last accepted packet was a river landing (a landing never follows a landing)
-	lastGrab: number?, -- client clock of the last grab a short gap hid (SquirrelMotor.envelope: one per two frames)
 }
 
 export type MoveValidator = typeof(setmetatable(
@@ -193,7 +206,7 @@ export type MoveValidator = typeof(setmetatable(
 		_marks: { [any]: Marks },
 		_fastest: { [boolean]: number },
 		_govBounds: { [boolean]: GovBounds },
-		_parked: { [any]: Gov? }, -- the governor's history of a body no one drives (forget), for its next driver
+		_parked: { [any]: Parked? }, -- what a body no one drives keeps of its last driver (forget), for its next
 	},
 	MoveValidator
 ))
@@ -359,7 +372,13 @@ function MoveValidator.forget(self: MoveValidator, actorId: any)
 	self._actors[actorId] = nil
 	self._marks[actorId] = nil
 	if marks and marks.gov then
-		self._parked[actorId] = marks.gov
+		self._parked[actorId] = {
+			gov = marks.gov,
+			stamina = marks.stamina,
+			staminaAt = marks.staminaAt,
+			gaps = marks.gaps,
+			wallGaps = marks.wallGaps,
+		}
 	end
 end
 
@@ -585,9 +604,9 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
 		local found, launchUsed, pounceAgo, judged =
-			SquirrelMotor.envelope(prev, next, dt, self.world, boosted, actor.lastGrab)
+			SquirrelMotor.envelope(prev, next, dt, self.world, boosted, actor.marks.lastGrab)
 		if judged.grab then
-			actor.lastGrab = judged.grab
+			actor.marks.lastGrab = judged.grab
 		end
 		launched = launchUsed
 		for _, v in found do
@@ -680,6 +699,17 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		elseif not floorBelow(next.x, next.y, next.z) then
 			table.insert(violations, { code = "float", severity = 0.34, detail = "grounded with nothing underfoot" })
 		end
+	end
+
+	-- slabs (validator round 8, the round-7 review's MEDIUM): no move through a floor, a roof or a ceiling, nor ending
+	-- inside one (ValidatorWorld.slab: one ray, only for a move that rose or fell); off the rails (a rail's own parts, a
+	-- bough's cylinder round its centreline, are the route's) and away from a trampoline's bed
+	if MoveValidator.throughSlab(self.world, prev, next, standY) and not riverLanding then
+		table.insert(violations, {
+			code = "slab",
+			severity = 1,
+			detail = `went from {prev.y} to {next.y} st through a floor, a roof or a ceiling`,
+		})
 	end
 
 	-- the displacement governor over every window of accepted places (invariant B: whatever path the packet took). The
@@ -775,6 +805,24 @@ function MoveValidator.nearTrampoline(world: World, x: number, z: number, margin
 		end
 	end
 	return false
+end
+
+-- throughSlab(world, from, next) -> boolean: the move from `from` to `next` went through a floor, a roof or a ceiling
+-- (world.slab; `standY`: the height it last stood at, for a long slanting fall), both ends off the rails and neither by
+-- a trampoline's bed
+function MoveValidator.throughSlab(
+	world: World,
+	from: { x: number, y: number, z: number, routeId: number? },
+	next: State,
+	standY: number?
+): boolean
+	local slab = (world :: any).slab
+	return slab ~= nil
+		and from.routeId == nil
+		and next.routeId == nil
+		and not MoveValidator.nearTrampoline(world, next.x, next.z, 2)
+		and not MoveValidator.nearTrampoline(world, from.x, from.z, 2)
+		and slab(from.x, from.y, from.z, next.x, next.y, next.z, standY)
 end
 
 local function marksOf(self: MoveValidator, actorId: any): Marks
@@ -912,6 +960,13 @@ function MoveValidator.hop(
 				detail = `higher than a leap over any floor after a {dt} s gap, no rail near as high`,
 			})
 		end
+	end
+	if MoveValidator.throughSlab(world, from, next) then
+		table.insert(violations, {
+			code = "slab",
+			severity = 1,
+			detail = `went from {from.y} to {next.y} st through a floor, a roof or a ceiling in a {dt} s gap`,
+		})
 	end
 	local crossesLong = world.crossesLong
 	if
@@ -1261,8 +1316,20 @@ end
 -- With no history at all (a body no player has driven): a new one there, the server's own place.
 function MoveValidator.relocate(self: MoveValidator, actorId: any, x: number, y: number, z: number, serverTime: number)
 	local marks = marksOf(self, actorId)
-	if marks.gov == nil then
-		marks.gov = self._parked[actorId]
+	local parked = self._parked[actorId]
+	if marks.gov == nil and parked then
+		-- (the last driver's constraints, never its spare allowance: the meter no fuller than it left it, refilled from
+		-- then by the server's own time; its gaps and wall gaps still counted)
+		marks.gov = parked.gov
+		if parked.stamina < marks.stamina or marks.staminaAt == 0 then
+			marks.stamina, marks.staminaAt = parked.stamina, parked.staminaAt
+		end
+		for _, t in parked.gaps do
+			table.insert(marks.gaps, t)
+		end
+		for _, t in parked.wallGaps do
+			table.insert(marks.wallGaps, t)
+		end
 	end
 	self._parked[actorId] = nil
 	local gov = marks.gov
