@@ -686,7 +686,9 @@ end
 local CART_SEAT = "#c9b68f"
 
 -- Golf cart: an open tub with a rounded nose and a sloped cowl, a bench seat, two golf bags standing on
--- the rear deck, and a canopy (the top of the box) on four posts behind a clear windshield.
+-- the rear deck, and a canopy (the top of the box) on four posts behind a clear windshield. Tuned for the traffic's
+-- 4 x 4.75 x 7.5 box; the player's cart (Vehicles/VehicleKinds) is 6.25 tall, so its posts and windshield are taller and
+-- its canopy clears a seated driver's head (the tub, bench and bags stay where they are, measured from the ground).
 local function cartParts(k: Kit, color: Rgb): number
 	local hw, hl, H = k.hw, k.hl, k.H
 	local trim, seat = hex(FIXED.trim), hex(CART_SEAT)

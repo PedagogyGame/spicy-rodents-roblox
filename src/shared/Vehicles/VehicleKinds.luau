@@ -88,7 +88,9 @@ local KINDS: { [string]: Kind } = {
 	cart = make({
 		id = "cart",
 		motor = "car",
-		size = { 1.5 * st, 1.9 * st, 2.6 * st },
+		-- 6.25 tall (the traffic's carts, Traffic/Boxes, are 4.75): the drawn canopy is the top of the box, and a seated
+		-- R15's head on the bench (5.72 up) clears its underside (6.0) by 0.28 (owner check sheet BIKES_CHECK)
+		size = { 1.5 * st, 2.5 * st, 2.6 * st },
 		maxSpeed = 22,
 		reverseSpeed = 8,
 		accel = 14,

@@ -7,7 +7,7 @@
 --   driver's head: one EyeSocket and one DriverSeat socket, straight over the Seat at a seated R15's eyes;
 --   the driver the server seats on the hidden DriverSeat (Seat:Sit) sits on the drawn saddle, bench or seat, behind
 --   the drawn steering wheel, on the left of a car (drive on the right), its feet near the pedals or on the floor,
---   its head under a closed car's roof;
+--   its head under a closed car's roof and the golf cart's (raised) canopy;
 --   the RootPart (the VehicleKinds box) is the only solid, queryable, massed part; every drawn part and the Seat
 --   collide with nothing, weigh nothing and are not anchored; the Seat is unseen on a drawn vehicle;
 --   a parked vehicle casts shadows from its big parts only.
@@ -181,6 +181,31 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("the golf cart: a seated head clears the canopy's underside, inside the taller box", function()
+		-- owner check sheet BIKES_CHECK: the head (5.72 up) came 1.2 through the old 4.75 box's canopy (underside 4.5)
+		local S = Placeholder.SEATED
+		local k = VehicleKinds.kind("cart")
+		local m = Placeholder.build("cart", "cart")
+		local seat = m:FindFirstChild("DriverSeat") :: any
+		local top = seatTop(seat)
+		local canopy = child(m, "Canopy", seat)
+		t.truthy(canopy, "the cart draws its canopy")
+		local under = canopy.CFrame.Position.Y - canopy.Size.Y / 2
+		local head = top.Y + S.head
+		local clear = under - head
+		t.truthy(clear >= 0.2 and clear <= 0.35, `the head ({head}) under the canopy ({under}) by {clear}`)
+		t.truthy(
+			math.abs(top.Z - canopy.CFrame.Position.Z) <= canopy.Size.Z / 2
+				and math.abs(top.X - canopy.CFrame.Position.X) <= canopy.Size.X / 2,
+			"the driver sits under the canopy"
+		)
+		t.near(canopy.CFrame.Position.Y + canopy.Size.Y / 2, k.size[2] / 2, 1e-3, "the canopy is the top of the box")
+		for _, name in { "PostFL", "PostFR", "PostBL", "PostBR" } do
+			local post = child(m, name, seat)
+			t.near(post.CFrame.Position.Y + post.Size.Y / 2, under, 1e-3, `{name} carries the raised canopy`)
+		end
+	end)
 
 	t.test(
 		"as built: the box is the one solid, queryable, massed part; the drawing and the Seat hit nothing, weigh nothing",
