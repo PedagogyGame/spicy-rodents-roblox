@@ -42,6 +42,7 @@ export type Params = {
 	react: { [string]: number },
 	windup: { [string]: number },
 	recover: { [string]: number },
+	whiffRecover: { [string]: number },
 	flinchSecs: number,
 	backSecs: number,
 	stepIn: { [string]: number },
@@ -82,6 +83,7 @@ export type Params = {
 	rewind: number,
 	launchSlack: number,
 	motorFresh: number,
+	lagMax: number,
 	-- from the other branches
 	chanceUnaware: number,
 	pounceWindup: number,
@@ -121,6 +123,7 @@ function CombatRules.params(): Params
 			"react",
 			"windup",
 			"recover",
+			"whiffRecover",
 			"flinchSecs",
 			"backSecs",
 			"stepIn",
@@ -161,6 +164,7 @@ function CombatRules.params(): Params
 			"rewind",
 			"launchSlack",
 			"motorFresh",
+			"lagMax",
 		}
 	do
 		p[k] = g("duel." .. k)

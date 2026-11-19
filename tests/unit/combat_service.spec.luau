@@ -94,8 +94,9 @@ return function(t)
 			rig.motor[rig.rodent] = { age = P.motorFresh + 0.1, launchAgo = rig.time - t1 - P.pounceWindup }
 		end)
 		t.eq(rig.combat:stats().bites, 0, "a stale motor")
-		-- and the same pounce launched on time lands
-		rig.step(2)
+		-- and the same pounce launched on time lands (on someone who has not just been chased about)
+		rig.put(rig.rodent, v.x + 400, v.z)
+		rig.step(10)
 		t.truthy(rig.lunge(v.id), "a lunge when the click said")
 	end)
 
@@ -186,6 +187,12 @@ return function(t)
 			rig.put(rig.rodent, v.x + math.sin(v.yaw) * 12, v.z + math.cos(v.yaw) * 12)
 			rig.step(0.6)
 			t.eq(rig.world.brains[v.id].state, "flee", "the dice say run")
+			-- (review finding 6) a runner stays a runner however far behind the rodent falls, for the brain's whole flight
+			rig.put(rig.rodent, v.x + 70, v.z)
+			rig.step(1)
+			local g = rig.combat:guardOf(v.id)
+			t.truthy(g ~= nil and g.phase == "flee", "still running, 70 studs off: a bite at the heels is a runner's")
+			t.eq(require("@shared/Combat/Duel").bitePhase(g, rig.now()), "runner")
 			-- a player's person: no orders, no stance; a kick is a raised leg
 			local p = rig.calmNear(-300, 0, { [v.id] = true })
 			rig.hold(p.id)

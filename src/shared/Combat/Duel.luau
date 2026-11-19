@@ -14,14 +14,21 @@
 --   flinch    open for flinchSecs, then ready
 --   back      backing away with an arm up for backSecs, then ready
 --   windup    a raised leg or arm (no bite lands), stepping in at stepIn; then the strike, then recover
---   recover   open for recover[temper], then ready
---   flee      runs (never a tough person); a bite at the heels is "runner"
+--   recover   open for recover[temper] (whiffRecover[temper] after a blow at nothing: the rodent out of reach), then
+--             ready
+--   flee      runs (never a tough person) for FLEE_SECS, as the brain's flight along the lane lasts; a bite at the
+--             heels is "runner". A person still with the rodent close when the flight ends stays on their guard
 -- A feint is a tell with no pounce after it: read (readFeint) the person counters at once, a quicker wind-up with a
 -- longer reach and counterHit (the brief's "free hit"); not read, they react to it as to a real pounce, and a swing at
 -- nothing leaves them open.
+-- THE LINK. The rodent's player sees a person as they were a round trip ago (the server's word on its way down, the
+-- pounce on its way up): a bite is judged against the person as the player saw them (bitePhaseAt: the trail of the
+-- last TRAIL_SECS), except the reaction to that very pounce's tell, which runs on the server's clock (a slow link
+-- buys no longer reaction window).
 -- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, dist, inView) -> boolean;
---   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase; batted(g, now) (a bite failed on
---   them: back to ready unless striking); reach(params, g) -> studs; PHASES
+--   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase;
+--   bitePhaseAt(g, now, rewind, tell?) -> CombatRules.BitePhase; batted(g, now) (a bite failed on them: back to ready
+--   unless striking); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
 -- Pure; studs and seconds. No side effects on require.
 
 local CombatRules = require("./CombatRules")
@@ -50,7 +57,11 @@ export type Guard = {
 	fleeFrom: number, -- when the flight began
 	strikes: number,
 	hits: number,
+	trail: { Sample }, -- how a bite would have met them, think by think (the last TRAIL_SECS)
 }
+
+-- One think's record: the bite phase then, and the tell it was the reaction window of (if it was one).
+export type Sample = { t: number, phase: CombatRules.BitePhase, tell: number? }
 
 -- What the person sees this tick (CombatService from the town, DuelSim from its own world).
 export type View = {
@@ -81,7 +92,8 @@ export type Out = {
 local Duel = {}
 
 Duel.PHASES = table.freeze({ "idle", "ready", "startle", "flinch", "back", "windup", "recover", "flee" })
-Duel.FLEE_SECS = 8 -- a flight lasts this long at most
+Duel.FLEE_SECS = 6 -- a flight lasts this long (Brains/Pedestrian: alert 8 falling to 2, running along the lane)
+Duel.TRAIL_SECS = 0.5 -- how far back a bite may be judged (the link's round trip, duel.lagMax, is less)
 Duel.FLEE_CLEAR = 15 -- studs beyond engage: far enough, the flight ends
 Duel.STARTLED_SECS = 0.8 -- a calm or wary person who noticed the rodent this recently is caught unready
 
@@ -107,6 +119,7 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 		fleeFrom = 0,
 		strikes = 0,
 		hits = 0,
+		trail = {},
 	}
 end
 
@@ -180,7 +193,18 @@ local function stanceOf(g: Guard): string?
 	return nil
 end
 
-function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): Out
+local function record(g: Guard, now: number)
+	local trail = g.trail
+	table.insert(
+		trail,
+		{ t = now, phase = Duel.bitePhase(g, now), tell = if g.phase == "startle" then g.lastTell else nil }
+	)
+	while #trail > 1 and trail[1].t < now - Duel.TRAIL_SECS do
+		table.remove(trail, 1)
+	end
+end
+
+local function think(params: Params, g: Guard, view: View, rand: () -> number): Out
 	local now = view.now
 	local out: Out = { move = "none", speed = 0, strike = nil, reacted = nil, read = false, stance = nil }
 	-- noticing, and letting go
@@ -204,7 +228,12 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 		else
 			return out
 		end
-	elseif view.dist > far and g.phase ~= "windup" then
+	elseif
+		view.dist > far
+		and g.phase ~= "windup"
+		and g.phase ~= "flee"
+		and not (g.phase == "startle" and g.running)
+	then
 		-- the rodent has gone: back to the day
 		g.aware = false
 		g.phase = "idle"
@@ -261,15 +290,17 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 		out.strike =
 			{ kind = g.strike or "kick", hit = hit, counter = g.counter, chance = if inReach then chance else 0 }
 		g.phase = "recover"
-		g.untilT = now + params.recover[g.temper]
+		-- (a blow at nothing, the rodent out of reach, leaves them overbalanced longer than one it dodged up close)
+		g.untilT = now + (if inReach then params.recover[g.temper] else params.whiffRecover[g.temper])
 		g.strike = nil
 		g.counter = false
 	elseif (g.phase == "flinch" or g.phase == "back" or g.phase == "recover") and now >= g.untilT then
 		ready(g)
 	elseif g.phase == "flee" then
-		if now - g.fleeFrom >= Duel.FLEE_SECS or view.dist > far then
-			if g.temper == "tough" then
-				ready(g)
+		-- (the flight runs its course: the brain's run along the lane does, however far the rodent falls behind)
+		if now - g.fleeFrom >= Duel.FLEE_SECS or (g.temper == "tough" and view.dist > far) then
+			if g.temper == "tough" or view.dist <= params.engage then
+				ready(g) -- (the rodent is still at their heels: they turn and face it)
 			else
 				g.aware = false
 				g.phase = "idle"
@@ -309,6 +340,12 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 	return out
 end
 
+function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): Out
+	local out = think(params, g, view, rand)
+	record(g, view.now)
+	return out
+end
+
 -- How a bite would meet this person now.
 function Duel.bitePhase(g: Guard, now: number): CombatRules.BitePhase
 	if not g.aware or g.phase == "idle" then
@@ -328,6 +365,39 @@ function Duel.bitePhase(g: Guard, now: number): CombatRules.BitePhase
 		return "windup"
 	end
 	return "guard"
+end
+
+-- How a bite would meet this person as the rodent's player saw them `rewind` seconds ago (the link's round trip): the
+-- phase at the think nearest then; the reaction window to the pounce whose tell is `tell` is the server's own (now).
+function Duel.bitePhaseAt(g: Guard, now: number, rewind: number, tell: number?): CombatRules.BitePhase
+	if rewind <= 0 then
+		return Duel.bitePhase(g, now)
+	end
+	-- (the think nearest that moment; between two, the later: the duel steps a tenth at a time, and a rounding that
+	-- always went back would give the rodent a whole step more than the link took)
+	local at = now - rewind
+	local found: Sample? = nil
+	local best = math.huge
+	for _, s in g.trail do
+		local off = math.abs(s.t - at)
+		if off <= best + 1e-6 then
+			found, best = s, off
+		end
+	end
+	if found == nil or (tell ~= nil and found.tell == tell) then
+		return Duel.bitePhase(g, now)
+	end
+	return found.phase
+end
+
+-- The closest a body moving from (ax, az) to (bx, bz) came to (px, pz): a pounce at 31 studs/s moves three studs a
+-- duel step, so contact is judged along the move, not at its end.
+function Duel.sweep(ax: number, az: number, bx: number, bz: number, px: number, pz: number): number
+	local dx, dz = bx - ax, bz - az
+	local len2 = dx * dx + dz * dz
+	local k = if len2 > 1e-9 then math.clamp(((px - ax) * dx + (pz - az) * dz) / len2, 0, 1) else 0
+	local cx, cz = ax + dx * k, az + dz * k
+	return math.sqrt((px - cx) ^ 2 + (pz - cz) ^ 2)
 end
 
 -- A bite failed on this person ("Batted away"): they square up again unless a blow is on its way or they are running.

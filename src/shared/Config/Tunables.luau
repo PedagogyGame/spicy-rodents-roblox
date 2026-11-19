@@ -56,27 +56,28 @@ Tunables.tree = {
 	-- "people that are extra aggressive and extra successful in landing blows against you, and extra resistant of being
 	-- bitten. Still possible, but harder"). Per temperament: calm, wary, and tough (the vigilantes, human.vigilanteShare).
 	-- Combat/CombatRules reads these; the duel simulation (tests/unit/combat_duel_sim.spec.luau) holds the balance:
-	-- a skilled rodent beats a vigilante 25-45 % of the time and a calm person 70-90 %; a straight sprint loses to a
-	-- vigilante almost always. Times in seconds, chances 0-1, reaches in studs.
+	-- on a real link (100 and 150 ms round trips, the motor's pounce along the body's heading) a skilled rodent beats a
+	-- vigilante 25-45 % of the time and a calm person 70-90 %; a straight sprint loses to a vigilante almost always. Times in seconds, chances 0-1, reaches in studs.
 	duel = { waryShare = { v = 0.3, src = "combat build default: the rest of the townspeople who are not vigilantes are calm" },
 	         notice = { v = { calm = 1.0, wary = 1.15, tough = 1.35 }, src = "spot range multiplier: a tough person notices sooner" },
-	         react = { v = { calm = 0.42, wary = 0.32, tough = 0.2 }, unit = "s", src = "the reaction window: from the pounce's tell to a raised arm (narrower on a tough person)" },
+	         react = { v = { calm = 0.3, wary = 0.26, tough = 0.2 }, unit = "s", src = "the reaction window: from the pounce's tell to a raised arm (narrower on a tough person)" },
 	         windup = { v = { calm = 0.58, wary = 0.5, tough = 0.4 }, unit = "s", src = "a kick's wind-up (v5.4 0.58); a swing takes swingWindupMult of it" },
-	         recover = { v = { calm = 0.6, wary = 0.5, tough = 0.4 }, unit = "s", src = "after a strike: the opening a bite lands in" },
+	         recover = { v = { calm = 0.6, wary = 0.5, tough = 0.3 }, unit = "s", src = "after a strike at a rodent in reach (dodged or not): the opening a bite lands in" },
+	         whiffRecover = { v = { calm = 0.6, wary = 0.55, tough = 0.7 }, unit = "s", src = "after a blow at nothing (the rodent out of reach): overbalanced, the opening a skilled rodent draws" },
 	         flinchSecs = { v = 0.5, unit = "s" },
 	         backSecs = { v = 1.2, unit = "s", src = "backing away with an arm up" },
 	         stepIn = { v = { calm = 0, wary = 2, tough = 6 }, unit = "st/s", src = "how fast a person steps in while winding up" },
-	         strikeHit = { v = { calm = 0.5, wary = 0.62, tough = 0.8 }, src = "a strike's chance to land on a rodent in reach" },
+	         strikeHit = { v = { calm = 0.55, wary = 0.62, tough = 0.8 }, src = "a strike's chance to land on a rodent in reach" },
 	         biteUnaware = { v = { calm = 1.0, wary = 0.95, tough = 0.8 }, src = "times pounce.chanceUnaware" },
-	         biteOpen = { v = { calm = 0.5, wary = 0.45, tough = 0.5 }, src = "a bite in the reaction window, a flinch, a recovery or a turned back" },
-	         biteRunner = { v = { calm = 0.18, wary = 0.2, tough = 0.2 }, src = "a bite at the heels of a running person: most shake it off" },
+	         biteOpen = { v = { calm = 0.22, wary = 0.35, tough = 0.35 }, src = "a bite in the reaction window, a flinch, a recovery or a turned back" },
+	         biteRunner = { v = { calm = 0.15, wary = 0.2, tough = 0.2 }, src = "a bite at the heels of a running person: most shake it off" },
 	         biteGuard = { v = { calm = 0.04, wary = 0.03, tough = 0 }, src = "a bite into a raised arm (brief: it does not land)" },
 	         readFeint = { v = { calm = 0.15, wary = 0.3, tough = 0.5 }, src = "the chance a feint is read: then the person hits back (counter)" },
 	         strikeRate = { v = { calm = 0.25, wary = 0.6, tough = 1.6 }, unit = "/s", src = "how often a person strikes unprompted at a rodent in reach" },
-	         entryStrike = { v = { calm = 0.2, wary = 0.6, tough = 0.85 }, src = "the chance a squared-up person strikes at a rodent coming into reach (a straight run is readable)" },
+	         entryStrike = { v = { calm = 0.35, wary = 0.6, tough = 0.85 }, src = "the chance a squared-up person strikes at a rodent coming into reach (a straight run is readable)" },
 	         guardUp = { v = { calm = 0.85, wary = 0.9, tough = 1 }, src = "the chance a squared-up person's arm is already up when a pounce comes (the rest are open until they react)" },
-	         respond = { v = { calm = { flee = 0.5, back = 0.2, flinch = 0.12, swing = 0.12, kick = 0.06 },
-	                           wary = { flee = 0.25, back = 0.3, flinch = 0.15, swing = 0.18, kick = 0.12 },
+	         respond = { v = { calm = { flee = 0.35, back = 0.17, flinch = 0.08, swing = 0.25, kick = 0.15 },
+	                           wary = { flee = 0.15, back = 0.25, flinch = 0.15, swing = 0.25, kick = 0.2 },
 	                           tough = { flee = 0, back = 0.05, flinch = 0.05, swing = 0.35, kick = 0.55 } },
 	                     src = "brief: flinch, swing, kick, back away or flee by awareness and nerve; vigilantes never flee" },
 	         nerveJitter = { v = 0.15, src = "each person's nerve differs a little from their temperament's" },
@@ -100,7 +101,8 @@ Tunables.tree = {
 	         contact = { v = 3.5, unit = "st", src = "Combat/PlayRules BITE_RANGE" }, contactHeight = { v = 5, unit = "st" },
 	         rewind = { v = 0.15, unit = "s", src = "D20: a pounce's window widened by up to this for the link" },
 	         launchSlack = { v = 0.05, unit = "s", src = "one movement packet: the motor's launch may be seen this much (plus rewind) either side of when the click said" },
-	         motorFresh = { v = 0.2, unit = "s", src = "a motor state older than this bites nobody (the rodent's packets stopped)" } },
+	         motorFresh = { v = 0.2, unit = "s", src = "a motor state older than this bites nobody (the rodent's packets stopped)" },
+	         lagMax = { v = 0.2, unit = "s", src = "a bite is judged against the person as the rodent's player saw them, up to this far back (the link's round trip)" } },
 	-- Power numbers live in Rodent/PowerRules.TABLE (brief v2 §15, verbatim v5.4; golden-tested). These
 	-- leaves are read-only mirrors for the tuning panel; PowerRules is the authority.
 	power = { bitePerson = { v = 100 }, bitePersonHigh = { v = 150 }, highAboveGroundU = { v = 1.6, src = "v5.4 uses absolute Y > 4; Q23" },

@@ -60,6 +60,9 @@ export type Opts = {
 	-- the rodent's motor as the validator saw it: seconds since its last clean packet, and since the last pounce launch
 	-- a clean packet showed (Movement/MovementService:motorOf); nil before any packet
 	motorOf: ((id: number) -> Motor?)?,
+	-- the link's round trip of the player holding the rodent, seconds (Player:GetNetworkPing): a bite is judged against
+	-- the person as that player saw them, up to duel.lagMax back (Combat/Duel.bitePhaseAt); nil: no rewind
+	linkOf: ((id: number) -> number?)?,
 	setAttr: ((id: number, name: string, value: any) -> ())?,
 	notify: ((rodentId: number, payload: { [string]: any }) -> ())?, -- news for the player holding the rodent
 	hurt: ((rodentId: number, amount: number, cause: string, byId: number) -> ())?,
@@ -86,6 +89,8 @@ type Rodent = {
 	iUntil: number,
 	landed: boolean, -- this pounce has made its contact
 	history: { Sample },
+	lastX: number?, -- where the rodent was at the last step (contact is judged along the move since)
+	lastZ: number,
 }
 
 type Chase = { zone: Zone, nextAt: number }
@@ -217,6 +222,8 @@ local function rodent(self: Service, id: number): Rodent
 			iUntil = -math.huge,
 			landed = true,
 			history = {},
+			lastX = nil,
+			lastZ = 0,
 		}
 		self.rods[id] = r
 	end
@@ -531,7 +538,8 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 				end
 			end
 		end
-		if best == nil or bestD > seenReach then
+		local running = g ~= nil and (g.phase == "flee" or (g.phase == "startle" and g.running))
+		if best == nil or (bestD > seenReach and not running) then
 			if g then
 				release(self, a.id)
 			end
@@ -640,9 +648,15 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		end
 		local ry = rod.y - rod.hip
 		local victim: any, vd = nil, P.contact
+		-- (along the move since the last step; a jump further than a pounce makes in two steps is a move the server made)
+		local fromX, fromZ = rod.x, rod.z
+		local lx = r.lastX
+		if lx ~= nil and (lx - rod.x) ^ 2 + (r.lastZ - rod.z) ^ 2 <= (P.contact * 3) ^ 2 then
+			fromX, fromZ = lx, r.lastZ
+		end
 		for _, a in world.actors do
 			if a.species == "human" and (a.lift or 0) == 0 then
-				local d = math.sqrt((a.x - rod.x) ^ 2 + (a.z - rod.z) ^ 2)
+				local d = Duel.sweep(fromX, fromZ, rod.x, rod.z, a.x, a.z)
 				local ay = a.y - a.hip
 				if
 					d <= vd
@@ -668,7 +682,9 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		else
 			temper = self:temperOf(vid)
 			local g = self.guards[vid]
-			phase = if g then Duel.bitePhase(g, now) else "unaware"
+			local linkOf = self.opts.linkOf
+			local rewind = math.clamp(if linkOf then linkOf(id) or 0 else 0, 0, P.lagMax)
+			phase = if g then Duel.bitePhaseAt(g, now, rewind, r.tell) else "unaware"
 		end
 		local chance = CombatRules.biteChance(P, temper, phase, self:inAlert(victim.x, victim.z, now))
 		endPounce(self, r, now)
@@ -728,6 +744,13 @@ function CombatService.step(self: Service, dt: number, now: number)
 	stepGuards(self, now, dt, live)
 	stepBites(self, now, live)
 	stepChases(self, now)
+	for id in live do
+		local rod = self.world.actorsById[id]
+		local r = self.rods[id]
+		if rod and r then
+			r.lastX, r.lastZ = rod.x, rod.z
+		end
+	end
 end
 
 function CombatService.stop(self: Service)

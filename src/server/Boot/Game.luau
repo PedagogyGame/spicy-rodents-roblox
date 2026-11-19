@@ -1340,6 +1340,17 @@ function Game.start(opts: Opts?): any
 				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
 				return { age = t - at, launchAgo = if pounceAt then t - pounceAt else nil }
 			end,
+			linkOf = function(id: number): number?
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				if driver ~= nil and typeof(driver) == "Instance" and driver:IsA("Player") then
+					local ok, ping = pcall(function(): number
+						return (driver :: Player):GetNetworkPing()
+					end)
+					return if ok then ping else nil
+				end
+				return nil
+			end,
 			setAttr = setTownAttr,
 			notify = function(id: number, payload: { [string]: any })
 				local actor = rt.byTownId[id]

@@ -227,4 +227,71 @@ return function(t)
 		t.eq(v.phase, "recover")
 		t.eq(Duel.bitePhase(v, 1.25), "open", "after the blow: the opening")
 	end)
+
+	t.test(
+		"the link: a bite is judged against the person as the rodent's player saw them; a blow at nothing opens longer",
+		function()
+			local function view(now: number, dist: number, tell: number?): Duel.View
+				return {
+					now = now,
+					dt = 0.1,
+					dist = dist,
+					dy = 0,
+					seen = true,
+					tell = tell,
+					tellFeint = false,
+					committed = false,
+					recovering = false,
+					zigzag = 0,
+					boosted = false,
+				}
+			end
+			local zero = function(): number
+				return 0
+			end
+			local high = function(): number
+				return 0.99
+			end
+			-- a vigilante kicks at a rodent out of reach: overbalanced for whiffRecover, longer than after a near miss
+			local g = Duel.new(P, 1, "tough", 1)
+			Duel.think(P, g, view(0, 20), zero)
+			Duel.think(P, g, view(0.1, 8), zero) -- (coming into reach: the dice say strike)
+			t.eq(g.phase, "windup")
+			local now = 0.1
+			while g.phase == "windup" do
+				now += 0.1
+				Duel.think(P, g, view(now, 30), high)
+			end
+			t.eq(g.phase, "recover")
+			t.near(g.untilT - now, P.whiffRecover.tough, 1e-9)
+			t.truthy(P.whiffRecover.tough > P.recover.tough)
+			-- the recovery ends; a round trip later the player still saw it: a bite then is judged open
+			local opened = now
+			while g.phase == "recover" do
+				now += 0.1
+				Duel.think(P, g, view(now, 12), high)
+			end
+			t.eq(Duel.bitePhase(g, now), "guard", "squared up again on the server")
+			t.eq(Duel.bitePhaseAt(g, now, 0.1, nil), "open", "the player, 100 ms behind, still sees the opening")
+			t.eq(Duel.bitePhaseAt(g, now, 0, nil), "guard", "no link, no rewind")
+			t.truthy(now - opened >= P.whiffRecover.tough - 1e-9)
+			-- but the reaction window to the pounce's own tell is the server's: a slow link buys no more of it
+			local c = Duel.new(P, 2, "calm", 0.25)
+			Duel.think(P, c, view(0, 25), high)
+			local tell = 0.1
+			Duel.think(P, c, view(0.1, 9, tell), function(): number
+				return 0.5
+			end)
+			t.eq(c.phase, "startle")
+			local tt = 0.1
+			while c.phase == "startle" do
+				tt += 0.1
+				Duel.think(P, c, view(tt, 9, tell), high)
+			end
+			t.eq(Duel.bitePhaseAt(c, tt, 0.1, tell), Duel.bitePhase(c, tt), "the reaction to this pounce: as it is now")
+			-- contact along the move: a pounce passes through in one step and still touches
+			t.near(Duel.sweep(-3, 0, 3, 0, 0, 1), 1, 1e-9)
+			t.near(Duel.sweep(0, 0, 0, 0, 3, 4), 5, 1e-9)
+		end
+	)
 end
