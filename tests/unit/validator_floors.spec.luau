@@ -136,24 +136,32 @@ return function(t)
 			-- "before": the round-6 floor ray, which looked past the bough cylinders (the wall ray's rule).
 			Height.configure(Data.default():module("TerrainExtensions"))
 			local worlds: { { name: string, w: BakedWorld.World } } = {}
-			for _, f in {
-				"build/Town.rbxm",
-				"build/Attractions.rbxm",
-				"build/Expansion_F1.rbxm",
-				"build/Expansion_F2.rbxm",
-				"build/Expansion_F4.rbxm",
-				"build/Expansion_LoungeClassic.rbxm",
-				"build/Expansion_NeighbourhoodShop.rbxm",
-			} do
+			for _, f in
+				{
+					"build/Town.rbxm",
+					"build/Attractions.rbxm",
+					"build/Expansion_F1.rbxm",
+					"build/Expansion_F2.rbxm",
+					"build/Expansion_F4.rbxm",
+					"build/Expansion_LoungeClassic.rbxm",
+					"build/Expansion_NeighbourhoodShop.rbxm",
+				}
+			do
 				if fs.isFile(f) then
 					table.insert(worlds, { name = f, w = BakedWorld.load(f) })
 				end
 			end
 			t.truthy(#worlds >= 2, "the bakes (lune run tools/bake/main.luau and the expansion bakes)")
-			table.insert(worlds, { name = "storm drains (SewerStandIn)", w = SewerStandIn.world(SewerLayout.default()) })
 			table.insert(
 				worlds,
-				{ name = "hollow trees (HollowShell)", w = BakedWorld.fromModel((HollowShell.build(roblox, HollowLayout.default()))) }
+				{ name = "storm drains (SewerStandIn)", w = SewerStandIn.world(SewerLayout.default()) }
+			)
+			table.insert(
+				worlds,
+				{
+					name = "hollow trees (HollowShell)",
+					w = BakedWorld.fromModel((HollowShell.build(roblox, HollowLayout.default()))),
+				}
 			)
 			local rows: { string } = {}
 			local missedNow, missedBefore = 0, 0

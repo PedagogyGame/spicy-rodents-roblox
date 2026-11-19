@@ -267,11 +267,33 @@ return function(t)
 		local y0 = body.y
 		for _ = 1, 100 do
 			t.truthy(wd.possession:recover(p))
+			wd.clock.t += 3
 		end
 		t.eq(a.body, body)
 		t.eq(p.Character, body)
 		t.near(body.y, y0 + 300, 1e-9)
 		t.eq(wd.possession.stats.recovered, 100)
+	end)
+
+	t.test("recover: at most once per RECOVER_EVERY seconds a player; the rest dropped, the body not moved", function()
+		local wd = world(1, 0)
+		local p = { UserId = 7, Name = "q", Character = nil }
+		local a = wd.actors:get("human_1") :: any
+		wd.possession:possess(p, a)
+		local body = a.body
+		local y0 = body.y
+		t.truthy(wd.possession:recover(p))
+		local moved = 1
+		for _ = 1, 60 do
+			wd.clock.t += 0.5
+			if wd.possession:recover(p) then
+				moved += 1
+			end
+		end
+		-- (30 s: one at the start and one each 3 s after)
+		t.eq(moved, 11)
+		t.near(body.y, y0 + 3 * moved, 1e-9)
+		t.eq(wd.possession.stats.recovered, moved)
 	end)
 
 	t.test(

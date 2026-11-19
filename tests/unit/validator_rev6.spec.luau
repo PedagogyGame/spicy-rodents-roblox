@@ -46,7 +46,7 @@ return function(t)
 			s.grounded, s.clock = true, 1
 			local codes = {}
 			v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 1)
-			local z0 = z
+			local z0, cleanAt = z, 1
 			for i = 1, rate * 5 do
 				local reach = 8.5 + v:fastest("a") * dt + 1
 				local slack = v:fastest("a") * math.min(dt, 0.5) + 1
@@ -59,8 +59,13 @@ return function(t)
 				for _, x in r.violations do
 					codes[x.code] = (codes[x.code] or 0) + 1
 				end
-				if r.accepted then
-					s, z = ns, nz
+				if r.accepted and r.ok then
+					s, z, cleanAt = ns, nz, 1 + i * dt
+				elseif r.accepted then
+					-- (the live service snaps a violation back to the last clean packet, its history kept: the bare
+					-- validator takes it as its baseline all the same, so the case does what the service does)
+					v:reset("a", SquirrelMotor.serialize(s), 1 + i * dt, i + 1)
+					v:anchor("a", s.x, s.y, s.z, 1 + i * dt, cleanAt)
 				end
 			end
 			local c = {}
@@ -170,11 +175,13 @@ return function(t)
 			end)
 			for k = 0, 15 do
 				rig:at(3.2 + k * 0.6, function()
-					local r = rig.server.root
-					local h = { x = r.x, y = r.y + 3, z = r.z }
-					held = h
-					resets += 1
-					rig:teleport(h.x, h.y, h.z, "reset")
+					-- (validator fix 7: the Reset as the server now does it, LiveRig.reset: at most once per 3 s, to a place
+					-- a clean grounded packet stood on a floor, the feet on it; the client holds its root there)
+					if rig:reset() then
+						local r = rig.server.root
+						held = { x = r.x, y = r.y, z = r.z }
+						resets += 1
+					end
 				end)
 			end
 			rig:run(13)

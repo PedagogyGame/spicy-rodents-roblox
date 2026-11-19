@@ -53,7 +53,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
+--   M:epochOf(actorId) -> number; M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
 --   number?; M:clickNew(actorId, seq) -> boolean (a click's number not taken yet: the first copy of a click to arrive,
 --   the Duel remote's or a motor packet's (verdict.click), is the one taken); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:paceOf(actorId) -> number? (read
@@ -154,8 +154,11 @@ type Squirrel = {
 	rootY: number,
 	rootZ: number,
 	rootAt: number,
-	highSince: number?, -- the root has been high in the air with nothing near since then, at highY
-	highY: number,
+	highSince: number?, -- the root has been high in the air with nothing near since then (its C.HIGH_LAG runs from it)
+	highY: number, -- ... from this height ...
+	highFrom: number, -- ... at this time (highSince, or the last move the server made since: rebase)
+	lastRiver: boolean, -- the last accepted packet was the client's own river recovery (MoveValidator's verdict.river)
+	safe: any, -- Movement/Recovery History: the places accepted clean grounded packets stood, a floor under the feet
 	paces: { number }, -- the recent packets' speeds (studs/s: their velocity, or the step from the one before)
 	-- the recent packets' arrival offsets (server time - client clock) and the link's round trip then
 	offsets: { { at: number, off: number, ping: number } },
@@ -197,6 +200,7 @@ export type Movement = {
 		rail: any?
 	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
+	safeTarget: (self: Movement, actorId: any) -> (number?, number?, number?),
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
 	clickNew: (self: Movement, actorId: any, seq: any) -> boolean,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
@@ -262,6 +266,7 @@ MovementService.C = table.freeze({
 	RAIL_KEEP = 2, -- seconds of packets on a rail kept to explain a crossing of the root by a rail (RAIL_RECENT either side)
 	CROSSINGS_MAX = 4, -- unexplained crossings kept at once (a fifth is a wall at once)
 	RAILS_TRIED = 8, -- rail packets a new crossing is tried against (the newest)
+	RIVER_ROOT_RISE = 1, -- studs: the root on the quay ahead of the packet, this near the quay's height (a step on)
 })
 local C = MovementService.C
 
@@ -377,6 +382,9 @@ function MovementService.new(deps: Deps): Movement
 				rootAt = -math.huge,
 				highSince = nil,
 				highY = 0,
+				highFrom = 0,
+				lastRiver = false,
+				safe = Recovery.newHistory(),
 				pinned = false,
 				pinnedAt = 0,
 				paces = {},
@@ -416,7 +424,10 @@ function MovementService.new(deps: Deps): Movement
 	-- the move (the root last seen, else the last packet) still counts for the drift a while
 	-- (`snapped`: the root was judged, so the place before is the last packet's, or the gate's, never the root's)
 	-- (`keepUntil`, a snap's: the server time the body held the target place; the displacement governor keeps its history
-	-- up to then. nil: a move the server made, the governor starts afresh at the target: MoveValidator.anchor)
+	-- up to then: MoveValidator.anchor. nil: a move the server made (a Reset, a hold given back, a knock): the governor's
+	-- whole history is carried to the target, MoveValidator.relocate. Invariant C (validator round 7): nothing the client
+	-- can trigger starts the governor afresh, nor the in-air timer: a root high in the air when the move came must fall
+	-- from the target from now on, its C.HIGH_LAG not given again)
 	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate, snapped: boolean?, keepUntil: number?)
 		local now = target.at
 		local gate = sq.gate
@@ -432,7 +443,9 @@ function MovementService.new(deps: Deps): Movement
 		sq.rootX = nil
 		table.clear(sq.crossings)
 		table.clear(sq.rails)
-		sq.highSince = nil
+		if sq.highSince ~= nil then
+			sq.highY, sq.highFrom = target.y, now
+		end
 		sq.overSince = nil
 		sq.epoch = nextEpoch(self)
 		sq.gate = target
@@ -449,7 +462,11 @@ function MovementService.new(deps: Deps): Movement
 		local validator = self.deps.validator
 		if validator then
 			validator:reset(id, nil)
-			validator:anchor(id, target.x, target.y, target.z, now, keepUntil)
+			if keepUntil then
+				validator:anchor(id, target.x, target.y, target.z, now, keepUntil)
+			else
+				validator:relocate(id, target.x, target.y, target.z, now)
+			end
 		end
 		if self.deps.swept then
 			self.deps.swept:markTeleported(id)
@@ -490,7 +507,7 @@ function MovementService.new(deps: Deps): Movement
 				to = sq.gate
 				keepUntil = if (sq.gate :: Gate).at > 0 then (sq.gate :: Gate).at else now
 			else
-				to = anchorOf(sq) -- (a place the server saw: the governor starts afresh there)
+				to = anchorOf(sq) -- (a place the server saw: the governor's history carried there, rebase)
 			end
 		end
 		if to == nil then
@@ -772,6 +789,33 @@ function MovementService.new(deps: Deps): Movement
 		return true
 	end
 
+	-- safeTarget(actorId) -> (x, y, z)?: where a Reset puts the body (feet), from where the server holds it (the last
+	-- accepted packet, else the gate or the place it keeps a pinned body; never the root the client moves): the quay of
+	-- the river it is in (Recovery.riverFall), else the newest place a clean grounded packet stood on a floor at least 4
+	-- st across from there (Recovery.unstick), else the newest such place, else that place itself; the feet on the
+	-- floor, no lift over it. nil: the server holds no place of the body
+	function m.safeTarget(self: Movement, actorId: any): (number?, number?, number?)
+		local sq = self.squirrels[actorId]
+		if sq == nil then
+			return nil, nil, nil
+		end
+		local last: Gate? = if sq.placed then { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = 0 } else nil
+		local held: Gate? = if sq.lastAt then last else sq.gate or sq.pinAt or last
+		if held == nil then
+			return nil, nil, nil
+		end
+		local h = held :: Gate
+		local qx, qy, qz = Recovery.riverFall(h.x, h.y, h.z)
+		if qx and qy and qz then
+			return qx, qy, qz
+		end
+		local s = Recovery.unstick(sq.safe, h.x, h.y, h.z) or Recovery.safePos(sq.safe)
+		if s then
+			return s.x, s.y, s.z
+		end
+		return h.x, h.y, h.z
+	end
+
 	function m.epochOf(self: Movement, actorId: any): number
 		return squirrel(self, actorId).epoch
 	end
@@ -878,16 +922,32 @@ function MovementService.new(deps: Deps): Movement
 				end
 			end
 			if d > loose then
-				-- (the client's own river recovery: the root on the quay a moment before the packet saying so)
-				ok = Recovery.riverLanding(
-					refX,
-					refZ,
-					x,
-					y,
-					z,
-					Motion.C.airGrab + fast * (now - refAt + C.DRIFT_LAG) + 1,
-					fast * math.min(now - refAt + C.DRIFT_LAG, SquirrelMotor.envelopeParams.maxDt) + 1
-				)
+				-- (the client's own river recovery: the root on the quay a moment before the packet saying so. The rule the
+				-- validator holds the packet to (Recovery.riverEntry): the quay spot of a fall into the water the body could
+				-- have made from the last accepted packet, never right after a landing; the root may have walked on from
+				-- the spot for C.DRIFT_FRESH_LAG)
+				local shot = sq.shot
+				local rid = if shot then shot.routeId else nil
+				ok = shot ~= nil
+					and not sq.lastRiver
+					and Recovery.riverEntry(
+							{
+								x = refX,
+								y = refY,
+								z = refZ,
+								vy = (shot.vy :: number?) or 0,
+								onRail = type(rid) == "number" and rid >= 0,
+							},
+							x,
+							y,
+							z,
+							math.min(now - refAt + C.DRIFT_LAG, SquirrelMotor.envelopeParams.maxDt),
+							fast,
+							SquirrelMotor.params.gravity,
+							SquirrelMotor.envelopeParams.posSlack + fast * C.DRIFT_FRESH_LAG,
+							C.RIVER_ROOT_RISE
+						)
+						~= nil
 			elseif d > tight then
 				-- (a leap's start the packets do not show yet: for a moment only)
 				sq.overSince = sq.overSince or now
@@ -1065,11 +1125,12 @@ function MovementService.new(deps: Deps): Movement
 			return nil
 		end
 		if sq.highSince == nil then
-			sq.highSince, sq.highY = now, y
+			sq.highSince, sq.highY, sq.highFrom = now, y, now
 			return nil
 		end
-		local tau = now - (sq.highSince :: number)
-		local fall = math.max(0, tau - C.HIGH_LAG)
+		-- (from highY at highFrom: a leap's rise at most, and gravity's fall once C.HIGH_LAG after highSince has passed)
+		local tau = now - sq.highFrom
+		local fall = math.max(0, now - math.max((sq.highSince :: number) + C.HIGH_LAG, sq.highFrom))
 		local ceiling = sq.highY
 			+ 2
 			+ MoveValidator.leapUpAllowance() * tau
@@ -1182,8 +1243,9 @@ function MovementService.new(deps: Deps): Movement
 				end
 				sq.gate = nil
 				if not validator:hasAnchor(actorId) then
-					-- (a new body: the governor judges from where the server had it)
-					validator:anchor(actorId, gate.x, gate.y, gate.z, gate.at, nil)
+					-- (a body taken: the governor judges from where the server had it, its history from its last driver, if
+					-- any, carried there: MoveValidator.takeOver)
+					validator:takeOver(actorId, gate.x, gate.y, gate.z, gate.at)
 				end
 			end
 			unpin(self, actorId, sq, now)
@@ -1274,7 +1336,19 @@ function MovementService.new(deps: Deps): Movement
 					-- (a packet after a gap too long to judge move by move is never a snap target)
 					sq.good = snapshot
 					sq.cleanAt = now
+					-- a place a Reset may put the body back on: clean, grounded, off the rails, a floor under the feet
+					-- (the server's own floor ray; validator round 7: the raw root was recorded, so a root held still in the
+					-- air was "safe")
+					local floorNear = validator.world.floorNear
+					if
+						snapshot.grounded == true
+						and not (type(rid) == "number" and rid >= 0)
+						and (floorNear == nil or floorNear(px, py, pz))
+					then
+						Recovery.record(sq.safe, now, px, py, pz, true)
+					end
 				end
+				sq.lastRiver = v.river == true
 			end
 			if v.flagged then
 				self._stats.flagged += 1

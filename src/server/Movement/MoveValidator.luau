@@ -89,6 +89,7 @@ export type Verdict = {
 	pounceGap: number?,
 	-- (Movement/MovementService) a click's copy the packet carried, not taken yet: its number and motor clock
 	click: { seq: number, clock: number }?,
+	river: boolean?, -- the packet is the client's own river recovery (the quay spot of a fall it could have made)
 }
 
 export type Options = {
@@ -170,6 +171,7 @@ type Actor = {
 	lastLanded: boolean, -- the last accepted packet came down on a floor inside its gap (the envelope's Judged.landed)
 	standY: number?, -- the height it last stood at off the rails (a grounded packet higher than this rose with its floor)
 	lastOffset: number, -- its arrival offset (server time - client clock)
+	lastRiver: boolean, -- the last accepted packet was a river landing (a landing never follows a landing)
 }
 
 export type MoveValidator = typeof(setmetatable(
@@ -190,6 +192,7 @@ export type MoveValidator = typeof(setmetatable(
 		_marks: { [any]: Marks },
 		_fastest: { [boolean]: number },
 		_govBounds: { [boolean]: GovBounds },
+		_parked: { [any]: Gov? }, -- the governor's history of a body no one drives (forget), for its next driver
 	},
 	MoveValidator
 ))
@@ -292,6 +295,7 @@ function MoveValidator.new(world: World, opts: Options?): MoveValidator
 		_marks = {} :: { [any]: Marks },
 		_fastest = {},
 		_govBounds = {},
+		_parked = {},
 	}, MoveValidator)
 	return self
 end
@@ -337,15 +341,20 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 		lastLanded = false,
 		standY = if state.grounded and not state.routeId then state.y else nil,
 		lastOffset = now - state.clock,
+		lastRiver = false,
 	}
 	record(actor.history, state.clock, state.x, state.y, state.z)
 	self._actors[actorId] = actor
 end
 
--- forget(actorId): drop the actor and its marks (a hand-off: a new body, a new start).
+-- forget(actorId): drop the actor and its marks (a hand-off: a new driver, a new start), all but the displacement
+-- governor's history of the body, kept aside for whoever takes it next (takeOver; invariant C: giving a body up and
+-- taking it back buys no fresh allowance)
 function MoveValidator.forget(self: MoveValidator, actorId: any)
+	local marks = self._marks[actorId]
 	self._actors[actorId] = nil
 	self._marks[actorId] = nil
+	self._parked[actorId] = if marks then marks.gov else nil
 end
 
 local function verdict(
@@ -537,19 +546,26 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local landed = false
 	local boosted = self.boostOf(actorId)
 	local fastest = self:fastest(actorId)
-	local riverLanding = not next.routeId
-		and next.grounded
-		and Recovery.riverLanding(
-			prev.x,
-			prev.z,
+	-- the client's own river recovery (Movement/Recovery.riverFall: the client sends the quay spot on the frame it put the
+	-- body there): the exact spot of a fall into the water the body could have made from the last place the server
+	-- accepted (its own vertical speed, the gap's time up to maxDt), never right after another landing (validator round
+	-- 7: a landing claimed every packet ran the quay at 112 to 296 st/s, each one a fresh governor)
+	local entryX, entryY, entryZ = nil, nil, nil
+	if not next.routeId and next.grounded and not actor.lastRiver then
+		entryX, entryY, entryZ = Recovery.riverEntry(
+			{ x = prev.x, y = prev.y, z = prev.z, vy = prev.vy, onRail = prev.routeId ~= nil },
 			next.x,
 			next.y,
 			next.z,
-			Motion.C.airGrab + fastest * math.max(dtEff, 0) + 1,
-			fastest * math.clamp(dtEff, 0, SquirrelMotor.envelopeParams.maxDt) + 1
+			math.clamp(dtEff, 0, SquirrelMotor.envelopeParams.maxDt),
+			fastest,
+			P.gravity,
+			SquirrelMotor.envelopeParams.posSlack
 		)
+	end
+	local riverLanding = entryX ~= nil
 	if riverLanding then
-		-- the client's own river recovery (Movement/Recovery.riverFall): the quay spot is the new baseline
+		-- the quay spot is the new baseline; the move to it is the move into the water (the governor below)
 		resync = true
 		actor.resyncs += 1
 	elseif dt > SquirrelMotor.envelopeParams.maxDt then
@@ -655,12 +671,18 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	end
 
 	-- the displacement governor over every window of accepted places (invariant B: whatever path the packet took). The
-	-- client's own river recovery puts the body on the quay: the governor starts afresh there
+	-- client's own river recovery: the move judged is the move into the water (to the entry point), the riverFall jump
+	-- from there to the quay carried by the whole history (shift: kept, never started afresh, invariant C)
 	if riverLanding then
-		MoveValidator.anchor(self, actorId, next.x, next.y, next.z, serverTime, nil)
-	else
-		MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
+		MoveValidator.shift(
+			self,
+			actorId,
+			next.x - (entryX :: number),
+			next.y - (entryY :: number),
+			next.z - (entryZ :: number)
+		)
 	end
+	MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
 
 	local ok = #violations == 0
 	for _, v in violations do
@@ -681,6 +703,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	end
 	actor.last = next
 	actor.lastLanded = landed
+	actor.lastRiver = riverLanding
 	actor.lastAcceptedAt = serverTime
 	actor.lastOffset = offset
 	record(actor.history, next.clock, next.x, next.y, next.z)
@@ -688,6 +711,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	v.launched = launched
 	v.pounce = pounceAt
 	v.pounceGap = if pounceAt then dt else nil
+	v.river = riverLanding or nil
 	return v
 end
 
@@ -1178,6 +1202,61 @@ end
 function MoveValidator.hasAnchor(self: MoveValidator, actorId: any): boolean
 	local marks = self._marks[actorId]
 	return marks ~= nil and marks.gov ~= nil
+end
+
+-- shift(actorId, dx, dy, dz): a jump the server allows without the body's own moves (the river's quay, a Reset to a safe
+-- place, a body held and given back, a body taken back: invariant C) carries the whole history with it: every kept
+-- place moves by the jump, so every window is judged as if the body had gone on from where it was. Nothing is cleared,
+-- no allowance is added: the one-offs and the rates already spent stay spent.
+function MoveValidator.shift(self: MoveValidator, actorId: any, dx: number, dy: number, dz: number)
+	local marks = self._marks[actorId]
+	local gov = if marks then marks.gov else nil
+	if gov == nil then
+		return
+	end
+	local g = gov :: Gov
+	local slots = MoveValidator.C.GOV_SLOTS
+	local i = g.head
+	for _ = 1, g.count do
+		g.x[i] += dx
+		g.y[i] += dy
+		g.z[i] += dz
+		i = (i - 2) % slots + 1
+	end
+	g.X += dx
+	g.Y += dy
+	g.Z += dz
+end
+
+-- relocate(actorId, x, y, z, serverTime): the server moved the body to (x, y, z) (feet) itself, by a move the client
+-- can ask for (a Reset, a hold given back, a body taken back, a minigame's knock): the history is kept and carried to
+-- the new place (shift), the time since the last place passes with no allowance (the body was put there, it did not
+-- go), and the newest place is the new one. With no history yet: a new one there (the server's own place).
+function MoveValidator.relocate(self: MoveValidator, actorId: any, x: number, y: number, z: number, serverTime: number)
+	local marks = marksOf(self, actorId)
+	local gov = marks.gov
+	if gov == nil then
+		marks.gov = newGov(x, y, z, serverTime, nil, false)
+		return
+	end
+	local g = gov :: Gov
+	MoveValidator.shift(self, actorId, x - g.X, y - g.Y, z - g.Z)
+	g.G += math.max(0, serverTime - g.S)
+	g.S = math.max(g.S, serverTime)
+	g.clock = nil
+	g.route = false
+	keep(g)
+end
+
+-- takeOver(actorId, x, y, z, serverTime): a driver takes the body where the server has it (feet): the history its last
+-- driver left (forget) carried there (relocate: the AI's moves in between are the server's own), else a new one there.
+function MoveValidator.takeOver(self: MoveValidator, actorId: any, x: number, y: number, z: number, serverTime: number)
+	local marks = marksOf(self, actorId)
+	if marks.gov == nil then
+		marks.gov = self._parked[actorId]
+	end
+	self._parked[actorId] = nil
+	MoveValidator.relocate(self, actorId, x, y, z, serverTime)
 end
 
 -- anchor(actorId, x, y, z, serverTime, keepUntil?): the server put the body at (x, y, z) (feet). keepUntil nil: a move it

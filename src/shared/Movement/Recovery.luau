@@ -10,10 +10,15 @@
 --   newest, `unstick` the newest at least `minAway` studs from where the body is stuck.
 -- * Reset routing: `resetTarget(history, x, y, z)` picks river recovery, else unstick, else stay.
 -- * onVehicleMoved(car, riders): riders standing on a car's roof are pushed off to the nearer side.
--- * riverLanding(fromX, fromZ, x, y, z, reach, slack): is (x, y, z) where riverFall puts a body that fell in within
---   `reach` studs of (fromX, fromZ), on the quay of the side it fell in from, give or take `slack` (the frames run
---   since)? The server's MoveValidator takes the client's own recovery as honest with it.
--- Interface: riverFall(x, y, z) -> (x, y, z)?, riverLanding(fromX, fromZ, x, y, z, reach, slack) -> boolean, newHistory(capacity?, interval?), record(h, t, x, y,
+-- * riverEntry(from, x, y, z, t, speed, gravity, slack, ySlack?): is (x, y, z) the quay spot riverFall gives (within
+--   `slack` across, `ySlack` up) for a fall into the water at a point a body at `from` (the server's own last place of
+--   it: x, y, z, its vertical speed, on a rail or not) could have reached in `t` seconds (across at `speed`, down as
+--   gravity takes it, or at `speed` off a rail)? The water point it went in at (the nearest such), else nil. The
+--   server's MoveValidator takes the client's own recovery as honest with it (validator round 7: the body must have
+--   been able to reach the water; the old rule, riverLanding, asked only that the water lay within reach, and a quay
+--   spot is itself within reach of the water, so landings chained along the quay at 112 to 296 st/s).
+-- Interface: riverFall(x, y, z) -> (x, y, z)?, riverEntry(from, x, y, z, t, speed, gravity, slack, ySlack?) ->
+--   (x, y, z)?, QUAY_Y, newHistory(capacity?, interval?), record(h, t, x, y,
 --   z, grounded), safePos(h), unstick(h, x, y, z, minAway?), resetTarget(h, x, y, z), isSane(x, y, z),
 --   onVehicleMoved(car, riders) -> { { id, x, z } }
 -- Pure; studs. No side effects on require.
@@ -53,37 +58,73 @@ function Recovery.riverFall(x: number, y: number, z: number): (number?, number?,
 	return (Height.riverCenterU(cz) + side * (R.halfWidth + 5)) * S, (R.bankY + 0.18) * S, cz * S
 end
 
--- riverLanding(fromX, fromZ, x, y, z, reach, slack): (x, y, z) is within `slack` of a quay spot riverFall gives (its
--- line on the side of the river (fromX, fromZ) is on, at about its height), the river's water lies within `reach` of
--- (fromX, fromZ), and the spot's z is one riverFall could give for a fall within that reach.
-function Recovery.riverLanding(
-	fromX: number,
-	fromZ: number,
+-- the quay's height (studs): where riverFall puts the feet
+Recovery.QUAY_Y = (R.bankY + 0.18) * S
+
+-- the server's own last place of a body (riverEntry's `from`)
+export type From = { x: number, y: number, z: number, vy: number, onRail: boolean }
+
+-- riverEntry(from, x, y, z, t, speed, gravity, slack, ySlack?) -> (wx, wy, wz)?: (above) the water point nearest `from`
+-- whose riverFall spot is (x, y, z), when the body could have reached it: across within speed * t (+ slack), and down to
+-- the recovery height (waterY + 0.45 u) in t: falling from its own downward speed (none up: a leap only delays it), or
+-- at `speed` off a rail. riverFall's spot for a water point: x on the quay line of the side of the centre line it is on,
+-- y the quay, z its own clamped to the quay's ends (a point past an end lands at that end).
+function Recovery.riverEntry(
+	from: From,
 	x: number,
 	y: number,
 	z: number,
-	reach: number,
-	slack: number
-): boolean
-	if math.abs(y - (R.bankY + 0.18) * S) > 3 + slack then
-		return false
+	t: number,
+	speed: number,
+	gravity: number,
+	slack: number,
+	ySlack: number?
+): (number?, number?, number?)
+	if math.abs(y - Recovery.QUAY_Y) > (ySlack or slack) or t < 0 then
+		return nil, nil, nil
 	end
-	local side = if fromX / S < Height.riverCenterU(fromZ / S) then -1 else 1
-	if math.abs(x - (Height.riverCenterU(z / S) + side * (R.halfWidth + 5)) * S) > slack then
-		return false
+	local cU = Height.riverCenterU(z / S)
+	local side = if x / S < cU then -1 else 1
+	if math.abs(x - (cU + side * (R.halfWidth + 5)) * S) > slack then
+		return nil, nil, nil
 	end
-	local lo, hi = math.clamp(fromZ - reach, -225 * S, 425 * S), math.clamp(fromZ + reach, -225 * S, 425 * S)
-	if z < lo - slack or z > hi + slack then
-		return false
+	local zLo, zHi = -225 * S, 425 * S
+	if z < zLo - slack or z > zHi + slack then
+		return nil, nil, nil
 	end
-	-- the water within reach: the river runs north-south, so look across it at the start's z and the landing's
-	for _, wz in { fromZ, z } do
-		local cx = Height.riverCenterU(wz / S) * S
-		if math.abs(fromX - cx) <= R.halfWidth * S + reach then
-			return true
+	-- (the water's z for that spot: its own, or anywhere past the quay's end it is at)
+	local wzLo, wzHi = z - slack, z + slack
+	if z <= zLo + slack then
+		wzLo = R.zMin * S
+	end
+	if z >= zHi - slack then
+		wzHi = R.zMax * S
+	end
+	wzLo, wzHi = math.max(wzLo, R.zMin * S), math.min(wzHi, R.zMax * S)
+	if wzLo > wzHi then
+		return nil, nil, nil
+	end
+	local wz = math.clamp(from.z, wzLo, wzHi)
+	local c = Height.riverCenterU(wz / S) * S
+	local hw = R.halfWidth * S - 1e-3
+	local wx = if side < 0 then math.clamp(from.x, c - hw, c) else math.clamp(from.x, c, c + hw)
+	if math.sqrt((wx - from.x) ^ 2 + (wz - from.z) ^ 2) > speed * t + slack then
+		return nil, nil, nil
+	end
+	local wy = (R.waterY + 0.45) * S
+	local drop = from.y - wy
+	if drop > 0 then
+		local v0 = math.max(0, -from.vy)
+		local tFall = (-v0 + math.sqrt(v0 * v0 + 2 * gravity * drop)) / gravity
+		if from.onRail then
+			tFall = math.min(tFall, drop / math.max(speed, 1e-6))
+		end
+		-- (a frame's grace: the motor's fall is stepped, a little ahead of the exact one)
+		if tFall > t + 1 / 60 then
+			return nil, nil, nil
 		end
 	end
-	return false
+	return wx, math.min(from.y, wy), wz
 end
 
 function Recovery.newHistory(capacity: number?, interval: number?): History
