@@ -12,7 +12,8 @@
 -- The one call Main.server needs: ActorsRuntime.start({}) (after WorldBoot). The S2 test place keeps
 -- its own harness.
 -- Interface: start(opts) -> Runtime { world, actors, possession, roles, devices, pickBody(player, rung),
---   become(player, species, variant?) -> (ok, reason), stop() }
+--   become(player, species, variant?) -> (ok, reason), stop() }; speciesForRung(rung); AI_ONLY;
+--   pickFree(actors, free, species, variant?, near?) -> town actor? (pure)
 -- Engine only inside the functions. No side effects on require.
 
 local Import = require("../Import")
@@ -82,6 +83,46 @@ function ActorsRuntime.speciesForRung(rung: string?): (string, string?)
 	return "human", nil
 end
 
+-- Posts whose bodies are AI-only and never handed to a player: the street riders (decision 21, data/population.json
+-- nonHumanoid: part-built rigs with no Humanoid, which a player could not move and which would fall once let go).
+ActorsRuntime.AI_ONLY = table.freeze({ rider = true }) :: { [string]: boolean }
+
+-- pickFree(actors, free, species, variant?, near?): the town actor (TownAI world.actors) a player may be handed: the
+-- nearest to `near` (or the lowest id) of that species and variant that `free` allows, a person only from the street
+-- (post townsperson); failing that any free person of another post. Never an AI-only post.
+function ActorsRuntime.pickFree(
+	actors: { any },
+	free: (a: any) -> boolean,
+	species: string,
+	variant: string?,
+	near: Vector3?
+): any?
+	local best, bestD = nil, math.huge
+	for _, a in actors do
+		if
+			a.species == species
+			and (variant == nil or a.variant == variant)
+			and not ActorsRuntime.AI_ONLY[a.post or ""]
+			and (species ~= "human" or a.post == "townsperson")
+			and free(a)
+		then
+			local d = if near then math.sqrt((a.x - near.X) ^ 2 + (a.z - near.Z) ^ 2) else a.id
+			if d < bestD then
+				best, bestD = a, d
+			end
+		end
+	end
+	if best == nil and species == "human" then
+		-- above-floor bodies of any other post (Population's re-post step, simplified for W1)
+		for _, a in actors do
+			if a.species == "human" and not ActorsRuntime.AI_ONLY[a.post or ""] and free(a) then
+				return a
+			end
+		end
+	end
+	return best
+end
+
 function ActorsRuntime.start(opts: Opts): Runtime
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -110,7 +151,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	local t0 = workspace:GetServerTimeNow()
 
 	for _, a in world.actors do
-		local model = BodyFactory.build(a.species, a.variant, a.id, a.post)
+		local model = BodyFactory.build(a.species, a.variant, a.id, a.post, a.ride)
 		local id = `{a.species}_{a.id}`
 		model.Name = id
 		model:SetAttribute(PossessionState.ATTR.ActorId, id)
@@ -185,35 +226,15 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		end,
 	})
 
+	-- a body the AI holds and that is possessable right now (not a patient on the ground, in an ambulance or in a
+	-- hospital bed: Infection/InfectionService); pickFree never offers a street rider (AI_ONLY)
+	local function free(a: any): boolean
+		local actor = byTownId[a.id]
+		return actor.possessable ~= false and possession:controllerOf(actor) == "ai"
+	end
 	local function freeOf(species: string, variant: string?, near: Vector3?): any?
-		local best, bestD = nil, math.huge
-		for _, a in world.actors do
-			local actor = byTownId[a.id]
-			-- a body that is not possessable right now (a patient on the ground, in an ambulance or in a
-			-- hospital bed: Infection/InfectionService) is never offered
-			if
-				a.species == species
-				and (variant == nil or a.variant == variant)
-				and actor.possessable ~= false
-				and possession:controllerOf(actor) == "ai"
-				and (species ~= "human" or a.post == "townsperson" or a.post == "rider")
-			then
-				local d = if near then (Vector3.new(a.x, 0, a.z) - Vector3.new(near.X, 0, near.Z)).Magnitude else a.id
-				if d < bestD then
-					best, bestD = actor, d
-				end
-			end
-		end
-		if best == nil and species == "human" then
-			-- above-floor bodies of any post (Population's re-post step, simplified for W1)
-			for _, a in world.actors do
-				local actor = byTownId[a.id]
-				if a.species == "human" and actor.possessable ~= false and possession:controllerOf(actor) == "ai" then
-					return actor
-				end
-			end
-		end
-		return best
+		local a = ActorsRuntime.pickFree(world.actors, free, species, variant, near)
+		return if a then byTownId[a.id] else nil
 	end
 
 	local function pickBody(player: any, rung: string?): any?

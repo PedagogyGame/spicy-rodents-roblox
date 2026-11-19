@@ -4,7 +4,9 @@
 -- Plan made stays the lot's PrimaryPart (same collision role), and this adds the pieces that make it
 -- read as the thing it is: columns under the fuel canopy and the hospital porte-cochere (roofs need
 -- supports), pilings under the Quay docks, a round trampoline on legs, and small street and yard
--- details (hydrants, benches, bins, stop signs, mailbox-sized yard props) instead of 3-stud boxes.
+-- details (hydrants, benches, bins, stop signs, mailbox-sized yard props) instead of 3-stud boxes; the kids' bikes,
+-- wheelbarrows, hose reels, the ride-on mower and the park shed's roof and door (owner playtest 2026-11-19: "bikes and
+-- things that were basic colors"), each drawn over its old box, which stays the lot's unseen PrimaryPart.
 -- The v5.4 `streetlight` details become invisible markers: street lamps are LampPlan's job (one row
 -- per street), and the 13 x 3 boxes read as fallen lamp posts.
 -- Interface: dress(lot, kit, body, list, seat) (body = the lot's block PartSpec, edited in place).
@@ -14,6 +16,7 @@ local Geometry = require("../Geometry")
 local Import = require("../Import")
 local Spec = require("../Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local RidePuppet = Import.shared("Vehicles/RidePuppet") :: typeof(require("../../shared/Vehicles/RidePuppet"))
 
 local Props = {}
 
@@ -34,6 +37,16 @@ local function add(
 	o: Spec.Opts
 )
 	list:add(ORIGIN, name, x, y, z, sx, sy, sz, o)
+end
+
+-- A part at a frame-local position p = { x, y, z } (y above the frame's height), size s; never solid.
+local function add3(list: Spec.PartList, f: Geometry.Frame, name: string, p: { number }, s: { number }, o: Spec.Opts)
+	o.canCollide = false
+	o.role = o.role or "Trim"
+	if o.castShadow == nil then
+		o.castShadow = false
+	end
+	list:add(f, name, p[1], p[2], p[3], s[1], s[2], s[3], o)
 end
 
 -- A vertical cylinder from y0 to y1.
@@ -157,6 +170,175 @@ local function trampoline(body: Spec.PartSpec, list: Spec.PartList, seat: number
 		local x, z = body.cx + math.cos(a) * (d / 2 - 0.6), body.cz + math.sin(a) * (d / 2 - 0.6)
 		post(list, `Leg{k}`, x, z, seat - 0.5, top - 0.6, 0.3, { 150, 152, 156 }, "Metal", false)
 	end
+end
+
+-- Parts drawn the PartBuilder way (Shared/Vehicles/RidePuppet: positions above the ground, local yaw, pitch and roll)
+-- put down in a frame on the lot; none collides (the box they replace never did), small ones cast no shadow.
+local function drawn(list: Spec.PartList, prefix: string, parts: { any }, f: Geometry.Frame)
+	for _, p in parts do
+		local c = p.color
+		add3(list, f, prefix .. p.name, p.pos, p.size, {
+			yaw = p.yaw,
+			pitch = p.pitch,
+			roll = p.roll,
+			shape = if p.shape == "Block" then nil else p.shape,
+			color = { math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5) },
+			material = p.material or "SmoothPlastic",
+			castShadow = p.castShadow == true,
+		})
+	end
+end
+
+-- The box a drawn prop replaces stays the lot's PrimaryPart, unseen: no shadow, nothing to stand on.
+local function hide(body: Spec.PartSpec)
+	body.transparency = 1
+	body.canQuery = false
+	body.castShadow = false
+end
+
+-- A kid's bicycle on its stand (RidePuppet's, at a kid's 0.82, one bar of spokes a wheel), in the old box's colour.
+local function kidsBike(body: Spec.PartSpec, list: Spec.PartList, seat: number)
+	hide(body)
+	local k = RidePuppet.newKit(0)
+	RidePuppet.drawBicycle(k, { scale = 0.82, frame = "#3c78aa", basket = true, spokes = 1 })
+	local f = Geometry.frame(body.cx, seat, body.cz, body.yaw)
+	drawn(list, "Bike", k.parts, f)
+	add3(
+		list,
+		f,
+		"BikeStand",
+		{ 0.32, 0.36, 0.75 },
+		{ 0.06, 0.8, 0.06 },
+		{ roll = 0.45, color = METAL, material = "Metal" }
+	)
+end
+
+-- A garden wheelbarrow: the red tray with its sloped front, the wheel, two wooden handles and two legs (7 parts).
+local function wheelbarrow(body: Spec.PartSpec, list: Spec.PartList, seat: number)
+	hide(body)
+	local f = Geometry.frame(body.cx, seat, body.cz, body.yaw)
+	local red, dark = { 150, 60, 50 }, { 30, 31, 33 }
+	add3(list, f, "Tray", { 0, 1.25, 0.35 }, { 1.9, 0.75, 1.5 }, { color = red, material = "Metal", castShadow = true })
+	add3(
+		list,
+		f,
+		"TrayNose",
+		{ 0, 1.25, -0.75 },
+		{ 1.9, 0.75, 0.7 },
+		{ shape = "Wedge", color = red, material = "Metal" }
+	)
+	add3(list, f, "Wheel", { 0, 0.5, -1.35 }, { 0.3, 1.0, 1.0 }, { shape = "Cylinder", color = dark })
+	for i, sx in { -1, 1 } do
+		add3(
+			list,
+			f,
+			`Handle{i}`,
+			{ sx * 0.62, 1.0, 0.25 },
+			{ 0.14, 0.14, 3.4 },
+			{ pitch = 0.12, color = WOOD, material = "Wood" }
+		)
+		add3(list, f, `Leg{i}`, { sx * 0.55, 0.45, 0.95 }, { 0.12, 0.9, 0.12 }, { color = METAL, material = "Metal" })
+	end
+end
+
+-- A garden hose reel: the green hose wound on a drum between two discs on a metal frame with a handle (6 parts).
+local function hoseReel(body: Spec.PartSpec, list: Spec.PartList, seat: number)
+	hide(body)
+	local f = Geometry.frame(body.cx, seat, body.cz, body.yaw)
+	add3(
+		list,
+		f,
+		"Hose",
+		{ 0, 1.0, 0 },
+		{ 1.0, 1.25, 1.25 },
+		{ shape = "Cylinder", color = { 70, 130, 70 }, castShadow = true }
+	)
+	for i, sx in { -1, 1 } do
+		add3(
+			list,
+			f,
+			`Disc{i}`,
+			{ sx * 0.56, 1.0, 0 },
+			{ 0.1, 1.7, 1.7 },
+			{ shape = "Cylinder", color = { 196, 160, 60 } }
+		)
+	end
+	add3(list, f, "Crank", { 0.75, 1.0, 0 }, { 0.3, 0.3, 0.3 }, { shape = "Ball", color = METAL, material = "Metal" })
+	add3(list, f, "Frame", { 0, 0.12, 0.2 }, { 1.4, 0.24, 1.9 }, { color = METAL, material = "Metal" })
+	add3(list, f, "Handle", { 0, 1.9, 0.75 }, { 1.4, 0.14, 0.14 }, { color = METAL, material = "Metal" })
+end
+
+-- The ride-on mower behind house 3 (v5.4 #d1ae44): the cutting deck, the yellow bonnet and body, the seat and its back,
+-- the steering column and wheel, small front and big back wheels (12 parts), along the old box.
+local function mower(body: Spec.PartSpec, list: Spec.PartList, seat: number)
+	hide(body)
+	local long = body.sz >= body.sx
+	local f = Geometry.frame(body.cx, seat, body.cz, body.yaw + (if long then 0 else math.pi / 2))
+	local yellow, dark, black = { 209, 174, 68 }, { 58, 60, 62 }, { 30, 31, 33 }
+	add3(list, f, "Deck", { 0, 0.6, 0.2 }, { 4.4, 0.45, 3.6 }, { color = dark, material = "Metal" })
+	add3(list, f, "Bonnet", { 0, 1.55, -2.3 }, { 2.6, 1.3, 2.6 }, { color = yellow, castShadow = true })
+	add3(list, f, "Grille", { 0, 1.45, -3.62 }, { 1.8, 0.8, 0.06 }, { color = black })
+	add3(list, f, "Chassis", { 0, 1.3, 1.1 }, { 3.0, 0.9, 3.6 }, { color = yellow, castShadow = true })
+	add3(list, f, "Seat", { 0, 1.95, 1.6 }, { 1.6, 0.35, 1.4 }, { color = black })
+	add3(list, f, "SeatBack", { 0, 2.6, 2.35 }, { 1.6, 1.2, 0.3 }, { pitch = -0.2, color = black })
+	add3(list, f, "Column", { 0, 2.2, -0.6 }, { 0.14, 1.4, 0.14 }, { pitch = -0.45, color = black })
+	add3(
+		list,
+		f,
+		"SteeringWheel",
+		{ 0, 2.85, -0.3 },
+		{ 0.1, 0.9, 0.9 },
+		{ shape = "Cylinder", roll = math.pi / 2 - 0.45, color = black }
+	)
+	for i, w in { { -1.45, -2.4, 0.55 }, { 1.45, -2.4, 0.55 }, { -1.55, 2.5, 0.85 }, { 1.55, 2.5, 0.85 } } do
+		add3(
+			list,
+			f,
+			`Wheel{i}`,
+			{ w[1], w[3], w[2] },
+			{ 0.55, w[3] * 2, w[3] * 2 },
+			{ shape = "Cylinder", color = black }
+		)
+	end
+end
+
+-- The park shed: the walls stay the body (the same solid box, still all that collides: the town's collidable massing
+-- and its far Skyline are unchanged); thin slates lie flush on its top with eaves all round (no gap to slip into),
+-- a door and a window on the front, a fascia board under the front eave (4 parts, none solid, the eaves unqueried).
+local function shed(body: Spec.PartSpec, list: Spec.PartList)
+	local W, D, H = body.sx, body.sz, body.sy
+	local f = Geometry.frame(body.cx, body.cy - H / 2, body.cz, body.yaw)
+	body.material = "WoodPlanks"
+	add3(list, f, "Slates", { 0, H + 0.15, 0 }, { W + 2.4, 0.3, D + 2.4 }, {
+		color = { 95, 93, 86 },
+		material = "Slate",
+		castShadow = true,
+		canQuery = false, -- an overhang takes no queries (worldgen_pins): rays land on the walls' top, as bodies do
+	})
+	add3(
+		list,
+		f,
+		"Fascia",
+		{ 0, H - 0.1, -D / 2 - 1.05 },
+		{ W + 2.4, 0.6, 0.25 },
+		{ color = { 120, 92, 66 }, material = "Wood" }
+	)
+	add3(
+		list,
+		f,
+		"Door",
+		{ -W * 0.18, 3.0, -D / 2 - 0.08 },
+		{ 4.2, 6.0, 0.2 },
+		{ color = { 96, 70, 50 }, material = "WoodPlanks" }
+	)
+	add3(
+		list,
+		f,
+		"Window",
+		{ W * 0.24, 4.2, -D / 2 - 0.08 },
+		{ 4.0, 2.4, 0.2 },
+		{ color = { 31, 44, 53 }, material = "Glass" }
+	)
 end
 
 -- Small details: the body (footprint x 3 st box) is replaced by a believable little object.
@@ -328,12 +510,20 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 	elseif kind == "sprinkler_head" then
 		reshape(0.5, 0.4, 0.5, { 90, 90, 90 }, "Metal", "Cylinder")
 	elseif kind == "kids_bike" or kind == "wheelbarrow" or kind == "garden_hose_reel" then
+		-- the old box stays (unseen) at its old size; the thing itself is drawn in its place
 		body.sx, body.sz = math.min(body.sx, 3.2), math.min(body.sz, 5.5)
 		body.sy, body.cy = 1.8, seat + 0.9
 		body.color = if kind == "kids_bike"
 			then { 60, 120, 170 }
 			elseif kind == "wheelbarrow" then { 150, 60, 50 }
 			else { 70, 130, 70 }
+		if kind == "kids_bike" then
+			kidsBike(body, list, seat)
+		elseif kind == "wheelbarrow" then
+			wheelbarrow(body, list, seat)
+		else
+			hoseReel(body, list, seat)
+		end
 	elseif kind == "porch_swing" then
 		-- a garden swing: the seat hangs from a top bar on two posts
 		body.sy, body.cy = 0.5, seat + 1.6
@@ -374,6 +564,10 @@ function Props.dress(lot: any, _kit: any, body: Spec.PartSpec, list: Spec.PartLi
 		trampoline(body, list, seat)
 	elseif t == "detail" then
 		detail(lot, body, list, seat)
+	elseif t == "backyard_prop" and string.find(lot.style or "", "mower", 1, true) then
+		mower(body, list, seat)
+	elseif t == "shed" then
+		shed(body, list)
 	end
 end
 

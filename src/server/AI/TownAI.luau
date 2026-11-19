@@ -7,7 +7,8 @@
 -- Store's shopkeeper, on the store's floor); hospital staff walk the ward rounds and the desk post of Infection/HospitalLayout, indoors
 -- on lanes the bake keeps clear; the ambulance crew walks a circuit at the ambulance bay; 6 officers
 -- patrol from west_police_station, the guard and car crew hold the station's locker room),
--- novelty riders and motorcyclists as cyclists on the lanes, squirrels running the 1,332 harvested
+-- the novelty riders (the mime, the five kids) as cyclists on the lanes (the two motorcyclists ride the traffic's
+-- motorcycles, Traffic/Fleet ids 8 and 11, drawn by Traffic/Ghost: not here as well), squirrels running the 1,332 harvested
 -- routes (Routes/Registry + Graph through AI/RouteAdapter), the AI rodent wandering and stalking
 -- from a v5.4 hide, the fox roaming and 6 deer grazing at their v5.4 origins. Ground is
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
@@ -420,11 +421,14 @@ function TownAI.build(opts: Opts): World
 		end
 	end
 	local nh = data:population().nonHumanoid or {}
-	local riders = opts.riders or ((nh.noveltyRiders or 6) + (nh.motorcyclists or 2))
+	-- population.json's two motorcyclists are Morgan and Alex on the traffic's motorcycles (BUILD_PLAN D-2: road users
+	-- in the fatal fleet), so only the novelty riders take the lanes: one of each person in town at once
+	local riders = opts.riders or nh.noveltyRiders or 6
 	for i = 1, riders do
 		local x, z = laneSpot(i * 7)
 		local actor = add("human", "rider", "Pedestrian", hipH, x, z)
 		actor.post = "rider"
+		actor.ride = i -- RidePuppet.RIDERS: the mime, then the five kids
 		register(actor, Pedestrian.new(actor, riderParams))
 	end
 

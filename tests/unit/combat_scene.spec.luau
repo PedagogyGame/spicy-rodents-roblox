@@ -37,6 +37,7 @@ local function streetVictim(rig: any, others: number): any
 		for _, a in rig.world.actors do
 			if
 				a.species == "human"
+				and a.post ~= "rider" -- a street rider rides off when bitten, never joins in
 				and a.id ~= v.id
 				and (a.x - v.x) ^ 2 + (a.z - v.z) ^ 2 <= P.sceneRadius * P.sceneRadius
 			then
