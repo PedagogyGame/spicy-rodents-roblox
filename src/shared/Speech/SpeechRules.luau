@@ -61,6 +61,13 @@ SpeechRules.CHANCE = table.freeze({
 	rafters = 0.8,
 	drain = 0.8,
 	stakeout = 1,
+	-- the overhead watch (Stealth/OverheadWatch): the one who points it out speaks most times, the neighbour they
+	-- told answers (a forced line, so the exchange is not cut in half), the wary and the lost now and then
+	overhead = 0.85,
+	overheadUneasy = 0.8,
+	overheadReply = 1,
+	overheadWary = 0.6,
+	overheadLost = 0.5,
 }) :: { [string]: number }
 
 -- How often a spotting line is the owner's own, when it was not the last line said in town.

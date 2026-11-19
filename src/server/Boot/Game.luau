@@ -55,7 +55,8 @@
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
---   not start), rafters (Attractions/RafterService; nil when it could not start), cornerStore (Items/CornerStore;
+--   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
+--   the town's people looking up at a squirrel overhead; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start),
 --   townIdOf(actorId), stop() };
@@ -95,6 +96,7 @@ local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
+local OverheadService = require("../Stealth/OverheadService")
 local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
@@ -496,6 +498,7 @@ function Game.start(opts: Opts?): any
 	local devices = rt.devices
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
+	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
 	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
@@ -1574,6 +1577,17 @@ function Game.start(opts: Opts?): any
 				rafters = nil
 			end
 		end
+		if overhead then
+			local okO, errO = pcall(overhead.step, overhead, dt)
+			if not okO then
+				warn(`[SpicyRodents] the overhead watch stopped: {errO}`)
+				pcall(overhead.stop, overhead)
+				overhead = nil
+				if combat then
+					combat.opts.overhead = nil
+				end
+			end
+		end
 	end
 
 	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
@@ -1792,6 +1806,61 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the rafter watch failed to start: {errR}`)
 	end
 
+	-- 6b''. the town's people notice, and talk about, a squirrel stalking above them on a wire, a fence, a branch or a
+	-- roof's edge (Stealth/OverheadService; owner playtest 2026-11-19); the rafters keep theirs. A person who has
+	-- pointed the rodent out above them meets it aware in the duel (Combat/CombatService opts.overhead)
+	local okO, errO = pcall(function()
+		overhead = OverheadService.new({
+			world = world,
+			infection = infection,
+			combat = combat,
+			groundAt = Height.at,
+			-- the held rodent's route, from the validator's last clean packet (a stale one says nothing)
+			motorOf = function(id: number): any
+				local actor = rt.byTownId[id]
+				if actor == nil then
+					return nil
+				end
+				local snap, at = movement:motorOf(actor.id)
+				if snap == nil or at == nil or workspace:GetServerTimeNow() - at > 1 then
+					return nil
+				end
+				return { routeId = (snap :: any).routeId }
+			end,
+			exclude = function(id: number): boolean
+				local actor = rt.byTownId[id]
+				return rafters ~= nil and actor ~= nil and rafters:watches(actor.id)
+			end,
+			setAttr = setTownAttr,
+			gaze = function(id: number, x: number?, y: number?, z: number?)
+				setTownAttr(id, "Gaze", if x and y and z then Vector3.new(x, y, z) else nil)
+			end,
+			-- the rodent's own eye: the player holding it (Client/UI/SneakMeter)
+			cue = function(id: number, meter: number?, seen: boolean?)
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				if driver ~= nil and driver ~= "ai" then
+					pcall(function()
+						driver:SetAttribute("OverheadMeter", meter)
+						driver:SetAttribute("OverheadSeen", seen)
+					end)
+				end
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+		})
+		if combat then
+			combat.opts.overhead = function(person: number, rodent: number): boolean
+				return overhead ~= nil and overhead:spotted(person, rodent)
+			end
+		end
+	end)
+	if not okO then
+		overhead = nil
+		warn(`[SpicyRodents] the overhead watch failed to start: {errO}`)
+	end
+
 	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
 	local dogs: any = nil
 	local okD, errD = pcall(function()
@@ -1939,6 +2008,7 @@ function Game.start(opts: Opts?): any
 		sewers = sewers,
 		skylift = skylift,
 		rafters = rafters,
+		overhead = overhead,
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
@@ -1961,6 +2031,9 @@ function Game.start(opts: Opts?): any
 			end
 			if rafters then
 				rafters:stop()
+			end
+			if overhead then
+				overhead:stop()
 			end
 			if lounge then
 				lounge:stop()

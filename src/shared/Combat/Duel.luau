@@ -20,6 +20,11 @@
 --             ready
 --   flee      runs (never a tough person) for FLEE_SECS, as the brain's flight along the lane lasts; a bite at the
 --             heels is "runner". A person still with the rodent close when the flight ends stays on their guard
+-- A STALK FOUND OUT (owner: stalking "still possible, but harder"): a calm or wary person who first notices the rodent
+-- within params.threat while it creeps (view.sneaking: it got right up to them), or hears the wind-up of a pounce they had not seen coming
+-- (params.tellHeard, one roll a tell), cries out and turns on it as a scene does (Duel.rally) and is ALARMED for the rest
+-- of the duel: blows as near a fresh bite (more swings, surer hits, never the bite penalty) and the arm always up when
+-- squared up; so does one an unaware bite failed on. A person who saw it coming from further off is not alarmed.
 -- A feint is a tell with no pounce after it: read (readFeint) the person counters at once, a quicker wind-up with a
 -- longer reach and counterHit (the brief's "free hit"); not read, they react to it as to a real pounce, and a swing at
 -- nothing leaves them open.
@@ -27,7 +32,7 @@
 -- pounce on its way up): a bite is judged against the person as the player saw them (bitePhaseAt: the trail of the
 -- last TRAIL_SECS), except the reaction to that very pounce's tell, which runs on the server's clock (a slow link
 -- buys no longer reaction window).
--- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, dist, inView) -> boolean;
+-- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, sight) -> boolean;
 --   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase;
 --   bitePhaseAt(g, now, rewind, tell?) -> CombatRules.BitePhase; batted(g, now) (a bite failed on them: back to ready
 --   unless striking); rally(params, g, now, mode) (the scene turns on the rodent); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
@@ -59,6 +64,7 @@ export type Guard = {
 	fleeFrom: number, -- when the flight began
 	rallyUntil: number, -- turned on the rodent (a bite, a group set on) until then: closes in, strikes on reaching it
 	provoked: boolean, -- it has struck at the rodent or been set on by it: a vigilante's stance shows from then on
+	alarmed: boolean, -- caught it sneaking up on them: on edge for the rest of the duel (blows as near a fresh bite)
 	shown: boolean, -- a vigilante shown however it is (Server/Combat/CombatService: the town 40 % bitten)
 	strikes: number,
 	hits: number,
@@ -81,6 +87,17 @@ export type View = {
 	recovering: boolean, -- the rodent is recovering from a pounce
 	zigzag: number, -- 0 to 1
 	boosted: boolean, -- near a fresh bite: the hidden strength boost
+	sneaking: boolean?, -- the rodent moves no faster than a creep (params.quietSpeed): found close, it was stalking them
+}
+
+-- What the person can tell of the rodent, for noticing it (Duel.notices).
+export type Sight = {
+	dist: number, -- studs, flat
+	dy: number?, -- the rodent's height over the person's feet
+	inView: boolean, -- inside their view cone (the v5.4 cone: facing . direction > 0.28)
+	speed: number?, -- the rodent's flat speed, studs/s (nil: moving)
+	lunging: boolean?, -- in a pounce's wind-up or lunge
+	spottedOverhead: boolean?, -- they have pointed it out above them (Stealth/OverheadWatch)
 }
 
 export type Strike = { kind: string, hit: boolean, counter: boolean, chance: number }
@@ -124,6 +141,7 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 		fleeFrom = 0,
 		rallyUntil = 0,
 		provoked = false,
+		alarmed = false,
 		shown = false,
 		strikes = 0,
 		hits = 0,
@@ -131,10 +149,37 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 	}
 end
 
--- Does the person notice the rodent at this distance: within the spot range times their temperament's notice, in
--- view, or close enough to hear and feel (v5.4: under 6.8 u = 17 studs whatever the facing).
-function Duel.notices(params: Params, g: Guard, dist: number, inView: boolean): boolean
-	return dist <= params.spotRange * params.notice[g.temper] and (inView or dist < 17)
+-- Does the person notice the rodent (the town's perception, so a stalk is a real play; combat review 19 Nov: "a person
+-- notices the rodent within 17 studs whatever way they face"):
+--   * it is pointed out overhead (Stealth/OverheadWatch: they have spotted it on a wire or a branch above them);
+--   * higher over their feet than params.overheadY the duel does not see it at all (the overhead watch does);
+--   * seen: in their view cone and within the spot range times their temperament's notice;
+--   * heard: moving faster than a creep (params.quietSpeed) within params.hear times their notice, whatever the facing;
+--   * felt: within params.brush of a rodent that is not pouncing.
+-- (The pounce itself, its wind-up and lunge, is too quick to turn round for: noticing it is what the reaction window to
+-- its tell is about, for a person already aware.) A creeping or still rodent behind a person, or one dropping from
+-- above behind them, goes unnoticed until it brushes them. `speed` nil reads as moving (heard). (Duel.think adds one
+-- last chance: a person who has not noticed it may hear the pounce's wind-up within params.threat and turn at the last
+-- moment, params.tellHeard by temperament, caught unready.)
+function Duel.notices(params: Params, g: Guard, sight: Sight): boolean
+	if sight.spottedOverhead then
+		return true
+	end
+	if (sight.dy or 0) > params.overheadY then
+		return false
+	end
+	local notice = params.notice[g.temper]
+	if sight.inView and sight.dist <= params.spotRange * notice then
+		return true
+	end
+	if sight.lunging then
+		return false
+	end
+	if sight.dist < params.brush then
+		return true
+	end
+	local loud = sight.speed == nil or sight.speed > params.quietSpeed
+	return loud and sight.dist <= params.hear * notice
 end
 
 -- The reach of the blow being wound up (studs).
@@ -217,6 +262,7 @@ end
 
 local function think(params: Params, g: Guard, view: View, rand: () -> number): Out
 	local now = view.now
+	local boosted = view.boosted or g.alarmed
 	local out: Out = { move = "none", speed = 0, strike = nil, reacted = nil, read = false, stance = nil }
 	-- noticing, and letting go
 	-- (a vigilante takes the rodent on from as far as it sees it: "on sighting ... they move to kick it")
@@ -229,12 +275,30 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 			g.awareAt = now
 			ready(g)
 			-- first sight: a calm or wary person may run at once; a tough one squares up
-			local w = CombatRules.weights(params, g.temper, g.nerve, view.boosted, true)
-			if
+			local w = CombatRules.weights(params, g.temper, g.nerve, boosted, true)
+			if view.sneaking == true and view.dist <= params.threat and g.temper ~= "tough" then
+				-- found right beside them (a stalk discovered late): they cry out and turn on it as a scene does, and stay on
+				-- edge for the rest of the duel (g.alarmed)
+				g.alarmed = true
+				Duel.rally(params, g, now, CombatRules.rallyPick(params, g.temper, g.nerve, boosted, rand()))
+			elseif
 				rand()
 				< (w.flee or 0) / math.max(1e-6, (w.flee or 0) + (w.back or 0) + (w.swing or 0) + (w.kick or 0))
 			then
 				apply(params, g, "flee", now)
+			end
+		elseif view.tell ~= nil and view.tell ~= g.lastTell and view.dist <= params.threat then
+			-- the wind-up's hiss right behind them: one roll a tell and person (params.tellHeard) to turn at the last moment (alarmed,
+			-- as above); else the pounce meets them unaware
+			-- (the roll is the person's and the tell's own, not the dice's: the server lets an idle person's Guard go
+			-- between its steps, and a tell is rolled for once however many steps its wind-up spans)
+			if CombatRules.hash(`heard:{tostring(g.id)}:{view.tell}`) < params.tellHeard[g.temper] then
+				-- (turned round by it, they cry out and turn on it as a scene does: Duel.rally)
+				g.alarmed = true
+				Duel.rally(params, g, now, CombatRules.rallyPick(params, g.temper, g.nerve, boosted, rand()))
+			else
+				g.lastTell = view.tell
+				return out
 			end
 		else
 			return out
@@ -266,10 +330,10 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 			else
 				-- (a vigilante is never caught unready: it squares up the moment it sees the rodent)
 				local startled = g.temper ~= "tough" and now - g.awareAt < Duel.STARTLED_SECS
-				local w = CombatRules.weights(params, g.temper, g.nerve, view.boosted, startled)
+				local w = CombatRules.weights(params, g.temper, g.nerve, boosted, startled)
 				g.pending = CombatRules.pick(w, rand())
 				-- squared up, the arm may be up already; caught moving (backing off, flinching) or just noticing, it is not
-				g.guarded = g.phase == "ready" and not startled and rand() < params.guardUp[g.temper]
+				g.guarded = g.phase == "ready" and not startled and (rand() < params.guardUp[g.temper] or g.alarmed)
 				g.running = g.phase == "flee"
 				g.phase = "startle"
 				g.reactAt = math.max(now, tell + params.react[g.temper])
@@ -291,7 +355,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 			committed = view.committed,
 			recovering = view.recovering,
 			counter = g.counter,
-			boosted = view.boosted,
+			boosted = boosted,
 		})
 		local inReach = view.dist <= reach and math.abs(view.dy or 0) <= params.contactHeight
 		local hit = inReach and rand() < chance
@@ -330,7 +394,7 @@ local function think(params: Params, g: Guard, view: View, rand: () -> number): 
 		g.rallyUntil = 0
 	end
 	if g.phase == "ready" and inReach then
-		local boost = if view.boosted then params.swingBias else 1
+		local boost = if boosted then params.swingBias else 1
 		-- (one who turned on the rodent strikes the moment it is in reach)
 		local p = if charging
 			then 1
@@ -442,6 +506,9 @@ end
 -- A bite failed on this person ("Batted away"): they square up again unless a blow is on its way or they are running.
 function Duel.batted(g: Guard, now: number)
 	g.provoked = true
+	if not g.aware or g.phase == "idle" then
+		g.alarmed = true -- (it was on them before they knew: on edge from now on)
+	end
 	if g.phase == "startle" and g.running then
 		g.phase = "flee" -- (shaken off, and still running)
 	elseif g.phase ~= "windup" and g.phase ~= "flee" then
