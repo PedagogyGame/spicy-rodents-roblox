@@ -15,6 +15,7 @@ local PlayerSaves = require("@server/Persistence/PlayerSaves")
 local Wardrobe = require("@server/Cosmetics/Wardrobe")
 local GiftShop = require("@server/Cosmetics/GiftShop")
 local Credits = require("@server/Economy/Credits")
+local BakedWorld = require("../lib/BakedWorld")
 
 local SHIRT = "alley_shirt"
 
@@ -461,6 +462,15 @@ return function(t)
 		t.falsy(paid)
 		t.falsy(a.wardrobe:owns(kim, SHIRT))
 		t.eq(wallet.balance(kim), 3)
+	end)
+
+	t.test("the desk GiftShop.start puts its prompt on is in the alley's bake (no bake change needed)", function()
+		local _, _, root = BakedWorld.bakeAlley()
+		-- (start searches Workspace.Attractions for the GiftShop model and takes its direct child Desk)
+		local shop = root:FindFirstChild("GiftShop", true)
+		t.truthy(shop)
+		local desk = shop:FindFirstChild("Desk")
+		t.truthy(desk and desk:IsA("BasePart"))
 	end)
 
 	t.test("the look: the shirt's colour on the body's shirt parts, put back when it comes off", function()

@@ -8,7 +8,7 @@
 --   owned       puts it on, or takes it off if it is on (saved too).
 -- Only a person shops (an animal is told so). A second press while one is being served is refused with words.
 -- The souvenirs (postcard, toy pin, mug) are not sold here yet; they would stay on the server, like every other item.
--- The prompt is made at boot on the baked desk (no bake change): 1 ProximityPrompt, no parts.
+-- The prompt is made at boot on the baked desk (no bake change): 1 Attachment and 1 ProximityPrompt, no parts.
 -- Interface: press(deps, player) -> (ok, words) (pure over deps); start(opts) -> Shop? (nil without the desk);
 --   ITEM; WORDS
 -- Engine only inside start; no side effects on require.
@@ -114,6 +114,10 @@ function GiftShop.start(opts: Opts): Shop?
 	if not (desk and desk:IsA("BasePart")) then
 		return nil
 	end
+	local att = Instance.new("Attachment")
+	att.Name = "GiftShopPoint"
+	att.Position = Vector3.new(0, desk.Size.Y / 2 + 0.6, 0) -- on the counter's top
+	att.Parent = desk
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "GiftShopPrompt"
 	prompt.ActionText = "Alley shirt"
@@ -122,7 +126,9 @@ function GiftShop.start(opts: Opts): Shop?
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
 	prompt.MaxActivationDistance = 8
 	prompt.RequiresLineOfSight = false
-	prompt.Parent = desk
+	prompt.HoldDuration = 0
+	prompt:SetAttribute("Door", true) -- E belongs to the prompt, not to the vehicles (Client/Minigames/MinigameClient)
+	prompt.Parent = att
 	local Players = game:GetService("Players")
 	local deps: Deps = {
 		wallet = opts.wallet,
@@ -149,7 +155,7 @@ function GiftShop.start(opts: Opts): Shop?
 		prompt = prompt,
 		stop = function()
 			conn:Disconnect()
-			prompt:Destroy()
+			att:Destroy()
 		end,
 	}
 end

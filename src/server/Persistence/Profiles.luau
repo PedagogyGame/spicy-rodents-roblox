@@ -5,6 +5,8 @@
 -- read-only fallback) over any DataStoreLike: W1 uses the in-memory MemoryStore (Serializer strings);
 -- W4 #11 passes DataStoreService:GetDataStore(...). Saves only through ProfileStore, so the lock and
 -- lease rules hold in both. No side effects on require.
+-- (The live server does not use this facade: Persistence/PlayerSaves holds the players' profiles in the game, off
+-- the frame thread, with retries and notices; the clothing is all it saves so far, owner D16 #25.)
 -- Interface: new(opts) -> Profiles; P:load(player) -> (Data, status); P:data(player) -> Data?;
 --            P:save(player) -> (ok, err?); P:locked(player) -> boolean (read-only session);
 --            P:release(player) -> (ok, err?); P:step(now); P:releaseAll() (BindToClose)
