@@ -105,4 +105,68 @@ return function(t)
 			)
 		end
 	)
+
+	-- knock ------------------------------------------------------------------------------------------------------------
+	t.test(
+		"knock: a root written inside the paintball station between two watches: the server puts the body out on its street",
+		function()
+			-- Boot/Game's `animals` (the minigames' list of squirrels) reads every body's root, a held one's too; the
+			-- paintball service's audience pass (every Clock.AUDIENCE_SECS) puts any animal found inside the station on
+			-- the street in front of it (PaintballService: knock -> Boot/Game movedBody -> MovementService.teleported,
+			-- "knocked": the governor's history carried there, the jump itself never judged). A bowling lane in play and
+			-- a pool shot knock an animal off the same way, from the same list.
+			local world, vworld = worldWith({})
+			local station = { x = 600, y = world.groundHeight, z = 0 } -- (inside the station's volume)
+			local street = { x = 600, y = world.groundHeight, z = 40 } -- (Paintball STREET: in front of the annex)
+			local cheating = false
+			local rig: any
+			rig = LiveRig.new({
+				world = world,
+				vworld = vworld,
+				link = { latency = 0.05, jitter = 0, loss = 0 },
+				seed = 5,
+				rootCheat = function(p: { x: number, y: number, z: number }, _now: number, _s: State)
+					if cheating then
+						p.x, p.y, p.z = station.x, station.y, station.z
+					end
+				end,
+			})
+			rig:possess(SquirrelMotor.new(0, world.groundHeight, 0), function(_now: number): SquirrelMotor.Input
+				return SquirrelMotor.idleInput(0)
+			end)
+			rig:run(3)
+			local start = table.clone(rig.server.root)
+			local startAt = rig.t
+			cheating = true
+			local knocked = false
+			for _ = 1, 400 do
+				rig:run(0.002)
+				local r = rig.server.root
+				if math.abs(r.x - station.x) < 1 and math.abs(r.z - station.z) < 1 then
+					-- (the pass finds an animal inside: knock(id, street) -> PivotTo, movedBody)
+					cheating = false
+					rig:teleport(street.x, street.y, street.z, "knocked")
+					knocked = true
+					break
+				end
+			end
+			t.truthy(knocked, "the pass read the client's root inside the station")
+			rig:run(3)
+			local r = rig:result()
+			local elapsed = rig.t - startAt
+			local b = MoveValidator.new(vworld):governorBounds(false)
+			local bound = b.vh * elapsed + b.dh
+			local moved = dist(start, r.root)
+			print(
+				string.format(
+					"      the root %.0f st from where the server last held it, %.1f s later (the governor's most %.0f); snaps %d",
+					moved,
+					elapsed,
+					bound,
+					r.snaps
+				)
+			)
+			t.truthy(moved <= bound, `a knock moved the body {math.floor(moved)} st in {elapsed} s, the most {bound}`)
+		end
+	)
 end
