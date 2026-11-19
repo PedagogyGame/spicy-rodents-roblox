@@ -5,7 +5,10 @@
 -- Usage (repo root): lune run tools/review/rides.luau [--out build/review/rides] [--res 1600x620] [--rows N] entry ...
 --   rider:<slot>      Server/AI/Puppets.build("human", "rider", 100 + slot, ..., slot): a street rider (1-8)
 --   device:<kind>     Shared/Vehicles/Placeholder.build(kind): a player vehicle (car, cart, bike, pickup, suv, jetski)
---   vehicle:<kind>    Shared/Traffic/VehiclePuppet.spec(kind): a traffic vehicle (a motorcycle with its rider)
+--   vehicle:<kind>    Shared/Traffic/VehiclePuppet.spec(kind): a traffic vehicle (a motorcycle with its rider, as
+--                     Traffic/Ghost draws fleet id 8: Morgan)
+--   seated:<kind>     device:<kind> with a stand-in seated R15 (blocky, scale 1, the sit clip's chair pose) on its
+--                     DriverSeat as Placeholder.SEATED puts it: where a player driving it sits
 --   prop:<name>       the first model in build/Town.rbxm whose name contains <name> (run tools/bake/main.luau first)
 -- The engine-side builders run on @lune/roblox instances (the engine globals are put in place for them here). Each
 -- entry stands on y = 0 (its lowest visible part), facing -Z, in rows; each row gets a front and a rear three-quarter
@@ -17,6 +20,7 @@ local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 
 local PartBuilder = require("../../src/shared/Avatar/PartBuilder")
+local Ghost = require("../../src/shared/Traffic/Ghost")
 local VehiclePuppet = require("../../src/shared/Traffic/VehiclePuppet")
 
 local out = "build/review/rides"
@@ -84,6 +88,36 @@ local function fromTown(name: string): any
 	error(`rides: no model named like {name} in build/Town.rbxm`)
 end
 
+-- A stand-in seated R15 on a vehicle's DriverSeat (review only: the real body is the player's avatar): blocky parts at
+-- R15 sizes, the chair pose of the sit clip, its head top, eyes and soles where Placeholder.SEATED says.
+local function seatR15(model: any, Placeholder: any)
+	local seat = model:FindFirstChild("DriverSeat")
+	local S = Placeholder.SEATED
+	local top = seat.CFrame * roblox.CFrame.new(0, seat.Size.Y / 2, 0)
+	local shirt, pants, skin =
+		roblox.Color3.fromRGB(52, 97, 168), roblox.Color3.fromRGB(45, 48, 56), roblox.Color3.fromRGB(236, 196, 120)
+	local function add(name: string, size: { number }, at: { number }, color: any)
+		local p = roblox.Instance.new("Part")
+		p.Name = `R15{name}`
+		p.Size = roblox.Vector3.new(size[1], size[2], size[3])
+		p.CFrame = top * roblox.CFrame.new(at[1], at[2], at[3])
+		p.Color = color
+		p.Parent = model
+	end
+	local sole, ahead = -S.feetBelow, S.feetAhead
+	add("Head", { 1.2, 1.2, 1.2 }, { 0, S.head - 0.6, 0 }, skin)
+	add("UpperTorso", { 2, 1.6, 1 }, { 0, S.head - 2.0, 0 }, shirt)
+	add("LowerTorso", { 2, 0.4, 1 }, { 0, S.head - 3.0, 0 }, pants)
+	for _, sx in { -1, 1 } do
+		local side = if sx < 0 then "L" else "R"
+		add(`UpperArm{side}`, { 1, 1.2, 1 }, { sx * 1.5, S.head - 1.8, 0 }, shirt)
+		add(`LowerArm{side}`, { 1, 1, 1.2 }, { sx * 1.5, S.head - 2.6, -0.6 }, skin)
+		add(`UpperLeg{side}`, { 1, 1, ahead + 0.1 }, { sx * 0.5, 0.5, -ahead / 2 + 0.05 }, pants)
+		add(`LowerLeg{side}`, { 1, 0.4 - sole - 0.2, 1 }, { sx * 0.5, (0.4 + sole + 0.2) / 2, -ahead }, pants)
+		add(`Foot{side}`, { 1, 0.2, 1.2 }, { sx * 0.5, sole + 0.1, -ahead - 0.1 }, roblox.Color3.fromRGB(30, 30, 30))
+	end
+end
+
 local function build(entry: string): (any, string)
 	local what, arg = string.match(entry, "^(%w+):([%w_]+)$")
 	if what == "rider" then
@@ -92,13 +126,20 @@ local function build(entry: string): (any, string)
 		local folder = roblox.Instance.new("Folder")
 		local rig = Puppets.build("human", "rider", 100 + slot, folder, slot)
 		return rig.model, `rider {slot}`
-	elseif what == "device" then
+	elseif what == "device" or what == "seated" then
 		local Placeholder = (require :: any)("../../src/shared/Vehicles/Placeholder")
-		return Placeholder.build(arg), `{arg} (player)`
+		local m = Placeholder.build(arg)
+		if what == "seated" then
+			seatR15(m, Placeholder)
+			return m, `{arg} + seated R15`
+		end
+		return m, `{arg} (player)`
 	elseif what == "vehicle" then
-		-- a motorcycle carries its rider, as the traffic draws it (Traffic/Ghost: Morgan Rider)
-		local rider = if arg == "motorcycle" then 7 else nil
-		return PartBuilder.instantiate(VehiclePuppet.spec(arg :: string, { rider = rider }), lib), arg :: string
+		-- a motorcycle carries its rider, as the traffic draws fleet id 8 (Traffic/Ghost: Morgan Rider)
+		local spec = if arg == "motorcycle"
+			then Ghost.spec(8, { kind = "motorcycle" })
+			else VehiclePuppet.spec(arg :: string)
+		return PartBuilder.instantiate(spec, lib), arg :: string
 	elseif what == "prop" then
 		return fromTown(arg :: string), arg :: string
 	end
