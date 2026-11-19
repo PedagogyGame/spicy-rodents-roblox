@@ -2642,10 +2642,12 @@ function SquirrelMotor.envelope(
 							if hit == nil then
 								return
 							end
-							-- (from somewhere within r of (x, y, z): any sample no further from it than the nearest is
-							-- and 2r, the highest of them)
+							-- (from somewhere within r across of (x, y, z), its height known: a sample S nearer to such a
+							-- place than the nearest one N is when |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the
+							-- place modelled; the highest of them)
 							local top = hit
 							if r > 0 then
+								local d2 = hit.d * hit.d
 								local band = hit.d + 2 * r
 								index:forEachNear(
 									x,
@@ -2653,22 +2655,21 @@ function SquirrelMotor.envelope(
 									z,
 									math.ceil(band / (index.cellSize or 20)),
 									function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
-										if
-											sy > top.y
-											and (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2 <= band * band
-											and (accept == nil or accept(id, tt))
-										then
-											top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+										if sy > top.y and (accept == nil or accept(id, tt)) then
+											local e2 = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
+											if e2 - d2 <= 2 * r * math.sqrt((sx - hit.x) ^ 2 + (sz - hit.z) ^ 2) then
+												top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+											end
 										end
 										return nil
 									end
 								)
 							end
 							local lift = 0
-							local route = reg:get(top.routeId)
-							if route then
+							local grabbed = reg:get(top.routeId)
+							if grabbed then
 								local drawn =
-									Motion.visualPose(world, route, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
+									Motion.visualPose(world, grabbed, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
 								lift = math.max(0, drawn.y - top.y)
 							end
 							any = true
@@ -2966,6 +2967,11 @@ function SquirrelMotor.envelope(
 			end
 		end
 		local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
+		if prev.grounded then
+			-- (the ground glue carried a grounded body down each frame before it left the ground: off a bough's round
+			-- cylinder, down a kerb; validator round 7, a walk along a bough after a drop)
+			downCap -= frames * math.max(P.glueMin, P.glueSlope * groundCap * P.substep)
+		end
 		if dy > upCap or dy < downCap then
 			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
 			local landing = next.grounded and math.abs(dy) <= Units.st(1.4)

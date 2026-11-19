@@ -156,13 +156,10 @@ return function(t)
 				worlds,
 				{ name = "storm drains (SewerStandIn)", w = SewerStandIn.world(SewerLayout.default()) }
 			)
-			table.insert(
-				worlds,
-				{
-					name = "hollow trees (HollowShell)",
-					w = BakedWorld.fromModel((HollowShell.build(roblox, HollowLayout.default()))),
-				}
-			)
+			table.insert(worlds, {
+				name = "hollow trees (HollowShell)",
+				w = BakedWorld.fromModel((HollowShell.build(roblox, HollowLayout.default()))),
+			})
 			local rows: { string } = {}
 			local missedNow, missedBefore = 0, 0
 			local byClass: { [string]: { n: number, now: number, before: number } } = {}

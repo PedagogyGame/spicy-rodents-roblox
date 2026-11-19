@@ -358,7 +358,9 @@ function MoveValidator.forget(self: MoveValidator, actorId: any)
 	local marks = self._marks[actorId]
 	self._actors[actorId] = nil
 	self._marks[actorId] = nil
-	self._parked[actorId] = if marks then marks.gov else nil
+	if marks and marks.gov then
+		self._parked[actorId] = marks.gov
+	end
 end
 
 local function verdict(
@@ -1253,10 +1255,15 @@ end
 
 -- relocate(actorId, x, y, z, serverTime): the server moved the body to (x, y, z) (feet) itself, by a move the client
 -- can ask for (a Reset, a hold given back, a body taken back, a minigame's knock): the history is kept and carried to
--- the new place (shift), the time since the last place passes with no allowance (the body was put there, it did not
--- go), and the newest place is the new one. With no history yet: a new one there (the server's own place).
+-- the new place (shift; the history its last driver left, forget, when it has none of its own), the time since the
+-- last place passes with no allowance (the body was put there, it did not go), and the newest place is the new one.
+-- With no history at all (a body no player has driven): a new one there, the server's own place.
 function MoveValidator.relocate(self: MoveValidator, actorId: any, x: number, y: number, z: number, serverTime: number)
 	local marks = marksOf(self, actorId)
+	if marks.gov == nil then
+		marks.gov = self._parked[actorId]
+	end
+	self._parked[actorId] = nil
 	local gov = marks.gov
 	if gov == nil then
 		marks.gov = newGov(x, y, z, serverTime, nil, false)
@@ -1274,11 +1281,6 @@ end
 -- takeOver(actorId, x, y, z, serverTime): a driver takes the body where the server has it (feet): the history its last
 -- driver left (forget) carried there (relocate: the AI's moves in between are the server's own), else a new one there.
 function MoveValidator.takeOver(self: MoveValidator, actorId: any, x: number, y: number, z: number, serverTime: number)
-	local marks = marksOf(self, actorId)
-	if marks.gov == nil then
-		marks.gov = self._parked[actorId]
-	end
-	self._parked[actorId] = nil
 	MoveValidator.relocate(self, actorId, x, y, z, serverTime)
 end
 

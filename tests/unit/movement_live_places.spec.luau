@@ -5,7 +5,9 @@
 -- bough, the vent, the rafters and the light rails), each run by the real motor with scripted keys through a 300 ms
 -- link with jitter, loss and held-up bursts, judged by the server with enforcement on and the live wall, floor and cover
 -- rays over the baked parts (BakedWorld.validatorRays: the server's own rule). Every run: 0 snaps.
+local fs = require("@lune/fs")
 local process = require("@lune/process")
+local Height = require("@shared/World/Height")
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
@@ -222,4 +224,60 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"drops (Q) off branches and wires across the baked town, standing on the bough cylinders: 0 snaps",
+		function()
+			-- validator round 6: Q off a branch stood the body on its bough's cylinder, which the live floor ray looked past, and
+			-- every grounded packet after it was a whole "float" (515 of 766 drops snapped). The real motor on build/Town.rbxm,
+			-- a branch or wire taken every so often across the town, Q at 0.4 s, then idle and a few steps along it
+			if not fs.isFile("build/Town.rbxm") then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			Height.configure(data:module("TerrainExtensions"))
+			local town = BakedWorld.load("build/Town.rbxm")
+			local w = town:motorWorld(data)
+			local vworld = vworldOf(town, w)
+			local routes = {}
+			for _, r in w.registry:all() do
+				if r.kind ~= "trunk" and not r.enclosure then
+					table.insert(routes, r)
+				end
+			end
+			table.sort(routes, function(a: any, b: any): boolean
+				return a.id < b.id
+			end)
+			local every = math.max(1, math.floor(#routes / (if FAST then 6 else 24)))
+			local drops, onBough = 0, 0
+			for i = 1, #routes, every do
+				local r = routes[i]
+				local tt = 0.3 + 0.4 * ((i * 0.618) % 1)
+				local landed: string? = nil
+				play(t, `Q off route {r.id} ({r.kind}) at t {string.format("%.2f", tt)}`, w, vworld, function(): State
+					local q = w.registry:pointAt(r, tt)
+					local s = SquirrelMotor.new(q.x, q.y, q.z)
+					s.grounded = false
+					s.routeId, s.railT, s.railDir = r.id, tt, 1
+					return s
+				end, function(now: number, st: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					if st.routeId == nil and st.grounded and landed == nil then
+						local _, part = town.groundPart(st.x, st.z, st.y)
+						landed = if part then part.path else "terrain"
+					end
+					return BakedWorld.keys(
+						math.sin(now) * 2,
+						{ drop = now > 0.4 and now < 0.5, fw = if now > 3 then 1 else 0 }
+					)
+				end, 5)
+				drops += 1
+				if landed and string.find(landed, "%.R%d") then
+					onBough += 1
+				end
+			end
+			Height.configure(nil)
+			print(`      {drops} drops, {onBough} of them stood on a bough's cylinder`)
+			t.truthy(onBough > 0, "some drops stood on a bough's cylinder")
+		end
+	)
 end
