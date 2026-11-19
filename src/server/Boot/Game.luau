@@ -1356,6 +1356,19 @@ function Game.start(opts: Opts?): any
 				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
 				return { age = t - at, launchAgo = if pounceAt then t - pounceAt else nil }
 			end,
+			-- the rodent's place by its last clean packet (a bite and a blow are judged there, not at the root its client
+			-- moves); the body's own when there is none (no packet yet, or the engine tests' own word on the motor)
+			poseOf = function(id: number): (number?, number?, number?)
+				local actor = rt.byTownId[id]
+				if o.motorOf or actor == nil then
+					return nil, nil, nil
+				end
+				local snap = movement:motorOf(actor.id)
+				if snap == nil then
+					return nil, nil, nil
+				end
+				return snap.x :: number, snap.y :: number, snap.z :: number
+			end,
 			linkOf = function(id: number): number?
 				local actor = rt.byTownId[id]
 				local driver = if actor then possession:controllerOf(actor) else nil
@@ -1427,9 +1440,14 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
-	-- the rodent's click (a pounce's tell) and F (a feint), from the PlayNet "Duel" remote
-	local function duel(player: any, verb: any)
+	-- the rodent's click (a pounce's tell, with the motor clock its client made it at) and F (a feint), from the PlayNet
+	-- "Duel" remote: CombatService.REMOTE_RATE calls a second heard, a refusal answered every REPLY_EVERY at most
+	local function duel(player: any, verb: any, clock: any)
 		if combat == nil or (verb ~= "pounce" and verb ~= "feint") then
+			return
+		end
+		local c = combat
+		if not c:remoteGate(player, now) then
 			return
 		end
 		local s = stateOf(player)
@@ -1438,7 +1456,17 @@ function Game.start(opts: Opts?): any
 		if s.role ~= "rodent" or actor == nil or actor.variant ~= "spicy" or tid == nil then
 			return
 		end
-		local ok, why = combat:rodentAct(tid, verb, now)
+		-- (the click's time on the movement packets' clock, as the duel's own: the remote's trip is no part of the tie)
+		local clickAt: number? = nil
+		if verb == "pounce" then
+			local t = workspace:GetServerTimeNow()
+			local at = movement:clickAt(actor.id, clock, t)
+			clickAt = if at then now - (t - at) else nil
+		end
+		local ok, why = c:rodentAct(tid, verb, now, clickAt)
+		if not ok and not c:mayReply(player, now) then
+			return
+		end
 		if not ok and verb == "feint" and why == "winded" then
 			fire(player, { kind = "duel", what = "winded" })
 		elseif not ok and verb == "pounce" then
@@ -1566,9 +1594,9 @@ function Game.start(opts: Opts?): any
 			warn(`[SpicyRodents] kick failed: {err}`)
 		end
 	end
-	local function onDuel(player: any, verb: any)
+	local function onDuel(player: any, verb: any, clock: any)
 		local ok, err = pcall(function()
-			duel(player, verb)
+			duel(player, verb, clock)
 		end)
 		if not ok then
 			warn(`[SpicyRodents] duel {verb} failed: {err}`)

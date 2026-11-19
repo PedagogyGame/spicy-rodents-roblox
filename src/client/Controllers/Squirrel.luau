@@ -34,8 +34,10 @@
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
--- (ctx.duel("pounce"): the tell everyone sees, Server/Combat/CombatService) and the motor's pounce follows windup seconds
--- later, a move the validator accepts as it always has. A click while the motor is still on its cooldown is not sent.
+-- (ctx.duel("pounce", clock): the tell everyone sees, Server/Combat/CombatService, with the motor clock it was made at)
+-- and the motor's pounce follows windup seconds later on the motor's own clock (the one its packets carry: the server
+-- ties the two on it), a move the validator accepts as it always has. A click while the motor is still on its
+-- cooldown is not sent.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant?, link?, duel? };
 --   windup(pendingAt, clock, pressed, secs, ready) -> (pounceNow, pendingAt?, tell) (pure);
 --   nightVisionSays(spicy, on) -> string (pure);
@@ -355,11 +357,11 @@ function Squirrel.start(
 			pounce = f.pounce,
 		}
 		if spicy then
-			local now, pend, tell = Squirrel.windup(pounceAt, os.clock(), f.pounce, windupSecs, state.cooldown <= 0)
+			local now, pend, tell = Squirrel.windup(pounceAt, state.clock, f.pounce, windupSecs, state.cooldown <= 0)
 			pounceAt = pend
 			mi.pounce = now
 			if tell and ctx.duel then
-				ctx.duel("pounce")
+				ctx.duel("pounce", state.clock)
 			end
 		end
 		local any = f.fw ~= 0 or f.side ~= 0 or f.leap or f.drop or f.grab or f.pounce

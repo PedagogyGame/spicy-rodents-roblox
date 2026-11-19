@@ -46,7 +46,8 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
+--   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?); M:clickAt(actorId, clock, now) ->
+--   number?; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
 
 local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
@@ -122,7 +123,7 @@ type Squirrel = {
 	good: { [string]: number | boolean }?, -- the last clean packet's snapshot
 	lastAt: number?, -- server time of the last accepted packet
 	pounceAt: number?, -- server time of the last pounce launch a clean packet showed (the envelope saw the launch)
-	attackWindow: number, -- the last accepted packet's pounce window (a rise in it with a launch is a new pounce)
+	pounceClock: number?, -- its client clock
 	since: number?, -- server time of this epoch's first accepted packet
 	possessedAt: number?, -- server time of the first packet after the hand-off (0: the hand-off, none yet)
 	lastX: number,
@@ -166,6 +167,7 @@ export type Movement = {
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	epochOf: (self: Movement, actorId: any) -> number,
+	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?),
 	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
@@ -209,6 +211,9 @@ MovementService.C = table.freeze({
 	-- seconds: the most of the engine's round trip (Player:GetNetworkPing, up to 10 s) any wait or window here takes; a
 	-- slower link is no reason to let the root sit further off for longer
 	PING_MAX = 1,
+	-- seconds: the most a click's own clock may put it before the remote carrying it arrived (a reliable remote resent
+	-- after a loss, a round trip and a timeout late; anything older is no click to tie a pounce to)
+	CLICK_EARLY = 1,
 })
 local C = MovementService.C
 
@@ -306,7 +311,7 @@ function MovementService.new(deps: Deps): Movement
 				good = nil,
 				lastAt = nil,
 				pounceAt = nil,
-				attackWindow = 0,
+				pounceClock = nil,
 				since = nil,
 				lastX = 0,
 				lastY = 0,
@@ -383,6 +388,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.since = nil
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
 		sq.pounceAt = nil
+		sq.pounceClock = nil
 		if self.deps.validator then
 			self.deps.validator:reset(id, nil)
 		end
@@ -507,6 +513,16 @@ function MovementService.new(deps: Deps): Movement
 		end
 	end
 
+	-- offsetFloor(sq, now): the lowest arrival offset (server time - client clock) of the recent packets: the client clock
+	-- to server time with the link's latency and none of a packet's jitter (0 before any)
+	local function offsetFloor(sq: Squirrel, _now: number): number
+		local lo = math.huge
+		for _, o in sq.offsets do
+			lo = math.min(lo, o.off)
+		end
+		return if lo < math.huge then lo else 0
+	end
+
 	-- paceOf(sq) -> v, lead, ping: the recent packets' pace (studs/s), how far the root may lead or trail them in time
 	-- (the spread of their arrivals, or half the link's round trip: a latency that drops lets the root's updates overtake
 	-- packets in flight; C.SPREAD_MAX at most) and the link's round trip
@@ -573,6 +589,21 @@ function MovementService.new(deps: Deps): Movement
 			return nil, nil, nil
 		end
 		return sq.good, sq.lastAt, sq.pounceAt
+	end
+
+	-- clickAt(actorId, clock, now): the server time of a click the held squirrel's client made at motor clock `clock`
+	-- (the duel's tell carries it), on the packets' own mapping (offsetFloor): when it was made, not when the remote
+	-- carrying it got through (its own jitter, a resend). Never later than it arrived, and never more than C.CLICK_EARLY
+	-- before (an older clock is a stale or made-up one). Nil when the clock is no number or no packet came yet.
+	function m.clickAt(self: Movement, actorId: any, clock: any, now: number): number?
+		local sq = self.squirrels[actorId]
+		if sq == nil or sq.lastAt == nil or #sq.offsets == 0 then
+			return nil
+		end
+		if type(clock) ~= "number" or not (math.abs(clock) < SquirrelWire.MAX_MAGNITUDE) then
+			return nil
+		end
+		return math.clamp(clock + offsetFloor(sq, now), now - C.CLICK_EARLY, now)
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
@@ -892,16 +923,16 @@ function MovementService.new(deps: Deps): Movement
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				pace(self, actorId, sq, snapshot, now)
-				-- a pounce the server believes: the motor's window rose with a launch the envelope saw in this move;
-				-- it launched inside the gap since the last packet, as long ago as the window has run (Combat/CombatService
-				-- ties the bite to it, so a click and a lunge held back for a better moment are not one pounce)
-				local aw = snapshot.attackWindow
-				local window = if type(aw) == "number" then aw else 0
-				if v.ok and not v.resync and v.launched and window > sq.attackWindow + 1e-3 then
-					local gap = if sq.lastAt then now - (sq.lastAt :: number) else 0
-					sq.pounceAt = now - math.clamp(SquirrelMotor.params.pounceWindow - window, 0, math.max(0, gap))
+				-- a pounce the server believes: a clean move holding a pounce-shaped launch the packets date closely
+				-- (MoveValidator's verdict.pounce: the client clock it launched at). Its server time is that clock on the
+				-- packets' own mapping (the lowest arrival offset of the last C.SPREAD_WINDOW: the link's latency without
+				-- this packet's jitter), never later than it arrived. Combat/CombatService ties the bite to it and the
+				-- click's own clock on the same mapping (clickAt), so a click and a lunge held back for a better moment are
+				-- not one pounce, and the link's jitter parts neither
+				if v.ok and not v.resync and v.pounce then
+					sq.pounceClock = v.pounce
+					sq.pounceAt = math.min(now, v.pounce + offsetFloor(sq, now))
 				end
-				sq.attackWindow = window
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
 				if sq.since == nil then
 					sq.since = now

@@ -82,6 +82,7 @@ export type Params = {
 	contactHeight: number,
 	rewind: number,
 	launchSlack: number,
+	launchLate: number,
 	motorFresh: number,
 	lagMax: number,
 	rally: { [string]: { [string]: number } }, -- by temperament: attack | back | flee
@@ -170,6 +171,7 @@ function CombatRules.params(): Params
 			"contactHeight",
 			"rewind",
 			"launchSlack",
+			"launchLate",
 			"motorFresh",
 			"lagMax",
 			"rally",

@@ -72,6 +72,10 @@ export type Opts = {
 	-- the rodent's motor as the validator saw it: seconds since its last clean packet, and since the last pounce launch
 	-- a clean packet showed (Movement/MovementService:motorOf); nil before any packet
 	motorOf: ((id: number) -> Motor?)?,
+	-- where the rodent is by its own validated motor state (feet; Movement/MovementService's last clean packet): bites
+	-- and blows are judged there, not at the root its client moves (which may run ahead of the packets by the drift the
+	-- server allows). Nil (or nil returned): the body's own position
+	poseOf: ((id: number) -> (number?, number?, number?))?,
 	-- the link's round trip of the player holding the rodent, seconds (Player:GetNetworkPing): a bite is judged against
 	-- the person as that player saw them, up to duel.lagMax back (Combat/Duel.bitePhaseAt); nil: no rewind
 	linkOf: ((id: number) -> number?)?,
@@ -111,6 +115,9 @@ type Rodent = {
 
 type Chase = { zone: Zone, nextAt: number, acquired: boolean? }
 
+-- one player's Duel remote: a token bucket of calls and when it was last answered with a refusal
+type Gate = { tokens: number, at: number, repliedAt: number }
+
 local CombatService = {}
 CombatService.__index = CombatService
 
@@ -119,6 +126,11 @@ CombatService.HELD_AIM = 4 -- studs beyond the kick's reach a player's kick stil
 CombatService.CHASE_EVERY = 0.5 -- s between a chasing officer's new orders
 CombatService.ORDER_SECS = 0.6 -- a duel order lasts this long unless renewed
 CombatService.REBALANCE_SECS = 1
+-- The Duel remote (Boot/Game): a player's calls beyond REMOTE_RATE a second (REMOTE_BURST at once) are dropped unheard,
+-- and a refusal is answered at most every REPLY_EVERY seconds, so a flood is neither judged nor reflected
+CombatService.REMOTE_RATE = 10
+CombatService.REMOTE_BURST = 4
+CombatService.REPLY_EVERY = 0.5
 -- The duel's sounds, by cue name, played at the body (Boot/Game: a Sound named after the cue). The ids are to be
 -- chosen from Roblox's licensed library (docs/AUDIO_BUDGET.md); an empty id is silent.
 CombatService.SOUNDS = table.freeze({
@@ -148,6 +160,7 @@ export type Service = typeof(setmetatable(
 		shown: { [number]: boolean },
 		alerts: { Zone },
 		chases: { [number]: Chase },
+		remotes: { [any]: Gate },
 		rebalanceAt: number,
 		_stats: { [string]: number },
 	},
@@ -172,6 +185,7 @@ function CombatService.new(opts: Opts): Service
 		shown = {},
 		alerts = {},
 		chases = {},
+		remotes = setmetatable({}, { __mode = "k" }) :: any,
 		rebalanceAt = -math.huge,
 		_stats = {
 			pounces = 0,
@@ -185,6 +199,7 @@ function CombatService.new(opts: Opts): Service
 			zones = 0,
 			chases = 0,
 			noMotor = 0,
+			dropped = 0,
 			rallied = 0,
 			rallyAttack = 0,
 		},
@@ -240,6 +255,18 @@ local function inSight(self: Service, a: any, rod: any): boolean
 		return true
 	end
 	return not Colliders.blocked(c, a.x, a.z, rod.x, rod.z, 1, (a.y - (a.hip or 0)) + 3)
+end
+
+-- where the rodent's feet are by its own validated motor state (opts.poseOf), else the body's: x, feet y, z
+local function poseOf(self: Service, id: number, rod: any): (number, number, number)
+	local f = self.opts.poseOf
+	if f then
+		local x, y, z = f(id)
+		if x and y and z then
+			return x, y, z
+		end
+	end
+	return rod.x, rod.y - rod.hip, rod.z
 end
 
 local function rodent(self: Service, id: number): Rodent
@@ -316,8 +343,17 @@ function CombatService.boost(self: Service, x: number, z: number, now: number): 
 end
 
 -- The player's click (a pounce's tell) or F (a feint). Refused while the rodent cannot: a pounce or a feint still
--- running, the cooldown, an empty feint meter.
-function CombatService.rodentAct(self: Service, id: number, verb: string, now: number): (boolean, string?)
+-- running, the cooldown, an empty feint meter. `clickAt`: when the click was made on the server's clock, if its client
+-- said (Movement/MovementService:clickAt: its motor clock on the movement packets' mapping; never after `now`): the
+-- motor's pounce is due the wind-up after it, so the remote's own trip (its jitter, a resend) is no part of the tie.
+-- The people see the tell when it arrives (`now`), and the bite waits the wind-up from then.
+function CombatService.rodentAct(
+	self: Service,
+	id: number,
+	verb: string,
+	now: number,
+	clickAt: number?
+): (boolean, string?)
 	local P = self.P
 	local r = rodent(self, id)
 	local busy = now < r.windowUntil or now < r.commitAt or now < r.recoverUntil
@@ -336,7 +372,7 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 		r.tell = now
 		r.tellFeint = false
 		r.commitAt = now + P.pounceWindup
-		r.launchDue = r.commitAt
+		r.launchDue = math.min(clickAt or now, now) + P.pounceWindup
 		r.windowUntil = r.commitAt + P.pounceWindow + P.rewind
 		r.cooldownUntil = r.commitAt + P.pounceCooldown - P.rewind -- (the motor's own 0.7 s, less the link's slack)
 		r.landed = false
@@ -361,6 +397,48 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 	setAttr(self, id, "PounceAt", now) -- the wind-up everyone sees (a feint looks the same)
 	cue(self, id, "Duel.Windup")
 	return true
+end
+
+-- remoteGate(key, now) -> boolean: a call on the Duel remote from `key` (the player) is heard (REMOTE_RATE a second,
+-- REMOTE_BURST at once); a dropped one is neither judged nor answered.
+function CombatService.remoteGate(self: Service, key: any, now: number): boolean
+	local g = self.remotes[key]
+	if g == nil then
+		g = { tokens = CombatService.REMOTE_BURST, at = now, repliedAt = -math.huge }
+		self.remotes[key] = g
+	end
+	local gate = g :: Gate
+	local refill = math.max(0, now - gate.at) * CombatService.REMOTE_RATE
+	gate.tokens = math.min(CombatService.REMOTE_BURST, gate.tokens + refill)
+	gate.at = now
+	if gate.tokens < 1 then
+		self._stats.dropped += 1
+		return false
+	end
+	gate.tokens -= 1
+	return true
+end
+
+-- mayReply(key, now) -> boolean: a refusal ("not yet", "winded") may be told to `key` now (REPLY_EVERY at most).
+function CombatService.mayReply(self: Service, key: any, now: number): boolean
+	local g = self.remotes[key]
+	if g == nil then
+		g = { tokens = CombatService.REMOTE_BURST, at = now, repliedAt = -math.huge }
+		self.remotes[key] = g
+	end
+	local gate = g :: Gate
+	if now - gate.repliedAt < CombatService.REPLY_EVERY then
+		return false
+	end
+	gate.repliedAt = now
+	return true
+end
+
+-- tied(P, launchAt, due) -> boolean: the motor's pounce launched at `launchAt` is the one the click said was due then.
+-- Both are on the movement packets' clock, so late only by the frame the wind-up ends in and a packet (P.launchLate);
+-- early by the link's slack (rewind + launchSlack: a click whose remote carried no clock is dated on arrival)
+function CombatService.tied(P: Params, launchAt: number, due: number): boolean
+	return launchAt - due <= P.launchLate and due - launchAt <= P.rewind + P.launchSlack
 end
 
 -- A person a player holds kicked (F), facing (lookX, lookZ) (default: the body's yaw): a raised leg for HELD_GUARD
@@ -832,7 +910,11 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		if strike then
 			self._stats.strikes += 1
 			cue(self, a.id, "Duel.Strike")
-			if strike.hit and not hidden and now >= r.iUntil then
+			-- (the blow lands where the rodent's own validated motor state has it, not where its client put the root)
+			local px, py, pz = poseOf(self, best.id, best)
+			local landsOn = math.sqrt((px - a.x) ^ 2 + (pz - a.z) ^ 2) <= Duel.reach(P, guard)
+				and math.abs(py - (a.y - a.hip)) <= P.contactHeight
+			if strike.hit and landsOn and not hidden and now >= r.iUntil then
 				self._stats.blows += 1
 				r.iUntil = now + P.iFrames
 				endPounce(self, r, now)
@@ -877,35 +959,35 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 			-- a fresh packet: a click alone bites nobody, and neither does a lunge held back for a better moment
 			local m = motorOf(id)
 			local launchAt = if m and m.launchAgo then now - m.launchAgo else nil
-			local slack = P.rewind + P.launchSlack
 			if
 				m == nil
 				or m.age > P.motorFresh
 				or launchAt == nil
-				or math.abs(launchAt - r.launchDue) > slack
+				or not CombatService.tied(P, launchAt, r.launchDue)
 				or now > launchAt + P.pounceWindow + P.rewind
 			then
 				self._stats.noMotor += 1
 				continue -- the motor has not shown this pounce (yet)
 			end
 		end
-		local ry = rod.y - rod.hip
+		-- (where the rodent's own validated motor state has it: the root its client moves may run ahead of the packets)
+		local rx, ry, rz = poseOf(self, id, rod)
 		local victim: any, vd = nil, P.contact
 		-- (along the move since the last step; a jump further than a pounce makes in two steps is a move the server made)
-		local fromX, fromZ = rod.x, rod.z
+		local fromX, fromZ = rx, rz
 		local lx = r.lastX
-		if lx ~= nil and (lx - rod.x) ^ 2 + (r.lastZ - rod.z) ^ 2 <= (P.contact * 3) ^ 2 then
+		if lx ~= nil and (lx - rx) ^ 2 + (r.lastZ - rz) ^ 2 <= (P.contact * 3) ^ 2 then
 			fromX, fromZ = lx, r.lastZ
 		end
 		for _, a in world.actors do
 			if a.species == "human" and (a.lift or 0) == 0 then
-				local d = Duel.sweep(fromX, fromZ, rod.x, rod.z, a.x, a.z)
+				local d = Duel.sweep(fromX, fromZ, rx, rz, a.x, a.z)
 				local ay = a.y - a.hip
 				if
 					d <= vd
 					and math.abs(ay - ry) <= P.contactHeight
 					and (self.infection == nil or self.infection:biteable(a.id))
-					and not Cover.between(rod.x, rod.y, rod.z, a.x, a.y, a.z)
+					and not Cover.between(rx, ry + rod.hip, rz, a.x, a.y, a.z)
 				then
 					victim, vd = a, d
 				end
@@ -1004,7 +1086,8 @@ function CombatService.step(self: Service, dt: number, now: number)
 		local rod = self.world.actorsById[id]
 		local r = self.rods[id]
 		if rod and r then
-			r.lastX, r.lastZ = rod.x, rod.z
+			local x, _, z = poseOf(self, id, rod)
+			r.lastX, r.lastZ = x, z
 		end
 	end
 end
