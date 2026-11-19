@@ -482,9 +482,9 @@ function WalkWay.new(opts: Opts): Way
 	return way
 end
 
--- the box with no ways inside that holds (x, z) (inside its walls by MARGIN), if any
-function WalkWay.solidAt(way: Way, x: number, z: number): Colliders.Box?
-	local m = WalkWay.MARGIN
+-- the box with no ways inside that holds (x, z) (inside its walls by `margin`, default MARGIN), if any
+function WalkWay.solidAt(way: Way, x: number, z: number, margin: number?): Colliders.Box?
+	local m = margin or WalkWay.MARGIN
 	for _, b in Colliders.query(way.colliders, x, z, x, z) do
 		if
 			way.roomOf[b.id] == nil
@@ -522,7 +522,8 @@ function WalkWay.clear(way: Way, x0: number, z0: number, x1: number, z1: number)
 	if WalkWay.roomAt(way, x0, z0) or WalkWay.roomAt(way, x1, z1) then
 		return false
 	end
-	if WalkWay.solidAt(way, x0, z0) or WalkWay.solidAt(way, x1, z1) then
+	-- (an end inside a wall at all, however little, is in the box: never a straight line through the rest of it)
+	if WalkWay.solidAt(way, x0, z0, 0) or WalkWay.solidAt(way, x1, z1, 0) then
 		return false
 	end
 	-- (an end within a walker's half width of a wall may cross that margin, never the wall)
@@ -613,7 +614,7 @@ function WalkWay.putBack(way: Way, x: number, z: number): (number, number, numbe
 		end
 		return x, z, 0, 0
 	end
-	local b = WalkWay.solidAt(way, x, z)
+	local b = WalkWay.solidAt(way, x, z, 0)
 	if b == nil then
 		return x, z, 0, 0
 	end

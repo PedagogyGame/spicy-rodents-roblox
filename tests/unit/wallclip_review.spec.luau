@@ -413,7 +413,10 @@ return function(t)
 			string.format("      ambulance at (%.1f, %.1f), the truck at (%.1f, %.1f)", amb.x, amb.z, truck.x, truck.z)
 		)
 		local s0 = amb.s
-		traffic:step(10, { people = {} })
+		-- (TrafficService.step takes at most 0.25 s a call: ten seconds is 300 ticks)
+		for _ = 1, 300 do
+			traffic:step(1 / 30, { people = {} })
+		end
 		t.truthy(amb.s > s0 + 20, `the ambulance drove {amb.s - s0} studs in 10 s (the truck {truck.speed} st/s)`)
 	end)
 

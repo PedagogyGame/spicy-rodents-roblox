@@ -193,6 +193,8 @@ export type Service = typeof(setmetatable(
 		layout: any?,
 		alley: any?, -- the bowling alley's placement (Shared/Attractions/AlleyLayout.Place), when it stands
 		roads: any,
+		-- the town's building boxes (World/Colliders.fromData): what blocks sight (the crowd's stand spots, and
+		-- Combat/CombatService's and the overhead watch's sight lines). Not the way's: a fence stops a walker, not a look
 		colliders: any,
 		foot: any, -- World/FootPath.Finder (the town's: way.foot)
 		way: any, -- World/WalkWay.Way (the town's: AI/TownAI world.way)
@@ -232,7 +234,9 @@ function InfectionService.new(opts: Opts): Service
 	local strips = world.town.strips
 	-- the town's way on foot (AI/TownAI builds it: the building boxes, the fences, the buildings' doors)
 	local way = world.way or WalkWay.new({ data = opts.data, hospital = layout })
-	local colliders = way.colliders
+	-- (sight is the buildings only: the way's own set adds the fences, decks and venues a walker cannot pass but
+	-- sees over, and a rodent on a fence rail stands inside a fence's box)
+	local colliders = Colliders.fromData(opts.data)
 	local crewIds = {}
 	for _, a in world.actors do
 		if a.species == "human" and a.post == "ambulance_crew" then
