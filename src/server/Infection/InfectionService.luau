@@ -77,7 +77,7 @@ local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../..
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
 local FootPath = Import.shared("World/FootPath") :: typeof(require("../../shared/World/FootPath"))
-local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/World/Ground"))
+local WalkWay = Import.shared("World/WalkWay") :: typeof(require("../../shared/World/WalkWay"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
@@ -157,6 +157,7 @@ InfectionService.CREW_WALK_SECS = 12 -- the crew walks this long to a patient; a
 InfectionService.AWAY_SECS = 2 -- a cured person with no way home on foot is out of sight this long, then home
 InfectionService.RUN = 30 -- studs: the run of a bitten person who has no lane to run along
 InfectionService.RUN_MIN = 8 -- studs: with less room than this there is no run
+InfectionService.ON_ROUND = 2.5 -- studs from their round's legs: an indoor run along it starts only this near it
 InfectionService.STRAY = 60 -- studs from their own round: staff further off than this are walked back by a real way
 InfectionService.CROWD_SCARE = 30 -- studs: a bystander this near the rodent leaves the crowd and runs
 InfectionService.LOAD_LINGER = 1.5 -- s the ambulance stays after its patient is aboard, before it pulls away
@@ -190,7 +191,8 @@ export type Service = typeof(setmetatable(
 		alley: any?, -- the bowling alley's placement (Shared/Attractions/AlleyLayout.Place), when it stands
 		roads: any,
 		colliders: any,
-		foot: any, -- World/FootPath.Finder
+		foot: any, -- World/FootPath.Finder (the town's: way.foot)
+		way: any, -- World/WalkWay.Way (the town's: AI/TownAI world.way)
 		tail: { { number } }?,
 		home: { number }?,
 		hospital: HospitalService.Hospital,
@@ -225,15 +227,15 @@ function InfectionService.new(opts: Opts): Service
 	local world = opts.world
 	local layout = HospitalLayout.fromData(opts.data, Tunables.get("hospital.beds"))
 	local strips = world.town.strips
-	local colliders = Colliders.fromData(opts.data)
+	-- the town's way on foot (AI/TownAI builds it: the building boxes, the fences, the buildings' doors)
+	local way = world.way or WalkWay.new({ data = opts.data, hospital = layout })
+	local colliders = way.colliders
 	local crewIds = {}
 	for _, a in world.actors do
 		if a.species == "human" and a.post == "ambulance_crew" then
 			table.insert(crewIds, a.id)
 		end
 	end
-	local river = Height.RIVER
-	local S = Height.STUDS_PER_UNIT
 	local self = setmetatable({
 		world = world,
 		traffic = opts.traffic,
@@ -241,20 +243,8 @@ function InfectionService.new(opts: Opts): Service
 		alley = AlleyStaff.placeOf(opts.data),
 		roads = MedicalRoute.build(strips),
 		colliders = colliders,
-		-- nobody walks through the river, or over its bridge (the AI motor does not know the deck)
-		foot = FootPath.new({
-			colliders = colliders,
-			bounds = Height.worldClamp(),
-			isBlocked = function(x: number, z: number): boolean
-				return Ground.surfaceKind(x, z) ~= "terrain"
-			end,
-			blockedBox = {
-				minX = river.startX * S,
-				maxX = river.endX * S,
-				minZ = river.zMin * S,
-				maxZ = river.zMax * S,
-			},
-		}),
+		foot = way.foot,
+		way = way,
 		tail = if layout then MedicalRoute.walkTail(strips, layout.entrance) else nil,
 		home = if opts.traffic then opts.traffic:responderHome() else nil,
 		hospital = HospitalService.new({
@@ -372,7 +362,7 @@ local function clearLine(self: Service, x0: number, z0: number, x1: number, z1: 
 	if math.abs(x1 - x0) + math.abs(z1 - z0) < 0.5 then
 		return true
 	end
-	return not Colliders.blocked(self.colliders, x0, z0, x1, z1, 1, Height.at(x0, z0) + 3)
+	return WalkWay.clear(self.way, x0, z0, x1, z1)
 end
 
 local function say(self: Service, id: number, situation: string, force: boolean?): boolean
@@ -449,8 +439,8 @@ local function inAlley(self: Service, x: number, z: number): boolean
 	return alley ~= nil and AlleyStaff.inside(alley, x, z)
 end
 
--- FootPath.find, but in and out of the bowling alley by its main doors and its own ways (FootPath leaves a box
--- straight through its nearest wall): an end inside the alley is joined to the walk in front of its doors
+-- The town's way on foot (World/WalkWay: round every building, in and out of the bowling alley, the hospital, the
+-- police station and the corner store by their doors and their own ways inside; never through a wall)
 local function footWay(
 	self: Service,
 	x0: number,
@@ -459,37 +449,7 @@ local function footWay(
 	z1: number,
 	opts: { [string]: any }?
 ): ({ { number } }?, number)
-	local alley = self.alley
-	local in0, in1 = inAlley(self, x0, z0), inAlley(self, x1, z1)
-	if alley == nil or not (in0 or in1) then
-		return FootPath.find(self.foot, x0, z0, x1, z1, opts)
-	end
-	if in0 and in1 then
-		local inside = AlleyWalk.way(alley, x0, z0, x1, z1)
-		return inside, FootPath.length(x0, z0, inside)
-	end
-	local ox, oz = AlleyWalk.outside(alley)
-	local out = if in0 then AlleyWalk.way(alley, x0, z0, ox, oz) else {}
-	local back = if in1 then AlleyWalk.way(alley, ox, oz, x1, z1) else {}
-	local inside = (if in0 then FootPath.length(x0, z0, out) else 0)
-		+ (if in1 then FootPath.length(ox, oz, back) else 0)
-	local o: { [string]: any } = table.clone(opts or {})
-	if type(o.maxLength) == "number" then
-		o.maxLength = (o.maxLength :: number) - inside -- (the limit is on the whole walk)
-	end
-	local fx, fz = if in0 then ox else x0, if in0 then oz else z0
-	local tx, tz = if in1 then ox else x1, if in1 then oz else z1
-	local way, len = FootPath.find(self.foot, fx, fz, tx, tz, o)
-	if way == nil then
-		return nil, 0
-	end
-	local points: { { number } } = {}
-	for _, list in { out, way, back } do
-		for _, p in list do
-			pushPoint(points, p[1], p[2])
-		end
-	end
-	return points, len + inside
+	return WalkWay.find(self.way, x0, z0, x1, z1, opts :: any)
 end
 
 -- sidewalkRoute(x, z): the way to the hospital door along the pavements, or nil when they do not
@@ -627,63 +587,132 @@ end
 -- a run with no lane -----------------------------------------------------------------------------
 
 local RUN_TURNS = { 0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, 2.6, -2.6 } -- rad off the straight line away
-local WALL = 2.5 -- studs a run indoors keeps from the walls
+
+-- A run along a round (the closed loop of a Staff brain's points, which the bake keeps clear): from the nearest point
+-- of the loop, RUN studs one way round or the other, whichever ends further from the threat at (fx, fz). nil when
+-- the loop has no RUN_MIN of run in it.
+local function loopRun(points: { { number } }, x: number, z: number, fx: number, fz: number): { { number } }?
+	local n = #points
+	if n < 2 then
+		return nil
+	end
+	-- the nearest leg and the point on it
+	local bestI, bestT, bestD = 1, 0, math.huge
+	for i = 1, n do
+		local p, q = points[i], points[i % n + 1]
+		local ex, ez = q[1] - p[1], q[2] - p[2]
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((x - p[1]) * ex + (z - p[2]) * ez) / l2, 0, 1) else 0
+		local d = (x - p[1] - ex * t) ^ 2 + (z - p[2] - ez * t) ^ 2
+		if d < bestD then
+			bestI, bestT, bestD = i, t, d
+		end
+	end
+	local p0, q0 = points[bestI], points[bestI % n + 1]
+	local sx, sz = p0[1] + (q0[1] - p0[1]) * bestT, p0[2] + (q0[2] - p0[2]) * bestT
+	local found, foundD = nil, -1
+	for _, dir in { 1, -1 } do
+		local run: { { number } } = {}
+		if math.abs(sx - x) + math.abs(sz - z) > 0.5 then
+			table.insert(run, { sx, sz })
+		end
+		local left, px, pz = InfectionService.RUN, sx, sz
+		-- the corners in turn: forward from the leg's end, or backward from its start
+		local k = if dir == 1 then bestI % n + 1 else bestI
+		for _ = 1, 2 * n do
+			local c = points[k]
+			local len = math.sqrt((c[1] - px) ^ 2 + (c[2] - pz) ^ 2)
+			if len >= left then
+				local f = left / len
+				table.insert(run, { px + (c[1] - px) * f, pz + (c[2] - pz) * f })
+				left = 0
+				break
+			end
+			table.insert(run, { c[1], c[2] })
+			left -= len
+			px, pz = c[1], c[2]
+			k = if dir == 1 then k % n + 1 else (k - 2) % n + 1
+		end
+		local e = run[#run]
+		if e and FootPath.length(x, z, run) >= InfectionService.RUN_MIN then
+			local d = (e[1] - fx) ^ 2 + (e[2] - fz) ^ 2
+			if d > foundD then
+				found, foundD = run, d
+			end
+		end
+	end
+	return found
+end
 
 -- Where someone with no lane to run along runs from a threat at (fx, fz): the waypoints of a short
 -- run, or nil when there is no room for one.
---   Indoors (the wards, the police station, a shop floor: the point is inside a building's box) the
---   run stays inside that building, as far as its walls allow, in the best direction. Nothing stops
---   a kinematic walker at a wall, so a run "out" would be a run through it. (The old test wanted a
---   clear line from the start point, which no line that starts inside a box is: of the 38 staff, the
---   29 who work indoors never ran.)
---   Outdoors: RUN studs along the first clear line, turning further from straight away at each try;
---   with every line blocked, round the building in the way (World/FootPath, a short search).
-local function runWay(self: Service, x: number, z: number, fx: number, fz: number): { { number } }?
+--   Indoors (the wards, the police station's locker room, a shop floor: the point is inside a building) the run
+--   keeps to the building's own clear ways: along the person's own round (`round`: a Staff brain's points, which
+--   the bake keeps clear) or along the building's way toward its door (World/WalkWay's rooms: the hospital's
+--   lanes, the alley's ways, the way out from behind the corner store's till), stopping inside, whichever ends
+--   further from the threat; never straight across a room (desks, beds, the walls between rooms) and never out
+--   through a wall. In a building with neither there is no run.
+--   Outdoors: RUN studs along the first clear line (World/WalkWay.clear: no building, fence or closed ground),
+--   turning further from straight away at each try; with every line blocked, round the building in the way
+--   (WalkWay.find, a short search).
+local function runWay(
+	self: Service,
+	x: number,
+	z: number,
+	fx: number,
+	fz: number,
+	round: { { number } }?
+): { { number } }?
 	local dx, dz = x - fx, z - fz
 	local m = math.sqrt(dx * dx + dz * dz)
 	if m < 0.01 then
 		dx, dz, m = 1, 0, 1
 	end
 	dx, dz = dx / m, dz / m
+	local way = self.way
+	local room = WalkWay.roomAt(way, x, z)
+	if room or WalkWay.solidAt(way, x, z) then
+		local runs: { { { number } } } = {}
+		local looped = if round then loopRun(round, x, z, fx, fz) else nil
+		if looped then
+			table.insert(runs, looped)
+		end
+		if room then
+			-- along the building's own way toward its door, as far as RUN and never out of it
+			local run: { { number } } = {}
+			local left, px, pz = InfectionService.RUN, x, z
+			for _, p in room.within(x, z, room.door[1], room.door[2]) do
+				if not room.inside(p[1], p[2]) then
+					break
+				end
+				local len = math.sqrt((p[1] - px) ^ 2 + (p[2] - pz) ^ 2)
+				if len >= left then
+					local f = left / len
+					table.insert(run, { px + (p[1] - px) * f, pz + (p[2] - pz) * f })
+					break
+				end
+				table.insert(run, p)
+				left -= len
+				px, pz = p[1], p[2]
+			end
+			if #run > 0 and FootPath.length(x, z, run) >= InfectionService.RUN_MIN then
+				table.insert(runs, run)
+			end
+		end
+		-- whichever ends further from the threat
+		local best, bestD = nil, -1
+		for _, r in runs do
+			local e = r[#r]
+			local d = (e[1] - fx) ^ 2 + (e[2] - fz) ^ 2
+			if d > bestD then
+				best, bestD = r, d
+			end
+		end
+		return best
+	end
 	local foot = self.foot
 	local run = InfectionService.RUN
 	local own = FootPath.boxesAt(foot, x, z)
-	local inside = false
-	if own then
-		for b in own do
-			if math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd then
-				inside = true
-			end
-		end
-	end
-	if own and inside then
-		local bestLen, bx, bz = 0, x, z
-		for _, turn in RUN_TURNS do
-			local c, s = math.cos(turn), math.sin(turn)
-			local ux, uz = dx * c - dz * s, dx * s + dz * c
-			local len = run
-			for b in own do
-				if math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd then
-					-- how far along (ux, uz) this building's walls are, less the margin
-					if math.abs(ux) > 1e-6 then
-						local wall = if ux > 0 then b.cx + b.hw - WALL else b.cx - b.hw + WALL
-						len = math.min(len, (wall - x) / ux)
-					end
-					if math.abs(uz) > 1e-6 then
-						local wall = if uz > 0 then b.cz + b.hd - WALL else b.cz - b.hd + WALL
-						len = math.min(len, (wall - z) / uz)
-					end
-				end
-			end
-			if len > bestLen + 0.5 and FootPath.clear(foot, x, z, x + ux * len, z + uz * len, own) then
-				bestLen, bx, bz = len, x + ux * len, z + uz * len
-				if len >= run then
-					break
-				end
-			end
-		end
-		return if bestLen >= InfectionService.RUN_MIN then { { bx, bz } } else nil
-	end
 	local bounds = foot.bounds
 	local function target(turn: number): (number, number, boolean)
 		local c, s = math.cos(turn), math.sin(turn)
@@ -704,16 +733,16 @@ local function runWay(self: Service, x: number, z: number, fx: number, fz: numbe
 	end
 	for _, turn in RUN_TURNS do
 		local tx, tz, ok = target(turn)
-		if ok and FootPath.clear(foot, x, z, tx, tz, own) then
+		if ok and WalkWay.clear(way, x, z, tx, tz) then
 			return { { tx, tz } }
 		end
 	end
 	for i = 1, 3 do
 		local tx, tz, ok = target(RUN_TURNS[i])
-		if ok and FootPath.boxesAt(foot, tx, tz) == nil then
-			local way = FootPath.find(foot, x, z, tx, tz, { maxLength = run * 1.5, maxNodes = 300 })
-			if way then
-				return way
+		if ok and FootPath.boxesAt(foot, tx, tz) == nil and WalkWay.roomAt(way, tx, tz) == nil then
+			local found = WalkWay.find(way, x, z, tx, tz, { maxLength = run * 1.5, maxNodes = 300 })
+			if found then
+				return found
 			end
 		end
 	end
@@ -797,7 +826,12 @@ local function runFrom(self: Service, id: number, threat: any, after: string?): 
 	if a and loop and inAlley(self, a.x, a.z) then
 		way = alleyRun(self, a.x, a.z, threat.x, threat.z, loop)
 	elseif a then
-		way = runWay(self, a.x, a.z, threat.x, threat.z)
+		-- (their own round only when they are on it: a guard bitten in the hospital has no run back to the locker room)
+		local round = if brain and brain.kind == "Staff" then brain.points else nil
+		if round and offRound(round, a.x, a.z) > InfectionService.ON_ROUND then
+			round = nil
+		end
+		way = runWay(self, a.x, a.z, threat.x, threat.z, round)
 	end
 	if way == nil then
 		return false
@@ -1368,13 +1402,35 @@ end
 -- The walk from a bed to (hx, hz): out through the ward door and the front door, then the way a
 -- walk-in comes, backwards (the pavements), or across the open ground round the buildings. nil when
 -- there is no way on foot (beyond the river; a search over its budget).
-local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: number): ({ { number } }?, number)
+local function wayHome(
+	self: Service,
+	layout: any,
+	bed: any,
+	hx: number,
+	hz: number,
+	from: { number }?
+): ({ { number } }?, number)
+	-- (`from`: where the person stands when it is not their bed: discharged on the way to it, the walk starts there)
+	local fx, fz = bed.x, bed.z
+	local atBed = true
+	if
+		from
+		and (from[1] - bed.x) ^ 2 + (from[2] - bed.z) ^ 2 > 4
+		and HospitalLayout.contains(layout, from[1], from[2])
+	then
+		fx, fz, atBed = from[1], from[2], false
+	end
 	if HospitalLayout.contains(layout, hx, hz) then
 		-- the hospital's own people: back to their post along the lanes (the aisles, the ward doors)
-		local points = HospitalLayout.walk(layout, bed.x, bed.z, hx, hz)
+		local points = HospitalLayout.walk(layout, fx, fz, hx, hz)
 		return points, MedicalRoute.length(points)
 	end
-	local points = HospitalLayout.pathOut(layout, bed)
+	local points = if atBed
+		then HospitalLayout.pathOut(layout, bed)
+		else HospitalLayout.walk(layout, fx, fz, layout.entrance[1], layout.entrance[2])
+	if not atBed then
+		table.insert(points, { layout.outside[1], layout.outside[2] })
+	end
 	local out = layout.outside
 	local back = self:sidewalkRoute(hx, hz)
 	if back then
@@ -1419,7 +1475,7 @@ local function wayBack(self: Service, x: number, z: number, hx: number, hz: numb
 			way[#way] = nil
 		end
 		local last = way[#way] or { x, z }
-		if not FootPath.clear(self.foot, last[1], last[2], hx, hz) then
+		if not clearLine(self, last[1], last[2], hx, hz) then
 			return nil
 		end
 		pushPoint(way, hx, hz)
@@ -1556,7 +1612,17 @@ local function apply(self: Service, rec: Record, effect: any)
 				local a = actorOf(self, id)
 				local points = HospitalLayout.pathIn(layout, bed)
 				if a and HospitalLayout.contains(layout, a.x, a.z) then
-					table.remove(points, 1) -- already through the door
+					-- already through the door (one of the hospital's own people, or walked in): along the lanes from
+					-- where they stand to the bed's way, never straight across the rooms to it
+					table.remove(points, 1)
+					local first = points[1]
+					if first then
+						local lead = HospitalLayout.walk(layout, a.x, a.z, first[1], first[2])
+						for i = 2, #points do
+							table.insert(lead, points[i])
+						end
+						points = lead
+					end
 				end
 				order(self, id, { mode = "route", points = points, speed = self.tun.walkInSpeed, after = "stand" })
 			end
@@ -1577,7 +1643,8 @@ local function apply(self: Service, rec: Record, effect: any)
 		sink(self, id, false)
 		if layout and bed and isAI(self, id) then
 			local hx, hz = homeOf(self, rec)
-			local points, len = wayHome(self, layout, bed, hx, hz)
+			local a = actorOf(self, id)
+			local points, len = wayHome(self, layout, bed, hx, hz, if a then { a.x, a.z } else nil)
 			if points then
 				order(self, id, { mode = "route", points = points, speed = self.tun.dischargeSpeed, after = "stand" })
 				-- a walk that overruns (it never should) ends at home all the same

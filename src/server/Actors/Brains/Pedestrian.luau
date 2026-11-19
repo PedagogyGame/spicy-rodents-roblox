@@ -14,7 +14,9 @@
 -- from the lane, the person adopts the nearest lane and WALKS back onto it (the lane lock damps the
 -- cross coordinate at lambda 8, which used to slide a person across the block in half a second).
 -- resume() also stops the motor (Common.halt) so the stale lane-locked intent cannot do that slide
--- in the frames before the brain's next think.
+-- in the frames before the brain's next think. The walk back onto a lane and the walk to a gathering go by the
+-- town's way (ctx.way: World/WalkWay through Common.toward), never straight through a house; the lanes themselves
+-- are pieces of pavement that miss every building (AI/TownAI splits them with WalkWay.splitLane).
 -- The duel (Server/Combat/CombatService, Combat/Duel): the event "duel" (mode stand | approach | back, the rodent's x
 -- and z, speed, untilTime; or mode "end") has the person face the rodent, close in on it or back away from it until
 -- untilTime, then walk back to the lane; a medical order or a gathering is never interrupted by it. A flight in the
@@ -62,6 +64,8 @@ type Brain = Common.Brain & {
 	observer: Perception.Observer,
 	target: Perception.Target,
 	pctx: Perception.Ctx,
+	leg: Common.Leg, -- the town's way back onto the lane (rejoin) or over to a gathering
+	laneTryAt: number, -- when a rejoin with no way to its lane may try another lane
 }
 
 -- What Server/Combat/CombatService has the person do while they face the rodent (Combat/Duel's move): stand facing it,
@@ -84,6 +88,7 @@ local DAMP_WALK, DAMP_FLEE = 6.8, 10 -- lambda (L7138)
 local REJOIN_FAR = 6 -- studs off the lane: further than this the person walks back instead of sliding
 local REJOIN_NEAR = 1.5 -- studs: on the lane again
 local REJOIN_SPEED = Units.st(1.6)
+local REJOIN_TRY = 300 -- studs: the lanes a rejoin with no way to its own may try instead
 
 -- The v5.4 sidewalk lanes (humans_actors §4.2 table), in studs. 4 core lanes first.
 function Pedestrian.defaultLanes(): { Lane }
@@ -259,8 +264,13 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 				intent.mode = "stand"
 				intent.heading = Common.yawOf(self.gatherX - actor.x, self.gatherZ - actor.z)
 			else
+				local tx, tz = Common.toward(self.leg, actor, ctx, self.gatherX, self.gatherZ)
+				if tx == nil or tz == nil then
+					intent.mode = "stand"
+					return
+				end
 				intent.mode = "walk"
-				intent.tx, intent.tz = self.gatherX, self.gatherZ
+				intent.tx, intent.tz = tx, tz
 				intent.laneAxis = nil
 				intent.speed = Units.st(1.6)
 				intent.turnRate = WALK_TURN
@@ -305,8 +315,38 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 			pickGoal(self)
 		else
 			local intent = actor.intent
+			-- by the town's way (from a back yard, a shop floor, the hospital: never through the walls between), to
+			-- the lane point it set out for (the nearest one moves as the person walks)
+			local leg, lane = self.leg, self.lane
+			if leg.points ~= nil then
+				local u, c = if lane.axis == "x" then leg.tx else leg.tz, if lane.axis == "x" then leg.tz else leg.tx
+				if math.abs(c - lane.fixed) < 0.01 and u >= lane.min and u <= lane.max then
+					x, z = leg.tx, leg.tz
+				end
+			end
+			local tx, tz = Common.toward(leg, actor, ctx, x, z)
+			if tx == nil or tz == nil then
+				-- no way to the nearest lane (across the river from it, in a fenced yard): another lane nearby
+				-- next time, a while later
+				intent.mode = "stand"
+				if ctx.now >= self.laneTryAt then
+					self.laneTryAt = ctx.now + Common.LEG_RETRY * 2 ^ math.min(leg.misses, 4)
+					local near = {}
+					for _, l in self.params.lanes do
+						local lx = if l.axis == "x" then math.clamp(actor.x, l.min, l.max) else l.fixed
+						local lz = if l.axis == "x" then l.fixed else math.clamp(actor.z, l.min, l.max)
+						if l ~= lane and Common.dist2d(actor.x, actor.z, lx, lz) < REJOIN_TRY then
+							table.insert(near, l)
+						end
+					end
+					if #near > 0 then
+						self.lane = near[math.floor(self.params.rng() * #near) + 1]
+					end
+				end
+				return
+			end
 			intent.mode = "walk"
-			intent.tx, intent.tz = x, z
+			intent.tx, intent.tz = tx, tz
 			intent.laneAxis, intent.laneCoord = nil, nil
 			intent.speed = math.max(self.walkSpeed, REJOIN_SPEED)
 			intent.turnRate = WALK_TURN
@@ -380,6 +420,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	-- nothing moves the body until the next think: the old intent is locked to the lane the person
 	-- was on before the hand-over, and the motor's lane lock would drag them back to it at once
 	Common.halt(self.actor)
+	Common.forget(self.leg)
 	-- handed back far from the lane (a player walked the body somewhere): walk to the nearest lane
 	if not Directive.active(self.directive) and self.state ~= "gather" and offLane(self) > REJOIN_FAR then
 		reseat(self)
@@ -464,6 +505,8 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		observer = { x = 0, y = 0, z = 0, facing = 0, witnessUntil = 0 },
 		target = { x = 0, y = 0, z = 0, groundY = 0, moveSpeed = 0, focus = false, inInterior = false },
 		pctx = { time = 0, hotHere = false, concealment = Perception.defaultConcealment() },
+		leg = Common.newLeg(),
+		laneTryAt = 0,
 	}, Methods)
 	-- start on the lane
 	if lane.axis == "x" then
