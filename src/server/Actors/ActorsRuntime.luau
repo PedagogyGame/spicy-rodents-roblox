@@ -426,7 +426,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 						body:SetAttribute("Task", a.task)
 					end
 				end
-			elseif isSquirrelFamily(actor) then
+			elseif isSquirrelFamily(actor) and movement and movement.heldPlace then
 				-- a held squirrel feeds the AI world from the place the server holds (invariant D, validator round 8:
 				-- perception, traffic, the duel, the lounge's guards, the overhead watch all read this record; its root is
 				-- its client's to write between the watches): MovementService.heldPlace, and the pace of its accepted
