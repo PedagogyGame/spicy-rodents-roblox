@@ -104,7 +104,7 @@ Tunables.tree = {
 	         contact = { v = 3.5, unit = "st", src = "Combat/PlayRules BITE_RANGE" }, contactHeight = { v = 5, unit = "st" },
 	         rewind = { v = 0.15, unit = "s", src = "D20: a pounce's window widened by up to this for the link" },
 	         launchSlack = { v = 0.05, unit = "s", src = "one movement packet: the motor's launch may be seen this much (plus rewind) before when the click said" },
-	         launchLate = { v = 0.13, unit = "s", src = "the motor's launch may be dated this much after when the click said (the frame the wind-up ends in, one packet; never the link's jitter: both are dated on the movement packets' clock)" },
+	         launchLate = { v = 0.13, unit = "s", src = "the motor's launch may be dated this much after when the click said (the frame the wind-up ends in and the duel's step; never the link's jitter: both are dated on the movement packets' clock)" },
 	         motorFresh = { v = 0.2, unit = "s", src = "a motor state older than this bites nobody (the rodent's packets stopped)" },
 	         lagMax = { v = 0.2, unit = "s", src = "a bite is judged against the person as the rodent's player saw them, up to this far back (the link's round trip)" },
 	         -- owner 2026-11-18 (second playtest): "none on the scene attacked me initially, i would like more of that"

@@ -1706,8 +1706,18 @@ function SquirrelMotor.envelope(
 				then ago
 				else nil
 		end
-		if u < pounceUpMin - gEps or u > pounceUp + gEps or vxz < pounceMinXZ or vxz > pounceXZ then
+		if u < pounceUpMin - gEps or u > pounceUp + gEps or vxz > pounceXZ then
 			return nil
+		end
+		if vxz < pounceMinXZ then
+			-- (slower than any lunge: only one that met a wall, which takes the speed off it substep by substep; the
+			-- wall is then just ahead along the body's heading)
+			local crosses = world.crosses
+			local r = 3
+			local hx, hz = next.x + math.sin(next.yaw) * r, next.z + math.cos(next.yaw) * r
+			if crosses == nil or not crosses(next.x, next.z, hx, hz, next.y, next.y, 0) then
+				return nil
+			end
 		end
 		return ago
 	end

@@ -68,9 +68,10 @@ export type Verdict = {
 	snapped: boolean?, -- (Movement/MovementService) the body was snapped back for this packet
 	launched: boolean?, -- the move from the last packet holds a launch (a leap, a pounce, off a rail) the envelope saw
 	-- the client clock the motor's pounce launched at, when the move holds a pounce-shaped launch (the window rose, the
-	-- body flies as that pounce) the packets show closely enough to date: the gap since the last packet no longer than
-	-- C.POUNCE_GAP (a silence hides when it was) and the launch no further back than C.POUNCE_AGO (the packet after it)
+	-- body flies as that pounce: SquirrelMotor.envelope's pounce), and the client clock gap it lies in (somewhere in it:
+	-- Movement/MovementService dates no pounce from a gap a silence may have made)
 	pounce: number?,
+	pounceGap: number?,
 }
 
 export type Options = {
@@ -162,11 +163,6 @@ MoveValidator.C = table.freeze({
 	CLOCK_RUN_KEEP = 120, -- ... kept this long ...
 	CLOCK_RUN_AGE = 60, -- ... the mark: the lowest of those at least this old (a 1.02 x clock is 1.2 s ahead of it) ...
 	CLOCK_RUN_MAX = 1.1, -- ... which the offset may never fall below by more (seconds: more than any latency drops)
-	-- seconds of client clock: a pounce is dated only from a packet that follows the last one by no more than this (one
-	-- lost packet at a slow frame rate; a silence longer hides when the lunge went) ...
-	POUNCE_GAP = 0.2,
-	-- ... and launched no further back than this before it (a send interval and the longest frame: the packet after it)
-	POUNCE_AGO = SquirrelWire.SEND_EVERY + SquirrelMotor.params.frameDtCap,
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -488,9 +484,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 				)
 			end
 			actor.lastPounce = at
-			if dt <= MoveValidator.C.POUNCE_GAP and pounceAgo <= MoveValidator.C.POUNCE_AGO + 1e-6 then
-				pounceAt = at
-			end
+			pounceAt = at
 		end
 		if arcVy then
 			-- (a plain arc: the baseline falls as gravity says, not as the packet claims within the slack)
@@ -546,6 +540,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local v = verdict(ok, true, violations, flagged, actor.bucket, correction, resync, false)
 	v.launched = launched
 	v.pounce = pounceAt
+	v.pounceGap = if pounceAt then dt else nil
 	return v
 end
 

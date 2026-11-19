@@ -211,6 +211,11 @@ MovementService.C = table.freeze({
 	-- seconds: the most of the engine's round trip (Player:GetNetworkPing, up to 10 s) any wait or window here takes; a
 	-- slower link is no reason to let the root sit further off for longer
 	PING_MAX = 1,
+	-- seconds of client clock: a pounce is dated only from a packet that follows the last one taken by no more than this
+	-- (a send interval and the longest frame: a lost packet at 60 frames a second), and the arrivals' spread (a packet overtaken by a later
+	-- one is dropped) up to POUNCE_SPREAD_MAX: a longer silence may hide a lunge held back for a better moment
+	POUNCE_GAP = SquirrelWire.SEND_EVERY + SquirrelMotor.params.frameDtCap,
+	POUNCE_SPREAD_MAX = 0.3,
 	-- seconds: the most a click's own clock may put it before the remote carrying it arrived (a reliable remote resent
 	-- after a loss, a round trip and a timeout late; anything older is no click to tie a pounce to)
 	CLICK_EARLY = 1,
@@ -511,6 +516,16 @@ function MovementService.new(deps: Deps): Movement
 		while #sq.offsets > 1 and now - sq.offsets[1].at > C.SPREAD_WINDOW do
 			table.remove(sq.offsets, 1)
 		end
+	end
+
+	-- arrivalSpread(sq): the spread of the recent packets' arrival offsets (the link's jitter as these packets met it),
+	-- never above C.POUNCE_SPREAD_MAX
+	local function arrivalSpread(sq: Squirrel): number
+		local lo, hi = math.huge, -math.huge
+		for _, o in sq.offsets do
+			lo, hi = math.min(lo, o.off), math.max(hi, o.off)
+		end
+		return if hi >= lo then math.min(hi - lo, C.POUNCE_SPREAD_MAX) else 0
 	end
 
 	-- offsetFloor(sq, now): the lowest arrival offset (server time - client clock) of the recent packets: the client clock
@@ -923,13 +938,20 @@ function MovementService.new(deps: Deps): Movement
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				pace(self, actorId, sq, snapshot, now)
-				-- a pounce the server believes: a clean move holding a pounce-shaped launch the packets date closely
-				-- (MoveValidator's verdict.pounce: the client clock it launched at). Its server time is that clock on the
-				-- packets' own mapping (the lowest arrival offset of the last C.SPREAD_WINDOW: the link's latency without
-				-- this packet's jitter), never later than it arrived. Combat/CombatService ties the bite to it and the
-				-- click's own clock on the same mapping (clickAt), so a click and a lunge held back for a better moment are
-				-- not one pounce, and the link's jitter parts neither
-				if v.ok and not v.resync and v.pounce then
+				-- a pounce the server believes: a clean move holding a pounce-shaped launch (MoveValidator's verdict.pounce:
+				-- the client clock it launched at, somewhere in the gap since the last packet) from a gap no longer than
+				-- C.POUNCE_GAP and the spread of the packets' arrivals (a packet lost, or overtaken: one later in the
+				-- gap would have shown it; a longer silence hides when the lunge went). Its server time is that clock on
+				-- the packets' own mapping (the lowest arrival offset of the last C.SPREAD_WINDOW: the link's latency
+				-- without this packet's jitter), never later than it arrived. Combat/CombatService ties the bite to it and
+				-- the click's own clock on the same mapping (clickAt), so a click and a lunge held back for a better moment
+				-- are not one pounce, and the link's jitter parts neither
+				if
+					v.ok
+					and not v.resync
+					and v.pounce
+					and (v.pounceGap or math.huge) <= C.POUNCE_GAP + arrivalSpread(sq)
+				then
 					sq.pounceClock = v.pounce
 					sq.pounceAt = math.min(now, v.pounce + offsetFloor(sq, now))
 				end
