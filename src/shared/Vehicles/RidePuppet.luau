@@ -172,7 +172,8 @@ end
 -- The bicycle at `scale` (1 = an adult's: 0.92-stud wheels 3.1 studs apart), the front wheel toward -Z, drawn from
 -- 21 parts (22 with a basket): two spoked wheels, the diamond frame in the paint colour (seat, top, down tube, chain
 -- and seat stays), the chrome fork, the stem and bar, a saddle, the chainring and the cranks.
-type BikeOpts = { scale: number?, frame: string?, basket: boolean? }
+-- spokes: bars of spokes per wheel (2 by default; a parked bike in a yard draws 1)
+type BikeOpts = { scale: number?, frame: string?, basket: boolean?, spokes: number? }
 function RidePuppet.drawBicycle(k: Kit, opts: BikeOpts?): Anchors
 	local o: BikeOpts = opts or {}
 	local s = o.scale or 1
@@ -184,8 +185,8 @@ function RidePuppet.drawBicycle(k: Kit, opts: BikeOpts?): Anchors
 	local seatTop: V = { 0, 2.18 * s, 0.6 * s }
 	local headTop: V, headFoot: V = { 0, 2.05 * s, -1.0 * s }, { 0, 1.55 * s, -1.15 * s }
 	local barAt: V = { 0, 2.42 * s, -1.02 * s }
-	wheel(k, "WheelF", front, R, 0.16 * s, 2)
-	wheel(k, "WheelB", rear, R, 0.16 * s, 2)
+	wheel(k, "WheelF", front, R, 0.16 * s, o.spokes or 2)
+	wheel(k, "WheelB", rear, R, 0.16 * s, o.spokes or 2)
 	local tube = 0.075 * s
 	seg(k, "SeatTube", bb, seatTop, tube, paint)
 	seg(k, "TopTube", { 0, 1.95 * s, 0.53 * s }, headTop, tube, paint)
@@ -358,10 +359,10 @@ local function drawFigure(k: Kit, dress: PeopleLooks.Dress, r: Rider, pose: Pose
 	elseif dress.hat == "Hat_beret" then
 		put(k, {
 			name = "Beret",
-			size = { 0.26 * s, 1.42 * s, 1.42 * s },
-			pos = at(k, add3(head, { 0.08 * s, 0.6 * s, 0.06 * s })),
+			size = { 0.3 * s, 1.22 * s, 1.22 * s },
+			pos = at(k, add3(head, { 0.16 * s, 0.6 * s, 0.1 * s })),
 			roll = math.pi / 2,
-			pitch = 0.22,
+			pitch = 0.32,
 			yaw = math.pi / 2,
 			color = hex(FIXED.beret),
 			shape = "Cylinder",
