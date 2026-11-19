@@ -935,7 +935,7 @@ function MovementService.new(deps: Deps): Movement
 								x = refX,
 								y = refY,
 								z = refZ,
-								vy = (shot.vy :: number?) or 0,
+								vy = if type(shot.vy) == "number" then shot.vy else 0,
 								onRail = type(rid) == "number" and rid >= 0,
 							},
 							x,

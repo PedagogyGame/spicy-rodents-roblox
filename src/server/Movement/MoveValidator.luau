@@ -559,7 +559,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	-- st/s, each one a fresh governor). The floor is not asked of the spot itself (riverFall's own), only of a walk on
 	local entryX, entryY, entryZ, quayExact = nil, nil, nil, nil
 	if not next.routeId and next.grounded and not actor.lastRiver then
-		entryX, entryY, entryZ, _, quayExact = Recovery.riverEntry(
+		local _after: number? = nil
+		entryX, entryY, entryZ, _after, quayExact = Recovery.riverEntry(
 			{ x = prev.x, y = prev.y, z = prev.z, vy = prev.vy, onRail = prev.routeId ~= nil },
 			next.x,
 			next.y,

@@ -364,7 +364,7 @@ end
 -- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: colliding parts
 -- in the squirrel's group, the bough cylinders included, the terrain, the water, the vehicles and the town's ground
 -- plates (Shared/World/GroundPlate) counted as floor. `cover`: `down` past the bough cylinders (stops: one rule each).
-function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
+function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	local function params(list: { Instance }): RaycastParams
 		local p = RaycastParams.new()
 		p.FilterType = Enum.RaycastFilterType.Exclude
