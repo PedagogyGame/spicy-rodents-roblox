@@ -85,6 +85,7 @@ function Probe.run(): { [string]: any }
 
 	a.saves:join(player)
 	steps.loadA = { seconds = waitIdle(a.saves, 30), status = a.saves:status(player) }
+	task.wait(PlayerSaves.WRITE_GAP) -- (a purchase is written at once only once the load's write is a gap old)
 	local gave, note = a.wardrobe:give(player, SHIRT)
 	steps.giveA = { ok = gave, note = note, seconds = waitIdle(a.saves, 30) }
 	local afterA = store:GetAsync(key)
