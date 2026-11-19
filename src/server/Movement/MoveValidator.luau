@@ -215,8 +215,8 @@ MoveValidator.C = table.freeze({
 	-- the displacement governor (_govern, validator round 6): every pair of accepted places this far apart in time or
 	-- less (seconds) is judged, the places kept at least GOV_SPACING apart (seconds) in a ring of GOV_SLOTS (the cost)
 	GOV_WINDOW = 3,
-	GOV_SPACING = 1 / 40,
-	GOV_SLOTS = 128,
+	GOV_SPACING = 1 / 20,
+	GOV_SLOTS = 64,
 	-- studs: the farthest the drawn pose lies off a rail's centreline (a big trunk's bark, 5.95; a lookout's lift)
 	DRAWN_MAX = 6.5,
 })
@@ -1066,7 +1066,7 @@ export type GovBounds = {
 }
 
 -- railClimbOf(registry, boosted): the fastest any rail of the world carries a body up (studs/s): each route's cap times
--- its steepest rise per stud along it (32 chords), once per registry
+-- its steepest rise per stud along it (16 chords), once per registry
 local climbCache: { [any]: { [boolean]: number } } = setmetatable({}, { __mode = "k" }) :: any
 local function railClimbOf(reg: any, boosted: boolean): number
 	if reg == nil then
@@ -1085,8 +1085,8 @@ local function railClimbOf(reg: any, boosted: boolean): number
 	for _, r in reg:all() do
 		local a = reg:pointAt(r, 0)
 		local steep = 0
-		for i = 1, 32 do
-			local b = reg:pointAt(r, i / 32)
+		for i = 1, 16 do
+			local b = reg:pointAt(r, i / 16)
 			local ds = math.sqrt((b.x - a.x) ^ 2 + (b.y - a.y) ^ 2 + (b.z - a.z) ^ 2)
 			if ds > 1e-6 then
 				steep = math.max(steep, math.abs(b.y - a.y) / ds)
@@ -1244,8 +1244,13 @@ function MoveValidator._govern(
 	local B = self:governorBounds(self.boostOf(actorId))
 	local t = math.max(0, tau)
 	local x, y, z = next.x, next.y, next.z
-	local tramp = MoveValidator.nearTrampoline(self.world, x, z, B.vh * t + 2)
-		or MoveValidator.nearTrampoline(self.world, g.X, g.Z, B.vh * t + 2)
+	local tramps = self.world.trampolines
+	local tramp = tramps ~= nil
+		and #tramps > 0
+		and (
+			MoveValidator.nearTrampoline(self.world, x, z, B.vh * t + 2)
+			or MoveValidator.nearTrampoline(self.world, g.X, g.Z, B.vh * t + 2)
+		)
 	local vv = 0
 	if y > g.Y then
 		-- (only a rising move earns rise: none is banked standing still)
@@ -1270,31 +1275,34 @@ function MoveValidator._govern(
 		marks.govPeak = peak
 	end
 	local pk = peak :: { number }
-	local function judge(gi: number, si: number, xi: number, yi: number, zi: number, bhi: number, bvi: number)
-		local tg = G - gi
-		local ts = S - si + swing
+	-- (every kept place C.GOV_WINDOW back, the newest slot being the last packet's: keep)
+	local slots, window, dh, dv = MoveValidator.C.GOV_SLOTS, MoveValidator.C.GOV_WINDOW, B.dh, B.dv
+	local gg, gs, gx, gy, gz, gbh, gbv = g.g, g.s, g.x, g.y, g.z, g.bh, g.bv
+	local i = g.head
+	for _ = 1, g.count do
+		local tg = G - gg[i]
+		if tg > window then
+			break
+		end
+		local ts = S - gs[i] + swing
 		-- (never more time than the server's own arrivals span, with the clock check's swing)
 		local scale = if tg > ts and tg > 0 then math.max(0, ts) / tg else 1
-		local h = math.sqrt((x - xi) ^ 2 + (z - zi) ^ 2) - (scale * (BH - bhi) + B.dh)
-		local v = (y - yi) - (scale * (BV - bvi) + B.dv)
+		local dx, dz = x - gx[i], z - gz[i]
+		local h = math.sqrt(dx * dx + dz * dz) - (scale * (BH - gbh[i]) + dh)
+		local v = (y - gy[i]) - (scale * (BV - gbv[i]) + dv)
 		local class = if tg <= 0.25 then 1 elseif tg <= 1 then 2 else 3
-		pk[class] = math.max(pk[class], h)
-		pk[class + 3] = math.max(pk[class + 3], v)
+		if h > pk[class] then
+			pk[class] = h
+		end
+		if v > pk[class + 3] then
+			pk[class + 3] = v
+		end
 		if h > overH then
 			overH, worstH = h, tg
 		end
 		if v > overV then
 			overV, worstV = v, tg
 		end
-	end
-	judge(g.G, g.S, g.X, g.Y, g.Z, g.BH, g.BV)
-	local slots = MoveValidator.C.GOV_SLOTS
-	local i = g.head
-	for _ = 1, g.count do
-		if G - g.g[i] > MoveValidator.C.GOV_WINDOW then
-			break
-		end
-		judge(g.g[i], g.s[i], g.x[i], g.y[i], g.z[i], g.bh[i], g.bv[i])
 		i = (i - 2) % slots + 1
 	end
 	if overH > 0 then
