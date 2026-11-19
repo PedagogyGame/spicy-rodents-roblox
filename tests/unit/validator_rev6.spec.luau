@@ -131,6 +131,62 @@ return function(t)
 	)
 
 	t.test(
+		"reset: Reset every 0.6 s with no packet and the root held still climbs 3 st a time into open air",
+		function()
+			-- Possession.recover (the Roblox menu's Reset, the remote `recover`: no rate limit) teleports the body to
+			-- Recovery.resetTarget of the safe history (ActorsRuntime: the server's root sampled every 0.5 s while |vy| < 1)
+			-- and 3 st over it: unstick finds no sample 4 st away across, so it is the newest, the place the last Reset put
+			-- the body. Emulated here: the safe sample is where the server last put the root (the client holds it there)
+			local world = TestWorld.build()
+			local _, vworld = worldWith({})
+			local held: { x: number, y: number, z: number }? = nil
+			local resets = 0
+			local rig: any
+			rig = LiveRig.new({
+				world = world,
+				vworld = vworld,
+				link = { latency = 0.1, jitter = 0.01, loss = 0 },
+				seed = 5,
+				silent = function(now: number): boolean
+					return now >= 3
+				end,
+				cheat = function(s: State, _i: SquirrelMotor.Input, _now: number, _w: any)
+					local h = held
+					if h then
+						s.x, s.y, s.z, s.vx, s.vy, s.vz = h.x, h.y, h.z, 0, 0, 0
+					end
+				end,
+				rootCheat = function(p: { x: number, y: number, z: number }, _now: number, _s: State)
+					local h = held
+					if h then
+						p.x, p.y, p.z = h.x, h.y, h.z
+					end
+				end,
+			})
+			local start = SquirrelMotor.new(0, world.groundHeight, 0)
+			rig:possess(start, function(): SquirrelMotor.Input
+				return SquirrelMotor.idleInput(0)
+			end)
+			for k = 0, 15 do
+				rig:at(3.2 + k * 0.6, function()
+					local r = rig.server.root
+					local h = { x = r.x, y = r.y + 3, z = r.z }
+					held = h
+					resets += 1
+					rig:teleport(h.x, h.y, h.z, "reset")
+				end)
+			end
+			rig:run(13)
+			local r = rig:result()
+			local up = r.root.y - world.groundHeight
+			print(
+				`      {LiveRig.describe("Reset every 0.6 s", r)}; {resets} resets; the root {string.format("%.0f", up)} st over open ground`
+			)
+			t.truthy(up < 10, `the root stands {up} st over open ground after {resets} resets`)
+		end
+	)
+
+	t.test(
 		"bough: an honest drop (Q) off a branch stands on its bough cylinder, which the live floor ray looks past",
 		function()
 			if not fs.isFile("build/Town.rbxm") then
