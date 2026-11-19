@@ -566,13 +566,22 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
 	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
 		local floorNear = self.world.floorNear
-		local rose = not resync and standY ~= nil and next.y > (standY :: number) + 1e-3
-		if rose and floorNear then
+		-- (where it last stood is unknown after a rail, a gap too long to judge or a hop: the round-4 review stood 3
+		-- studs over open ground from there on, FLOOR_DEPTH being all floorBelow asks)
+		local unknown = resync or standY == nil
+		local rose = not unknown and next.y > (standY :: number) + 1e-3
+		if (rose or unknown) and floorNear then
 			if not floorNear(next.x, next.y, next.z) then
+				-- (a car's roof the client draws a little behind or off the server's box, on a slope or a bump: a third)
+				local carFloor = self.world.carFloor
+				local onCar = carFloor ~= nil and carFloor(next.x, next.y, next.z)
+				actor.standY = nil -- (never a height it floated at: the next packet is judged the same way)
 				table.insert(violations, {
-					code = "climb",
-					severity = 1,
-					detail = `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`,
+					code = if rose then "climb" else "float",
+					severity = if onCar then 0.34 else 1,
+					detail = if rose
+						then `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`
+						else "grounded where it last stood is unknown, with no floor just under the feet",
 				})
 			end
 		elseif not floorBelow(next.x, next.y, next.z) then
@@ -786,7 +795,16 @@ function MoveValidator.hop(
 		crossesLong
 		and moved <= reach
 		and not onRails(world.index, from, next, along == true)
-		and crossesLong(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex)
+		and crossesLong(
+			from.x,
+			from.z,
+			next.x,
+			next.z,
+			math.min(from.y, next.y),
+			math.max(from.y, next.y),
+			apex,
+			next.y
+		)
 	then
 		local n = self:wallGap(actorId, serverTime)
 		table.insert(violations, {

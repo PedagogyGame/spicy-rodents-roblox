@@ -907,7 +907,8 @@ function MovementService.new(deps: Deps): Movement
 				c.z,
 				math.min(vis.y, c.y),
 				math.max(vis.y, c.y),
-				MoveValidator.leapRise()
+				MoveValidator.leapRise(),
+				c.y
 			)
 		end
 		if rail then
@@ -967,14 +968,14 @@ function MovementService.new(deps: Deps): Movement
 			local y0, y1 = math.min(sq.rootY, y), math.max(sq.rootY, y)
 			-- (over the higher end, what a leap rises in the time between the samples)
 			local rise = MoveValidator.leapUpAllowance() * (now - sq.rootAt)
-			local crossed = world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise)
+			local crossed = world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise, y)
 			-- a jump of the root longer than a chord (its updates held up, or a hop): judged chord by chord, weighed as a
 			-- gap is (one may be a corner rounded unseen)
 			if
 				not crossed
 				and world.crossesLong
 				and dist(px, sq.rootY, sq.rootZ, x, y, z) > ValidatorWorld.C.MAX_CHORD
-				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise())
+				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise(), y)
 			then
 				crossed = byRail or (validator :: any):wallGap(actorId, now) >= 2
 			end
