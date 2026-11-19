@@ -13,12 +13,20 @@
 --   meter    the next driver inherits the validator's sprint meter (MoveValidator.takeOver: "the meter no fuller than
 --            left"), but its client's motor starts a new body full (SquirrelMotor.new stamina = 1) and is never told: an
 --            honest player who takes a body its last driver ran winded, and sprints, is flagged and snapped.
--- About 5 s: `lune run tests/run.luau validator_r8rv`.
+--   sink     the slab ray is cast only for a move of SLAB_DY (0.05) or more, and from RAY_ABOVE (1.5) over the last
+--            place: a grounded claim sinks 0.049 st a packet (the floor ray still meets the roof's top within 1.5 over
+--            the feet), then one air step under 0.05 (a fall from rest at 30 packets a second: 0.042), and every ray after
+--            starts inside the roof: the fall on through it into the sealed storey is never judged (needs build/Town.rbxm).
+-- About 10 s: `lune run tests/run.luau validator_r8rv`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("@tests/lib/BakedWorld")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local TestWorld = require("@tests/cheat/TestWorld")
 local LiveRig = require("@tests/lib/LiveRig")
+local MoveValidator = require("@server/Movement/MoveValidator")
+local Height = require("@shared/World/Height")
+local Data = require("@shared/Data")
+local fs = require("@lune/fs")
 
 type State = SquirrelMotor.State
 type V3 = { x: number, y: number, z: number }
@@ -220,4 +228,112 @@ return function(t)
 		print(`      {table.concat(rows, "; ")}`)
 		t.eq(snapped, 0, "an honest next driver is never snapped")
 	end)
+	-- sink -------------------------------------------------------------------------------------------------------------
+	t.test(
+		"sink: a grounded claim sinks under a roof's top by steps under 0.05 st, then falls through it: judged",
+		function()
+			if not fs.isFile("build/Town.rbxm") then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			Height.configure(Data.default():module("TerrainExtensions"))
+			local town = BakedWorld.load("build/Town.rbxm")
+			local w = town:motorWorld(Data.default())
+			local wall, down, cover = BakedWorld.validatorRays(town)
+			local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
+			local P = SquirrelMotor.params
+			local rows = {}
+			local passed = 0
+			for _, path in { "Lots.hospital_main.Roof", "Lots.west_police_station.Roof" } do
+				local roof: any = nil
+				for _, p in town.parts do
+					if p.path == path then
+						roof = p
+					end
+				end
+				if roof == nil then
+					table.insert(rows, `{path}: not found`)
+					continue
+				end
+				local cx, cz = (roof.x0 + roof.x1) / 2, (roof.z0 + roof.z1) / 2
+				local top = town.groundAt(cx, cz, roof.y1 + 1)
+				local under = town.groundAt(cx, cz, roof.y0 - 1.6)
+				local rate = 30
+				local v = MoveValidator.new(vworld)
+				local s0 = SquirrelMotor.new(cx, top, cz)
+				s0.grounded, s0.clock = true, 1
+				v:accept("a", { seq = 0, snapshot = SquirrelMotor.serialize(s0) }, 1)
+				local seq, now = 0, 1
+				local codes: { [string]: number } = {}
+				local n = 0
+				local function send(st: State)
+					seq += 1
+					now += 1 / rate
+					st.clock = now
+					for _, x in v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(st) }, now).violations do
+						n += 1
+						codes[x.code] = (codes[x.code] or 0) + 1
+					end
+				end
+				for _ = 1, rate do
+					local st = SquirrelMotor.new(cx, top, cz)
+					st.grounded = true
+					send(st)
+				end
+				-- sink, grounded, 0.049 st a packet, to 1.49 under the top (the floor ray from 1.5 over the feet still meets it)
+				local y = top
+				while y - 0.049 > top - 1.49 do
+					y -= 0.049
+					local st = SquirrelMotor.new(cx, y, cz)
+					st.grounded = true
+					send(st)
+				end
+				local sunk = y
+				-- then a fall from rest, every packet as gravity says, onto what lies under the roof
+				local t0 = now
+				while true do
+					local tt = now + 1 / rate - t0
+					local fy = sunk - 0.5 * P.gravity * tt * tt
+					local st = SquirrelMotor.new(cx, math.max(fy, under), cz)
+					if fy <= under then
+						st.grounded = true
+						send(st)
+						break
+					end
+					st.grounded, st.vy = false, -P.gravity * tt
+					send(st)
+				end
+				-- and a walk on the floor under it
+				for i = 1, rate do
+					local st = SquirrelMotor.new(cx + i * 0.25, under, cz)
+					st.grounded, st.vx = true, 7.5
+					send(st)
+				end
+				local list = {}
+				for k, c in codes do
+					table.insert(list, `{k}={c}`)
+				end
+				table.sort(list)
+				if n == 0 then
+					passed += 1
+				end
+				table.insert(
+					rows,
+					string.format(
+						"%s (%.2f thick): sank to %.2f under its top %.1f, fell to %.1f: %d violations %s",
+						path,
+						roof.y1 - roof.y0,
+						top - sunk,
+						top,
+						under,
+						n,
+						table.concat(list, " ")
+					)
+				)
+			end
+			Height.configure(nil)
+			print(`      {table.concat(rows, "; ")}`)
+			t.eq(passed, 0, "every sink through a roof judged")
+		end
+	)
 end
