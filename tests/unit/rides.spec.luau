@@ -13,6 +13,7 @@ local RidePuppet = require("@shared/Vehicles/RidePuppet")
 local Placeholder = require("@shared/Vehicles/Placeholder")
 local VehicleKinds = require("@shared/Vehicles/VehicleKinds")
 local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
+local Bake = require("@worldgen/Bake")
 
 local lib = {
 	Instance = roblox.Instance,
@@ -248,5 +249,50 @@ return function(t)
 		-- the player-only kinds need a box (no traffic kind is drawn by accident)
 		t.falsy(pcall(VehiclePuppet.spec, "pickup"), "a pickup has no traffic box")
 		t.truthy(table.find(VehiclePuppet.KINDS, "pickup") == nil, "and is not a traffic kind")
+	end)
+
+	t.test("the town's yard props are drawn over their old boxes, which stay unseen and never block anyone", function()
+		local plans = Bake.plans(Bake.data())
+		local seen: { [string]: number } = {}
+		for _, p in plans do
+			local kind = string.match(p.id or "", "^detail_%d+_(.+)$")
+				or (if p.id == "core_mower" then "mower" elseif p.id == "north_park_shed" then "shed" else nil)
+			local wants = ({
+				kids_bike = "BikeWheelF",
+				wheelbarrow = "Tray",
+				garden_hose_reel = "Hose",
+				mower = "Bonnet",
+				shed = "Door",
+			})[kind or ""]
+			if wants then
+				seen[kind :: string] = (seen[kind :: string] or 0) + 1
+				local names, drawn = {}, 0
+				for _, part in p.parts do
+					names[part.name] = part
+					if part.name ~= "Greybox" and part.name ~= "Foundation" and part.name ~= "Roof" then
+						drawn += 1
+						t.falsy(part.canCollide, `{p.id}.{part.name} blocks nobody`)
+					end
+				end
+				t.truthy(names[wants], `{p.id} has its {wants}`)
+				local body = names.Greybox
+				if kind == "shed" then
+					t.truthy(
+						body.canCollide and (body.transparency or 0) == 0,
+						"the shed's walls are still the solid box"
+					)
+					t.truthy(names.Roof.canCollide, "its roof is solid like every roof")
+				else
+					t.eq(body.transparency, 1, `{p.id}: the old box is unseen`)
+					t.falsy(body.canCollide or body.canQuery, `{p.id}: the old box blocks nothing`)
+					t.truthy(drawn >= 6 and drawn <= 22, `{p.id}: {drawn} drawn parts`)
+				end
+			end
+		end
+		t.eq(seen.kids_bike, 3)
+		t.eq(seen.wheelbarrow, 2)
+		t.eq(seen.garden_hose_reel, 2)
+		t.eq(seen.mower, 1)
+		t.eq(seen.shed, 1)
 	end)
 end

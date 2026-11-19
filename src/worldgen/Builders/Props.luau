@@ -269,7 +269,7 @@ local function hoseReel(body: Spec.PartSpec, list: Spec.PartList, seat: number)
 end
 
 -- The ride-on mower behind house 3 (v5.4 #d1ae44): the cutting deck, the yellow bonnet and body, the seat and its back,
--- the steering column and wheel, small front and big back wheels (11 parts), along the old box.
+-- the steering column and wheel, small front and big back wheels (12 parts), along the old box.
 local function mower(body: Spec.PartSpec, list: Spec.PartList, seat: number)
 	hide(body)
 	local long = body.sz >= body.sx
@@ -278,7 +278,7 @@ local function mower(body: Spec.PartSpec, list: Spec.PartList, seat: number)
 	add3(list, f, "Deck", { 0, 0.6, 0.2 }, { 4.4, 0.45, 3.6 }, { color = dark, material = "Metal" })
 	add3(list, f, "Bonnet", { 0, 1.55, -2.3 }, { 2.6, 1.3, 2.6 }, { color = yellow, castShadow = true })
 	add3(list, f, "Grille", { 0, 1.45, -3.62 }, { 1.8, 0.8, 0.06 }, { color = black })
-	add3(list, f, "Body", { 0, 1.3, 1.1 }, { 3.0, 0.9, 3.6 }, { color = yellow, castShadow = true })
+	add3(list, f, "Chassis", { 0, 1.3, 1.1 }, { 3.0, 0.9, 3.6 }, { color = yellow, castShadow = true })
 	add3(list, f, "Seat", { 0, 1.95, 1.6 }, { 1.6, 0.35, 1.4 }, { color = black })
 	add3(list, f, "SeatBack", { 0, 2.6, 2.35 }, { 1.6, 1.2, 0.3 }, { pitch = -0.2, color = black })
 	add3(list, f, "Column", { 0, 2.2, -0.6 }, { 0.14, 1.4, 0.14 }, { pitch = -0.45, color = black })
@@ -302,25 +302,25 @@ local function mower(body: Spec.PartSpec, list: Spec.PartList, seat: number)
 	end
 end
 
--- The park shed: the walls stay the body (the same solid box); a roof over it at the v5.4 tilt (0.09) with eaves, a
--- door and a window on the front, a fascia board (4 parts, none of them solid).
+-- The park shed: the walls stay the body (the same solid box); a flat slate roof sits on it with eaves all round (solid,
+-- like every roof in town: nothing can slip between it and the walls), a door and a window on the front, a fascia
+-- board under the front eave (4 parts).
 local function shed(body: Spec.PartSpec, list: Spec.PartList)
 	local W, D, H = body.sx, body.sz, body.sy
 	local f = Geometry.frame(body.cx, body.cy - H / 2, body.cz, body.yaw)
 	body.material = "WoodPlanks"
-	add3(
-		list,
-		f,
-		"Roof",
-		{ 0, H + 0.6, 0 },
-		{ W + 2.4, 0.5, D + 2.4 },
-		{ pitch = 0.09, color = { 95, 93, 86 }, material = "Slate", castShadow = true }
-	)
+	list:add(f, "Roof", 0, H + 0.2, 0, W + 2.4, 0.4, D + 2.4, {
+		color = { 95, 93, 86 },
+		material = "Slate",
+		canCollide = true,
+		castShadow = true,
+		role = "Roof",
+	})
 	add3(
 		list,
 		f,
 		"Fascia",
-		{ 0, H + 0.1, -D / 2 - 1.1 },
+		{ 0, H - 0.1, -D / 2 - 1.05 },
 		{ W + 2.4, 0.6, 0.25 },
 		{ color = { 120, 92, 66 }, material = "Wood" }
 	)
