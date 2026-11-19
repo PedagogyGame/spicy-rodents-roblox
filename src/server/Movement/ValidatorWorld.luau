@@ -9,9 +9,9 @@
 --     the highest point it could have reached (a leap over a fence is not a wall), each along the centre line and
 --     C.SIDE to either side (a corner the honest body rounded, a thin pole, a window it went through are not); and
 --     only for a move of at most C.MAX_CHORD studs (a longer gap could have gone round a corner);
---   * the floor (`floorBelow`): something under a grounded body's feet within C.FLOOR_DEPTH (the client stands on
---     non-colliding ground plates up to 0.3 st above the colliding surface, and on vehicles drawn a little behind the
---     server's), or the river's water.
+--   * the floor (`floorBelow`): something under a grounded body's feet within C.FLOOR_DEPTH (vehicles drawn a little
+--     behind the server's), or the river's water; the colliding parts, the terrain and the town's non-colliding ground
+--     plates the client's motor stands on as drawn (Shared/World/GroundPlate: up to 3.3 st over the terrain, measured).
 -- What the client's motor treats as a wall (Client/World/ClientWorld) and what these rays see must agree in one
 -- direction only: a ray may miss a wall the client sees (that lets a cheat through, it never snaps an honest body),
 -- it must never stop where the client's body went. So the engine rays look past a tree's invisible bough cylinders
@@ -39,6 +39,7 @@ local Import = require("../Import")
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
 local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
+local GroundPlate = Import.shared("World/GroundPlate") :: typeof(require("../../shared/World/GroundPlate"))
 
 local ValidatorWorld = {}
 
@@ -331,7 +332,7 @@ end
 
 -- engineRays(exclude): the two rays on the live server. `wall`: colliding parts in the squirrel's group, past the
 -- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: the same, with the
--- terrain, the water and the vehicles counted as floor.
+-- terrain, the water, the vehicles and the town's ground plates (Shared/World/GroundPlate) counted as floor.
 function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 	local function params(list: { Instance }): RaycastParams
 		local p = RaycastParams.new()
@@ -380,7 +381,56 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 			return false
 		end
 	end
-	return cast(wallParams), cast(floorParams)
+	-- the town's ground plates (Shared/World/GroundPlate: non-colliding, laid over the terrain), which the client's motor
+	-- stands on as drawn (Client/World/ClientWorld.groundAt): a floor too, or a body on a tennis court's tiles, up to
+	-- 1.5 studs over the terrain, would be a climb (validator round 5: tests/unit/validator_floors.spec.luau)
+	local plateParams = RaycastParams.new()
+	plateParams.FilterType = Enum.RaycastFilterType.Include
+	plateParams.RespectCanCollide = false
+	local folders: { Instance } = {}
+	local function plateFolders(): boolean
+		if #folders == 0 then
+			local town = workspace:FindFirstChild("Town")
+			for _, n in GroundPlate.FOLDERS do
+				local f = town and town:FindFirstChild(n)
+				if f then
+					table.insert(folders, f)
+				end
+			end
+			plateParams.FilterDescendantsInstances = folders
+		end
+		return #folders > 0
+	end
+	local function plate(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		if not plateFolders() then
+			return false
+		end
+		local origin = Vector3.new(ox, oy, oz)
+		local left = Vector3.new(dx, dy, dz)
+		for _ = 1, 4 do
+			local hit = workspace:Raycast(origin, left, plateParams)
+			if hit == nil then
+				return false
+			end
+			local part = hit.Instance :: BasePart
+			if not part.CanCollide and GroundPlate.like(part.Name, part.Size.Y, part.Transparency) then
+				return true
+			end
+			local unit = left.Unit
+			local gone = (hit.Position - origin).Magnitude + 0.02
+			left = unit * math.max(0, left.Magnitude - gone)
+			origin = hit.Position + unit * 0.02
+			if left.Magnitude < 1e-3 then
+				return false
+			end
+		end
+		return false
+	end
+	local solidDown = cast(floorParams)
+	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return solidDown(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	end
+	return cast(wallParams), down
 end
 
 return ValidatorWorld

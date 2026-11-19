@@ -51,6 +51,7 @@ local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../s
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
 local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
+local GroundPlate = Import.shared("World/GroundPlate") :: typeof(require("../../shared/World/GroundPlate"))
 
 export type ClientWorld = {
 	groundAt: (x: number, z: number, refY: number) -> number,
@@ -71,20 +72,10 @@ local ClientWorld = {}
 
 local singleton: ClientWorld? = nil
 
--- Is a non-colliding part of the town a ground plate worth standing on? Opaque only (water sheets are
--- translucent); lot ground and paving (thin Greybox), banks, court tiles, pads and road segments. Plinths,
--- foundations, lamp bases and thick grey boxes are bodies, not ground.
+-- Is a non-colliding part of the town a ground plate worth standing on? (Shared/World/GroundPlate.like: the server's
+-- floor ray takes the same plates, Server/Movement/ValidatorWorld.engineRays)
 function ClientWorld.groundLike(name: string, sizeY: number, transparency: number): boolean
-	if transparency > 0 then
-		return false
-	end
-	if string.sub(name, 1, 7) == "Greybox" then
-		return sizeY <= 0.25
-	end
-	return string.sub(name, 1, 4) == "Bank"
-		or string.sub(name, 1, 4) == "Tile"
-		or string.sub(name, 1, 3) == "Pad"
-		or string.sub(name, 1, 3) == "Seg"
+	return GroundPlate.like(name, sizeY, transparency)
 end
 
 -- The tallest thing a walking body steps onto (SquirrelMotor.params.glueMin: the same height it follows
@@ -213,7 +204,7 @@ function ClientWorld.get(): ClientWorld
 			local list: { Instance } = {}
 			local town = workspace:FindFirstChild("Town")
 			if town then
-				for _, n in { "Lots", "Roads" } do
+				for _, n in GroundPlate.FOLDERS do
 					local f = town:FindFirstChild(n)
 					if f then
 						table.insert(list, f)
