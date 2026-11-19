@@ -279,6 +279,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			if movement and movement.epochOf then
 				payload.motorEpoch = movement:epochOf(payload.actorId)
 			end
+			-- the sprint meter the driver's motor starts from: the server's own, as the last driver left it (validator
+			-- round 9: a body taken winded is taken winded; Movement/MovementService.meterOf)
+			if movement and movement.meterOf then
+				local now = if type(payload.serverTime) == "number" then payload.serverTime else 0
+				payload.stamina, payload.winded = movement:meterOf(payload.actorId, now)
+			end
 			if typeof(player) == "Instance" then
 				granted:FireClient(player :: Player, payload)
 			end

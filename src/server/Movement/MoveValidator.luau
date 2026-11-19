@@ -2,7 +2,7 @@
 -- ServerScriptService.Server.Movement.MoveValidator
 -- Validates client motor packets; log-only until W7.
 -- Interface (BUILD_PLAN §1.4): accept(actor, packet) -> ok, correction; pose(id, t); also new(world, opts); reset;
---   forget; hop; wallGap; fastest; clearFlag; isFlagged; last; stats; the shared bounds leapRise, apexAllowance,
+--   forget; hop; reachable; meterOf; wallGap; fastest; clearFlag; isFlagged; last; stats; the shared bounds leapRise, apexAllowance,
 --   leapUpAllowance, gravity, nearTrampoline; C
 --
 -- The server side of D2: players move their own squirrel with the shared SquirrelMotor and stream its
@@ -984,14 +984,47 @@ function MoveValidator.hop(
 			next.y
 		)
 	then
+		-- (validator round 9: a third only when a corner rounded unseen explains it, world.around; else a whole flag)
+		local round = world.around
+		local cornered = round == nil
+			or round(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex, next.y)
 		local n = self:wallGap(actorId, serverTime)
 		table.insert(violations, {
 			code = "wall",
-			severity = if n >= 2 then 1 else 0.34,
-			detail = `the straight line of a {dt} s gap goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
+			severity = if n >= 2 or not cornered then 1 else 0.34,
+			detail = `the straight line of a {dt} s gap goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s{if cornered
+				then ""
+				else ", no way round a corner"})`,
 		})
 	end
 	return violations
+end
+
+-- reachable(from, next) -> boolean: could a body have gone from `from` to `next` with no wall and no slab between, by
+-- the line or a way round a corner (world.around)? (Invariant E, validator round 9: after a doubtful packet a clean one
+-- becomes the held place only when the held place reaches it; the packets between were judged from the doubtful one.)
+-- A line on the rails (both ends near one rail one of them claims) is not judged for walls, as a gate's is not. Pure
+-- (no wall gap counted); its cost only after a doubtful packet: one slab ray, a line's chords, the corners only when the
+-- line is through a wall
+function MoveValidator.reachable(
+	self: MoveValidator,
+	from: { x: number, y: number, z: number, routeId: number? },
+	next: State
+): boolean
+	local world = self.world
+	if MoveValidator.throughSlab(world, from, next) then
+		return false
+	end
+	local crossesLong = world.crossesLong
+	if crossesLong == nil or onRails(world.index, from, next, true) then
+		return true
+	end
+	local lo, hi, rise = math.min(from.y, next.y), math.max(from.y, next.y), MoveValidator.leapRise()
+	if not crossesLong(from.x, from.z, next.x, next.z, lo, hi, rise, next.y) then
+		return true
+	end
+	local round = world.around
+	return round ~= nil and round(from.x, from.z, next.x, next.z, lo, hi, rise, next.y)
 end
 
 -- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full). Faster
@@ -1344,6 +1377,23 @@ function MoveValidator.relocate(self: MoveValidator, actorId: any, x: number, y:
 	g.clock = nil
 	g.route = false
 	keep(g)
+end
+
+-- meterOf(actorId, serverTime) -> (stamina, winded): the sprint meter the next driver of a body starts with (validator
+-- round 9, the round-8 review's LOW-MEDIUM: takeOver carries the last driver's meter, no fuller than it left it, but the
+-- new driver's motor started full, so an honest player who took a body run winded, and sprinted, was snapped): the
+-- server's own meter as the body's last driver left it (forget), refilled by the server's time since, as takeOver will
+-- have it; full for a body no player drove. Possession's grant carries it (Actors/ActorsRuntime) and the client's motor
+-- starts from it (Client/Controllers/Squirrel). Never below 0 (the motor's range); winded below the motor's
+-- sprintRecover (the motor sprints again only from there: the meter it may spend is then the server's too)
+function MoveValidator.meterOf(self: MoveValidator, actorId: any, serverTime: number): (number, boolean)
+	local src: any = self._parked[actorId] or self._marks[actorId]
+	if src == nil or src.staminaAt == nil or src.staminaAt == 0 then
+		return 1, false
+	end
+	local P = SquirrelMotor.params
+	local s = math.min(1, src.stamina + math.max(0, serverTime - src.staminaAt) / P.sprintRefill)
+	return math.clamp(s, 0, 1), s < P.sprintRecover
 end
 
 -- takeOver(actorId, x, y, z, serverTime): a driver takes the body where the server has it (feet): the history its last

@@ -34,7 +34,9 @@
 --   Traffic/Solid sets); withCars(wall?, down?, cars) -> (wall?, down?); crosses(wall, down?) ->
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?, endY?) -> boolean (a rise only as high as the far end is open above:
 --   cover(down) -> (x, z, footY, top) -> number?); crossesLong(wall, down?) -> the same, chord by chord, for any
---   length; floor(down, depth?) -> (x, y, z) -> boolean (the world's floorBelow, and floorNear at C.FLOOR_NEAR);
+--   length; around(wall, down?) -> the same args -> boolean (a way round a corner is clear: two legs via a corner);
+--   floor(down, depth?, above?) -> (x, y, z) -> boolean (the world's floorBelow); floorNear(down) (C.FLOOR_NEAR under,
+--   C.SLAB_ON over the feet);
 --   stops(kind, name, parentName) -> boolean (the one rule: does a ray of `kind` "wall" | "floor" | "cover" stop at a
 --   colliding part of that name under that parent);
 --   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
@@ -95,7 +97,7 @@ ValidatorWorld.C = table.freeze({
 	-- ... a move this far across is the vertical part judged in full; a longer one only its last SLAB_REACH studs across
 	-- (an honest fall may have come in beside an overhang's edge: the wall test's own chord, MAX_CHORD)
 	SLAB_REACH = 4,
-	-- ... and a move rising or falling less than this is no vertical move (no ray)
+	-- ... and a move rising less than this is no vertical move (no ray; validator round 9: every fall is judged)
 	SLAB_DY = 0.05,
 	-- floorUnder's bisection: the most rays, and the height it stops at
 	FLOOR_RAYS = 14,
@@ -302,16 +304,65 @@ function ValidatorWorld.crossesLong(
 	end
 end
 
--- floor(down, depth?)(x, y, z): is there something to stand on under feet at y (or the river's water), within `depth`
--- under them (default C.FLOOR_DEPTH)?
-function ValidatorWorld.floor(down: Ray, depth: number?): (number, number, number) -> boolean
+-- around(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?) -> boolean: a long line through a wall (crossesLong)
+-- has a way round a corner: two legs via a corner, each judged as crossesLong judges a line, one such way clear
+-- (validator round 9, the round-8 review's MEDIUM: one long packet through a wall was weighed a third, as a corner
+-- rounded unseen, and kept). The corners tried: the two L-shaped paths (via (x1, z0) and via (x0, z1)) and the two
+-- right-angle corners in the line's own frame (its middle, half its length to either side: a corner of a building
+-- that is not square to the axes). An honest gap that cut a corner has one of them clear; a line into a closed room has
+-- none. The first leg is asked for no cover (its corner's height is unknown: the lenient way), the second as the line.
+-- Cost: only for a line already through a wall (rare); at most 8 legs, each bounded as crossesLong is
+function ValidatorWorld.around(
+	wall: Ray,
+	down: Ray?
+): (number, number, number, number, number, number?, number?, number?) -> boolean
+	local long = ValidatorWorld.crossesLong(wall, down)
+	return function(
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		yLow: number,
+		yHigh: number?,
+		rise: number?,
+		endY: number?
+	): boolean
+		local mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
+		local hx, hz = (x1 - x0) / 2, (z1 - z0) / 2
+		for _, c in { { x1, z0 }, { x0, z1 }, { mx - hz, mz + hx }, { mx + hz, mz - hx } } do
+			local cx, cz = c[1], c[2]
+			if
+				not long(x0, z0, cx, cz, yLow, yHigh, rise, nil)
+				and not long(cx, cz, x1, z1, yLow, yHigh, rise, endY)
+			then
+				return true
+			end
+		end
+		return false
+	end
+end
+
+-- floor(down, depth?, above?)(x, y, z): is there something to stand on under feet at y (or the river's water), within
+-- `depth` under them (default C.FLOOR_DEPTH), the ray from `above` over them (default C.RAY_ABOVE)?
+function ValidatorWorld.floor(down: Ray, depth: number?, above: number?): (number, number, number) -> boolean
 	local d = depth or C.FLOOR_DEPTH
+	local a = above or C.RAY_ABOVE
 	return function(x: number, y: number, z: number): boolean
 		if Height.insideRiverWater(x, z) and y <= Height.WATER_Y + d then
 			return true
 		end
-		return down(x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + d), 0)
+		return down(x, y + a, z, 0, -(a + d), 0)
 	end
+end
+
+-- floorNear(down)(x, y, z): the top a grounded body stands on: within C.FLOOR_NEAR under its feet and C.SLAB_ON over
+-- them (validator round 9, the round-8 review's MEDIUM: from RAY_ABOVE, 1.5 over the feet, a grounded claim sank under a
+-- roof's top by steps the slab test skipped and still "stood" on it). The honest motor's feet are AT the top its ground
+-- ray found (it stands on anything within 1.5 over them after every substep); SLAB_ON is the slab test's own band (a
+-- ground plate the server counts and the client does not, 0.28 over the terrain). A body sunk deeper into a part has
+-- the ray start inside it, which meets nothing: no floor
+function ValidatorWorld.floorNear(down: Ray): (number, number, number) -> boolean
+	return ValidatorWorld.floor(down, C.FLOOR_NEAR, C.SLAB_ON)
 end
 
 -- landable(down)(x, y, z, depth): is there ground within `depth` under feet at y (a landing the gap can hide)?
@@ -356,9 +407,16 @@ end
 -- A fall slanting further than SLAB_REACH across in one move (a slow link: 2 packets a second at 10 st/s) is judged
 -- in full only at the height the body last stood (`standY`): a second ray, there, at the end's column (the roof it
 -- stood on reaches over where it ends: it sank through it; an honest body comes in under a top lower than its floor)
+-- Validator round 9 (the round-8 review's MEDIUM: a grounded claim sank under a roof's top by steps under SLAB_DY, then
+-- fell from rest by steps under it, and every ray after started inside the roof, which meets nothing): every fall is
+-- judged whatever its drop (SLAB_DY now gates rises only), and a fall the down ray found nothing for casts one ray up,
+-- at the end's column from SLAB_ON over the end's feet to SLAB_ON over the start's: it meets a slab's underside the down
+-- ray started inside (the body's own box swept that column; an honest one has nothing there). A grounded claim stands
+-- within SLAB_ON under a top at most (floorNear), so the down ray starts over the top it stood on
 function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number, number, number?) -> boolean
 	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, standY: number?): boolean
-		if math.abs(y1 - y0) < C.SLAB_DY or Height.insideRiverWater(x1, z1) then
+		local fell = y1 < y0
+		if (not fell and y1 - y0 < C.SLAB_DY) or Height.insideRiverWater(x1, z1) then
 			return false
 		end
 		local across = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
@@ -370,9 +428,12 @@ function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number,
 		end
 		if standY and across > C.SLAB_REACH and standY - C.SLAB_ON > top then
 			local from = standY + C.SLAB_ON
-			return ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0)
+			if ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0) then
+				return true
+			end
 		end
-		return false
+		-- (the up ray: a slab whose top the down ray started under)
+		return fell and ray(x1, y1 + C.SLAB_ON, z1, 0, drop, 0)
 	end
 end
 
@@ -416,8 +477,9 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		end,
 		crosses = if wall then ValidatorWorld.crosses(wall, cover) else nil,
 		crossesLong = if wall then ValidatorWorld.crossesLong(wall, cover) else nil,
+		around = if wall then ValidatorWorld.around(wall, cover) else nil,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
-		floorNear = if down then ValidatorWorld.floor(down, C.FLOOR_NEAR) else nil,
+		floorNear = if down then ValidatorWorld.floorNear(down) else nil,
 		-- a car's roof within C.CAR_SLACK under the feet (the climb and float flags weigh a third there)
 		carFloor = if o.cars
 			then function(x: number, y: number, z: number): boolean

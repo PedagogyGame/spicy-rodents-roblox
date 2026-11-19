@@ -41,8 +41,18 @@
 --     move it was told of is told again under the same epoch (a packet under it may still be on its way).
 -- C.HOLD_AFTER snaps inside C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it
 -- still) for C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
--- For C.STREAM_GRACE after a hand-off a wall alone does not snap (logged): the town around a new body may still be
--- streaming in on its client, and a house it has not got yet is no wall to its motor. A packet with a number that is
+-- For C.STREAM_GRACE after a hand-off a wall alone further than C.STREAMED from where the body was handed over does not
+-- snap (logged): the town there may still be streaming in on its client, and a house it has not got yet is no wall to
+-- its motor. Within C.STREAMED (Possession streams around the body before it hands it over) and for a slab, never
+-- (validator round 9, the round-8 review's HIGH: a swap bought 3 s of walking through walls and roofs). A wall or slab
+-- snap inside that window is not counted toward a hold (an honest client with a house not streamed is put back once).
+-- Invariant E (validator round 9): a packet with ANY doubt (a violation of any weight, a wall or slab crossing graced or
+-- weighed a third, a missing floor, a gap too long to judge move by move) never becomes the held place, the snap target,
+-- the release place or the next gate: those are one place (sq.good, heldPlace), and it advances only on a clean packet
+-- after a doubtful one that is reachable from it (no wall, or a way round a corner, and no slab between:
+-- MoveValidator.reachable). A doubtful packet is accepted for the motion only (the drift's reference, the pace, the
+-- duel's pose while fresh); a doubt the clean packets after it do not clear within C.DOUBT_SNAP is snapped back to the
+-- held place ("unreached"). A packet with a number that is
 -- not finite (SquirrelWire.sane) is snapped and never judged. No packet and no root sample costs more than a bounded
 -- time: the validator's rail scans and long lines are bounded (MoveValidator.C.RAIL_REACH_MAX, ValidatorWorld.C).
 -- Validator round 3 (2026-11-19, the rule: nothing judged by a number only the client claimed): the duel's pose of the
@@ -53,7 +63,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
+--   M:epochOf(actorId) -> number; M:meterOf(actorId, now) -> (stamina, winded) (the grant's sprint meter); M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
 --   -> (x, y, z)? (THE place the server holds for a held squirrel: invariant D); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
 --   number?; M:clickNew(actorId, seq) -> boolean (a click's number not taken yet: the first copy of a click to arrive,
@@ -141,6 +151,10 @@ type Squirrel = {
 	pounceClock: number?, -- its client clock
 	since: number?, -- server time of this epoch's first accepted packet
 	possessedAt: number?, -- server time of the first packet after the hand-off (0: the hand-off, none yet)
+	handoff: Gate?, -- where the body was handed over (the client streamed C.STREAMED around it before it got the body)
+	base: Gate?, -- the gate this epoch's first packet passed (the held place until a packet is held: invariant E)
+	-- server time of the first doubtful packet accepted since the held place last advanced (nil: none; invariant E)
+	doubtAt: number?,
 	lastX: number,
 	lastY: number,
 	lastZ: number,
@@ -194,6 +208,7 @@ export type Movement = {
 	suspend: (self: Movement, actorId: any, on: boolean) -> (),
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
+	_reached: (self: Movement, actorId: any, sq: Squirrel, snapshot: { [string]: number | boolean }) -> boolean,
 	_explained: (
 		self: Movement,
 		sq: Squirrel,
@@ -201,8 +216,9 @@ export type Movement = {
 		rail: any?
 	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
+	meterOf: (self: Movement, actorId: any, now: number) -> (number, boolean),
 	safeTarget: (self: Movement, actorId: any) -> (number?, number?, number?),
-	heldPlace: (self: Movement, actorId: any) -> (number?, number?, number?),
+	heldPlace: (self: Movement, actorId: any, current: boolean?) -> (number?, number?, number?),
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
 	clickNew: (self: Movement, actorId: any, seq: any) -> boolean,
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
@@ -231,7 +247,13 @@ MovementService.C = table.freeze({
 	HOLD_AFTER = 3, -- snaps ...
 	HOLD_WINDOW = 10, -- ... inside this many seconds: the body is held
 	HOLD_SECONDS = 2,
-	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped
+	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped ...
+	-- ... only further than this from where the body was handed over (studs: the place's StreamingMinRadius; Possession
+	-- streams around the body before it hands it over, so its client has the town that near)
+	STREAMED = 64,
+	-- seconds a doubtful packet's doubt may stand with no clean packet reachable from the held place before the body is
+	-- snapped back there (invariant E: "unreached")
+	DOUBT_SNAP = 1,
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
 	-- studs: a root this near a rail's samples (the feet drawn on a big trunk's bark are up to 5.95 off them) is not judged
 	-- for height, nor for walls while the packets have the body on a rail ...
@@ -407,7 +429,7 @@ function MovementService.new(deps: Deps): Movement
 		return if v then v:fastest(id) else 60
 	end
 
-	local tell: (self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number) -> ()
+	local tell: (self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number, noHold: boolean?) -> ()
 
 	-- pingOf(self, id): the driver's round trip as the engine measures it, never above C.PING_MAX (0: unknown)
 	local function pingOf(self: Movement, id: any): number
@@ -458,6 +480,8 @@ function MovementService.new(deps: Deps): Movement
 		sq.lastAt = nil
 		sq.since = nil
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
+		sq.base = nil
+		sq.doubtAt = nil
 		sq.shot = nil
 		sq.cleanAt = nil
 		sq.pounceAt = nil
@@ -496,7 +520,7 @@ function MovementService.new(deps: Deps): Movement
 
 	-- snap the body back to `target` (default: the last clean packet, else the gate, else a place the server holds:
 	-- anchorOf), tell its driver, hold it after a run of snaps. With no place known at all nothing is moved (logged)
-	local function snap(self: Movement, id: any, why: string, now: number, target: Gate?)
+	local function snap(self: Movement, id: any, why: string, now: number, target: Gate?, noHold: boolean?)
 		local sq = squirrel(self, id)
 		local to = target
 		-- (the server time the body held the target: the governor's history is kept to then)
@@ -509,6 +533,10 @@ function MovementService.new(deps: Deps): Movement
 			elseif sq.gate then
 				to = sq.gate
 				keepUntil = if (sq.gate :: Gate).at > 0 then (sq.gate :: Gate).at else now
+			elseif sq.base then
+				-- (the gate this epoch's first packet passed: no packet held since, invariant E)
+				to = sq.base
+				keepUntil = if (sq.base :: Gate).at > 0 then (sq.base :: Gate).at else now
 			else
 				to = anchorOf(sq) -- (a place the server saw: the governor's history carried there, rebase)
 			end
@@ -520,18 +548,20 @@ function MovementService.new(deps: Deps): Movement
 		local t = to :: Gate
 		local gate: Gate = { x = t.x, y = t.y, z = t.z, at = now, snapshot = t.snapshot }
 		rebase(self, id, sq, gate, true, keepUntil)
-		tell(self, id, sq, gate, why, now)
+		tell(self, id, sq, gate, why, now, noHold)
 	end
 
-	-- tell(self, id, sq, gate, why, now): the snap to `gate` under the current epoch: counted, logged, the body moved
-	-- there and its driver told; a run of them holds it
-	function tell(self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number)
+	-- tell(self, id, sq, gate, why, now, noHold?): the snap to `gate` under the current epoch: counted, logged, the body
+	-- moved there and its driver told; a run of them holds it (`noHold`: not counted toward a hold)
+	function tell(self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number, noHold: boolean?)
 		local gate = t
 		local st = self._stats
 		st.snaps += 1
 		st.corrections += 1
 		st.reasons[why] = (st.reasons[why] or 0) + 1
-		table.insert(sq.snapTimes, now)
+		if not noHold then
+			table.insert(sq.snapTimes, now)
+		end
 		while #sq.snapTimes > 0 and now - sq.snapTimes[1] > C.HOLD_WINDOW do
 			table.remove(sq.snapTimes, 1)
 		end
@@ -581,6 +611,7 @@ function MovementService.new(deps: Deps): Movement
 				local x, y, z = poseOf(actor)
 				if x and y and z then
 					sq.gate = { x = x, y = y, z = z, at = 0 } -- (its time is set by the first packet or watch)
+					sq.handoff = { x = x, y = y, z = z, at = 0 }
 				end
 			end
 			sq.possessedAt = 0
@@ -827,28 +858,45 @@ function MovementService.new(deps: Deps): Movement
 		return px, py, pz
 	end
 
-	-- heldPlace(actorId) -> (x, y, z)? (feet): THE place the server holds for a player-held squirrel-family body, the one
-	-- accessor every server system reads to decide anything about it (invariant D, validator round 8: where to move it,
-	-- release it, knock it, seat it, judge a bite or a blow, count it in an area): the last packet the validator accepted
-	-- this epoch, else the gate (where the server put the body: a snap, a teleport, a hand-off), else where it keeps a
-	-- pinned body, else the last accepted packet. Never the root its client writes (the watch alone reads that, to judge
-	-- it). nil: no place held (not a body the validator watches)
-	function m.heldPlace(self: Movement, actorId: any): (number?, number?, number?)
+	-- heldPlace(actorId, current?) -> (x, y, z)? (feet): THE place the server holds for a player-held squirrel-family body,
+	-- the one accessor every server system reads to decide anything about it (invariant D, validator round 8: where to
+	-- move it, release it, knock it, seat it, judge it, count it in an area). Invariant E (round 9): the last CLEAN packet
+	-- held this epoch (sq.good, the snap target: never a packet with any doubt, nor one only a doubtful packet leads to),
+	-- else the gate (where the server put the body: a snap, a teleport, a hand-off), else where it keeps a pinned body,
+	-- else the gate this epoch's first packet passed. Never the root its client writes (the watch alone reads that, to
+	-- judge it), never a doubtful packet. `current` (the strict mode, for a pick-up or a deposit: Foraging, the hollows):
+	-- only while that clean packet is also the newest accepted one (no doubt since, no packet yet: nil). nil: no place
+	-- held (not a body the validator watches)
+	function m.heldPlace(self: Movement, actorId: any, current: boolean?): (number?, number?, number?)
 		local sq = self.squirrels[actorId]
 		if sq == nil then
 			return nil, nil, nil
 		end
-		if sq.lastAt then
-			return sq.lastX, sq.lastY, sq.lastZ
+		local good = sq.good
+		if current then
+			if good == nil or sq.doubtAt ~= nil or sq.cleanAt == nil or sq.cleanAt ~= sq.lastAt then
+				return nil, nil, nil
+			end
+			return good.x :: number, good.y :: number, good.z :: number
 		end
-		local g = sq.gate or sq.pinAt
+		if good then
+			return good.x :: number, good.y :: number, good.z :: number
+		end
+		local g = sq.gate or sq.pinAt or sq.base
 		if g then
 			return g.x, g.y, g.z
 		end
-		if sq.placed then
-			return sq.lastX, sq.lastY, sq.lastZ
-		end
 		return nil, nil, nil
+	end
+
+	-- meterOf(actorId, now) -> (stamina, winded): the sprint meter a new driver's motor starts from (Possession's grant:
+	-- the validator's own, as the body's last driver left it, refilled since; MoveValidator.meterOf)
+	function m.meterOf(self: Movement, actorId: any, now: number): (number, boolean)
+		local validator = self.deps.validator
+		if validator == nil then
+			return 1, false
+		end
+		return validator:meterOf(actorId, now)
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
@@ -1079,6 +1127,27 @@ function MovementService.new(deps: Deps): Movement
 		return false
 	end
 
+	-- _reached(actorId, sq, snapshot) -> boolean: the held place (invariant E) reaches this packet with no wall (or a way
+	-- round a corner) and no slab between (MoveValidator.reachable); no held place: nothing to reach from (true)
+	function m._reached(self: Movement, _actorId: any, sq: Squirrel, snapshot: { [string]: number | boolean }): boolean
+		local validator = self.deps.validator
+		if validator == nil then
+			return true
+		end
+		local from: any
+		local good = sq.good
+		if good then
+			from = SquirrelMotor.deserialize(good)
+		else
+			local g = sq.gate or sq.pinAt or sq.base
+			if g == nil then
+				return true
+			end
+			from = { x = g.x, y = g.y, z = g.z }
+		end
+		return validator:reachable(from, SquirrelMotor.deserialize(snapshot))
+	end
+
 	-- _rootPath(actorId, sq, x, y, z, now) -> why?: the root's own path between two samples: no wall (once the epoch has
 	-- settled), and high in the air with no packet fresh only on a fall
 	function m._rootPath(
@@ -1102,9 +1171,13 @@ function MovementService.new(deps: Deps): Movement
 		local apex = MoveValidator.apexAllowance()
 		-- walls between consecutive samples, once the epoch has settled and the town has streamed in
 		local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
+		-- (the stream grace, validator round 9: only further than C.STREAMED from where the body was handed over)
+		local handoff = sq.handoff
 		local fresh = sq.possessedAt ~= nil
 			and sq.possessedAt ~= 0
 			and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+			and handoff ~= nil
+			and dist(x, y, z, handoff.x, handoff.y, handoff.z) > C.STREAMED
 		local px = sq.rootX
 		-- (a wall the root passed by a rail that no packet on a rail has explained within C.RAIL_RECENT of it: a wall)
 		local crossings = sq.crossings
@@ -1277,6 +1350,7 @@ function MovementService.new(deps: Deps): Movement
 					return { ok = false, accepted = false, violations = violations, flagged = true }
 				end
 				sq.gate = nil
+				sq.base = gate -- (the held place until a packet is held: invariant E)
 				if not validator:hasAnchor(actorId) then
 					-- (a body taken: the governor judges from where the server had it, its history from its last driver, if
 					-- any, carried there: MoveValidator.takeOver)
@@ -1288,6 +1362,24 @@ function MovementService.new(deps: Deps): Movement
 			local spread0 = spreadOf(self, actorId, sq)
 			local floor0 = if #sq.offsets > 0 then offsetFloor(sq, now) else math.huge
 			local v = validator:accept(actorId, packet, now)
+			-- the stream grace (validator round 9): a flagged packet whose only violations are walls, in the first
+			-- C.STREAM_GRACE after the hand-off's first packet, further than C.STREAMED from where the body was handed over
+			-- (a house its client may not have streamed in yet); never a slab, never within the streamed radius
+			local handoff = sq.handoff
+			local inGrace = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+			local wallOnly = #v.violations > 0
+			local crossingOnly = #v.violations > 0
+			for _, x in v.violations do
+				wallOnly = wallOnly and x.code == "wall"
+				crossingOnly = crossingOnly and (x.code == "wall" or x.code == "slab")
+			end
+			local graced = enforce
+				and v.flagged
+				and not v.ok
+				and wallOnly
+				and inGrace
+				and handoff ~= nil
+				and dist(px, py, pz, handoff.x, handoff.y, handoff.z) > C.STREAMED
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				-- (its pace by the speeds the validator kept, never one only the client claimed)
@@ -1367,21 +1459,29 @@ function MovementService.new(deps: Deps): Movement
 					sq.since = now
 					sq.priorUntil = math.max(sq.priorUntil, now + C.SETTLE)
 				end
-				if v.ok and not v.resync then
-					-- (a packet after a gap too long to judge move by move is never a snap target)
-					sq.good = snapshot
-					sq.cleanAt = now
-					-- a place a Reset may put the body back on: clean, grounded, off the rails, a floor under the feet
-					-- (the server's own floor ray; validator round 7: the raw root was recorded, so a root held still in the
-					-- air was "safe")
-					local floorNear = validator.world.floorNear
-					if
-						snapshot.grounded == true
-						and not (type(rid) == "number" and rid >= 0)
-						and (floorNear == nil or floorNear(px, py, pz))
-					then
-						Recovery.record(sq.safe, now, px, py, pz, true)
+				-- invariant E: the held place (the snap target, the release place, the next gate) advances only on a
+				-- clean packet: no violation of any weight, not graced, not after a gap too long to judge move by move;
+				-- after a doubtful one, only on a clean packet reachable from the held place (the doubtful packet may have
+				-- gone through a wall, and every packet since is judged from it)
+				if v.ok and not v.resync and not graced then
+					if sq.doubtAt == nil or self:_reached(actorId, sq, snapshot) then
+						sq.good = snapshot
+						sq.cleanAt = now
+						sq.doubtAt = nil
+						-- a place a Reset may put the body back on: held, grounded, off the rails, a floor under the feet
+						-- (the server's own floor ray; validator round 7: the raw root was recorded, so a root held still
+						-- in the air was "safe")
+						local floorNear = validator.world.floorNear
+						if
+							snapshot.grounded == true
+							and not (type(rid) == "number" and rid >= 0)
+							and (floorNear == nil or floorNear(px, py, pz))
+						then
+							Recovery.record(sq.safe, now, px, py, pz, true)
+						end
 					end
+				elseif sq.doubtAt == nil then
+					sq.doubtAt = now
 				end
 				sq.lastRiver = v.river == true
 			end
@@ -1394,26 +1494,35 @@ function MovementService.new(deps: Deps): Movement
 			v.correction = nil
 			if enforce and v.flagged and not v.ok then
 				local codes = {}
-				local wallOnly = true
 				for _, x in v.violations do
 					table.insert(codes, x.code)
-					-- (a slab too: a floor its client has not streamed in yet is none to its motor)
-					wallOnly = wallOnly and (x.code == "wall" or x.code == "slab")
 				end
-				local fresh = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
-				if wallOnly and fresh then
-					-- (a house its client may not have streamed in yet: logged, the bucket emptied)
+				if graced then
+					-- (a house its client may not have streamed in yet: logged, the bucket emptied; never held: E)
 					validator:clearFlag(actorId)
 					self.log:every(
 						`grace:{actorId}`,
 						5,
 						"warn",
-						`{actorId} through a wall {now - (sq.possessedAt :: number)} s after a hand-off; not snapped`
+						`{actorId} through a wall {now - (sq.possessedAt :: number)} s after a hand-off, {C.STREAMED} st or more from it; not snapped, not held`
 					)
 				else
-					snap(self, actorId, table.concat(codes, "+"), now, nil)
+					-- (a wall or slab snap in the old grace window: not counted toward a hold)
+					snap(self, actorId, table.concat(codes, "+"), now, nil, inGrace and crossingOnly)
 					v.snapped = true
 				end
+			end
+			-- a doubt no clean packet reachable from the held place has cleared: back to the held place (invariant E)
+			local doubtAt = sq.doubtAt
+			if enforce and not v.snapped and doubtAt ~= nil and now - doubtAt > C.DOUBT_SNAP then
+				self.log:every(
+					`unreached:{actorId}`,
+					5,
+					"warn",
+					`{actorId}: no clean packet reachable from the held place in {now - doubtAt} s; snapped back`
+				)
+				snap(self, actorId, "unreached", now, nil, inGrace)
+				v.snapped = true
 			end
 			return v
 		end
