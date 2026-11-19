@@ -10,6 +10,9 @@
 --            logged and the bucket emptied (MovementService: "a house its client may not have streamed in yet"), and the
 --            root is not wall-tested (_rootPath `fresh`): a client whose motor ignores walls walks into a closed room
 --            right after it is given the body and stays there. A swap and a retake (0.75 s) gives a new grace.
+--   meter    the next driver inherits the validator's sprint meter (MoveValidator.takeOver: "the meter no fuller than
+--            left"), but its client's motor starts a new body full (SquirrelMotor.new stamina = 1) and is never told: an
+--            honest player who takes a body its last driver ran winded, and sprints, is flagged and snapped.
 -- About 5 s: `lune run tests/run.luau validator_r8rv`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("@tests/lib/BakedWorld")
@@ -167,4 +170,54 @@ return function(t)
 			t.truthy(not inside(p), "a body outside a closed room never ends inside it")
 		end
 	)
+	-- meter ------------------------------------------------------------------------------------------------------------
+	t.test("meter: an honest driver sprints a body its last driver left winded: never snapped", function()
+		local rows = {}
+		local snapped = 0
+		for _, wait in { 0.75, 12 } do
+			local world, vworld = room()
+			local g = world.groundHeight
+			local rig = LiveRig.new({
+				world = world,
+				vworld = vworld,
+				link = { latency = 0.05, jitter = 0, loss = 0 },
+				seed = 83,
+			})
+			local west = BakedWorld.cameraYawToward(-1, 0)
+			local function sprint(_now: number, _s: State): SquirrelMotor.Input
+				return BakedWorld.keys(west, { fw = 1, sprint = true })
+			end
+			-- the first driver runs west, out of the meter (honest: its own motor winded)
+			rig:possess(SquirrelMotor.new(-5, g, 0), sprint)
+			rig:run(6)
+			local mid = rig:result().snaps
+			local rel = rig:release() :: V3
+			rig:run(wait)
+			-- the next driver (another player, or the same one back) takes it: a new motor, its meter full
+			rig.server.count -= 1
+			rig:possess(SquirrelMotor.new(rel.x, rel.y, rel.z), sprint)
+			rig:run(4)
+			local r = rig:result()
+			local reasons = {}
+			for k, v in r.reasons do
+				table.insert(reasons, `{k}={v}`)
+			end
+			table.sort(reasons)
+			if wait < 1 then
+				snapped += r.snaps - mid
+			end
+			table.insert(
+				rows,
+				string.format(
+					"taken back %.2f s later: first driver %d snaps, next driver %d (%s)",
+					wait,
+					mid,
+					r.snaps - mid,
+					table.concat(reasons, " ")
+				)
+			)
+		end
+		print(`      {table.concat(rows, "; ")}`)
+		t.eq(snapped, 0, "an honest next driver is never snapped")
+	end)
 end
