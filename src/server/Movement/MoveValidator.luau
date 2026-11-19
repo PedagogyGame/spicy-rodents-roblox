@@ -704,7 +704,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	-- slabs (validator round 8, the round-7 review's MEDIUM): no move through a floor, a roof or a ceiling, nor ending
 	-- inside one (ValidatorWorld.slab: one ray, only for a move that rose or fell); off the rails (a rail's own parts, a
 	-- bough's cylinder round its centreline, are the route's) and away from a trampoline's bed
-	if MoveValidator.throughSlab(self.world, prev, next) and not riverLanding then
+	if MoveValidator.throughSlab(self.world, prev, next, standY) and not riverLanding then
 		table.insert(violations, {
 			code = "slab",
 			severity = 1,
@@ -798,22 +798,6 @@ function MoveValidator.gravity(): number
 	return SquirrelMotor.params.gravity
 end
 
--- throughSlab(world, from, next) -> boolean: the move from `from` to `next` went through a floor, a roof or a ceiling
--- (world.slab), both ends off the rails and neither by a trampoline's bed
-function MoveValidator.throughSlab(
-	world: World,
-	from: { x: number, y: number, z: number, routeId: number? },
-	next: State
-): boolean
-	local slab = (world :: any).slab
-	return slab ~= nil
-		and from.routeId == nil
-		and next.routeId == nil
-		and not MoveValidator.nearTrampoline(world, next.x, next.z, 2)
-		and not MoveValidator.nearTrampoline(world, from.x, from.z, 2)
-		and slab(from.x, from.y, from.z, next.x, next.y, next.z)
-end
-
 function MoveValidator.nearTrampoline(world: World, x: number, z: number, margin: number): boolean
 	for _, site in world.trampolines or {} do
 		if math.sqrt((x - site.x) ^ 2 + (z - site.z) ^ 2) <= Trampoline.C.radius + margin then
@@ -821,6 +805,24 @@ function MoveValidator.nearTrampoline(world: World, x: number, z: number, margin
 		end
 	end
 	return false
+end
+
+-- throughSlab(world, from, next) -> boolean: the move from `from` to `next` went through a floor, a roof or a ceiling
+-- (world.slab; `standY`: the height it last stood at, for a long slanting fall), both ends off the rails and neither by
+-- a trampoline's bed
+function MoveValidator.throughSlab(
+	world: World,
+	from: { x: number, y: number, z: number, routeId: number? },
+	next: State,
+	standY: number?
+): boolean
+	local slab = (world :: any).slab
+	return slab ~= nil
+		and from.routeId == nil
+		and next.routeId == nil
+		and not MoveValidator.nearTrampoline(world, next.x, next.z, 2)
+		and not MoveValidator.nearTrampoline(world, from.x, from.z, 2)
+		and slab(from.x, from.y, from.z, next.x, next.y, next.z, standY)
 end
 
 local function marksOf(self: MoveValidator, actorId: any): Marks

@@ -197,6 +197,32 @@ end
 
 -- gameSeconds(serverTime, epoch, base, rate): the game clock as Boot/DayClock publishes it (and as
 -- Shared/Time/Clock reads it on every client): what the wallet's passes are timed on.
+-- animals(townActors, byTownId, placeOf) -> { { id, kind, x, y, z } }: every squirrel-family body for the minigames
+-- (the paintball pass, a bowling lane in play, a pool shot: they knock an animal found on them), each where the server
+-- holds it (placeOf: Actors/ActorsRuntime.placeOf; invariant D, validator round 8: a root written inside the station or
+-- on a lane between two watches knocks nobody anywhere). Pure
+function Game.animals(
+	townActors: { any },
+	byTownId: { [number]: any },
+	placeOf: (actor: any) -> (number, number, number)
+): { { [string]: any } }
+	local out = {}
+	for _, a in townActors do
+		local other = byTownId[a.id]
+		if other and (other.species == "squirrel" or other.species == "rodent") then
+			local qx, qy, qz = placeOf(other)
+			table.insert(out, {
+				id = other.id,
+				kind = if other.variant == "spicy" then "rodent" else "squirrel",
+				x = qx,
+				y = qy,
+				z = qz,
+			})
+		end
+	end
+	return out
+end
+
 function Game.gameSeconds(serverTime: number, epoch: number, base: number, rate: number): number
 	return base + (serverTime - epoch) * rate
 end
@@ -1785,23 +1811,7 @@ function Game.start(opts: Opts?): any
 			end,
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
-				local out = {}
-				for _, a in world.actors do
-					local other = rt.byTownId[a.id]
-					if other and isSquirrelFamily(other) then
-						-- (where the server holds it: invariant D, validator round 8; a root written inside the station
-						-- or on a lane between two watches knocks nobody anywhere)
-						local qx, qy, qz = rt.placeOf(other)
-						table.insert(out, {
-							id = other.id,
-							kind = if other.variant == "spicy" then "rodent" else "squirrel",
-							x = qx,
-							y = qy,
-							z = qz,
-						})
-					end
-				end
-				return out
+				return Game.animals(world.actors, rt.byTownId, rt.placeOf)
 			end,
 			knock = function(id: any, x: number, y: number, z: number, text: string)
 				local townId = townIdOf[id]

@@ -39,7 +39,7 @@
 --   colliding part of that name under that parent);
 --   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
 --   maxChord (the world's: C.MAX_CHORD); floorUnder(down) -> (x, y, z, depth) -> number? (the first floor's height under
---   feet at y); slab(cover) -> (x0, y0, z0, x1, y1, z1) -> boolean (a move through a floor, a roof or a ceiling);
+--   feet at y); slab(cover) -> (x0, y0, z0, x1, y1, z1, standY?) -> boolean (a move through a floor, a roof or a ceiling);
 --   landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray, cover: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
@@ -89,8 +89,9 @@ ValidatorWorld.C = table.freeze({
 	-- two or three; a further one cleared over its top is a crossing. Cost: (COVER_RAYS + 1 + 3) rays each
 	COVER_WALLS = 3,
 	-- the slab test (slab; validator round 8): a top this near over the end's feet is the floor it stands on (the client's
-	-- numbers against the server's ray) ...
-	SLAB_ON = 0.1,
+	-- numbers against the server's ray, and a ground plate the server's plate ray counts and the client's ground does not:
+	-- 0.28 st over the terrain on the quay's market square; FLOOR_NEAR, the floor check's own) ...
+	SLAB_ON = 0.6,
 	-- ... a move this far across is the vertical part judged in full; a longer one only its last SLAB_REACH studs across
 	-- (an honest fall may have come in beside an overhang's edge: the wall test's own chord, MAX_CHORD)
 	SLAB_REACH = 4,
@@ -351,9 +352,12 @@ end
 -- body ends, no top lies between its feet and RAY_ABOVE over them, and a fall's vertical part crossed none. One cover
 -- ray (past a tree's bough cylinders: nothing to hide in; never a car: those are drawn behind) at the end's column,
 -- from RAY_ABOVE over the feet, raised by the fall's drop over its last SLAB_REACH studs across, down to SLAB_ON over
--- them; a hit is a top the body went through or stands inside. Nothing in the river's water (the client's recovery)
-function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number, number) -> boolean
-	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean
+-- them; a hit is a top the body went through or stands inside. Nothing in the river's water (the client's recovery).
+-- A fall slanting further than SLAB_REACH across in one move (a slow link: 2 packets a second at 10 st/s) is judged
+-- in full only at the height the body last stood (`standY`): a second ray, there, at the end's column (the roof it
+-- stood on reaches over where it ends: it sank through it; an honest body comes in under a top lower than its floor)
+function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number, number, number?) -> boolean
+	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, standY: number?): boolean
 		if math.abs(y1 - y0) < C.SLAB_DY or Height.insideRiverWater(x1, z1) then
 			return false
 		end
@@ -361,7 +365,14 @@ function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number,
 		local drop = math.max(0, y0 - y1)
 		local part = if across <= C.SLAB_REACH then drop else drop * C.SLAB_REACH / across
 		local top = y1 + C.RAY_ABOVE + part
-		return ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0)
+		if ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0) then
+			return true
+		end
+		if standY and across > C.SLAB_REACH and standY - C.SLAB_ON > top then
+			local from = standY + C.SLAB_ON
+			return ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0)
+		end
+		return false
 	end
 end
 

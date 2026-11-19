@@ -804,27 +804,27 @@ function MovementService.new(deps: Deps): Movement
 		if sq == nil then
 			return nil, nil, nil
 		end
-		local hx, hy, hz = self:heldPlace(actorId)
-		if not (hx and hy and hz) then
+		local px, py, pz = self:heldPlace(actorId)
+		if not (px and py and pz) then
 			return nil, nil, nil
 		end
-		local qx, qy, qz = Recovery.riverFall(hx, hy, hz)
+		local qx, qy, qz = Recovery.riverFall(px, py, pz)
 		if qx and qy and qz then
 			return qx, qy, qz
 		end
-		local s = Recovery.unstick(sq.safe, hx, hy, hz) or Recovery.safePos(sq.safe)
+		local s = Recovery.unstick(sq.safe, px, py, pz) or Recovery.safePos(sq.safe)
 		if s then
 			return s.x, s.y, s.z
 		end
 		local validator = self.deps.validator
 		local world = if validator then validator.world else nil
-		if world and world.floorNear and not world.floorNear(hx, hy, hz) and world.floorUnder then
-			local fy = world.floorUnder(hx, hy, hz, C.FLOOR_SEARCH)
+		if world and world.floorNear and not world.floorNear(px, py, pz) and world.floorUnder then
+			local fy = world.floorUnder(px, py, pz, C.FLOOR_SEARCH)
 			if fy then
-				return hx, fy, hz
+				return px, fy, pz
 			end
 		end
-		return hx, hy, hz
+		return px, py, pz
 	end
 
 	-- heldPlace(actorId) -> (x, y, z)? (feet): THE place the server holds for a player-held squirrel-family body, the one

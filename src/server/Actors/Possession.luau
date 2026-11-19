@@ -368,15 +368,16 @@ function Possession.new(deps: Deps): Service
 		if deps.safePose then
 			x, y, z, yaw = deps.safePose(actor)
 		else
-			x, y, z, yaw = deps.actors:poseOf(actor)
-			y += 3
+			local ax, ay, az, ayaw = deps.actors:poseOf(actor)
+			x, y, z, yaw = ax, ay + 3, az, ayaw
 		end
-		if not (x and y and z) then
+		if x == nil or y == nil or z == nil then
 			return false -- (no place known to put it: left where it is)
 		end
-		engine.teleport(actor.body, x, y, z, yaw or 0)
+		local px: number, py: number, pz: number = x, y, z
+		engine.teleport(actor.body, px, py, pz, yaw or 0)
 		if deps.onTeleport then
-			deps.onTeleport(actor, x, y, z, "reset")
+			deps.onTeleport(actor, px, py, pz, "reset")
 		end
 		self.stats.recovered += 1
 		return true
