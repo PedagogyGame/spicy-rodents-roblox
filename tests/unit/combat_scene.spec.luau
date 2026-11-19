@@ -210,14 +210,12 @@ return function(t)
 		local P = rig2.combat.P
 		local g = rig2.calmNear(0, 0)
 		local skip: { [number]: boolean } = { [g.id] = true }
-		local group = { g }
 		for i = 1, 3 do
 			local o = rig2.near(g.x, g.z, nil, skip)
 			skip[o.id] = true
 			rig2.hold(o.id) -- (held still for the test, then let go to the AI)
 			rig2.put(o.id, g.x + math.cos(i * 2) * 6, g.z + math.sin(i * 2) * 6)
 			rig2.let(o.id)
-			table.insert(group, o)
 		end
 		rig2.holdRodent()
 		rig2.put(rig2.rodent, g.x + 3, g.z)
