@@ -1579,6 +1579,7 @@ export type Judged = { vy: number, xz: number, y: number?, landed: boolean, long
 SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	seq = "rises (MoveValidator: an older or repeated one is dropped); |seq| < MAX_MAGNITUDE",
 	epoch = "equals the epoch the server last gave (MovementService: else dropped as stale)",
+	flags = "a byte of bits, each one of the booleans below (the wire reads them so)",
 	grounded = "boolean (a wire bit); on the ground no vertical speed (envelope 0b), a floor under the feet (MoveValidator)",
 	committedAirborne = "boolean (a wire bit); read by no judgement",
 	focus = "boolean (a wire bit); read by no judgement",
@@ -1592,8 +1593,8 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	z = "as x",
 	railT = "[0, 1] (fieldCheck); on a rail the body at that point (envelope 1) and its pace (envelope 2)",
 	clock = "rises (dt > 0), never ahead of the arrivals (MoveValidator's clock check); a gap over maxDt is a hop",
-	vx = "horizontal speed within the launch cap on any packet (fieldCheck), the speed caps off a rail (envelope)",
-	vy = "within [-terminal, launch] on any packet (fieldCheck); 0 on the ground, gravity, launch bounds (envelope)",
+	vx = "horizontal speed within the fastest cap on any packet (fieldCheck), each move's own cap off a rail (envelope)",
+	vy = "within [-terminal, a trampoline's bounce] on any packet (fieldCheck); 0 on the ground, gravity, launch bounds (envelope)",
 	vz = "as vx",
 	yaw = "any finite angle: read only through sin and cos (the slow pounce's heading)",
 	moveSpeed = "[0, sprint x boost] (fieldCheck); read by no judgement",
@@ -1644,11 +1645,16 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 		add(out, "field", 1, `railDir {s.railDir}`)
 	end
 	range("railT", 0, 1)
+	-- (the fastest any way of moving goes with the chili rush on, a trampoline's push on top; the envelope holds each
+	-- move to its own)
+	local trampUp = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
 	local hv = hypot2(tonumber(s.vx) or math.huge, tonumber(s.vz) or math.huge)
-	if hv > SquirrelMotor.launchCapXZ(true) * E.launchTol then
+	local hMax = math.max(SquirrelMotor.groundCap(true) * E.speedTol, SquirrelMotor.launchCapXZ(true) * E.launchTol)
+		+ Trampoline.C.push * E.launchTol
+	if hv > hMax then
 		add(out, "field", 1, `horizontal speed {hv}`)
 	end
-	range("vy", -P.terminalFall - P.gravity * E.gravityEps, P.leapUp * E.launchTol)
+	range("vy", -P.terminalFall - P.gravity * E.gravityEps, math.max(P.leapUp * E.launchTol, trampUp))
 	range("moveSpeed", 0, P.sprint * P.boostMult)
 	range("boostRemaining", 0, E.boostMax)
 	range("cooldown", 0, P.pounceCooldown)
@@ -1864,6 +1870,13 @@ function SquirrelMotor.envelope(
 	-- the slowest a pounce lunges across (a slow one at the steepest pitch, or a winded one at a walk), with tolerance
 	local pounceMinXZ = math.min(P.walk, P.pounceSpeedSlow * math.cos(P.pouncePitchMax)) / E.launchTol
 	local gEps = P.gravity * E.gravityEps
+	-- climbThenLaunch(cap, n): the most a body rises in the gap climbing a rail at `cap` (studs/s up) for part of it and
+	-- for the rest in `n` launches one after the other (a leap off the rail and a grab back, n times): the time shared,
+	-- never each in full (the greedy adversary of round 5 climbed a trunk at the run's pace and a leap's on top)
+	local function climbThenLaunch(cap: number, n: number): number
+		local t2 = math.clamp(n * (launchUp - cap) / P.gravity, 0, dt)
+		return cap * (dt - t2) + launchUp * t2 - P.gravity * t2 * t2 / (2 * n)
+	end
 
 	-- 0b. Vertical speed off the rails, whatever the move: on the ground there is none (the motor's is exactly 0), and
 	-- no fall is faster than the motor's terminal speed. Every bound below that reads a vertical speed reads a judged one.
@@ -1964,6 +1977,12 @@ function SquirrelMotor.envelope(
 			else
 				if b.elapsed > dt + P.substep then
 					add(out, "railPose", 1, `a new transfer {b.elapsed} s along after a {dt} s gap`)
+				end
+				-- (a transfer begins on a change of rail; onto the rail it was on only back in through an enclosed run's
+				-- mouth, which a long gap can hide: else a new one every packet kept the body a transfer's reach off it)
+				local enclosed = nextRoute.enclosure ~= nil
+				if prevRoute and prevRoute.id == nextRoute.id and (dt <= E.shortDt or not enclosed) then
+					add(out, "railPose", 1, `a new transfer onto the rail it was on, route {nextRoute.id}`)
 				end
 				local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
 				local pace = math.max(
@@ -2069,8 +2088,6 @@ function SquirrelMotor.envelope(
 				local offset = hypot2(w.x - a.x, w.z - a.z)
 				local across = hypot2(b.x - a.x, b.z - a.z)
 				local runUp = railCap * E.railTol * dt
-				local tUp = math.min(dt, launchUp / P.gravity)
-				local leapUp = launchUp * tUp - 0.5 * P.gravity * tUp * tUp
 				local rise = b.y - a.y
 				if
 					across
@@ -2078,7 +2095,7 @@ function SquirrelMotor.envelope(
 							+ railCap * P.substep
 							+ offset
 							+ E.posSlack
-					and rise <= runUp + leapUp + E.posSlack
+					and rise <= climbThenLaunch(railCap * E.railTol, 1) + E.posSlack
 					and -rise <= runUp + 0.5 * P.gravity * dt * dt + E.posSlack
 				then
 					allowed = moved
@@ -2281,35 +2298,94 @@ function SquirrelMotor.envelope(
 		local riseNext = math.max(0, (u * u - v * v) / (2 * P.gravity))
 		local step = if next.grounded then Units.st(1.4) else 0 -- (landing snaps to the ground, a step either way)
 		local allowXZ = launchXZ * dt + Units.st(0.5) + E.posSlack
-		local allowUp = riseNext + step + E.posSlack
 		local allowDown = 0.5 * P.gravity * dt * dt + gEps * dt + step + E.posSlack
 		local overXZ = nearXZ > allowXZ
-		local overUp = next.y - topY > allowUp
-		if (overXZ or overUp) and not shortGap then
-			-- railVisit: a rail sample S near `next` the body could have grabbed after a launch from a launch point and left
-			-- again to be where `next` is
+		local overUp
+		if prevSpec then
+			-- (out of a mouth: over its launch point)
+			overUp = next.y - topY > riseNext + step + E.posSlack
+		else
+			-- (off an open rail: up the rail for part of the gap and the launch for the rest, the time shared: the
+			-- rise is convex in the launch's time, so the most is all climb, or the launch from when it could reach
+			-- its speed cap at `next`'s speed, the climb before it)
+			local ref = visualPosition(prev, world).y
+			local capT = railCap * E.railTol
+			local function climb(time: number): number
+				return math.min(topY - ref, capT * time)
+			end
+			local tm = math.clamp((hopUp - v - gEps) / P.gravity, 0, dt)
+			local um = math.min(hopUp, v + P.gravity * tm + gEps)
+			local u0 = math.min(hopUp, v + gEps)
+			local most = math.max(
+				climb(dt) + math.max(0, (u0 * u0 - v * v) / (2 * P.gravity)),
+				climb(dt - tm) + math.max(0, (um * um - v * v) / (2 * P.gravity))
+			)
+			overUp = next.y - ref > most + step + E.posSlack
+		end
+		if overXZ or overUp then
+			-- another rail the body was on in the gap, launched from: one the rail it left leads to (an end's link, a fork,
+			-- a transfer: in any gap, a route's end switching it on inside a frame), reached within a transfer's reach of
+			-- the stretch; or, in a long gap, any rail a launch and a grab reach (railVisit). Its sample S near `next`, and
+			-- `next` within a launch from S's drawn pose (a trunk's bark: a grab's reach off S at most)
+			local graph = world.graph
+			local visitUp = climbThenLaunch(railCap * E.railTol, 2)
 			local reach = C.airGrab + launchXZ * dt + E.posSlack
+			local vis = visualPosition(prev, world)
 			local index = world.index :: any
 			local found = false
 			index:forEachNear(
 				next.x,
 				next.y,
 				next.z,
-				math.ceil(reach / (index.cellSize or 20)),
+				math.ceil((reach + C.enterMaxGap) / (index.cellSize or 20)),
 				function(id: number, _t: number, sx: number, sy: number, sz: number): boolean?
 					local toNext = hypot2(sx - next.x, sz - next.z)
 					if toNext > reach or sy < next.y - riseNext - C.visualBranchLift - E.posSlack then
 						return nil
 					end
-					local ceiling = topY + riseInDt + (if id == prevRoute.id then 0 else C.airGrab) + E.posSlack
-					if sy > ceiling then
+					local near3, nearXZ2 = math.huge, math.huge
+					for _, p in points do
+						near3 = math.min(near3, math.sqrt((sx - p.x) ^ 2 + (sy - p.y) ^ 2 + (sz - p.z) ^ 2))
+						nearXZ2 = math.min(nearXZ2, hypot2(sx - p.x, sz - p.z))
+					end
+					-- (a transfer: S on a rail this one leads to, within a transfer's reach of the stretch and its own run
+					-- in the gap; the body no higher than the transfer's easing carries it in the gap (it takes bridgeMin at
+					-- least), its run up that rail and a launch off it)
+					local other = if id ~= prevRoute.id then reg:get(id) else nil
+					if other and graph:relation(prevRoute.id, id) ~= nil then
+						local runB = SquirrelMotor.routeCap(other, boosted) * E.railTol * dt
+						local eased = C.enterMaxGap * Motion.ease(dt / C.bridgeMin)
+						-- (its drawn pose: a trunk's bark, a bough's lift; a launch starts there)
+						local w = Motion.visualPose(
+							world,
+							other,
+							_t,
+							Curve.vec3(sx, sy, sz),
+							prev.trunkNormalX,
+							prev.trunkNormalZ
+						)
+						local off = hypot2(w.x - sx, w.z - sz)
+						if
+							near3 <= C.enterMaxGap + runB + E.posSlack
+							and nearXZ <= eased + runB + off + allowXZ
+							and next.y - topY <= eased + runB + riseNext + (w.y - sy) + E.posSlack
+						then
+							found = true
+							return true
+						end
+					end
+					if shortGap then
 						return nil
 					end
-					local fromLaunch = math.huge
-					for _, p in points do
-						fromLaunch = math.min(fromLaunch, hypot2(sx - p.x, sz - p.z))
+					-- (a grab: reached by a launch, and off it by another, the gap's time shared between the climb and the two)
+					local grab = if id == prevRoute.id then 0 else C.airGrab
+					if
+						sy > topY + riseInDt + grab + E.posSlack
+						or next.y - vis.y > visitUp + grab + C.visualBranchLift + E.posSlack
+					then
+						return nil
 					end
-					if fromLaunch + toNext <= allowXZ + 2 * C.airGrab then
+					if nearXZ2 + toNext <= allowXZ + 2 * C.airGrab then
 						found = true
 						return true
 					end
@@ -2324,7 +2400,7 @@ function SquirrelMotor.envelope(
 			add(out, "teleport", 1, `left the rail {nearXZ} st across from the launch point (allowed {allowXZ})`)
 		end
 		if overUp then
-			add(out, "teleport", 1, `left the rail {next.y - topY} st up in {dt} s (allowed {allowUp})`)
+			add(out, "teleport", 1, `left the rail {next.y - topY} st over its stretch in {dt} s`)
 		end
 		if lowY - next.y > allowDown then
 			add(out, "teleport", 1, `left the rail {lowY - next.y} st down in {dt} s (allowed {allowDown})`)

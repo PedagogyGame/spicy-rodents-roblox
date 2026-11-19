@@ -28,7 +28,7 @@
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?, endY?) -> boolean (a rise only as high as the far end is open above:
 --   cover(down) -> (x, z, footY, top) -> number?); crossesLong(wall, down?) -> the same, chord by chord, for any
 --   length; floor(down, depth?) -> (x, y, z) -> boolean (the world's floorBelow, and floorNear at C.FLOOR_NEAR);
---   the world's carFloor (x, y, z) -> boolean (a car's roof within C.FLOOR_DEPTH under the feet, with opts.cars);
+--   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
 --   maxChord (the world's: C.MAX_CHORD); landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
@@ -65,6 +65,10 @@ ValidatorWorld.C = table.freeze({
 	-- client's ground plates are up to 0.3 over the colliding surface): it rose because the floor did (the round-3
 	-- review: a standing body crept up a posSlack a packet to FLOOR_DEPTH over the floor)
 	FLOOR_NEAR = 0.6,
+	-- studs: a grounded body this near over a car's roof the server has, with no floor within FLOOR_NEAR, is weighed a
+	-- third a packet (the roof its client draws, a little behind or off the server's on a slope or a bump), not a whole
+	-- flag (carFloor)
+	CAR_SLACK = 1.5,
 	-- the down rays that bisect the cover over the far end of a wall a leap's rise cleared (cover): its height to an
 	-- eighth of the rise
 	COVER_RAYS = 3,
@@ -99,17 +103,76 @@ function ValidatorWorld.cover(down: Ray): (number, number, number, number) -> nu
 	end
 end
 
+-- chordTest(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?, useCover) -> (crossed, coverSpent): one chord
+-- of at most C.MAX_CHORD by the six rays (crosses), the cover over its far end asked only when `useCover` (C.COVER_RAYS
+-- + 1 down rays and three more wall rays: 13 rays at most)
+local function chordTest(
+	wall: Ray,
+	down: Ray?
+): (number, number, number, number, number, number?, number?, number?, boolean) -> (boolean, boolean)
+	local covered = if down then ValidatorWorld.cover(down) else nil
+	return function(
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		yLow: number,
+		yHigh: number?,
+		rise: number?,
+		endY: number?,
+		useCover: boolean
+	): (boolean, boolean)
+		local dx, dz = x1 - x0, z1 - z0
+		local len = math.sqrt(dx * dx + dz * dz)
+		if len < C.MIN_CHORD or len > C.MAX_CHORD then
+			return false, false
+		end
+		local px, pz = -dz / len * C.SIDE, dx / len * C.SIDE
+		local low = yLow + C.CORE
+		local high = (yHigh or yLow) + C.TOP + math.max(rise or 0, 0)
+		local roofable = useCover and covered ~= nil and endY ~= nil
+		local over = false -- a high ray passed over it
+		for _, side in { 0, 1, -1 } do
+			local ox, oz = x0 + px * side, z0 + pz * side
+			if not wall(ox, low, oz, dx, 0, dz) then
+				return false, false
+			end
+			if not over and not wall(ox, high, oz, dx, 0, dz) then
+				if not roofable then
+					return false, false
+				end
+				over = true
+			end
+		end
+		if not over then
+			return true, false
+		end
+		-- (cleared over the top: only as high as the far end is open above, the body coming down under its cover)
+		local open = (covered :: any)(x1, z1, endY :: number, high)
+		if open == nil then
+			return false, true
+		end
+		local capped = math.max(low, open)
+		for _, side in { 0, 1, -1 } do
+			if not wall(x0 + px * side, capped, z0 + pz * side, dx, 0, dz) then
+				return false, true
+			end
+		end
+		return true, true
+	end
+end
+
 -- crosses(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?): did the straight move from (x0, z0) to (x1, z1) go
 -- through a wall? yLow / yHigh: the lower and higher feet of the two ends; rise: how far above yHigh the body could have
--- been in between (a leap's arc); endY: the feet at (x1, z1), where the body came down. A wall the arc's rise alone
--- clears (every low ray stopped, a high ray over the top) is cleared only as high as the far end is open above (the
--- round-4 review: a leap's rise cleared a 14-stud house wall into the house under its roof): with `down` and `endY`,
--- the high rays again no higher than the cover over the far end (cover).
+-- been in between (a leap's arc); endY: the feet at (x1, z1), where the body came down. A wall cleared over its top
+-- (every low ray stopped, a high ray over it: by the arc's rise or the higher end's own height) is cleared only as high
+-- as the far end is open above (the round-4 review: a leap's rise cleared a 14-stud house wall into the house under its
+-- roof): with `down` and `endY`, the high rays again no higher than the cover over the far end (cover).
 function ValidatorWorld.crosses(
 	wall: Ray,
 	down: Ray?
 ): (number, number, number, number, number, number?, number?, number?) -> boolean
-	local covered = if down then ValidatorWorld.cover(down) else nil
+	local one = chordTest(wall, down)
 	return function(
 		x0: number,
 		z0: number,
@@ -120,58 +183,21 @@ function ValidatorWorld.crosses(
 		rise: number?,
 		endY: number?
 	): boolean
-		local dx, dz = x1 - x0, z1 - z0
-		local len = math.sqrt(dx * dx + dz * dz)
-		if len < C.MIN_CHORD or len > C.MAX_CHORD then
-			return false
-		end
-		local px, pz = -dz / len * C.SIDE, dx / len * C.SIDE
-		local low = yLow + C.CORE
-		local top = (yHigh or yLow) + C.TOP
-		local high = top + math.max(rise or 0, 0)
-		local roofable = covered ~= nil and endY ~= nil and high > top
-		local over = false -- a high ray passed over it
-		for _, side in { 0, 1, -1 } do
-			local ox, oz = x0 + px * side, z0 + pz * side
-			if not wall(ox, low, oz, dx, 0, dz) then
-				return false
-			end
-			if not over and not wall(ox, high, oz, dx, 0, dz) then
-				if not roofable then
-					return false
-				end
-				over = true
-			end
-		end
-		if not over then
-			return true
-		end
-		-- (the rise cleared it: only under open sky, no higher than the far end's cover)
-		local open = (covered :: any)(x1, z1, endY :: number, high)
-		if open == nil then
-			return false
-		end
-		local capped = math.max(top, open)
-		for _, side in { 0, 1, -1 } do
-			if not wall(x0 + px * side, capped, z0 + pz * side, dx, 0, dz) then
-				return false
-			end
-		end
-		return true
+		return (one(x0, z0, x1, z1, yLow, yHigh, rise, endY, true))
 	end
 end
 
 -- crossesLong(wall, down?)(x0, z0, x1, z1, yLow, yHigh?, rise?, endY?): the straight line of a gap too long for
--- crosses, judged chord by chord (each at most C.MAX_CHORD, each by the six rays, the cover over each chord's far end
--- at the feet the line has there): did any chord go through a wall? (An honest body may have gone round a corner in
--- the gap: the caller weighs it as such.) A line longer than C.MAX_CHORDS chords is judged by that many chords spread
--- evenly along it: the cost is bounded (a line that long, 64 studs, is over a second at the fastest, judged on its
--- reach first).
+-- crosses, judged chord by chord (each at most C.MAX_CHORD, each by the six rays; the cover over a chord's far end, at
+-- the feet the line has there, for the first chord cleared over its top only, so a line costs one cover at most): did
+-- any chord go through a wall? (An honest body may have gone round a corner in the gap: the caller weighs it as such.)
+-- A line longer than C.MAX_CHORDS chords is judged by that many chords spread evenly along it: the cost is bounded (a
+-- line that long, 64 studs, is over a second at the fastest, judged on its reach first).
 function ValidatorWorld.crossesLong(
 	wall: Ray,
 	down: Ray?
 ): (number, number, number, number, number, number?, number?, number?) -> boolean
-	local one = ValidatorWorld.crosses(wall, down)
+	local one = chordTest(wall, down)
 	return function(
 		x0: number,
 		z0: number,
@@ -196,24 +222,26 @@ function ValidatorWorld.crossesLong(
 		local spread = if n > 1 then (1 - step) / (n - 1) else 0
 		-- (the feet at the start: the end that is not endY)
 		local startY = if endY then yLow + (yHigh or yLow) - endY else nil
+		local coverLeft = true
 		for i = 1, n do
 			local a = (i - 1) * spread
 			local b = a + step
 			local y = if endY and startY then startY + (endY - startY) * b else nil
-			if
-				one(
-					x0 + (x1 - x0) * a,
-					z0 + (z1 - z0) * a,
-					x0 + (x1 - x0) * b,
-					z0 + (z1 - z0) * b,
-					yLow,
-					yHigh,
-					rise,
-					y
-				)
-			then
+			local crossed, spent = one(
+				x0 + (x1 - x0) * a,
+				z0 + (z1 - z0) * a,
+				x0 + (x1 - x0) * b,
+				z0 + (z1 - z0) * b,
+				yLow,
+				yHigh,
+				rise,
+				y,
+				coverLeft
+			)
+			if crossed then
 				return true
 			end
+			coverLeft = coverLeft and not spent
 		end
 		return false
 	end
@@ -279,12 +307,12 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		crossesLong = if wall then ValidatorWorld.crossesLong(wall, down) else nil,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
 		floorNear = if down then ValidatorWorld.floor(down, C.FLOOR_NEAR) else nil,
-		-- a car's roof within C.FLOOR_DEPTH under the feet (the climb and float flags weigh a third there)
+		-- a car's roof within C.CAR_SLACK under the feet (the climb and float flags weigh a third there)
 		carFloor = if o.cars
 			then function(x: number, y: number, z: number): boolean
 				local floors = (o.cars :: Cars).floors
 				return floors.n > 0
-					and Solid.ray(floors, x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + C.FLOOR_DEPTH), 0)
+					and Solid.ray(floors, x, y + C.RAY_ABOVE, z, 0, -(C.RAY_ABOVE + C.CAR_SLACK), 0)
 			end
 			else nil,
 		landable = if down then ValidatorWorld.landable(down) else nil,
