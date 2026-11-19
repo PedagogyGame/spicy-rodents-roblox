@@ -382,6 +382,13 @@ return function(t)
 			end
 		end
 		t.truthy(#crowd >= 60, `{#crowd} people`)
+		-- every Gaze write (an attribute that replicates to every player), by person
+		local writes: { [number]: number } = {}
+		local inner = rig.overhead.opts.gaze
+		rig.overhead.opts.gaze = function(id: number, x: number?, y: number?, z: number?)
+			writes[id] = (writes[id] or 0) + 1
+			inner(id, x, y, z)
+		end
 		local before = rig.overhead:stats()
 		onWire(rig, 18, 20, function()
 			local rod = rig.world.actorsById[rig.rodent]
@@ -406,6 +413,28 @@ return function(t)
 		)
 		t.truthy(ticks >= 90, "it ticked")
 		t.truthy(mean < 1.0, `a tick costs {mean} ms on average`)
+		-- the network: Gaze is rewritten only when the squirrel has moved a few degrees, at most twice a second a person
+		local total, most, gazers = 0, 0, 0
+		for _, n in writes do
+			total += n
+			most = math.max(most, n)
+			gazers += 1
+		end
+		local secs = 20
+		print(
+			string.format(
+				"      Gaze: %d writes in %d s by %d people (%.1f a second; the most from one person %.2f a second)",
+				total,
+				secs,
+				gazers,
+				total / secs,
+				most / secs
+			)
+		)
+		t.eq(st.gazeWrites - before.gazeWrites, total, "the stats count every write")
+		t.truthy(most / secs <= 2.1, `no one's head is rewritten more than twice a second ({most / secs})`)
+		t.truthy(total / secs <= 2.1 * math.max(1, gazers), "nor the crowd's")
+		t.truthy(total / secs <= 90, `the crowd's Gaze writes stay under 90 a second ({total / secs}; was 186)`)
 		local _ = OverheadService
 	end)
 end

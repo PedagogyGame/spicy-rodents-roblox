@@ -93,7 +93,11 @@ OverheadService.C = {
 	backSpeed = 5,
 	hurrySecs = 8, -- ... then hurries on this long
 	closeSpeed = 6, -- studs/s a vigilante closes in under it
-	gazeStep = 1, -- studs the squirrel moves before a Gaze is written again
+	-- a person's Gaze (a replicated attribute) is written again only once the squirrel has moved more than gazeAngle off
+	-- the way it was written, seen from their eye, and at most every gazeEvery seconds (a new squirrel, or none, at once):
+	-- the client's neck eases between (Client/Render/GazeView). Network: 2 writes a second a person at most
+	gazeAngle = math.rad(6),
+	gazeEvery = 0.5,
 	areaRadius = AreaPace.DEFAULTS.radius,
 	areaWindow = AreaPace.DEFAULTS.window,
 	areaMax = AreaPace.DEFAULTS.max,
@@ -137,6 +141,7 @@ type Seen = { squirrel: any, rate: number, impulse: number, exposure: number, cr
 type Observer = { id: any, x: number, y: number, z: number, faceX: number, faceZ: number }
 
 type Sense = { lastOn: number, kind: string?, air: boolean }
+type Gazed = { x: number, y: number, z: number, at: number, squirrel: any }
 
 export type Stats = {
 	ticks: number,
@@ -152,6 +157,7 @@ export type Stats = {
 	lost: number,
 	lines: number,
 	refused: number, -- lines the caps held back
+	gazeWrites: number, -- Gaze attribute writes (each one replicates to every player)
 	lastMs: number,
 	peakMs: number,
 	busyMs: number, -- all the ticks with a squirrel overhead, added up (busyMs / busyTicks: the mean)
@@ -180,7 +186,8 @@ function OverheadService.new(opts: Opts): any
 		people = Perception.newGrid(16),
 		inGrid = {} :: { [number]: boolean },
 		buffer = {} :: { number },
-		gazes = {} :: { [number]: { number } }, -- person -> the point last written
+		gazes = {} :: { [number]: Gazed }, -- person -> the point last written
+		gazeWrites = 0, -- Gaze attribute writes (stats: the network's cost)
 		gestures = {} :: { [number]: number }, -- person -> when the pointing arm comes down
 		hurry = {} :: { [number]: { x: number, z: number, at: number } }, -- a calm person's hurry after backing off
 		cued = {} :: { [number]: { meter: number?, seen: boolean? } },
@@ -199,6 +206,7 @@ function OverheadService.new(opts: Opts): any
 			lost = 0,
 			lines = 0,
 			refused = 0,
+			gazeWrites = 0,
 			lastMs = 0,
 			peakMs = 0,
 			busyMs = 0,
@@ -468,11 +476,13 @@ local function neighbour(self: any, id: number): number?
 	return best
 end
 
+-- the point a person's head turns to (nil: none), written under the C.gazeAngle / C.gazeEvery threshold
 local function gaze(self: any, id: number, s: Overhead?)
 	local f = self.opts.gaze
 	if s == nil then
 		if self.gazes[id] ~= nil then
 			self.gazes[id] = nil
+			self._stats.gazeWrites += 1
 			if f then
 				f(id, nil, nil, nil)
 			end
@@ -480,11 +490,30 @@ local function gaze(self: any, id: number, s: Overhead?)
 		return
 	end
 	local g = self.gazes[id]
-	if g and (g[1] - s.x) ^ 2 + (g[2] - s.y) ^ 2 + (g[3] - s.z) ^ 2 < C.gazeStep * C.gazeStep then
-		return
+	local t = now(self)
+	if g and g.squirrel == s.id then
+		if t - g.at < C.gazeEvery then
+			return
+		end
+		-- (the angle between the way it was written and the way it is now, from their eye)
+		local a = self.world.actorsById[id]
+		if a then
+			local ex, ey, ez = a.x, eyeOf(a), a.z
+			local ux, uy, uz = g.x - ex, g.y - ey, g.z - ez
+			local vx, vy, vz = s.x - ex, s.y - ey, s.z - ez
+			local lu = math.sqrt(ux * ux + uy * uy + uz * uz)
+			local lv = math.sqrt(vx * vx + vy * vy + vz * vz)
+			if lu > 1e-6 and lv > 1e-6 then
+				local cos = math.clamp((ux * vx + uy * vy + uz * vz) / (lu * lv), -1, 1)
+				if math.acos(cos) <= C.gazeAngle then
+					return
+				end
+			end
+		end
 	end
 	local x, y, z = math.floor(s.x * 2 + 0.5) / 2, math.floor(s.y * 2 + 0.5) / 2, math.floor(s.z * 2 + 0.5) / 2
-	self.gazes[id] = { x, y, z }
+	self.gazes[id] = { x = x, y = y, z = z, at = t, squirrel = s.id }
+	self._stats.gazeWrites += 1
 	if f then
 		f(id, x, y, z)
 	end
