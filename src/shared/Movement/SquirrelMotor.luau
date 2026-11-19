@@ -1466,7 +1466,11 @@ end
 -- down to in the gap, rises what that launch can reach ((u^2 - v^2) / 2g), and in the air only the motor's pounce
 -- launches, recognised by its window (the window rose to what it is a moment after a pounce, the body flies as that
 -- pounce: pounceAgo); a plain arc rises no more than the mean of its end speeds; the wall test's rise is a launch's
--- apex at most.
+-- apex at most. Round 3 (2026-11-19: no allowance sized from a number only the client claimed): a landing hidden in a
+-- gap is timed from the validator's own vertical speed and ends on the floor a ray finds, or a leap over it in the time
+-- left (landedIn); a rail visit hidden in a gap explains a rise only from a rail high enough (railHigh); leaving a rail
+-- is wall-tested from the launch point; a long line chord by chord; a pounce slower than a lunge met a wall where the
+-- server's own two places say; and the envelope returns what it judged (Judged) for the validator's baseline.
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1484,8 +1488,9 @@ SquirrelMotor.envelopeParams = {
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
 	floorSlack = st(0.2),
-	-- a pounce slower than a lunge met a wall: within wallAhead (studs) along the move the server saw, when it moved at
-	-- least wallMoved; a body that hardly moved touches it (wallTouch along its heading: the body's half-width and a bit)
+	-- a pounce slower than a lunge met a wall: within wallAhead (studs) along the move the server saw, or along its heading
+	-- when it moved that way, when it moved at least wallMoved; a body that hardly moved touches it (wallTouch along its
+	-- heading: the body's half-width and a bit)
 	wallAhead = 3,
 	wallMoved = 0.25,
 	wallTouch = 1.5,

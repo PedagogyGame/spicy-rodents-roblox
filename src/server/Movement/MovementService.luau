@@ -31,8 +31,9 @@
 --     (ignoredFor: a round trip, twice, and a second) the place before it, within what the pace covers in a round trip;
 --     never more than C.DRIFT_BASE and the fastest the squirrel goes since (C.DRIFT_LAG);
 --   * walls: between two samples of the root once an epoch has settled, the live wall rays (a client that stops sending
---     still cannot walk through a house); a root by a rail (C.RAIL_NEAR: a trunk's bark, a downspout on a wall) only
---     while no packet has the body on a rail within C.RAIL_RECENT of it (the root may lead the packets: it waits);
+--     still cannot walk through a house); a root by a rail (C.RAIL_NEAR: a trunk's bark, a downspout on a wall) crosses
+--     a wall only where a packet on a rail within C.RAIL_RECENT of the crossing has the body drawn (_explained: its drawn
+--     pose reaches the crossing's far end with no wall between; the root may lead the packets, so it waits that long);
 --   * the air: while no packet is fresh, a root off the rails higher above any floor than a leap may only fall
 --     (C.HIGH_LAG of a held update, then gravity): no hanging, no flying while silent;
 --   * silence: a body that moves C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped
@@ -44,10 +45,16 @@
 -- streaming in on its client, and a house it has not got yet is no wall to its motor. A packet with a number that is
 -- not finite (SquirrelWire.sane) is snapped and never judged. No packet and no root sample costs more than a bounded
 -- time: the validator's rail scans and long lines are bounded (MoveValidator.C.RAIL_REACH_MAX, ValidatorWorld.C).
+-- Validator round 3 (2026-11-19, the rule: nothing judged by a number only the client claimed): the duel's pose of the
+-- rodent is its last ACCEPTED packet (motorOf), a pounce is dated with the link's spread measured before the click and
+-- by its own arrival offset when that is later than the spread explains (a clock slowed while a lunge is held), a click
+-- dated at most C.CLICK_EARLY before it arrived and on its arrival when it came long after the launch it says it
+-- preceded, the spread never above the round trip the engine measures, and the pace by the validator's kept speeds.
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?); M:clickAt(actorId, clock, now) ->
+--   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
+--   M:clickAt(actorId, clock, now) ->
 --   number?; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
 
 local Import = require("../Import")

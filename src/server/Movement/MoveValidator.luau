@@ -40,6 +40,12 @@
 --     (verdict.pounce, the client clock it launched at, and verdict.pounceGap, the gap it lies in); two closer than
 --     the cooldown are a flag at any gap. A plain arc's baseline takes the vertical speed gravity gives, not the one
 --     the packet claims within the slack (claimed a little slower each packet, the slack added up to a slow fall).
+--   * Round 3 (2026-11-19): the baseline keeps only what the envelope judged (SquirrelMotor.Judged: the vertical speed
+--     within the bounds it was checked against, the horizontal one within its cap, an arc's height no higher than the
+--     arc), so no later packet is judged by a number only the client claimed; a line too long for the short wall test
+--     that crosses a wall is weighed as a gap's (wallGap); a grounded packet higher than where the body last stood needs
+--     a floor just under its feet (world.floorNear: no creeping up posSlack a packet); a landing the gap hid counts as
+--     ground for the sprint meter.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
