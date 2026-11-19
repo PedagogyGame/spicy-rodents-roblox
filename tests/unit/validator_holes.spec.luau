@@ -26,6 +26,8 @@ local Rng = require("@tests/cheat/Rng")
 local TestWorld = require("@tests/cheat/TestWorld")
 local LiveRig = require("@tests/lib/LiveRig")
 local BiteRig = require("@tests/lib/BiteRig")
+local Driver = require("@tests/cheat/Driver")
+local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 
 type State = SquirrelMotor.State
 
@@ -536,6 +538,48 @@ return function(t)
 			wall = wall or v.code == "wall"
 		end
 		t.truthy(wall, "a wall")
+	end)
+
+	t.test("ground: a silent client's root walked through a garden wall beside a tree is a wall (the rail no excuse)", function()
+		-- (the server's own root wall test was off within MovementService.C.RAIL_NEAR of any rail; now only while the
+		-- packets have the body on a rail)
+		local base = TestWorld.build()
+		local trunk = Driver.targetsAround(base, 0, 0, 200)[1]
+		local foot = base.registry:foot(trunk)
+		local box = { minX = foot.x + 2, maxX = foot.x + 3, minZ = foot.z - 6, maxZ = foot.z + 6, top = 14 }
+		local world = TestWorld.build({ boxes = { box } })
+		local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
+			return TestWorld.segmentCrossesBox({ box }, ox, oz, ox + dx, oz + dz, oy)
+		end
+		local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
+			local lo = oy + dy
+			if lo <= 0 and oy >= 0 then
+				return true
+			end
+			return ox > box.minX and ox < box.maxX and oz > box.minZ and oz < box.maxZ and box.top >= lo and box.top <= oy
+		end
+		local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
+		local z = foot.z + 3
+		local rig = LiveRig.new({
+			world = world,
+			vworld = vworld,
+			link = QUIET,
+			seed = 28,
+			silent = function(tt: number): boolean
+				return tt >= CHEAT_AT
+			end,
+			rootCheat = function(p: { x: number, y: number, z: number }, tt: number, _s: State)
+				if tt >= CHEAT_AT then
+					p.x, p.z = math.min(foot.x - 3 + 15 * (tt - CHEAT_AT), foot.x + 6), z
+				end
+			end,
+		})
+		rig:possess(SquirrelMotor.new(foot.x - 3, world.groundHeight, z), idle())
+		rig:run(CHEAT_AT + 3)
+		local r = rig:result()
+		print(`      {LiveRig.describe("through a wall by a tree", r)}; first snap {r.firstSnap}`)
+		t.truthy((r.reasons.wall or 0) >= 1, "a wall")
+		t.truthy((r.firstSnap or math.huge) <= CHEAT_AT + 2, "within a rail packet's wait")
 	end)
 
 	-- an honest pounce in the air whose new vertical speed happens to lie within gravityEps of the arc's (the envelope
