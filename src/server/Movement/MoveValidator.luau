@@ -547,12 +547,13 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local boosted = self.boostOf(actorId)
 	local fastest = self:fastest(actorId)
 	-- the client's own river recovery (Movement/Recovery.riverFall: the client sends the quay spot on the frame it put the
-	-- body there): the exact spot of a fall into the water the body could have made from the last place the server
-	-- accepted (its own vertical speed, the gap's time up to maxDt), never right after another landing (validator round
-	-- 7: a landing claimed every packet ran the quay at 112 to 296 st/s, each one a fresh governor)
-	local entryX, entryY, entryZ = nil, nil, nil
+	-- body there): the spot of a fall into the water the body could have made from the last place the server accepted
+	-- (its own vertical speed, the gap's time up to maxDt), or a walk on from it in the time left (that packet lost),
+	-- never right after another landing (validator round 7: a landing claimed every packet ran the quay at 112 to 296
+	-- st/s, each one a fresh governor). The floor is not asked of the spot itself (riverFall's own), only of a walk on
+	local entryX, entryY, entryZ, quayExact = nil, nil, nil, nil
 	if not next.routeId and next.grounded and not actor.lastRiver then
-		entryX, entryY, entryZ = Recovery.riverEntry(
+		entryX, entryY, entryZ, _, quayExact = Recovery.riverEntry(
 			{ x = prev.x, y = prev.y, z = prev.z, vy = prev.vy, onRail = prev.routeId ~= nil },
 			next.x,
 			next.y,
@@ -644,7 +645,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local onBed = floorBelow ~= nil
 		and next.grounded
 		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
-	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
+	if floorBelow and next.grounded and not next.routeId and not (riverLanding and quayExact) and not onBed then
 		local floorNear = self.world.floorNear
 		-- (validator round 6, the round-5 review's LOW: a level packet was held only to floorBelow, FLOOR_DEPTH, so from
 		-- a ledge a body walked on level over open ground: every grounded packet off the rails stands on a floor just
@@ -674,13 +675,16 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	-- client's own river recovery: the move judged is the move into the water (to the entry point), the riverFall jump
 	-- from there to the quay carried by the whole history (shift: kept, never started afresh, invariant C)
 	if riverLanding then
-		MoveValidator.shift(
-			self,
-			actorId,
-			next.x - (entryX :: number),
-			next.y - (entryY :: number),
-			next.z - (entryZ :: number)
-		)
+		local qx, qy, qz = Recovery.riverFall(entryX :: number, entryY :: number, entryZ :: number)
+		if qx and qy and qz then
+			MoveValidator.shift(
+				self,
+				actorId,
+				qx - (entryX :: number),
+				qy - (entryY :: number),
+				qz - (entryZ :: number)
+			)
+		end
 	end
 	MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
 
