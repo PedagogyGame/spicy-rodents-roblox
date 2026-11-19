@@ -364,7 +364,7 @@ function DuelSim.run(opts: Options): Result
 				dt = DuelSim.SERVER_DT,
 				dist = d,
 				dy = 0,
-				seen = Duel.notices(P, g, d, true),
+				seen = Duel.notices(P, g, { dist = d, inView = true }),
 				tell = tell,
 				tellFeint = tellFeint,
 				committed = flying,

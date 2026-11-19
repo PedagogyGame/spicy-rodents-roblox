@@ -14,7 +14,8 @@
 -- the nearest person in contact. A feint (`rodentAct(id, "feint")`, F) is a tell with no pounce: it costs
 -- duel.feintCost of a feint meter that refills at duel.feintRefill a second, and no pounce follows for feintRecover.
 -- THE PEOPLE. Every AI townsperson (Pedestrian, not a rider) and police officer near a player's rodent runs a Combat/Duel
--- Guard: it notices (spot range x its temperament's notice, in view or close), reacts to tells, squares up, strikes,
+-- Guard: it notices as the town perceives (Combat/Duel.notices: seen in its view cone, heard when the rodent moves faster
+-- than a creep, felt when it brushes them, or pointed out overhead: opts.overhead), reacts to tells, squares up, strikes,
 -- backs off, flinches or flees, and the service turns the Guard's move into the brain's orders (Pedestrian "duel" and
 -- "witness" events, Officer "respond") and its stance into the body's Stance attribute (clients draw it; the vigilante's
 -- "squared" stance is the visible tell). A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
@@ -84,6 +85,8 @@ export type Opts = {
 	-- (default: the bite-to-hospital sequence's own, infection.colliders)
 	colliders: any?,
 	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
+	-- the person has pointed the rodent out above them (Server/Stealth/OverheadService:spotted): they are aware of it
+	overhead: ((personId: number, rodentId: number) -> boolean)?,
 }
 
 export type Motor = { age: number, launchAgo: number? }
@@ -749,6 +752,22 @@ local function stepChases(self: Service, now: number)
 	end
 end
 
+-- the rodent's flat speed over its last duel step (studs/s; from where the server had it: Combat/Duel.notices hears a
+-- rodent faster than a creep), nil before two steps
+local function paceOf(r: Rodent): number?
+	local h = r.history
+	local n = #h
+	if n < 2 then
+		return nil
+	end
+	local a, b = h[n - 1], h[n]
+	local dt = b.t - a.t
+	if dt <= 1e-6 then
+		return nil
+	end
+	return math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2) / dt
+end
+
 -- the people round one rodent: their duels (returns nothing; orders, stances and blows are applied)
 local function stepGuards(self: Service, now: number, dt: number, live: { [number]: boolean })
 	local P = self.P
@@ -805,12 +824,25 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		-- (out of sight: in a drain or a hollow, behind a housing's walls or a building)
 		local hidden = covered(self, best.id) or not inSight(self, a, best)
 		local boosted = self:inAlert(a.x, a.z, now)
+		local dy = (best.y - best.hip) - (a.y - a.hip)
+		local seen = false
+		if not hidden then
+			local f = self.opts.overhead
+			seen = Duel.notices(P, guard, {
+				dist = bestD,
+				dy = dy,
+				inView = facing >= 0.28,
+				speed = paceOf(r),
+				lunging = r.tell ~= nil and now >= r.tell and now < r.windowUntil,
+				spottedOverhead = f ~= nil and f(a.id, best.id),
+			})
+		end
 		local view: any = {
 			now = now,
 			dt = dt,
 			dist = bestD,
-			dy = (best.y - best.hip) - (a.y - a.hip),
-			seen = not hidden and Duel.notices(P, guard, bestD, facing >= 0.28),
+			dy = dy,
+			seen = seen,
 			tell = if hidden then nil else r.tell,
 			tellFeint = r.tellFeint,
 			committed = now >= r.commitAt and now < r.windowUntil,

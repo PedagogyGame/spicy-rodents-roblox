@@ -27,7 +27,7 @@
 -- pounce on its way up): a bite is judged against the person as the player saw them (bitePhaseAt: the trail of the
 -- last TRAIL_SECS), except the reaction to that very pounce's tell, which runs on the server's clock (a slow link
 -- buys no longer reaction window).
--- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, dist, inView) -> boolean;
+-- Interface: new(params, id, temper, nerve, weapon?) -> Guard; notices(params, g, sight) -> boolean;
 --   think(params, g, view, rand) -> Out; bitePhase(g, now) -> CombatRules.BitePhase;
 --   bitePhaseAt(g, now, rewind, tell?) -> CombatRules.BitePhase; batted(g, now) (a bite failed on them: back to ready
 --   unless striking); rally(params, g, now, mode) (the scene turns on the rodent); reach(params, g) -> studs; sweep(ax, az, bx, bz, px, pz) -> studs; PHASES; FLEE_SECS; TRAIL_SECS
@@ -83,6 +83,16 @@ export type View = {
 	boosted: boolean, -- near a fresh bite: the hidden strength boost
 }
 
+-- What the person can tell of the rodent, for noticing it (Duel.notices).
+export type Sight = {
+	dist: number, -- studs, flat
+	dy: number?, -- the rodent's height over the person's feet
+	inView: boolean, -- inside their view cone (the v5.4 cone: facing . direction > 0.28)
+	speed: number?, -- the rodent's flat speed, studs/s (nil: moving)
+	lunging: boolean?, -- in a pounce's wind-up or lunge
+	spottedOverhead: boolean?, -- they have pointed it out above them (Stealth/OverheadWatch)
+}
+
 export type Strike = { kind: string, hit: boolean, counter: boolean, chance: number }
 
 export type Out = {
@@ -131,10 +141,35 @@ function Duel.new(params: Params, id: any, temper: CombatRules.Temper, nerve: nu
 	}
 end
 
--- Does the person notice the rodent at this distance: within the spot range times their temperament's notice, in
--- view, or close enough to hear and feel (v5.4: under 6.8 u = 17 studs whatever the facing).
-function Duel.notices(params: Params, g: Guard, dist: number, inView: boolean): boolean
-	return dist <= params.spotRange * params.notice[g.temper] and (inView or dist < 17)
+-- Does the person notice the rodent (the town's perception, so a stalk is a real play; combat review 19 Nov: "a person
+-- notices the rodent within 17 studs whatever way they face"):
+--   * it is pointed out overhead (Stealth/OverheadWatch: they have spotted it on a wire or a branch above them);
+--   * higher over their feet than params.overheadY the duel does not see it at all (the overhead watch does);
+--   * seen: in their view cone and within the spot range times their temperament's notice;
+--   * heard: moving faster than a creep (params.quietSpeed) within params.hear times their notice, whatever the facing;
+--   * felt: within params.brush of a rodent that is not pouncing.
+-- (The pounce itself, its wind-up and lunge, is too quick to turn round for: noticing it is what the reaction window to
+-- its tell is about, for a person already aware.) A creeping or still rodent behind a person, or one dropping from
+-- above behind them, goes unnoticed until it brushes them. `speed` nil reads as moving (heard).
+function Duel.notices(params: Params, g: Guard, sight: Sight): boolean
+	if sight.spottedOverhead then
+		return true
+	end
+	if (sight.dy or 0) > params.overheadY then
+		return false
+	end
+	local notice = params.notice[g.temper]
+	if sight.inView and sight.dist <= params.spotRange * notice then
+		return true
+	end
+	if sight.lunging then
+		return false
+	end
+	if sight.dist < params.brush then
+		return true
+	end
+	local loud = sight.speed == nil or sight.speed > params.quietSpeed
+	return loud and sight.dist <= params.hear * notice
 end
 
 -- The reach of the blow being wound up (studs).
