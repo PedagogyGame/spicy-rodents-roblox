@@ -23,6 +23,10 @@
 
 local NutMeter = {}
 
+-- the pick-up's tick, heard by the picker only (a Sound under the meter's gui; nothing replicated): a stand-in from
+-- the licensed library already in the game (Items.Click, Flashlight Switch 13, ProSoundEffects), quiet, until a nut
+-- sound is picked (docs/AUDIO_BUDGET.md "Nuts")
+NutMeter.PICK_SOUND = { id = "rbxassetid://9114481274", volume = 0.35, speed = 1.3 }
 NutMeter.WIDTH = 210
 NutMeter.HEIGHT = 44 -- with the hint line; 26 without
 NutMeter.CLAIM = 0.7 -- the tick on the bar (Tunables forage.ownThreshold)
@@ -96,16 +100,14 @@ function NutMeter.look(attrs: { [string]: any }): Look
 		look.tree, look.fill = inId, inMeter
 		look.fillColor = if inState == "taken" then GREY else STORE
 		look.hint = if inState == "yours"
-			then "Your tree: your nuts go in"
-			elseif inState == "taken" then "Another squirrel's tree: you keep your nuts"
-			else "Nobody's tree: fill it to 70% to claim it"
+			then "Your tree: nuts go in"
+			elseif inState == "taken" then "Not yours: you keep your nuts"
+			else "Nobody's: fill to 70% to claim"
 	elseif own ~= "" then
 		look.tree, look.fill = own, math.clamp(num(attrs.NutStore) or 0, 0, 1)
 		look.hint = if carried > 0 then `Take them home to {own}` else nil
 	else
-		look.hint = if carried > 0
-			then "Run them into a hollow tree's hole"
-			else "Find nuts under oak trees, in yards and in the park"
+		look.hint = if carried > 0 then "Run them into a hollow tree" else "Find nuts: oaks, yards, the park"
 	end
 	if look.tree ~= "" then
 		look.percent = `{math.floor(look.fill * 100 + 0.5)}%`
@@ -135,7 +137,7 @@ end
 -- left corner (anchor x, the x scale, x offset, y offset from the top)
 function NutMeter.place(width: number): (number, number, number, number)
 	if width >= NutMeter.WIDE then
-		return 0, 0.5, NutMeter.HP_HALF + NutMeter.BAR_GAP, 79
+		return 0, 0.5, NutMeter.HP_HALF + NutMeter.BAR_GAP, 82
 	end
 	return 0, 0, 12, 8
 end
@@ -156,6 +158,7 @@ function NutMeter.start(opts: Opts?): Handle
 	gui.Name = "NutMeter"
 	gui.ResetOnSpawn = false
 	gui.Enabled = false
+	gui.DisplayOrder = -1 -- (under the menu's toasts and banners where they cross)
 	local pill = Instance.new("Frame")
 	pill.Name = "Pill"
 	pill.Size = UDim2.fromOffset(NutMeter.WIDTH, NutMeter.HEIGHT)
@@ -219,6 +222,13 @@ function NutMeter.start(opts: Opts?): Handle
 	hint.TextTruncate = Enum.TextTruncate.AtEnd
 	gui.Parent = o.parent or player:WaitForChild("PlayerGui")
 
+	local tickSound = Instance.new("Sound")
+	tickSound.Name = "Nuts.Pick"
+	tickSound.SoundId = NutMeter.PICK_SOUND.id
+	tickSound.Volume = NutMeter.PICK_SOUND.volume
+	tickSound.PlaybackSpeed = NutMeter.PICK_SOUND.speed
+	tickSound.Parent = gui
+
 	local camera = workspace.CurrentCamera
 	local function placeIt()
 		local w = if camera then camera.ViewportSize.X else 1280
@@ -260,6 +270,9 @@ function NutMeter.start(opts: Opts?): Handle
 			plus.Text = said
 			plus.Position = UDim2.fromOffset(30 + count.TextBounds.X + 6, 2)
 			plus.Visible = true
+			if string.sub(said, 1, 1) == "+" then
+				tickSound:Play()
+			end
 			task.delay(1.2, function()
 				if flashToken == mine then
 					plus.Visible = false
