@@ -214,5 +214,10 @@ The library's human voices are few; the two vocal picks are the riskiest in this
 |---|---|---|
 | `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | **upload slot `dog_bark`** (the game's own; silent until uploaded) |
 
+### Nuts (`src/client/UI/NutMeter.luau` `PICK_SOUND`)
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `Nuts.Pick` | the player's own squirrel picks a nut up (heard by that player only; volume 0.35, played a little higher) | Wood Drop, Impacts On Concrete, Small Pieces: a small wooden tick and bounce (9120863989). It replaces the stand-in, the store's flashlight click (9114481274). |
+
 ## To hear first in Studio
 All of the above were chosen without being heard. The ones most likely to need a swap: the duel's two voices; `Items.SodaFizz` (a gulp, not a can opening); `sewer.footEcho` and `sewer.rung` at their volumes; `SkyLift.CableHum` (a building's lift motor, not a rope); and the two upload candidates.

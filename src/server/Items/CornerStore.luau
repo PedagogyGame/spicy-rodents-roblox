@@ -15,6 +15,9 @@
 --     has the basket put back, with words. A player who leaves the game has it put back; one who leaves while
 --     being served is refunded by the wallet (the handing-over fails: nobody to hand it to).
 -- What is bought is used from the hotbar: each Tool's Activated goes to Items/ItemWorld (Items/ItemService's rules).
+-- What is bought stays the buyer's (owner, D16 #26; Items/Lending): somebody else's frisbee caught or picked up is a
+-- borrowed Tool (lendTool: attributes LentItem and LentFrom, never ItemId, so the Inventory never counts it), put
+-- in the hand when the hand is free, to throw back.
 -- The player attribute StoreBasket holds the basket as "id,id,..." ("" when empty) for a screen to show.
 -- Sounds: cue names only (no uploads; docs/AUDIO_BUDGET.md): CUES, and SOUNDS (cue -> a library sound's id, empty).
 -- Interface: new(deps) -> Store { take(player, id) -> (ok, words), pay(player) -> (ok, words),
@@ -279,7 +282,7 @@ end
 function CornerStore.stow(body: Instance?, backpack: Instance?): number
 	local n = 0
 	for _, t in (if body then body:GetChildren() else {}) :: { Instance } do
-		if t:IsA("Tool") and t:GetAttribute("ItemId") ~= nil then
+		if t:IsA("Tool") and (t:GetAttribute("ItemId") ~= nil or t:GetAttribute("LentItem") ~= nil) then
 			n += 1
 			if backpack then
 				t.Parent = backpack
@@ -418,8 +421,8 @@ function CornerStore.start(opts: StartOpts): Store?
 			if typeof(player) == "Instance" then
 				backpack = (player :: Player):FindFirstChildOfClass("Backpack")
 			end
-			if not sample or not backpack then
-				return nil
+			if not sample or not backpack or (player :: Player).Parent ~= Players then
+				return nil -- (a buyer who left: their record counts it, a Tool is made when they come back)
 			end
 			local tool = CornerStore.makeTool(sample, itemId, displayName(itemId))
 			-- using it (a click, a tap, the gamepad's trigger): Items/ItemService decides, Items/ItemWorld does
@@ -506,6 +509,37 @@ function CornerStore.start(opts: StartOpts): Store?
 		zones = opts.zones,
 		dogs = opts.dogs,
 		heartbeat = opts.heartbeat,
+		-- somebody else's thing, borrowed to throw back (Items/Lending): its use is ItemWorld's `use`
+		lendTool = function(player: any, itemId: string, ownerName: string, use: () -> ()): any?
+			local sample = samples[itemId]
+			local backpack: Instance? = nil
+			if typeof(player) == "Instance" then
+				backpack = (player :: Player):FindFirstChildOfClass("Backpack")
+			end
+			if not sample or not backpack then
+				return nil
+			end
+			local name = `{ownerName}'s {string.lower(displayName(itemId))}`
+			local tool = CornerStore.makeTool(sample, itemId, name)
+			tool:SetAttribute("ItemId", nil)
+			tool:SetAttribute("LentItem", itemId)
+			tool:SetAttribute("LentFrom", ownerName)
+			tool.Activated:Connect(function()
+				if CornerStore.heldBy(tool, player) then
+					use()
+				end
+			end)
+			tool.Parent = backpack
+			-- in the hand at once when it is free, so a catch can be thrown straight back
+			local body = (player :: Player).Character
+			local hum = body and body:FindFirstChildOfClass("Humanoid")
+			if hum and body and body:FindFirstChildOfClass("Tool") == nil then
+				pcall(function()
+					hum:EquipTool(tool)
+				end)
+			end
+			return tool
+		end,
 	})
 	-- the chalk's words come back from the owner's client (Client/Items/ItemClient): text only, checked and
 	-- filtered by ItemService before anything is written

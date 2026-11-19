@@ -94,6 +94,9 @@ local InfectionService = require("../Infection/InfectionService")
 local CombatService = require("../Combat/CombatService")
 local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
+local ForageService = require("../Foraging/ForageService")
+local ForageRules = Import.shared("Foraging/ForageRules") :: typeof(require("../../shared/Foraging/ForageRules"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
 local OverheadService = require("../Stealth/OverheadService")
@@ -714,29 +717,146 @@ function Game.start(opts: Opts?): any
 	end
 	-- the hollow trees and the fallen log (Foraging/HollowService): their insides built (World/HollowShell), the cover,
 	-- the nut meter and the claim shown on each tree; a failure leaves the routes running and nobody hidden in them
+	-- where the server holds a player's squirrel (the validator's invariant D: never the root its client moves): the
+	-- feet of its last accepted motor packet, only while that packet was clean; nil before one (a body still pinned)
+	-- or after a flagged one. What the nuts read: a pick-up (Foraging/ForageService) and a deposit (HollowService)
+	local function heldPlace(id: number): (number?, number?, number?)
+		local actor = rt.byTownId[id]
+		if actor == nil then
+			return nil, nil, nil
+		end
+		local snap, at, _, cleanAt = movement:motorOf(actor.id)
+		if snap == nil or at == nil or cleanAt == nil or cleanAt < at then
+			return nil, nil, nil
+		end
+		local x, y, z = snap.x, snap.y, snap.z
+		if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then
+			return nil, nil, nil
+		end
+		return x, y, z
+	end
+	-- a claim is the player's (by UserId), not the body's; the computer's bodies claim as themselves
+	local function claimKey(id: number): string
+		local actor = rt.byTownId[id]
+		local holder = if actor then possession:controllerOf(actor) else nil
+		if typeof(holder) == "Instance" and holder:IsA("Player") then
+			return `player {holder.UserId}`
+		end
+		return `body {id}`
+	end
 	local hollows: any = nil
 	local okH, errH = pcall(function()
 		hollows = HollowService.start({
 			world = world,
-			-- a claim is the player's (by UserId), not the body's; the computer's bodies claim as themselves
-			keyOf = function(id: number): string
-				local actor = rt.byTownId[id]
-				local holder = if actor then possession:controllerOf(actor) else nil
-				if typeof(holder) == "Instance" and holder:IsA("Player") then
-					return `player {holder.UserId}`
-				end
-				return `body {id}`
-			end,
+			keyOf = claimKey,
+			placeOf = heldPlace,
 			nameOf = function(key: any): string?
 				local userId = tonumber(string.match(tostring(key), "^player (%-?%d+)$"))
 				local player = if userId then Players:GetPlayerByUserId(userId) else nil
 				return if player then player.DisplayName else nil
+			end,
+			-- a claim's words to its player, as the notice toast (the computer's squirrels are told nothing)
+			tell = function(key: any, text: string)
+				local userId = tonumber(string.match(tostring(key), "^player (%-?%d+)$"))
+				local player = if userId then Players:GetPlayerByUserId(userId) else nil
+				if player then
+					fire(player, { kind = "notice", text = text })
+				end
 			end,
 		})
 	end)
 	if not okH then
 		hollows = nil
 		warn(`[SpicyRodents] the hollow trees did not start (their runs work, nobody is hidden in them): {errH}`)
+	end
+	-- the game day (Boot/DayClock's clock), fractional
+	local function gameDay(): number
+		return Game.gameSeconds(workspace:GetServerTimeNow(), dayClock.epoch, dayClock.base, dayClock.rate)
+			/ DayClock.REAL_SECONDS_PER_DAY
+	end
+	-- nut foraging (Foraging/ForageService): the acorns at the spots, a player's squirrel picking one up where the
+	-- server holds it, the computer's squirrels nibbling; the dip on the body (PickAt) and the player's nut meter. A
+	-- failure leaves the town without nuts and everything else running
+	local forage: any = nil
+	local showNuts: (player: any) -> () = function() end
+	if hollows then
+		local okF, errF = pcall(function()
+			forage = ForageService.start({
+				world = world,
+				hollows = hollows,
+				placeOf = heldPlace,
+				groundAt = Height.at,
+				day = gameDay,
+				onPick = function(id: number, _spot: any, _held: number, _ai: boolean)
+					local actor = rt.byTownId[id]
+					if actor then
+						(actor.body :: Model):SetAttribute("PickAt", workspace:GetServerTimeNow())
+						local driver = possession:controllerOf(actor)
+						if driver ~= "ai" and driver ~= nil then
+							showNuts(driver)
+						end
+					end
+				end,
+				onFull = function(id: number, _spot: any)
+					local actor = rt.byTownId[id]
+					local driver = if actor then possession:controllerOf(actor) else nil
+					if driver ~= "ai" and driver ~= nil then
+						fire(driver, {
+							kind = "notice",
+							text = `Your paws are full ({Tunables.get("forage.carryMax")} nuts): run them into a hollow tree`,
+						})
+					end
+				end,
+			})
+		end)
+		if not okF then
+			forage = nil
+			warn(`[SpicyRodents] the nut spots did not start (no nuts to find; the hollows still work): {errF}`)
+		end
+	end
+	-- the player's nut meter (Client/UI/NutMeter draws it): the nuts its squirrel carries, the hollow it holds and how
+	-- full that is, and the claimable hollow it is in now ("H4|0.45|free", "yours" or "taken"); nothing while it plays
+	-- anything else (the Spicy Rodent forages nothing)
+	showNuts = function(player: any)
+		local actor = possession:actorOf(player)
+		local tid = if actor then townIdOf[actor.id] else nil
+		local a = if tid then world.actorsById[tid] else nil
+		if
+			forage == nil
+			or hollows == nil
+			or tid == nil
+			or a == nil
+			or not ForageRules.forages(a.species, a.variant)
+		then
+			for _, k in { "NutsCarried", "NutsMax", "NutTree", "NutTreeName", "NutStore", "NutInside" } do
+				setAttr(player, k, nil)
+			end
+			return
+		end
+		local key = claimKey(tid)
+		local own, ownMeter = nil, -1
+		local inside = ""
+		local space = hollows:spaceOf(a)
+		for _, h in hollows.layout.hollows do
+			if not h.claimable then
+				continue
+			end
+			local m = hollows:meter(h.id)
+			local owner = hollows:owner(h.id)
+			if owner == key and m > ownMeter then
+				own, ownMeter = h, m
+			end
+			if space ~= nil and h.space == space then
+				local state = if owner == nil then "free" elseif owner == key then "yours" else "taken"
+				inside = `{h.id}|{math.floor(m * 100 + 0.5) / 100}|{state}`
+			end
+		end
+		setAttr(player, "NutsCarried", hollows:carried(tid))
+		setAttr(player, "NutsMax", Tunables.get("forage.carryMax"))
+		setAttr(player, "NutTree", if own then own.id else "")
+		setAttr(player, "NutTreeName", if own then own.tree else "")
+		setAttr(player, "NutStore", if own then math.floor(ownMeter * 100 + 0.5) / 100 else 0)
+		setAttr(player, "NutInside", inside)
 	end
 	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
 	-- that does not load leaves its drains in the bake's plain parts
@@ -1563,6 +1683,14 @@ function Game.start(opts: Opts?): any
 			biteAcc = 0
 			bites()
 		end
+		if forage then
+			local okF, errF = pcall(forage.step, forage, dt, now)
+			if not okF then
+				warn(`[SpicyRodents] the nut spots stopped: {errF}`)
+				pcall(forage.stop, forage)
+				forage = nil
+			end
+		end
 		fadeAcc += dt
 		if fadeAcc >= 1 then
 			money.sweep() -- (everyone joined through RoleService already: this only catches a join that was missed)
@@ -1618,11 +1746,19 @@ function Game.start(opts: Opts?): any
 			end
 			-- the hollows' meters and claims, on the game day (Boot/DayClock's clock)
 			if hollows then
-				local day = Game.gameSeconds(workspace:GetServerTimeNow(), dayClock.epoch, dayClock.base, dayClock.rate)
-					/ DayClock.REAL_SECONDS_PER_DAY
-				local okD, errD = pcall(hollows.step, hollows, day)
+				local okD, errD = pcall(hollows.step, hollows, gameDay())
 				if not okD then
 					warn(`[SpicyRodents] the hollow meters failed this second: {errD}`)
+				end
+			end
+			-- each player's nut meter
+			for player in states do
+				local okN, errN = pcall(function()
+					showNuts(player)
+				end)
+				if not okN then
+					warn(`[SpicyRodents] the nut meter failed: {errN}`)
+					break
 				end
 			end
 			fadeAcc = 0
@@ -2078,6 +2214,8 @@ function Game.start(opts: Opts?): any
 		attractions = attractions,
 		infection = infection,
 		sewers = sewers,
+		hollows = hollows,
+		forage = forage,
 		skylift = skylift,
 		rafters = rafters,
 		overhead = overhead,
@@ -2097,6 +2235,9 @@ function Game.start(opts: Opts?): any
 			end
 			if hollows then
 				hollows:stop()
+			end
+			if forage then
+				forage:stop()
 			end
 			if skylift then
 				skylift:stop()

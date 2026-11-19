@@ -19,6 +19,14 @@
 --     brought forage.keepMargin of it itself, owns the tree while the meter stays above the threshold less that margin
 --     and it visits at least once every forage.ownVisitDays game days; the meter decays forage.meterDecayPerDay of
 --     capacity a game day. Proximity only: no ritual, no animation. The log is a hiding place, never claimed.
+--   * One tree each (owner, D16 #21): a squirrel (a player's or the computer's) holds at most one tree. Inside any
+--     other claimable tree it brings nothing in (its nuts stay carried), so it never claims a second; once its
+--     claim lapses it may claim anew. Refused, not moved: claiming is proximity, so a squirrel diving into the
+--     nearest hole to hide never loses its home or pours its nuts into a tree it cannot own. The Spicy Rodent
+--     claims none (it rests in any hollow).
+--   * Words (opts.tell, to the claim's key: Boot/Game shows a player's as the notice toast; the computer's are
+--     dropped): a tree claimed, a tree lost, and, once a visit, why carried nuts stay carried (WORDS). A tree is
+--     named by NAMES (the trees' data names are the town's internal ones).
 --   * Who claims: opts.keyOf(body id) (Boot/Game: the player driving it, else the computer's body), so a player's
 --     claim stays the player's when they let the body go, and the computer that takes the body back does not hold
 --     it. Nuts are carried by the body: they drop when it changes hands or is knocked out (drop).
@@ -29,12 +37,12 @@
 -- their finite stock per season, theft from an unclaimed tree (HollowClaim.withdraw is the rule), the winter
 -- survival check (Seasons/SeasonService), the squirrel rank's nut count (Roles/Ladder reads stats.nuts).
 -- Interface: new(opts) -> Service (pure but for the cover); start(opts) -> Service (new, then the shell in the
---   workspace); Service: :step(day) (once a second is plenty: deposits, visits, decay, lapses, the tree's
---   attributes); :carry(id, n) -> taken; :carried(id) -> n; :drop(id) (the carried nuts are lost: a knock-out; the
---   body changing hands drops them by itself); :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) ->
---   hollowId?; :mayBite(id); :isRefuge(id);
---   :healRate(id, fed); :heal(id, health, maxHealth, dt, fed); :surface(x, y, z) -> (x, y, z, yaw)?; :stop(); C;
---   under(layout, world, x, y, z, actor?) -> space? (the cover test)
+--   workspace); treeName(hollow) -> "the Bur Oak"; WORDS; NAMES; Service: :step(day) (once a second is plenty:
+--   deposits, visits, decay, lapses, the tree's attributes); :heldBy(key) -> hollowId? (the one tree it holds);
+--   :carry(id, n) -> taken; :carried(id) -> n; :drop(id) (the carried nuts are lost: a knock-out; the body changing
+--   hands drops them by itself); :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) -> hollowId?;
+--   :mayBite(id); :isRefuge(id); :healRate(id, fed); :heal(id, health, maxHealth, dt, fed); :surface(x, y, z) ->
+--   (x, y, z, yaw)?; :stop(); C; under(layout, world, x, y, z, actor?) -> space? (the cover test)
 -- Studs and the HTML yaw (Brains/Common). Engine calls only in start and the tree's attributes. No side effects on
 -- require.
 
@@ -58,6 +66,40 @@ HollowService.C = {
 	pennant = { size = { 0.08, 0.9, 1.3 }, lift = 2.6, color = { 214, 120, 52 } }, -- the claim flag by the hole
 }
 
+-- What a squirrel is told (string.format; a tree's name from treeName, capitalised where it starts a sentence).
+HollowService.WORDS = table.freeze({
+	claimed = "%s is your tree now! Visit it at least every %d game days to keep it.",
+	elsewhere = "You already have a tree: %s. A squirrel keeps just one, so your nuts stay with you.",
+	theirs = "This tree belongs to %s. Your nuts stay with you.",
+	lapsed = "%s is not your tree any more. You can claim a new one.",
+	someone = "another squirrel",
+})
+
+-- The trees' names as players read them (data/hollows.json's `tree` is the town's internal name).
+HollowService.NAMES = table.freeze({
+	H1 = "the Highland Elm",
+	H2 = "the Sycamore",
+	H3 = "the Bur Oak",
+	H4 = "the Pump Elm",
+	H5 = "the Old Watch Sycamore",
+	H6 = "the Sentinel Oak",
+	H7 = "the Treehouse Oak",
+	H8 = "the sycamore by the grill",
+	H9 = "the Estate Oak",
+	H10 = "the Westside shade oak",
+	H11 = "the Quay Willow",
+	H12 = "the American Elm",
+} :: { [string]: string })
+
+-- treeName(hollow): "the Bur Oak" (NAMES, else "the " and its data name in lower case)
+function HollowService.treeName(h: { id: string, tree: string? }): string
+	return HollowService.NAMES[h.id] or `the {string.lower(h.tree or "tree")}`
+end
+
+local function upFirst(text: string): string
+	return string.upper(string.sub(text, 1, 1)) .. string.sub(text, 2)
+end
+
 export type Opts = {
 	world: TownAI.World,
 	layout: Layout?, -- default HollowLayout.default()
@@ -67,6 +109,11 @@ export type Opts = {
 	-- who a body's claims belong to (default: the body's id); a player's key keeps the claim theirs
 	keyOf: ((id: number) -> Who)?,
 	nameOf: ((key: Who) -> string?)?, -- a claimant's shown name (a player's), nil for the computer's
+	tell: ((key: Who, text: string) -> ())?, -- words for a claimant (a player's toast; nil for the computer's)
+	-- the feet of a player's squirrel where the server holds it (Boot/Game: its last clean accepted motor packet); when
+	-- given, a player's squirrel brings nuts in and visits by that place, never by the root its client moves (nil: it
+	-- is in no hollow). The computer's squirrels by the AI world's own place, as before
+	placeOf: ((id: number) -> (number?, number?, number?))?,
 	-- start only
 	parent: any?, -- default workspace
 }
@@ -82,6 +129,9 @@ export type Service = typeof(setmetatable(
 		show: (hollowId: string, attrs: { [string]: any }) -> (),
 		keyOf: (id: number) -> Who,
 		nameOf: (key: Who) -> string?,
+		tell: (key: Who, text: string) -> (),
+		told: { [number]: string }, -- body id -> the hollow and word it was last told this visit
+		placeOf: ((id: number) -> (number?, number?, number?))?,
 		uncover: () -> (),
 		root: any?,
 		parts: number,
@@ -118,6 +168,9 @@ function HollowService.new(opts: Opts): Service
 		nameOf = opts.nameOf or function(): string?
 			return nil
 		end,
+		tell = opts.tell or function() end,
+		told = {},
+		placeOf = opts.placeOf,
 		uncover = function() end,
 		root = nil,
 		parts = 0,
@@ -271,8 +324,32 @@ function HollowService.owner(self: Service, hollowId: string): Who?
 	return if c then c.owner else nil
 end
 
--- step(day): every squirrel inside a claimable hollow brings in what it carries and visits; then each hollow's decay
--- and lapse as of `day` (fractional game days), and its attributes when they changed
+-- the tree `key` holds now, nil for none
+function HollowService.heldBy(self: Service, key: Who): string?
+	return HollowClaim.heldBy(self.claims, key)
+end
+
+-- once a visit: words for the squirrel in body `id` (a new word or a new tree speaks again)
+local function tellOnce(self: Service, id: number, key: Who, word: string, text: string)
+	if self.told[id] ~= word then
+		self.told[id] = word
+		self.tell(key, text)
+	end
+end
+
+-- spaceOf(actor): the hollow space a squirrel brings its nuts into: a player's by where the server holds it (placeOf),
+-- the computer's by the AI world's cover
+function HollowService.spaceOf(self: Service, actor: any): string?
+	if self.placeOf and self.world.possessed[actor.id] then
+		local x, y, z = self.placeOf(actor.id)
+		return if x and y and z then self.layout.contains(x, y + (actor.hip or 0), z) else nil
+	end
+	return TownAI.covered(self.world, actor.id)
+end
+
+-- step(day): every squirrel inside a claimable hollow brings in what it carries and visits (one tree each: a
+-- squirrel that holds another keeps its nuts); then each hollow's decay and lapse as of `day` (fractional game days),
+-- and its attributes when they changed
 function HollowService.step(self: Service, day: number)
 	local ownAt = Tunables.get("forage.ownThreshold")
 	local margin = Tunables.get("forage.keepMargin")
@@ -284,15 +361,33 @@ function HollowService.step(self: Service, day: number)
 		if self.carrying[actor.id] and self.carrier[actor.id] ~= key then
 			self:drop(actor.id) -- the body changed hands: what it carried is gone
 		end
-		local h = hollowOfSpace(self.layout, TownAI.covered(self.world, actor.id))
+		local h = hollowOfSpace(self.layout, HollowService.spaceOf(self, actor))
 		local c = if h then self.claims[h.id] else nil
-		if h and c then
-			local held = self.carrying[actor.id] or 0
-			if held > 0 then
-				self.carrying[actor.id] = held - HollowClaim.deposit(c, key, held, day, h.meter.capacity, ownAt, margin)
-			else
-				HollowClaim.visit(c, key, day)
-			end
+		if h == nil or c == nil then
+			self.told[actor.id] = nil -- (out of the trees: the next visit may be told again)
+			continue
+		end
+		local held = self.carrying[actor.id] or 0
+		if held <= 0 then
+			HollowClaim.visit(c, key, day)
+			continue
+		end
+		local mine = self:heldBy(key)
+		local elsewhere = mine ~= nil and mine ~= h.id
+		local had = c.owner
+		self.carrying[actor.id] = held
+			- HollowClaim.deposit(c, key, held, day, h.meter.capacity, ownAt, margin, elsewhere)
+		if elsewhere then
+			local other = self.layout.hollow(mine :: string)
+			local name = if other then HollowService.treeName(other) else "another tree"
+			tellOnce(self, actor.id, key, `{h.id} elsewhere`, string.format(HollowService.WORDS.elsewhere, name))
+		elseif c.owner ~= nil and c.owner ~= key then
+			local who = self.nameOf(c.owner) or HollowService.WORDS.someone
+			tellOnce(self, actor.id, key, `{h.id} theirs`, string.format(HollowService.WORDS.theirs, who))
+		elseif had == nil and c.owner == key then
+			local days = Tunables.get("forage.ownVisitDays")
+			self.told[actor.id] = `{h.id} claimed`
+			self.tell(key, string.format(HollowService.WORDS.claimed, upFirst(HollowService.treeName(h)), days))
 		end
 	end
 	for _, h in self.layout.hollows do
@@ -300,6 +395,7 @@ function HollowService.step(self: Service, day: number)
 		if c == nil then
 			continue
 		end
+		local had = c.owner
 		HollowClaim.update(
 			c,
 			day,
@@ -309,6 +405,9 @@ function HollowService.step(self: Service, day: number)
 			Tunables.get("forage.meterDecayPerDay"),
 			margin
 		)
+		if had ~= nil and c.owner ~= had then
+			self.tell(had, string.format(HollowService.WORDS.lapsed, upFirst(HollowService.treeName(h))))
+		end
 		local meter = math.floor(HollowClaim.meter(c, h.meter.capacity) * 100 + 0.5) / 100
 		local attrs = {
 			Meter = meter,

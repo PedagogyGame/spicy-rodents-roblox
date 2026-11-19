@@ -13,6 +13,9 @@
 --   on the hollow's own runs it is
 --   a kick (PlayRules.kickTarget) or a bite (biteVictims) does not reach through the bark of any hollow or the log
 --   (each is a Combat/Cover shape while the service runs), at the hole in the open it does
+--   one tree each (owner, D16 #21): a squirrel holding a tree brings no nuts into another (refused, with the words
+--   once a visit), so it never holds two; once its claim lapses (it is told) it claims anew; a player inside someone
+--   else's tree is told whose it is; the computer's squirrels keep the same rule; every tree has a player's name
 local Data = require("@shared/Data")
 local HollowClaim = require("@shared/Foraging/HollowClaim")
 local HollowLayout = require("@shared/World/HollowLayout")
@@ -85,7 +88,8 @@ return function(t)
 
 	local rail: any = nil
 	local function rig(
-		keyOf: ((id: number) -> HollowClaim.Who)?
+		keyOf: ((id: number) -> HollowClaim.Who)?,
+		tell: ((key: HollowClaim.Who, text: string) -> ())?
 	): (TownAI.World, HollowService.Service, { [string]: { [string]: any } })
 		local world = TownAI.build({
 			data = data,
@@ -110,8 +114,9 @@ return function(t)
 			end,
 			keyOf = keyOf,
 			nameOf = function(key: HollowClaim.Who): string?
-				return if key == 1 then "Pip" else nil
+				return if key == 1 or key == "player 1" then "Pip" else nil
 			end,
+			tell = tell,
 		})
 		return world, svc, shown
 	end
@@ -439,5 +444,189 @@ return function(t)
 		t.truthy(checked >= 5 * #layout.hollows, `{checked} positions`)
 		svc:stop()
 		t.eq(#Cover.list(), before, "stopped: the shapes are gone")
+	end)
+	-- one tree each: fill `id` with `a`'s nuts until it is claimed (or `trips` runs out); the day after
+	local function fill(
+		world: TownAI.World,
+		svc: HollowService.Service,
+		a: any,
+		id: string,
+		day: number,
+		trips: number?
+	): number
+		local h = layout.hollow(id) :: HollowLayout.Hollow
+		local c = chamberOf(id)
+		for _ = 1, trips or 40 do
+			if svc:owner(id) ~= nil then
+				break
+			end
+			hold(world, a, h.x + 30, h.y + 1, h.z)
+			TownAI.stepFrame(world, DT)
+			svc:step(day)
+			svc:carry(a.id, 9)
+			hold(world, a, c.x, c.y + 0.8, c.z)
+			TownAI.stepFrame(world, DT)
+			svc:step(day)
+			day += 0.05
+		end
+		return day
+	end
+
+	t.test("the rule: a squirrel that holds a tree brings nothing into another and never claims it", function()
+		local M = Tunables.get("forage.keepMargin")
+		local claims = { A = HollowClaim.new(), B = HollowClaim.new() }
+		t.eq(HollowClaim.heldBy(claims, 1), nil)
+		HollowClaim.deposit(claims.A, 1, 23, 0, 30, OWN, M)
+		t.eq(claims.A.owner, 1)
+		t.eq(HollowClaim.heldBy(claims, 1), "A")
+		-- B is unclaimed and nearly full of someone else's nuts: one trip would claim it, but 1 holds A
+		HollowClaim.deposit(claims.B, 2, 18, 0, 30, OWN, M)
+		t.eq(HollowClaim.deposit(claims.B, 1, 9, 0.1, 30, OWN, M, true), 0, "its nuts stay carried")
+		t.eq(claims.B.owner, nil, "no second tree")
+		t.eq(claims.B.stored, 18)
+		t.eq(HollowClaim.deposit(claims.A, 1, 3, 0.1, 30, OWN, M, false), 3, "its own tree takes them")
+		-- A lapses: B can be claimed now
+		HollowClaim.update(claims.A, 0.1, 30, OWN, 3, 0, M)
+		t.eq(HollowClaim.update(claims.A, 4, 30, OWN, 3, 0, M), true)
+		t.eq(HollowClaim.heldBy(claims, 1), nil)
+		t.eq(HollowClaim.deposit(claims.B, 1, 9, 4, 30, OWN, M, false), 9)
+		t.eq(claims.B.owner, 1, "claimed anew once the first lapsed")
+	end)
+
+	t.test("one tree each: a player's second tree is refused with words, claimed once the first lapses", function()
+		local holder: { [number]: string } = {}
+		local told: { [string]: { string } } = {}
+		local world, svc, shown = rig(function(id: number): HollowClaim.Who
+			return holder[id] or `body {id}`
+		end, function(key: HollowClaim.Who, text: string)
+			local list = told[tostring(key)] or {}
+			told[tostring(key)] = list
+			table.insert(list, text)
+		end)
+		local a = squirrels(world)[1]
+		holder[a.id] = "player 1"
+		local day = fill(world, svc, a, "H3", 30)
+		t.eq(svc:owner("H3"), "player 1")
+		t.eq(svc:heldBy("player 1"), "H3")
+		t.eq(
+			told["player 1"][#told["player 1"]],
+			"The Bur Oak is your tree now! Visit it at least every 3 game days to keep it."
+		)
+		-- into the American Elm (unclaimed) with nine nuts: they stay carried, the meter does not move, one notice
+		local h12 = layout.hollow("H12") :: HollowLayout.Hollow
+		local c12 = chamberOf("H12")
+		hold(world, a, h12.x + 30, h12.y + 1, h12.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day)
+		svc:carry(a.id, 9)
+		local n = #told["player 1"]
+		hold(world, a, c12.x, c12.y + 0.8, c12.z)
+		TownAI.stepFrame(world, DT)
+		t.eq(svc:inside(a.id), "H12")
+		for k = 1, 5 do
+			svc:step(day + k * 0.01)
+		end
+		t.eq(svc:carried(a.id), 9, "its nuts stay with it")
+		t.eq(svc:meter("H12"), 0)
+		t.eq(svc:owner("H12"), nil)
+		t.eq(#told["player 1"], n + 1, "told once a visit, not once a second")
+		t.eq(
+			told["player 1"][n + 1],
+			"You already have a tree: the Bur Oak. A squirrel keeps just one, so your nuts stay with you."
+		)
+		-- out and back in: told again
+		hold(world, a, h12.x + 30, h12.y + 1, h12.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day + 0.1)
+		hold(world, a, c12.x, c12.y + 0.8, c12.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day + 0.11)
+		t.eq(#told["player 1"], n + 2)
+		-- the Bur Oak is left three game days: it lapses (the player is told), and the elm is claimed instead
+		svc:step(day + 3.5)
+		t.eq(svc:owner("H3"), nil)
+		t.eq(told["player 1"][#told["player 1"]], "The Bur Oak is not your tree any more. You can claim a new one.")
+		t.eq(shown.H3.Claimed, false)
+		day = fill(world, svc, a, "H12", day + 3.6)
+		t.eq(svc:owner("H12"), "player 1")
+		t.eq(svc:heldBy("player 1"), "H12")
+		t.eq(
+			told["player 1"][#told["player 1"]],
+			"The American Elm is your tree now! Visit it at least every 3 game days to keep it."
+		)
+		-- never two at once, whatever was done above
+		local count = 0
+		for _, h in layout.hollows do
+			if svc:owner(h.id) == "player 1" then
+				count += 1
+			end
+		end
+		t.eq(count, 1)
+		svc:stop()
+	end)
+
+	t.test("someone else's tree says whose it is; the computer's squirrels keep one tree too", function()
+		local told: { [string]: { string } } = {}
+		local holder: { [number]: string } = {}
+		local world, svc = rig(function(id: number): HollowClaim.Who
+			return holder[id] or `body {id}`
+		end, function(key: HollowClaim.Who, text: string)
+			local list = told[tostring(key)] or {}
+			told[tostring(key)] = list
+			table.insert(list, text)
+		end)
+		local sq = squirrels(world)
+		local a, b, c = sq[1], sq[2], sq[3]
+		holder[a.id] = "player 1"
+		local day = fill(world, svc, a, "H3", 40)
+		t.eq(svc:owner("H3"), "player 1")
+		-- the computer's squirrel b claims the American Elm, then cannot take the Sycamore as well
+		day = fill(world, svc, b, "H12", day)
+		local bKey = `body {b.id}`
+		t.eq(svc:owner("H12"), bKey, "a computer squirrel claims a tree")
+		day = fill(world, svc, b, "H2", day, 30)
+		t.eq(svc:owner("H2"), nil, "but not a second")
+		t.eq(svc:meter("H2"), 0)
+		t.eq(svc:carried(b.id), 9, "its nuts stay carried")
+		-- a third (a player too) carries nuts into the player's Bur Oak: it is told whose tree it is
+		holder[c.id] = "player 2"
+		local h3 = layout.hollow("H3") :: HollowLayout.Hollow
+		local c3 = chamberOf("H3")
+		hold(world, c, h3.x + 30, h3.y + 1, h3.z)
+		TownAI.stepFrame(world, DT)
+		svc:carry(c.id, 9)
+		hold(world, c, c3.x, c3.y + 0.8, c3.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day)
+		svc:step(day + 0.01)
+		t.eq(svc:carried(c.id), 9)
+		t.eq(#told["player 2"], 1, "once")
+		t.eq(told["player 2"][1], "This tree belongs to Pip. Your nuts stay with you.")
+		-- and a computer squirrel's owner is "another squirrel"
+		local h12 = layout.hollow("H12") :: HollowLayout.Hollow
+		local c12 = chamberOf("H12")
+		hold(world, c, h12.x + 30, h12.y + 1, h12.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day + 0.02)
+		hold(world, c, c12.x, c12.y + 0.8, c12.z)
+		TownAI.stepFrame(world, DT)
+		svc:step(day + 0.03)
+		t.eq(told["player 2"][2], "This tree belongs to another squirrel. Your nuts stay with you.")
+		svc:stop()
+	end)
+
+	t.test("every claimable tree has a name a player reads, and the words are mild", function()
+		for _, h in layout.hollows do
+			if h.claimable then
+				local name = HollowService.NAMES[h.id]
+				t.truthy(name ~= nil, `{h.id} has a name`)
+				t.eq(HollowService.treeName(h), name)
+				t.falsy(string.find(string.lower(name :: string), "chili", 1, true), `{h.id}: no restaurant brand`)
+			end
+		end
+		for key, w in HollowService.WORDS do
+			t.falsy(string.find(w, "!!", 1, true), key)
+			t.truthy(#w < 100, `{key} is short`)
+		end
 	end)
 end
