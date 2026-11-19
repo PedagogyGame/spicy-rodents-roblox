@@ -302,19 +302,18 @@ local function mower(body: Spec.PartSpec, list: Spec.PartList, seat: number)
 	end
 end
 
--- The park shed: the walls stay the body (the same solid box); a flat slate roof sits on it with eaves all round (solid,
--- like every roof in town: nothing can slip between it and the walls), a door and a window on the front, a fascia
--- board under the front eave (4 parts).
+-- The park shed: the walls stay the body (the same solid box, still all that collides: the town's collidable massing
+-- and its far Skyline are unchanged); thin slates lie flush on its top with eaves all round (no gap to slip into),
+-- a door and a window on the front, a fascia board under the front eave (4 parts, none solid, the eaves unqueried).
 local function shed(body: Spec.PartSpec, list: Spec.PartList)
 	local W, D, H = body.sx, body.sz, body.sy
 	local f = Geometry.frame(body.cx, body.cy - H / 2, body.cz, body.yaw)
 	body.material = "WoodPlanks"
-	list:add(f, "Roof", 0, H + 0.2, 0, W + 2.4, 0.4, D + 2.4, {
+	add3(list, f, "Slates", { 0, H + 0.15, 0 }, { W + 2.4, 0.3, D + 2.4 }, {
 		color = { 95, 93, 86 },
 		material = "Slate",
-		canCollide = true,
 		castShadow = true,
-		role = "Roof",
+		canQuery = false, -- an overhang takes no queries (worldgen_pins): rays land on the walls' top, as bodies do
 	})
 	add3(
 		list,

@@ -37,11 +37,11 @@ Nothing else about the riders changed. They are still never patients. The only t
 
 ## Collisions
 
-**Nothing changed, with one exception: the shed roof.**
+**Nothing changed.**
 - Each vehicle's invisible collision box is exactly the size it was.
 - A rider's only solid part is the old small box.
 - The yard props never blocked anyone, and still don't. Their old boxes are still there, but invisible, and a squirrel can no longer stand on top of them.
-- The shed's walls are the same solid box. Its new roof is solid, like every roof in town, and reaches 1.2 studs past the walls on every side.
+- The shed's walls are the same solid box. Its new slate roof lies flush on top and is not solid itself, so whoever climbs onto the shed stands on the walls' top, sunk 0.3 studs into the slates.
 
 ## For you to look at in Studio
 1. Watch a kid ride past and the mime come down the main street. Do they read well at street distance?
