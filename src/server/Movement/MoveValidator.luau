@@ -46,6 +46,11 @@
 --     that crosses a wall is weighed as a gap's (wallGap); a grounded packet higher than where the body last stood needs
 --     a floor just under its feet (world.floorNear: no creeping up posSlack a packet); a landing the gap hid counts as
 --     ground for the sprint meter.
+--   * Round 6 (2026-11-19), two invariants whatever path a packet takes: (A) every packet's rail claim agrees with its
+--     x, y, z (SquirrelMotor.fieldCheck), and a packet with no baseline is judged from a place the server holds (the
+--     service's gate, root or last accepted place: never taken where it says); (B) the displacement governor (_govern):
+--     every window of up to C.GOV_WINDOW of accepted places stays within the motor's honest pace across and up
+--     (governorBounds), its history kept across a snap (anchor). Every grounded packet off the rails needs floorNear.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -116,6 +121,35 @@ type Marks = {
 	wallGaps: { number }, -- server times of the recent gaps whose straight line went through a wall
 	stamina: number, -- the server's own sprint meter (stamina()): 1 full, below 0 the client sprints on credit
 	staminaAt: number, -- server time it was last brought up to date
+	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
+	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
+	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
+	govPeak: { number }?,
+}
+
+-- The displacement governor (validator round 6, invariant B; _govern): the newest accepted place, the running sums it is
+-- judged by, and a ring of earlier ones C.GOV_SPACING apart, C.GOV_WINDOW back. Each sum is cumulative from the ring's
+-- start: G the time the moves stand for, S the server's arrival time, BH / BV the honest horizontal travel and rise those
+-- moves allowed (studs).
+type Gov = {
+	G: number,
+	S: number,
+	X: number,
+	Y: number,
+	Z: number,
+	BH: number,
+	BV: number,
+	clock: number?, -- the client clock of the newest packet (nil: an anchor the server set)
+	route: boolean, -- the newest packet was on a rail
+	g: { number },
+	s: { number },
+	x: { number },
+	y: { number },
+	z: { number },
+	bh: { number },
+	bv: { number },
+	head: number,
+	count: number,
 }
 
 type Actor = {
@@ -155,6 +189,7 @@ export type MoveValidator = typeof(setmetatable(
 		_actors: { [any]: Actor },
 		_marks: { [any]: Marks },
 		_fastest: { [boolean]: number },
+		_govBounds: { [boolean]: GovBounds },
 	},
 	MoveValidator
 ))
@@ -177,6 +212,13 @@ MoveValidator.C = table.freeze({
 	CLOCK_RUN_KEEP = 120, -- ... kept this long ...
 	CLOCK_RUN_AGE = 60, -- ... the mark: the lowest of those at least this old (a 1.02 x clock is 1.2 s ahead of it) ...
 	CLOCK_RUN_MAX = 1.1, -- ... which the offset may never fall below by more (seconds: more than any latency drops)
+	-- the displacement governor (_govern, validator round 6): every pair of accepted places this far apart in time or
+	-- less (seconds) is judged, the places kept at least GOV_SPACING apart (seconds) in a ring of GOV_SLOTS (the cost)
+	GOV_WINDOW = 3,
+	GOV_SPACING = 1 / 20,
+	GOV_SLOTS = 64,
+	-- studs: the farthest the drawn pose lies off a rail's centreline (a big trunk's bark, 5.95; a lookout's lift)
+	DRAWN_MAX = 6.5,
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -249,6 +291,7 @@ function MoveValidator.new(world: World, opts: Options?): MoveValidator
 		_actors = {} :: { [any]: Actor },
 		_marks = {} :: { [any]: Marks },
 		_fastest = {},
+		_govBounds = {},
 	}, MoveValidator)
 	return self
 end
@@ -354,6 +397,27 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			return verdict(false, false, fieldFaults, true, 1, nil, false, false)
 		end
 		self:reset(actorId, packet.snapshot, serverTime, packet.seq)
+		-- (the governor from the place the server anchored, for the time since: MovementService's gate)
+		local first = self._actors[actorId]
+		local gov = first.marks.gov
+		local govFaults: { Violation } = {}
+		MoveValidator._govern(
+			self,
+			actorId,
+			first.marks,
+			first.last,
+			if gov then serverTime - gov.S else 0,
+			serverTime,
+			self.clockSlack,
+			govFaults
+		)
+		if #govFaults > 0 then
+			first.bucket = 1
+			first.flagged = true
+			first.flaggedAt = serverTime
+			first.violations += #govFaults
+			return verdict(false, true, govFaults, true, 1, nil, false, true)
+		end
 		return verdict(true, true, {}, false, 0, nil, false, true)
 	end
 	actor.packets += 1
@@ -551,11 +615,9 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		violations
 	)
 
-	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's).
-	-- One higher than where it last stood off the rails rose with the floor (up a slope, a kerb, onto a ledge it leapt
-	-- to): it stands on one just under its feet (world.floorNear), never on air a slack at a time (the round-3 review: a
-	-- standing body crept up posSlack a packet, on the ground or every other packet in the air, to FLOOR_DEPTH over the
-	-- floor and stood there): a whole flag
+	-- floors: a grounded body off the rails stands on a floor just under its feet (world.floorNear), never on air a
+	-- slack at a time (the round-3 review: a body crept up posSlack a packet to FLOOR_DEPTH over the floor; round 5: one
+	-- walked on level off a ledge): a whole flag, a third on a car's roof the client draws a little behind the server's
 	local floorBelow = self.world.floorBelow
 	local standY = actor.standY
 	if next.routeId then
@@ -568,11 +630,12 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		and Trampoline.bedAt(self.world.trampolines or {}, next.x, next.z, next.y) ~= nil
 	if floorBelow and next.grounded and not next.routeId and not riverLanding and not onBed then
 		local floorNear = self.world.floorNear
-		-- (where it last stood is unknown after a rail, a gap too long to judge or a hop: the round-4 review stood 3
-		-- studs over open ground from there on, FLOOR_DEPTH being all floorBelow asks)
+		-- (validator round 6, the round-5 review's LOW: a level packet was held only to floorBelow, FLOOR_DEPTH, so from
+		-- a ledge a body walked on level over open ground: every grounded packet off the rails stands on a floor just
+		-- under its feet, the motor's ground glue keeping the feet on it)
 		local unknown = resync or standY == nil
 		local rose = not unknown and next.y > (standY :: number) + 1e-3
-		if (rose or unknown) and floorNear then
+		if floorNear then
 			if not floorNear(next.x, next.y, next.z) then
 				-- (a car's roof the client draws a little behind or off the server's box, on a slope or a bump: a third)
 				local carFloor = self.world.carFloor
@@ -583,12 +646,20 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 					severity = if onCar then 0.34 else 1,
 					detail = if rose
 						then `rose {next.y - (standY :: number)} st on the ground with no floor just under the feet`
-						else "grounded where it last stood is unknown, with no floor just under the feet",
+						else "grounded with no floor just under the feet",
 				})
 			end
 		elseif not floorBelow(next.x, next.y, next.z) then
 			table.insert(violations, { code = "float", severity = 0.34, detail = "grounded with nothing underfoot" })
 		end
+	end
+
+	-- the displacement governor over every window of accepted places (invariant B: whatever path the packet took). The
+	-- client's own river recovery puts the body on the quay: the governor starts afresh there
+	if riverLanding then
+		MoveValidator.anchor(self, actorId, next.x, next.y, next.z, serverTime, nil)
+	else
+		MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
 	end
 
 	local ok = #violations == 0
@@ -952,8 +1023,7 @@ end
 
 -- fastest(actorId): the most studs a second the squirrel can cover honestly (the sprint, a leap, the fastest rail of
 -- the world with its own pace, with the chili rush if the server says it is on), with the envelope's tolerance.
-function MoveValidator.fastest(self: MoveValidator, actorId: any): number
-	local boosted = self.boostOf(actorId)
+local function fastestFor(self: MoveValidator, boosted: boolean): number
 	local cached = self._fastest[boosted]
 	if cached then
 		return cached
@@ -969,6 +1039,291 @@ function MoveValidator.fastest(self: MoveValidator, actorId: any): number
 		* SquirrelMotor.envelopeParams.speedTol
 	self._fastest[boosted] = v
 	return v
+end
+
+function MoveValidator.fastest(self: MoveValidator, actorId: any): number
+	return fastestFor(self, self.boostOf(actorId))
+end
+
+-- The displacement governor (validator round 6, invariant B). Five review rounds each found a path the envelope's local
+-- reasoning did not cover (an unchecked field, a packet that skipped section 1, a grab's reach along a rail). The
+-- governor holds whatever path a packet took: over every window of up to C.GOV_WINDOW seconds of ACCEPTED places, the
+-- straight horizontal distance and the net rise between its two ends may not exceed what an honest squirrel covers in
+-- that time, from the motor's own constants (governorBounds), with a little slack. Each move between two packets adds
+-- the time it stands for (the validator's dtEff: the client's clock gap, never more than the server's arrivals allow)
+-- and the most it could honestly cover in it to running sums; a window's allowance is the difference of the sums,
+-- never for more time than the server's own arrivals span and the clock check's swing, plus a one-off. A window that
+-- breaks it is a whole flag ("governor"): the service snaps the body to its last clean packet, which kept within it.
+-- Its history outlives a snap (anchor: back to the snap's target, the moves after it dropped), so a snap buys no new
+-- allowance; a move the server makes itself (a teleport, a hand-off) starts it afresh.
+export type GovBounds = {
+	vh: number, -- studs/s across: the fastest any way of moving goes (fastest: sprint, a leap, the fastest rail)
+	vhTramp: number, -- ... near a trampoline: with every bounce's push
+	vRail: number, -- studs/s up near a rail: its climb, or a leap off it regrabbed (Space and E every second frame)
+	vLedge: number, -- studs/s up anywhere else: a leap onto a ledge a step under its apex, and on again
+	vTramp: number, -- studs/s up near a trampoline: the highest bounce's launch
+	dh: number, -- studs across once per window: a grab's snap and the drawn pose's offset off the centreline
+	dv: number, -- studs up once per window: a grab's snap, the drawn pose's lift, a landing's step and a fork's hop
+}
+
+-- railClimbOf(registry, boosted): the fastest any rail of the world carries a body up (studs/s): each route's cap times
+-- its steepest rise per stud along it (16 chords), once per registry
+local climbCache: { [any]: { [boolean]: number } } = setmetatable({}, { __mode = "k" }) :: any
+local function railClimbOf(reg: any, boosted: boolean): number
+	if reg == nil then
+		return 0
+	end
+	local cache = climbCache[reg]
+	if cache == nil then
+		cache = {}
+		climbCache[reg] = cache
+	end
+	local known = (cache :: { [boolean]: number })[boosted]
+	if known then
+		return known
+	end
+	local v = 0
+	for _, r in reg:all() do
+		local a = reg:pointAt(r, 0)
+		local steep = 0
+		for i = 1, 16 do
+			local b = reg:pointAt(r, i / 16)
+			local ds = math.sqrt((b.x - a.x) ^ 2 + (b.y - a.y) ^ 2 + (b.z - a.z) ^ 2)
+			if ds > 1e-6 then
+				steep = math.max(steep, math.abs(b.y - a.y) / ds)
+			end
+			a = b
+		end
+		v = math.max(v, SquirrelMotor.routeCap(r, boosted) * steep)
+	end
+	(cache :: { [boolean]: number })[boosted] = v
+	return v
+end
+
+-- governorBounds(boosted): the honest rates and one-offs the governor allows, from the motor's constants (derivation in
+-- each field's comment; the slack: the envelope's own tolerances, speedTol on speeds, launchTol on launches, railTol on
+-- rails, and posSlack twice per one-off)
+function MoveValidator.governorBounds(self: MoveValidator, boosted: boolean): GovBounds
+	local cached = self._govBounds[boosted]
+	if cached then
+		return cached
+	end
+	local P, E, MC = SquirrelMotor.params, SquirrelMotor.envelopeParams, Motion.C
+	local launchUp = P.leapUp * E.launchTol
+	local step = Units.st(1.4) -- (a landing's snap up onto a ledge: the envelope's step)
+	local vh = fastestFor(self, boosted)
+	local b: GovBounds = {
+		vh = vh,
+		vhTramp = vh + Trampoline.C.maxCount * Trampoline.C.push * E.launchTol,
+		-- (a leap off a rail regrabbed, again and again: E and Space every second frame. A one-frame cycle rises less
+		-- than half the index's sample spacing, so the regrab lands on the sample it left and the body climbs nothing
+		-- (measured: 0.8 st in 3 s; every second frame 28.9 st/s); over a two-frame cycle gravity takes g * substep of the
+		-- launch's speed on average)
+		vRail = math.max(railClimbOf(self.world.registry, boosted) * E.railTol, launchUp - P.gravity * P.substep),
+		-- (a leap rises its apex in leapUp / g; the ground probe takes the feet onto a ledge a step over them)
+		vLedge = (MoveValidator.leapRise() + step) / (P.leapUp / P.gravity),
+		vTramp = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol,
+		dh = MC.airGrab + MoveValidator.C.DRAWN_MAX + 2 * E.posSlack,
+		dv = MC.airGrab
+			+ math.max(MC.visualBranchLift, MC.visualLookoutLift)
+			+ step
+			+ MC.forkTakeForced
+			+ 2 * E.posSlack,
+	}
+	self._govBounds[boosted] = b
+	return b
+end
+
+local function newGov(x: number, y: number, z: number, serverTime: number, clock: number?, route: boolean): Gov
+	local slots = MoveValidator.C.GOV_SLOTS
+	local gov: Gov = {
+		G = 0,
+		S = serverTime,
+		X = x,
+		Y = y,
+		Z = z,
+		BH = 0,
+		BV = 0,
+		clock = clock,
+		route = route,
+		g = table.create(slots, 0),
+		s = table.create(slots, 0),
+		x = table.create(slots, 0),
+		y = table.create(slots, 0),
+		z = table.create(slots, 0),
+		bh = table.create(slots, 0),
+		bv = table.create(slots, 0),
+		head = 1,
+		count = 1,
+	}
+	gov.s[1], gov.x[1], gov.y[1], gov.z[1] = serverTime, x, y, z
+	return gov
+end
+
+-- keep(gov): the newest place into the ring's newest slot. That slot is the newer place's to take until it lies
+-- C.GOV_SPACING after the slot before it; then the next place opens a new one (the oldest is overwritten)
+local function keep(gov: Gov)
+	local slots = MoveValidator.C.GOV_SLOTS
+	local i = gov.head
+	if gov.count == 1 or gov.g[i] - gov.g[(i - 2) % slots + 1] >= MoveValidator.C.GOV_SPACING then
+		i = i % slots + 1
+		gov.head = i
+		gov.count = math.min(gov.count + 1, slots)
+	end
+	gov.g[i], gov.s[i], gov.x[i], gov.y[i], gov.z[i], gov.bh[i], gov.bv[i] =
+		gov.G, gov.S, gov.X, gov.Y, gov.Z, gov.BH, gov.BV
+end
+
+-- hasAnchor(actorId): the governor has a place to judge the next packet from
+function MoveValidator.hasAnchor(self: MoveValidator, actorId: any): boolean
+	local marks = self._marks[actorId]
+	return marks ~= nil and marks.gov ~= nil
+end
+
+-- anchor(actorId, x, y, z, serverTime, keepUntil?): the server put the body at (x, y, z) (feet). keepUntil nil: a move it
+-- made (a teleport, a hand-off's gate, the river's quay): the governor starts afresh there. keepUntil: a snap back to a
+-- place the body held at that server time (its last clean packet, or the gate): the moves accepted after it are dropped
+-- and the history before it kept, so a snap buys no new allowance.
+function MoveValidator.anchor(
+	self: MoveValidator,
+	actorId: any,
+	x: number,
+	y: number,
+	z: number,
+	serverTime: number,
+	keepUntil: number?
+)
+	local marks = marksOf(self, actorId)
+	local gov = marks.gov
+	if keepUntil == nil or gov == nil then
+		marks.gov = newGov(x, y, z, serverTime, nil, false)
+		return
+	end
+	local g = gov :: Gov
+	local slots = MoveValidator.C.GOV_SLOTS
+	-- (drop the kept places newer than keepUntil; the newest left is the history's end)
+	while g.count > 1 and g.s[g.head] > keepUntil + 1e-9 do
+		g.head = (g.head - 2) % slots + 1
+		g.count -= 1
+	end
+	local i = g.head
+	local B = self:governorBounds(self.boostOf(actorId))
+	-- (from it to the target: what an honest body covers in the time between, the target being a place it held then)
+	local span = math.max(0, keepUntil - g.s[i]) + MoveValidator.C.GOV_SPACING
+	g.G = g.g[i] + math.max(0, serverTime - g.s[i])
+	g.S = serverTime
+	g.BH = g.bh[i] + B.vh * span
+	g.BV = g.bv[i] + B.vRail * span
+	g.X, g.Y, g.Z = x, y, z
+	g.clock = nil
+	g.route = false
+	keep(g)
+end
+
+-- _govern(actorId, marks, next, tau, serverTime, swing, violations): the governor's judgement of an accepted packet
+-- (above): `tau` the time its move stands for (dtEff), `swing` how far the client clock may lead the server's (the clock
+-- check's). Cost: arithmetic over the ring (C.GOV_SLOTS at most), and one bounded rail query for a rising move off a rail.
+function MoveValidator._govern(
+	self: MoveValidator,
+	actorId: any,
+	marks: Marks,
+	next: State,
+	tau: number,
+	serverTime: number,
+	swing: number,
+	violations: { Violation }
+)
+	local onRoute = next.routeId ~= nil
+	local gov = marks.gov
+	if gov == nil then
+		-- (the very first packet of a validator no service anchored: the service always anchors first, invariant A)
+		local g = newGov(next.x, next.y, next.z, serverTime, next.clock, onRoute)
+		marks.gov = g
+		return
+	end
+	local g = gov :: Gov
+	local B = self:governorBounds(self.boostOf(actorId))
+	local t = math.max(0, tau)
+	local x, y, z = next.x, next.y, next.z
+	local tramps = self.world.trampolines
+	local tramp = tramps ~= nil
+		and #tramps > 0
+		and (
+			MoveValidator.nearTrampoline(self.world, x, z, B.vh * t + 2)
+			or MoveValidator.nearTrampoline(self.world, g.X, g.Z, B.vh * t + 2)
+		)
+	local vv = 0
+	if y > g.Y then
+		-- (only a rising move earns rise: none is banked standing still)
+		if tramp then
+			vv = B.vTramp
+		elseif onRoute or g.route then
+			vv = B.vRail
+		else
+			local index = self.world.index
+			local reach =
+				math.min(Motion.C.airGrab + MoveValidator.C.DRAWN_MAX + B.vh * t, MoveValidator.C.RAIL_REACH_MAX)
+			vv = if index ~= nil and index:nearest(x, y, z, reach) ~= nil then B.vRail else B.vLedge
+		end
+	end
+	local G, S = g.G + t, serverTime
+	local BH = g.BH + (if tramp then B.vhTramp else B.vh) * t
+	local BV = g.BV + vv * t
+	local worstH, worstV, overH, overV = 0, 0, 0, 0
+	local peak = marks.govPeak
+	if peak == nil then
+		peak = table.create(6, -math.huge)
+		marks.govPeak = peak
+	end
+	local pk = peak :: { number }
+	-- (every kept place C.GOV_WINDOW back, the newest slot being the last packet's: keep)
+	local slots, window, dh, dv = MoveValidator.C.GOV_SLOTS, MoveValidator.C.GOV_WINDOW, B.dh, B.dv
+	local gg, gs, gx, gy, gz, gbh, gbv = g.g, g.s, g.x, g.y, g.z, g.bh, g.bv
+	local i = g.head
+	for _ = 1, g.count do
+		local tg = G - gg[i]
+		if tg > window then
+			break
+		end
+		local ts = S - gs[i] + swing
+		-- (never more time than the server's own arrivals span, with the clock check's swing)
+		local scale = if tg > ts and tg > 0 then math.max(0, ts) / tg else 1
+		local dx, dz = x - gx[i], z - gz[i]
+		local h = math.sqrt(dx * dx + dz * dz) - (scale * (BH - gbh[i]) + dh)
+		local v = (y - gy[i]) - (scale * (BV - gbv[i]) + dv)
+		local class = if tg <= 0.25 then 1 elseif tg <= 1 then 2 else 3
+		if h > pk[class] then
+			pk[class] = h
+		end
+		if v > pk[class + 3] then
+			pk[class + 3] = v
+		end
+		if h > overH then
+			overH, worstH = h, tg
+		end
+		if v > overV then
+			overV, worstV = v, tg
+		end
+		i = (i - 2) % slots + 1
+	end
+	if overH > 0 then
+		table.insert(violations, {
+			code = "governor",
+			severity = 1,
+			detail = `{overH} st further across than an honest body goes in {worstH} s`,
+		})
+	end
+	if overV > 0 then
+		table.insert(violations, {
+			code = "governor",
+			severity = 1,
+			detail = `{overV} st higher than an honest body rises in {worstV} s`,
+		})
+	end
+	g.G, g.S, g.X, g.Y, g.Z, g.BH, g.BV = G, S, x, y, z, BH, BV
+	g.clock = next.clock
+	g.route = onRoute
+	keep(g)
 end
 
 -- clearFlag(actorId): the service applied the correction; start a fresh bucket.
@@ -989,6 +1344,13 @@ end
 function MoveValidator.last(self: MoveValidator, actorId: any): State?
 	local actor = self._actors[actorId]
 	return if actor then actor.last else nil
+end
+
+-- governorPeak(actorId) -> { number }?: the governor's closest calls so far (studs over its allowance; below 0 within
+-- it): across in windows of up to 0.25 s, 1 s and 3 s, then up in the same three
+function MoveValidator.governorPeak(self: MoveValidator, actorId: any): { number }?
+	local marks = self._marks[actorId]
+	return if marks then marks.govPeak else nil
 end
 
 export type Stats = {

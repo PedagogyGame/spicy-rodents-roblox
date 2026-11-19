@@ -230,8 +230,11 @@ return function(t)
 			print(`        {lines[i]}`)
 		end
 		-- the rays an engine pays: one wall judgement of the envelope (6), a long line's chords (C.MAX_CHORDS x 6), the
-		-- floor and the air (a few)
-		t.truthy(worstRays <= ValidatorWorld.C.MAX_CHORDS * 6 + 12, `rays per call bounded ({worstRays})`)
+		-- floor and the air (a few); validator round 6: the cover over each wall a long line clears over its top, up to
+		-- C.COVER_WALLS of them (C.COVER_RAYS + 1 down rays and three wall rays each; one of them was always counted)
+		local C = ValidatorWorld.C
+		local most = C.MAX_CHORDS * 6 + 12 + (C.COVER_WALLS - 1) * (C.COVER_RAYS + 4)
+		t.truthy(worstRays <= most, `rays per call bounded ({worstRays} of {most})`)
 		-- (Lune's time; generous for a loaded machine: the bound is what matters, before this fix 60 s cost 1,200 ms)
 		t.truthy(worstMs < 8, `the worst call {worstName} took {worstMs} ms`)
 	end)
