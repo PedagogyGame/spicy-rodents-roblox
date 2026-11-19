@@ -209,7 +209,11 @@ return function(t)
 	t.test("TownAI: every species on the real town; 60 s liveness; suspend and resume", function()
 		local world = TownAI.build({ data = data, seed = 5 })
 		local c = TownAI.counts(world)
-		t.eq(c.human, 72 + 6, "72 standing (FRB) + the 6 novelty riders (the motorcyclists ride the traffic's motorcycles)")
+		t.eq(
+			c.human,
+			72 + 6,
+			"72 standing (FRB) + the 6 novelty riders (the motorcyclists ride the traffic's motorcycles)"
+		)
 		t.eq(c.squirrel, 14 + 1, "14 squirrels + the rodent")
 		t.eq(c.deer, 6)
 		t.eq(c.fox, 1)
