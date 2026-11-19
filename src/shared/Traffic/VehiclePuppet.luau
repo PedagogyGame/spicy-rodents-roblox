@@ -825,7 +825,9 @@ local function jetskiParts(k: Kit, color: Rgb): number
 	local dark, white = hex("#2b2c2e"), hex("#f2f0ea")
 	local bow = -hl + 1.7
 	add(k, "Hull", hw - 0.1, 0, 1.05, bow, hl - 0.1, color)
-	add(k, "Bow", hw - 0.1, 0, 1.05, -hl, bow, color).roll = math.pi
+	-- the bow: a wedge turned over, so its top runs level to the tip and its underside sweeps up to it
+	local nose = add(k, "Bow", hw - 0.1, 0, 1.05, -hl, bow, color)
+	nose.shape, nose.roll = "Wedge", math.pi
 	add(k, "Keel", hw - 0.06, 0, 0.32, bow, hl - 0.1, dark)
 	add(k, "Stripe", hw - 0.04, 0.62, 0.78, bow + 0.2, hl - 0.4, white)
 	add(k, "Deck", hw - 0.3, 1.05, 1.12, -1.4, hl - 0.25, dark)

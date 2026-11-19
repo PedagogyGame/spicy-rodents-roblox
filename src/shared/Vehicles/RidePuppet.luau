@@ -430,12 +430,14 @@ end
 local function joints(parts: { Part }, root: string): { PartBuilder.JointSpec }
 	local out: { PartBuilder.JointSpec } = {}
 	for i = 2, #parts do
-		local name = parts[i].name
-		if name == "WheelF" or name == "WheelB" then
-			table.insert(out, { name = name, kind = "Motor6D", part0 = root, part1 = name })
-		else
-			table.insert(out, { name = `{name}Weld`, kind = "Weld", part0 = root, part1 = name })
-		end
+		local name: string = parts[i].name
+		local motor = name == "WheelF" or name == "WheelB"
+		table.insert(out, {
+			name = if motor then name else `{name}Weld`,
+			kind = if motor then "Motor6D" else "Weld",
+			part0 = root,
+			part1 = name,
+		})
 	end
 	return out
 end
@@ -514,10 +516,9 @@ function RidePuppet.rider(slot: number, index: number?): PartBuilder.ModelSpec
 end
 
 -- A parked bicycle on its own: the root is the bike's box (`size`, centred), drawn standing on the box's floor.
-function RidePuppet.bicycle(
-	opts: { scale: number?, frame: string?, basket: boolean?, size: V?, name: string? }?
-): PartBuilder.ModelSpec
-	local o = opts or {}
+export type BicycleOpts = { scale: number?, frame: string?, basket: boolean?, size: V?, name: string? }
+function RidePuppet.bicycle(opts: BicycleOpts?): PartBuilder.ModelSpec
+	local o: BicycleOpts = opts or {}
 	local s = o.scale or 1
 	local size: V = o.size or { 1.3 * s, 2.5 * s, 4.98 * s }
 	local k = RidePuppet.newKit(-size[2] / 2)
