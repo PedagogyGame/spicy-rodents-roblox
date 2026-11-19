@@ -36,7 +36,7 @@ The game sits you on a hidden seat in each vehicle. That seat used to be where t
 
 Nobody has checked these in the game yet. They are worked out from a standard Roblox body's sit pose.
 
-### Two size calls for you
+### A size call for you, and the cart fixed
 
 - **The bike is a small adult bike.** It is drawn at 0.88 of a full bicycle so that it fits its collision box, which is 1.25 wide, 3 high and 4.5 long:
 
@@ -49,11 +49,12 @@ Nobody has checked these in the game yet. They are worked out from a standard Ro
 
   A seated player is about 5.6 studs tall on it, so it looks small under an adult. A full-size bike needs a box of about 1.3 wide, 3 high and 5.0 long. That changes what the bike collides with, and the box its steering and speed work in. **Default if you say nothing:** the box and the 0.88 bike stay as they are.
 
-- **The golf cart's roof is too low for a seated player.** The bench top is 2.12 studs up, and a seated player's head reaches 5.72. The underside of the roof is at 4.5, so the head pokes about 1.2 studs through it (see `after_seated.jpg`). The cart's collision box is only 4.75 tall. The fix is either:
-  - a taller cart: a box of about 6.0 tall, with the roof raised; or
-  - a lower bench, which puts the driver's hips down into the tub.
-
-  **Default if you say nothing:** it stays as it is, and you sit on the bench as drawn.
+- **The golf cart's roof: fixed: roof raised, box 6.25 (about 6.0).** Before, a seated player's head (5.72 studs up: the bench top is 2.12) poked about 1.2 studs through the roof, whose underside was at 4.5 in a 4.75-tall box. Now:
+  - your cart's collision box is 6.25 tall (still 3.75 wide and 6.5 long), and its posts, windshield and roof go up with it;
+  - the underside of the roof is at 6.0, so a seated head clears it by about 0.3 studs (see `after_seated.jpg`). A box of exactly 6.0 would have left only 0.03;
+  - the tub, the bench and the golf bags have not moved, so you sit where you did;
+  - the traffic's carts are not changed: they keep their 4.75 box and their lower roof;
+  - the two parked carts still stand clear: nothing is built over their spots.
 
 ## Why the riders are not the new rounded townspeople models
 
@@ -92,7 +93,7 @@ Nothing else about the riders changed. They are still never patients. The only t
 5. Get on the bike, a cart and the jet ski, and get into a patrol car:
    - Do you sit on the seat?
    - Does the first-person view come from your own head?
-   - In the car, does your head stay under the roof?
+   - In the car and the golf cart, does your head stay under the roof?
 
 ## Still basic-looking: left for you to decide
 - **The trolley stops (3)** on the east boulevard are solid 24 x 7.5-stud blocks. Making them look like shelters means making them open, which changes their collisions. **Default if you say nothing:** they stay as they are.
