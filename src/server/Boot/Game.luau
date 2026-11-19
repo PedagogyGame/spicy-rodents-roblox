@@ -118,6 +118,9 @@ export type Opts = {
 	heroes: boolean?, -- load the sculpted squirrel and rodent models (default true; false keeps the puppets)
 	people: boolean?, -- load the rounded townspeople once uploaded (default true; false keeps the stock R15s)
 	net: boolean?, -- create ReplicatedStorage.Net and stream poses (default true)
+	-- the duel's word on the rodent's motor (Combat/CombatService opts.motorOf), in place of the live validator's: the
+	-- engine tests have no client to send motor packets (default: Movement/MovementService)
+	motorOf: ((townId: number) -> any)?,
 }
 
 local Game = {}
@@ -1336,6 +1339,9 @@ function Game.start(opts: Opts?): any
 			rodents = rodentsInPlay,
 			-- the pounce the validator accepted (Movement/MovementService): a click alone bites nobody
 			motorOf = function(id: number): any
+				if o.motorOf then
+					return o.motorOf(id)
+				end
 				local actor = rt.byTownId[id]
 				if actor == nil then
 					return nil
