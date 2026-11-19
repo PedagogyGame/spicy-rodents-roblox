@@ -43,6 +43,7 @@ local Trampoline = require("./Trampoline")
 local Motion = require("../Routes/Motion")
 local Registry = require("../Routes/Registry")
 local SpatialIndex = require("../Routes/SpatialIndex")
+local SquirrelWire = require("./SquirrelWire")
 local Units = require("../Config/Units")
 
 local SquirrelMotor = {}
@@ -1494,6 +1495,12 @@ SquirrelMotor.envelopeParams = {
 	wallAhead = 3,
 	wallMoved = 0.25,
 	wallTouch = 1.5,
+	-- the packet's own fields (fieldCheck): how far from 1 the trunk normal's length may be (the motor's is a unit
+	-- vector to f32 rounding), the longest chili rush (Tunables chili.chiliRushCap) and the longest a click's copy
+	-- rides in the packets (Movement/SquirrelWire)
+	normalTol = 0.01,
+	boostMax = 90,
+	clickCopy = SquirrelWire.CLICK_COPY,
 }
 local E = SquirrelMotor.envelopeParams
 
@@ -1542,6 +1549,140 @@ end
 --   longWall: the straight line was too long for the short wall test and a chord of it went through a wall (the
 --       validator weighs it as a gap's: one may be a corner rounded unseen).
 export type Judged = { vy: number, xz: number, y: number?, landed: boolean, longWall: boolean }
+
+-- The motor packet, field by field (validator round 5: the round-4 review's worst hole came from a field nobody checked,
+-- the trunk normal): what bounds every field of Shared/Movement/SquirrelWire, so that no number the validator or the
+-- duel reads is the client's word alone. fieldCheck judges the ranges, enums and lengths here on every packet (the
+-- baseline included); the envelope judges each field's consistency with the last packet; MoveValidator and
+-- MovementService the sequence, the epoch and the clock. A spec holds every wire field to an entry here.
+SquirrelMotor.FIELD_BOUNDS = table.freeze({
+	seq = "rises (MoveValidator: an older or repeated one is dropped); |seq| < MAX_MAGNITUDE",
+	epoch = "equals the epoch the server last gave (MovementService: else dropped as stale)",
+	grounded = "boolean (a wire bit); on the ground no vertical speed (envelope 0b), a floor under the feet (MoveValidator)",
+	committedAirborne = "boolean (a wire bit); read by no judgement",
+	focus = "boolean (a wire bit); read by no judgement",
+	routeWasMoving = "boolean (a wire bit); read by no judgement",
+	alive = "boolean (a wire bit); read by no judgement",
+	winded = "boolean (a wire bit); read by no judgement (the server keeps its own sprint meter)",
+	bridgeActive = "boolean (a wire bit); only on a rail (fieldCheck)",
+	railDir = "enum -1 or 1 (the wire keeps the sign only)",
+	x = "against the last packet: rail speed, transfer, grab, launch, speed and teleport bounds, walls (envelope)",
+	y = "against the last packet: gravity, launch rise, landing, climb and floor (envelope, MoveValidator)",
+	z = "as x",
+	railT = "[0, 1] (fieldCheck); on a rail the body at that point (envelope 1) and its pace (envelope 2)",
+	clock = "rises (dt > 0), never ahead of the arrivals (MoveValidator's clock check); a gap over maxDt is a hop",
+	vx = "horizontal speed within the launch cap on any packet (fieldCheck), the speed caps off a rail (envelope)",
+	vy = "within [-terminal, launch] on any packet (fieldCheck); 0 on the ground, gravity, launch bounds (envelope)",
+	vz = "as vx",
+	yaw = "any finite angle: read only through sin and cos (the slow pounce's heading)",
+	moveSpeed = "[0, sprint x boost] (fieldCheck); read by no judgement",
+	boostRemaining = "[0, boostMax] (fieldCheck); never trusted (the server's boostOf)",
+	cooldown = "[0, pounceCooldown] (fieldCheck); the pounce rate is judged by the window's dates",
+	attack = "[0, pounceAttack] (fieldCheck)",
+	attackWindow = "[0, pounceWindow] (fieldCheck); a pounce's date only as the window's fall within the gap (envelope)",
+	cameraCommit = "[0, the longest commit] (fieldCheck)",
+	trunkNormalX = "the trunk normal is a unit vector, |n| within normalTol of 1 (fieldCheck; Motion.visualPose also normalises it)",
+	trunkNormalZ = "as trunkNormalX",
+	routeFreeLook = "[0, freeLookAfterTransfer] (fieldCheck)",
+	stamina = "[0, 1] (fieldCheck); the server keeps its own meter",
+	emergedEnd = "enum 0 or 1 (fieldCheck)",
+	emergedFw = "[-1, 1] (fieldCheck)",
+	routeId = "-1 or a route of the world (envelope: unknown route); near the route it claims (MoveValidator.hop)",
+	pendingFork = "-1 or a route of the world (fieldCheck)",
+	selectedJunction = "-1 or a route of the world (fieldCheck)",
+	emergedFrom = "-1 or a route of the world (fieldCheck)",
+	bfx = "the transfer's start within a transfer or a grab of its target (fieldCheck), within reach of the last packet when new (envelope 1)",
+	bfy = "as bfx",
+	bfz = "as bfx",
+	btx = "the transfer's target on the rail at railT (envelope 1)",
+	bty = "as btx",
+	btz = "as btx",
+	bElapsed = "[0, bDuration] (fieldCheck); new: no more than the gap, else on from the last packet's by the gap (envelope 1)",
+	bDuration = "Motion.bridgeDuration of the transfer's own length (fieldCheck)",
+	clickSeq = "0 (none) or 1..255, a click counted once, the newer only (MovementService.clickNew)",
+	clickAgo = "[0, SquirrelWire.CLICK_COPY], 0 with no click (fieldCheck); the click dated as the remote's (clickAt)",
+})
+
+-- fieldCheck(snapshot, world) -> violations: the ranges, enums and lengths of FIELD_BOUNDS for one packet as it came
+-- off the wire (SquirrelWire.fromRecord's snapshot, numbers already finite: SquirrelWire.sane), any packet, judged or
+-- not. Pure arithmetic, but for one registry look-up per id.
+function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violation }
+	local out: { Violation } = {}
+	local function range(k: string, lo: number, hi: number)
+		local v = s[k]
+		if type(v) ~= "number" or v < lo - 1e-4 or v > hi + 1e-4 then
+			add(out, "field", 1, `{k} {v} outside [{lo}, {hi}]`)
+		end
+	end
+	for _, k in { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" } do
+		if type(s[k]) ~= "boolean" then
+			add(out, "field", 1, `{k} is no boolean`)
+		end
+	end
+	if s.railDir ~= 1 and s.railDir ~= -1 then
+		add(out, "field", 1, `railDir {s.railDir}`)
+	end
+	range("railT", 0, 1)
+	local hv = hypot2(tonumber(s.vx) or math.huge, tonumber(s.vz) or math.huge)
+	if hv > SquirrelMotor.launchCapXZ(true) * E.launchTol then
+		add(out, "field", 1, `horizontal speed {hv}`)
+	end
+	range("vy", -P.terminalFall - P.gravity * E.gravityEps, P.leapUp * E.launchTol)
+	range("moveSpeed", 0, P.sprint * P.boostMult)
+	range("boostRemaining", 0, E.boostMax)
+	range("cooldown", 0, P.pounceCooldown)
+	range("attack", 0, P.pounceAttack)
+	range("attackWindow", 0, P.pounceWindow)
+	range("cameraCommit", 0, math.max(P.cameraCommitLaunch, P.cameraCommitDrop, P.cameraCommitLand))
+	range("routeFreeLook", 0, P.freeLookAfterTransfer)
+	range("stamina", 0, 1)
+	range("emergedFw", -1, 1)
+	if s.emergedEnd ~= 0 and s.emergedEnd ~= 1 then
+		add(out, "field", 1, `emergedEnd {s.emergedEnd}`)
+	end
+	-- (the client's own number in a drawn pose: the round-4 review moved the launch point 600 studs by a long normal)
+	local nl = hypot2(tonumber(s.trunkNormalX) or 0, tonumber(s.trunkNormalZ) or 0)
+	if math.abs(nl - 1) > E.normalTol then
+		add(out, "railPose", 1, `trunk normal {nl} long`)
+	end
+	local reg = world.registry
+	for _, k in { "pendingFork", "selectedJunction", "emergedFrom" } do
+		local id = s[k]
+		if id ~= -1 and (type(id) ~= "number" or reg:get(id) == nil) then
+			add(out, "field", 1, `{k} {id}: no such route`)
+		end
+	end
+	if s.bridgeActive == true then
+		if type(s.routeId) ~= "number" or s.routeId < 0 then
+			add(out, "railPose", 1, "a transfer off any rail")
+		end
+		local gap = math.sqrt(
+			((s.btx :: number) - (s.bfx :: number)) ^ 2
+				+ ((s.bty :: number) - (s.bfy :: number)) ^ 2
+				+ ((s.btz :: number) - (s.bfz :: number)) ^ 2
+		)
+		-- (a transfer starts where the body was: within a transfer's reach of its target; into an enclosed run at a mouth,
+		-- whose reach the envelope's section 0 judges from the last packet)
+		local r = if type(s.routeId) == "number" then reg:get(s.routeId) else nil
+		if not (r and r.enclosure) and gap > C.enterMaxGap + E.posSlack then
+			add(out, "railPose", 1, `a transfer {gap} st long`)
+		end
+		if math.abs((s.bDuration :: number) - Motion.bridgeDuration(gap)) > 1e-3 then
+			add(out, "railPose", 1, `transfer easing {s.bDuration} s for {gap} st`)
+		end
+		if (s.bElapsed :: number) < -1e-6 then
+			add(out, "railPose", 1, "transfer easing before its start")
+		end
+	end
+	local seq = s.clickSeq
+	if seq ~= nil then
+		if type(seq) ~= "number" or seq < 0 or seq > 255 or seq ~= math.floor(seq) then
+			add(out, "field", 1, `clickSeq {seq}`)
+		end
+		range("clickAgo", 0, if seq == 0 then 0 else E.clickCopy)
+	end
+	return out
+end
 
 -- Returns the violations; whether a launch (leap, pounce, a step off a rail) was needed to explain the move; how long
 -- before `next` the motor's pounce launched when the move holds one (a pounce-shaped launch the window dates; nil
@@ -1786,6 +1927,40 @@ function SquirrelMotor.envelope(
 			end
 			if b.elapsed > b.duration + 1e-9 or b.duration < C.bridgeMin - 1e-9 or b.duration > C.bridgeMax + 1e-9 then
 				add(out, "railPose", 1, "transfer easing out of range")
+			end
+			-- (the transfer's start and its easing are the client's numbers: the start is where the body was when it began,
+			-- inside the gap and within its reach of the last packet, and the easing runs on by the gap's time, so a body
+			-- kept at a transfer's start floats beside a rail no longer than a transfer lasts)
+			local pb = prev.bridge
+			local same = pb ~= nil
+				and math.abs(pb.fx - b.fx) + math.abs(pb.fy - b.fy) + math.abs(pb.fz - b.fz) < 1e-3
+				and math.abs(pb.tx - b.tx) + math.abs(pb.ty - b.ty) + math.abs(pb.tz - b.tz) < 1e-3
+			if same then
+				local pe = (pb :: Bridge).elapsed
+				if b.elapsed < pe - 1e-6 or b.elapsed > pe + dt + P.substep then
+					add(out, "railPose", 1, `transfer easing {pe} -> {b.elapsed} in {dt} s`)
+				end
+			else
+				if b.elapsed > dt + P.substep then
+					add(out, "railPose", 1, `a new transfer {b.elapsed} s along after a {dt} s gap`)
+				end
+				local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
+				local pace = math.max(
+					groundCap,
+					launchXZ,
+					vPrev,
+					if prevRoute then SquirrelMotor.routeCap(prevRoute, boosted) * E.railTol else 0
+				)
+				local reach = pace * (dt + P.substep) + E.posSlack
+				local from = math.sqrt((b.fx - prev.x) ^ 2 + (b.fy - prev.y) ^ 2 + (b.fz - prev.z) ^ 2)
+				if prevRoute and from > reach then
+					-- (a leap starts at the drawn pose)
+					local w = visualPosition(prev, world)
+					from = math.min(from, math.sqrt((b.fx - w.x) ^ 2 + (b.fy - w.y) ^ 2 + (b.fz - w.z) ^ 2))
+				end
+				if from > reach then
+					add(out, "railPose", 1, `a transfer from {from} st away from the last packet in {dt} s`)
+				end
 			end
 			-- the body lies on the from->to segment at the eased fraction
 			local p = Motion.ease(b.elapsed / b.duration)

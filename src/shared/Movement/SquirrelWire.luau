@@ -4,13 +4,19 @@
 -- Server/Movement/MoveValidator judges (SquirrelMotor.serialize's snapshot), a sequence number, and the motor epoch
 -- the server last handed this player (Possession.Granted's `motorEpoch`, then each "Correction"). The server drops a
 -- packet from an older epoch: it was sent before a teleport, a snap-back or a hand-off reached the client.
--- 162 bytes: positions, the rail parameter and the clock as f64 (the on-rail check is 0.125 studs and the clock only
--- grows), velocities and timers as f32, the four optional ids as i32 (-1 none), the flags as one byte.
+-- 167 bytes: positions, the rail parameter and the clock as f64 (the on-rail check is 0.125 studs and the clock only
+-- grows), velocities and timers as f32, the four optional ids as i32 (-1 none), the flags as one byte, and the rodent's
+-- last click (validator round 5: a click's reliable remote resent after a loss arrived too late to tie its pounce): its
+-- number (clickSeq, u8: 0 none, then 1 to 255 round) and how long before this packet's clock it was made (clickAgo,
+-- f32 seconds), repeated in every packet for CLICK_COPY seconds after the click (Controllers/MotorLink.click). The server
+-- takes the first copy of a click to arrive, the remote's or a packet's (Movement/MovementService.clickNew). Not motor
+-- state: SquirrelMotor.deserialize ignores them. Every field's bound: SquirrelMotor.FIELD_BOUNDS.
 -- SEND_EVERY: the client sends when its motor clock has moved this far since the last packet (20 a second at any
 -- frame rate; a frame is at most SquirrelMotor.params.frameDtCap, so honest gaps are 0.05 to 0.08 s plus losses).
 -- Interface: LAYOUT (Util/BufferCodec); SEND_EVERY; encode(seq, epoch, snapshot) -> buffer;
 --   fromRecord(record) -> (seq, epoch, snapshot) (a record Net decoded from LAYOUT); decode(buffer) -> same;
---   sane(snapshot) -> boolean (every number finite and in range: the server judges nothing else); MAX_MAGNITUDE
+--   sane(snapshot) -> boolean (every number finite and in range: the server judges nothing else); MAX_MAGNITUDE;
+--   CLICK_COPY; FIELDS (every field's name, the wire's order)
 -- Pure. No side effects on require.
 
 local BufferCodec = require("../Util/BufferCodec")
@@ -18,6 +24,8 @@ local BufferCodec = require("../Util/BufferCodec")
 local SquirrelWire = {}
 
 SquirrelWire.SEND_EVERY = 0.05
+-- seconds a click rides in the packets after it was made (a lost packet is covered by the next one, 0.05 s later)
+SquirrelWire.CLICK_COPY = 0.5
 
 local FLAG_BITS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded", "bridgeActive" }
 local IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
@@ -47,6 +55,8 @@ local fields: { BufferCodec.Field } = {
 	{ name = "epoch", kind = "u32" },
 	{ name = "flags", kind = "u8" },
 	{ name = "railDir", kind = "i8" },
+	{ name = "clickSeq", kind = "u8" },
+	{ name = "clickAgo", kind = "f32" },
 }
 for _, k in F64 do
 	table.insert(fields, { name = k, kind = "f64" })
@@ -61,6 +71,13 @@ for _, k in BRIDGE do
 	table.insert(fields, { name = k, kind = "f32" })
 end
 SquirrelWire.LAYOUT = BufferCodec.layout(fields)
+SquirrelWire.FIELDS = {} :: { string }
+for _, f in fields do
+	table.insert(SquirrelWire.FIELDS, f.name)
+end
+for _, k in FLAG_BITS do
+	table.insert(SquirrelWire.FIELDS, k)
+end
 
 function SquirrelWire.encode(seq: number, epoch: number, snapshot: { [string]: number | boolean }): buffer
 	local rec: { [string]: number } = { seq = seq, epoch = epoch }
@@ -73,6 +90,9 @@ function SquirrelWire.encode(seq: number, epoch: number, snapshot: { [string]: n
 	rec.flags = flags
 	local dir = snapshot.railDir
 	rec.railDir = if type(dir) == "number" and dir < 0 then -1 else 1
+	local click = snapshot.clickSeq
+	rec.clickSeq = if type(click) == "number" then click else 0
+	rec.clickAgo = if type(click) == "number" and click ~= 0 then snapshot.clickAgo :: number else 0
 	for _, k in F64 do
 		rec[k] = snapshot[k] :: number
 	end
@@ -99,6 +119,8 @@ function SquirrelWire.fromRecord(rec: { [string]: number }): (number, number, { 
 		s[k] = bit32.btest(flags, bit32.lshift(1, i - 1))
 	end
 	s.railDir = if (rec.railDir or 1) < 0 then -1 else 1
+	s.clickSeq = rec.clickSeq or 0
+	s.clickAgo = rec.clickAgo or 0
 	for _, k in F64 do
 		s[k] = rec[k] or 0
 	end

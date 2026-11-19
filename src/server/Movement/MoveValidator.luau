@@ -344,7 +344,13 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		actor.flagged = flagged
 		return verdict(false, false, bad, flagged, actor.bucket, SquirrelMotor.serialize(actor.last), false, false)
 	end
+	-- every field within its own bounds (SquirrelMotor.FIELD_BOUNDS), the baseline's too: a number no check bounds is
+	-- one a later reader trusts (the round-4 review: the trunk normal moved the drawn pose 600 studs)
+	local fieldFaults = SquirrelMotor.fieldCheck(packet.snapshot, self.world)
 	if not actor then
+		if #fieldFaults > 0 then
+			return verdict(false, false, fieldFaults, true, 1, nil, false, false)
+		end
 		self:reset(actorId, packet.snapshot, serverTime, packet.seq)
 		return verdict(true, true, {}, false, 0, nil, false, true)
 	end
@@ -363,7 +369,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local next = SquirrelMotor.deserialize(packet.snapshot)
 	local prev = actor.last
 	local dt = next.clock - prev.clock
-	local violations: { Violation } = {}
+	local violations: { Violation } = table.clone(fieldFaults)
 
 	-- clock: the arrival offset (server time - client clock: the one-way latency and a constant) may not fall more
 	-- than the link can swing below its lowest of a while ago. A time hack runs the client clock ahead, and the offset

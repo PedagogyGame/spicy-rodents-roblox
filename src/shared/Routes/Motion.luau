@@ -1320,7 +1320,9 @@ end
 
 -- visualPose (§14, L6769-6790): where the mesh sits for a squirrel on `route` at `t`. The route
 -- centreline is the physics position; trunks push the body out along the surface normal, boughs and
--- wires lift it. trunkNormal (XZ unit) is the bark normal chosen when the trunk was entered.
+-- wires lift it. trunkNormal (XZ unit) is the bark normal chosen when the trunk was entered; it is taken as a
+-- direction only (normalised here: a client's packet carries it, and the validator round 4 review moved the drawn feet
+-- 600 studs with a normal 400 long), a zero one as the default (0, 1).
 function Motion.visualPose(
 	world: World,
 	route: Route,
@@ -1336,6 +1338,12 @@ function Motion.visualPose(
 			sx, sz = 0, 1
 		else
 			sx, sz = trunkNormalX or 0, trunkNormalZ or 1
+			local l = math.sqrt(sx * sx + sz * sz)
+			if l > 1e-6 and l == l then
+				sx, sz = sx / l, sz / l
+			else
+				sx, sz = 0, 1
+			end
 		end
 		local r = if route.surfaceRadius > 0 then route.surfaceRadius else C.visualDefaultR
 		local tapered
