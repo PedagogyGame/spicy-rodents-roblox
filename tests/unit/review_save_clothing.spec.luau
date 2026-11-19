@@ -198,6 +198,30 @@ return function(t)
 		t.eq(math.floor(torso.Color.R * 255 + 0.5), 200, "nobody holds P: its own shirt colour is back")
 	end)
 
+	-- PASSES (a guard: clothing_save's "threads" case leaves before the load job starts, so a leave while the load's
+	-- UpdateAsync is in flight was never exercised; dropping PlayerSaves' `p:release()` after such a load passed every
+	-- spec and would leave a 180 s lock behind a quick leave).
+	t.test("holds: a leave while the load is in flight hands the lock straight back", function()
+		local store = MockDataStore.new()
+		local _c, now, sleep = clock()
+		local p = { UserId = 50 }
+		local sv: any = nil
+		local left = false
+		local real = store.UpdateAsync
+		store.UpdateAsync = function(self: any, key: string, fn: any): (any, any)
+			if not left then
+				left = true
+				sv.saves:leave(p) -- (the player goes while the DataStore call is out)
+			end
+			return real(self, key, fn)
+		end
+		sv = server(store, "A", now, sleep)
+		sv.saves:join(p)
+		t.truthy(store:peek("p_50") ~= nil, "(the load wrote the record)")
+		t.eq(store:peek("p_50").meta.lock, nil, "released as soon as the load came back")
+		t.falsy(sv.saves:busy())
+	end)
+
 	-- PASSES (a guard the builder's spec lacks: it compares against the template, whose other fields are all empty,
 	-- so a change that reset them would go unseen). A record holding money, receipts, items, reputation and stats
 	-- goes through load, a purchase, an autosave and a release with every non-clothing field exactly as it was.
