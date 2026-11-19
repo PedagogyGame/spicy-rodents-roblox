@@ -1054,7 +1054,7 @@ end
 export type GovBounds = {
 	vh: number, -- studs/s across: the fastest any way of moving goes (fastest: sprint, a leap, the fastest rail)
 	vhTramp: number, -- ... near a trampoline: with every bounce's push
-	vRail: number, -- studs/s up near a rail: its climb, or a leap off it regrabbed at once (Space and E every frame)
+	vRail: number, -- studs/s up near a rail: its climb, or a leap off it regrabbed (Space and E every second frame)
 	vLedge: number, -- studs/s up anywhere else: a leap onto a ledge a step under its apex, and on again
 	vTramp: number, -- studs/s up near a trampoline: the highest bounce's launch
 	dh: number, -- studs across once per window: a grab's snap and the drawn pose's offset off the centreline
@@ -1110,7 +1110,11 @@ function MoveValidator.governorBounds(self: MoveValidator, boosted: boolean): Go
 	local b: GovBounds = {
 		vh = vh,
 		vhTramp = vh + Trampoline.C.maxCount * Trampoline.C.push * E.launchTol,
-		vRail = math.max(railClimbOf(self.world.registry, boosted) * E.railTol, launchUp),
+		-- (a leap off a rail regrabbed, again and again: E and Space every second frame. A one-frame cycle rises less
+		-- than half the index's sample spacing, so the regrab lands on the sample it left and the body climbs nothing
+		-- (measured: 0.8 st in 3 s; every second frame 28.9 st/s); over a two-frame cycle gravity takes g * substep of the
+		-- launch's speed on average)
+		vRail = math.max(railClimbOf(self.world.registry, boosted) * E.railTol, launchUp - P.gravity * P.substep),
 		-- (a leap rises its apex in leapUp / g; the ground probe takes the feet onto a ledge a step over them)
 		vLedge = (MoveValidator.leapRise() + step) / (P.leapUp / P.gravity),
 		vTramp = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol,

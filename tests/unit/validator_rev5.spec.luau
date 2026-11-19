@@ -329,8 +329,17 @@ return function(t)
 				-- (an honest body: the rail's pace, or for a level rail a leap along it; up a trunk a leap off it and a
 				-- grab back lands at the trunk's nearest point, at the body's own height: no faster than the climb and a
 				-- leap, the time shared. Half as much again, to be generous)
-				local bound = if case.name == "trunk" then 1.5 * cap else 1.1 * math.max(cap, launchXZ)
+				-- (validator round 6: the honest motor itself climbs a trunk faster than 1.5 x its pace by leaping off it and
+				-- regrabbing it, E and Space every second frame: 28.9 st/s on this trunk, validator_r6. The trunk's bound is
+				-- that leap-and-regrab chain's ceiling at the envelope's launch tolerance, the launch speed itself, with the
+				-- envelope's own per-packet slack: a regrab every second packet lands up to half an index sample up (the
+				-- nearest sample, 1/6 u) and each packet has its posSlack. The climb is measured on the rail, not at the top
+				-- of the last leap)
 				for _, rate in { 2, 4, 10, 20 } do
+					local chain = P.leapUp * E.launchTol + (Units.st(1 / 6) + 2 * E.posSlack) * rate / 2
+					local bound = if case.name == "trunk"
+						then math.max(1.5 * cap, chain)
+						else 1.1 * math.max(cap, launchXZ)
 					local v = MoveValidator.new(vworld)
 					local dt = 1 / rate
 					local tt = 0.05
@@ -409,7 +418,9 @@ return function(t)
 						local res = v:accept("a", { seq = n, snapshot = SquirrelMotor.serialize(cand) }, clock)
 						bad += #res.violations
 						if case.name == "trunk" then
-							peak = math.max(peak, cand.y - y0)
+							if cand.routeId then
+								peak = math.max(peak, cand.y - y0)
+							end
 						else
 							peak = math.max(peak, flat(cand, a0))
 						end
