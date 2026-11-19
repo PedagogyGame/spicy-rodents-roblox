@@ -604,4 +604,83 @@ return function(t)
 		t.truthy(x == 3 and z == 4, "the same column")
 		t.truthy(y ~= nil and math.abs((y :: number) - g) <= 0.06, `on the ground ({y})`)
 	end)
+
+	t.test("slab, honest: Q off every third branch and wire of the baked town, then a walk on: no slab flag", function()
+		-- (the round-7 review's sweep: the real motor, Q at t 0.35 and 0.7 along the route, judged at 20 packets a second;
+		-- here 3 s each, the last 1.5 s walking on: off the bough, off roofs' and walls' edges, down the banks)
+		if not fs.isFile("build/Town.rbxm") then
+			t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+			return
+		end
+		Height.configure(Data.default():module("TerrainExtensions"))
+		local town = BakedWorld.load("build/Town.rbxm")
+		local w = town:motorWorld(Data.default())
+		local wall, down, cover = BakedWorld.validatorRays(town)
+		local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
+		local routes = {}
+		for _, r in w.registry:all() do
+			if r.kind ~= "trunk" and not r.enclosure then
+				table.insert(routes, r)
+			end
+		end
+		table.sort(routes, function(a: any, b: any): boolean
+			return a.id < b.id
+		end)
+		local drops, flagged, packets, rays = 0, 0, 0, 0
+		local slab0 = vworld.slab
+		vworld.slab = function(...: any): boolean
+			rays += 1
+			return slab0(...)
+		end
+		local examples = {}
+		for i = 1, #routes, 3 do
+			local r = routes[i]
+			for _, at in { 0.35, 0.7 } do
+				drops += 1
+				local q = w.registry:pointAt(r, at)
+				local s = SquirrelMotor.new(q.x, q.y, q.z)
+				s.grounded = false
+				s.routeId, s.railT, s.railDir = r.id, at, 1
+				s.clock = 1
+				local v = MoveValidator.new(vworld)
+				v:accept("a", { seq = 0, snapshot = SquirrelMotor.serialize(s) }, 1)
+				local seq, frame, bad = 0, 0, false
+				local yaw = (r.id * 0.618) % 1 * 2 * math.pi
+				while frame < 180 do
+					frame += 1
+					local now = frame / 60
+					local _ = SquirrelMotor.step(
+						s,
+						BakedWorld.keys(yaw, { drop = now < 0.1, fw = if now > 1.5 then 1 else 0 }),
+						1 / 60,
+						w
+					)
+					s.clock = 1 + now
+					if frame % 3 == 0 then
+						seq += 1
+						packets += 1
+						local res = v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, 1 + now)
+						for _, x in res.violations do
+							if x.code == "slab" and not bad then
+								bad = true
+								if #examples < 5 then
+									table.insert(examples, `route {r.id} at {at}: {x.detail}`)
+								end
+							end
+						end
+					end
+				end
+				if bad then
+					flagged += 1
+				end
+			end
+		end
+		vworld.slab = slab0
+		Height.configure(nil)
+		print(`      {drops} drops ({packets} packets, {rays} slab rays): {flagged} with a slab flag`)
+		for _, e in examples do
+			print(`      {e}`)
+		end
+		t.eq(flagged, 0, "honest drops flagged for a slab")
+	end)
 end
