@@ -8,6 +8,7 @@ local Height = require("@shared/World/Height")
 local Data = require("@shared/Data")
 local BakedWorld = require("@tests/lib/BakedWorld")
 local LiveRig = require("@tests/lib/LiveRig")
+local Driver = require("@tests/cheat/Driver")
 local fs = require("@lune/fs")
 
 type State = SquirrelMotor.State
@@ -259,6 +260,95 @@ return function(t)
 				print("      " .. row)
 			end
 			t.eq(dirty, 0, "an honest drop off a branch is never a violation")
+		end
+	)
+
+	t.test(
+		"short gap: off a trunk, 30 packets a second, each a 'hidden grab and leap' 13 st up: 135 st in 0.37 s",
+		function()
+			-- the envelope's round-6 allowance (section 5, "a short gap hides a grab and a leap"): any rail sample within a
+			-- grab of the last place, not the nearest one, and the rise a launch's over that sample. Beside a vertical
+			-- trunk the sample 8.5 st over the body is within a grab; the honest grab takes the nearest, at the body's height
+			local world, vworld = worldWith({})
+			local trunk: any = nil
+			for _, r in Driver.targetsAround(world, 0, 0, 3000) do
+				if trunk == nil or r.length > trunk.length then
+					trunk = r
+				end
+			end
+			local foot = world.registry:foot(trunk)
+			local function climb(rate: number, govern: boolean): (number, number, string)
+				local saved = MoveValidator._govern
+				if not govern then
+					MoveValidator._govern = function(...: any) end :: any
+				end
+				local v = MoveValidator.new(vworld)
+				local dt = 1 / rate
+				local s = SquirrelMotor.new(foot.x + 2.5, world.groundHeight, foot.z)
+				s.grounded, s.clock = true, 1
+				v:accept("a", { seq = 0, snapshot = SquirrelMotor.serialize(s) }, 1)
+				local codes, y0, now = {}, s.y, 1
+				for i = 1, rate * 3 do
+					local prev = v:last("a") :: State
+					local bestN, bestDy = prev, -1
+					for _, vy in { -5, 0, 10, 20, 35 } do
+						local lo, hi = 0, 40
+						for _ = 1, 20 do
+							local mid = (lo + hi) / 2
+							local n = SquirrelMotor.clone(prev)
+							n.y, n.vy, n.vx, n.vz, n.grounded, n.routeId, n.clock =
+								prev.y + mid, vy, 0, 0, false, nil, prev.clock + dt
+							if #SquirrelMotor.envelope(prev, n, dt, vworld, false) == 0 then
+								lo = mid
+							else
+								hi = mid
+							end
+						end
+						if lo > bestDy then
+							bestDy = lo
+							bestN = SquirrelMotor.clone(prev)
+							bestN.y, bestN.vy, bestN.vx, bestN.vz, bestN.grounded, bestN.routeId, bestN.clock =
+								prev.y + lo, vy, 0, 0, false, nil, prev.clock + dt
+						end
+					end
+					now += dt
+					local res = v:accept("a", { seq = i, snapshot = SquirrelMotor.serialize(bestN) }, now)
+					for _, x in res.violations do
+						codes[x.code] = (codes[x.code] or 0) + 1
+					end
+					if bestN.y > foot.y + trunk.length - 4 then
+						break
+					end
+				end
+				MoveValidator._govern = saved
+				local c = {}
+				for code, k in codes do
+					table.insert(c, `{code}={k}`)
+				end
+				return (v:last("a") :: State).y - y0, now - 1, table.concat(c, " ")
+			end
+			local worst = 0
+			for _, rate in { 30, 60 } do
+				for _, govern in { false, true } do
+					local up, secs, codes = climb(rate, govern)
+					print(
+						string.format(
+							"      %d/s, governor %s: %.0f st up in %.2f s (%.0f st/s; the trunk's pace 19.2, the motor's E+Space 28.9); %s",
+							rate,
+							if govern then "on" else "off",
+							up,
+							secs,
+							up / secs,
+							codes
+						)
+					)
+					if not govern and codes == "" then
+						worst = math.max(worst, up / secs)
+					end
+				end
+			end
+			-- (the round-5 review's bound as the builder raised it, at 20 packets a second: 41.9 st/s)
+			t.truthy(worst <= 41.9, `the envelope alone passed a climb at {worst} st/s beside a trunk`)
 		end
 	)
 end
