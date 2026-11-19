@@ -581,13 +581,13 @@ return function(t)
 			end)
 			t.truthy(svc:isRefuge(other.id))
 			t.eq(svc:healRate(other.id, true), 0)
-			-- the alligator: a line and a cue name, no asset
+			-- the alligator: a line and a cue with a library sound (never seen)
 			local w = svc:idleWarning(rodent.id) :: SewerService.Warning
 			t.eq(w.predator, "small alligator")
 			t.eq(w.text, "A low hiss and a ripple in the sewer water.")
 			t.eq(w.cue, "sewer.hiss")
 			for name, id in SewerService.CUES do
-				t.eq(id, "", `{name} has no asset yet`)
+				t.truthy(string.match(id, "^rbxassetid://%d+$") ~= nil, `{name} has a library sound`)
 			end
 			-- the re-entry mouth after a death at the crossing: far enough, nobody near it
 			local m = svc:reentry(0, 0) :: SewerLayout.Mouth

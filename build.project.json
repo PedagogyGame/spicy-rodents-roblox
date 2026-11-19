@@ -1,6 +1,6 @@
 {
   "name": "SpicyRodents",
-  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep"],
+  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep", "assets/audio/**"],
   "tree": {
     "$className": "DataModel",
 

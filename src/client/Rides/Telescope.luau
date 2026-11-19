@@ -15,6 +15,8 @@
 --   * Out: E, Q or the gamepad's B; walking more than LEAVE_DIST from it; the body gone or the telescope streamed
 --     out; leave(). The camera type, field of view and the cursor are given back and CameraRig.hold(false).
 --   * Words: hud(TITLE, HINT) on the way in, hud(nil, nil) on the way out (the joiner wires it to Hud.set).
+--   * Sound: the click on the way out, on this screen (Shared/Rides/SkyLiftSounds "Telescope.Click"); the way in
+--     is heard from the server's own click at the telescope (SkyLift.TelescopeClick, for everyone near).
 -- The render step runs at RenderPriority.Camera + 1, after the default camera and CameraRig.
 -- Started once by the client's Main (the joiner, lane 6). No service access at require time.
 -- Interface: start(opts?) -> stop; enter(scope) -> boolean; leave(); active() -> boolean; scopeOf(prompt) ->
@@ -25,6 +27,8 @@
 --   Character), onChange: ((active: boolean) -> ())? }
 -- Lane 8 (not built): the zoom that streams the looked-at street in (Player.ReplicationFocus on the server).
 
+local Import = require("../Import")
+local SkyLiftSounds = Import.shared("Rides/SkyLiftSounds") :: typeof(require("../../shared/Rides/SkyLiftSounds"))
 local CameraRig = require("../Camera/CameraRig")
 
 local Telescope = {}
@@ -267,6 +271,15 @@ function Telescope.leave()
 	if v.prompt then
 		v.prompt.Enabled = v.promptWas
 	end
+	local click = Instance.new("Sound")
+	click.Name = "Telescope.Click"
+	click.SoundId = SkyLiftSounds.CUES["Telescope.Click"]
+	click.Volume = SkyLiftSounds.VOLUME["Telescope.Click"]
+	click.Parent = game:GetService("SoundService")
+	click.Ended:Once(function()
+		click:Destroy()
+	end)
+	click:Play()
 	local hud = opts.hud
 	if hud then
 		hud(nil, nil)

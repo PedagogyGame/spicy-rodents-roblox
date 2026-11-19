@@ -84,9 +84,10 @@ SewerService.HISS = table.freeze({
 	cue = "sewer.hiss",
 })
 
--- named cue points (docs/AUDIO_BUDGET.md lists the sewer cues; lane S3 plays them): no ids until audio exists
+-- the server's cue (docs/AUDIO_BUDGET.md lists the sewer cues): the same library sound as the client's
+-- (Client/World/SewerAmbience CUES; tests/unit/audio_cues.spec.luau keeps them one)
 SewerService.CUES = table.freeze({
-	["sewer.hiss"] = "",
+	["sewer.hiss"] = "rbxassetid://9119302862", -- Snake Hiss 1 (ProSoundEffects): airy hisses
 })
 
 export type Lost = {

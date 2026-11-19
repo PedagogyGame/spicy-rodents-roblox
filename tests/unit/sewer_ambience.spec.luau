@@ -9,7 +9,7 @@
 --   arm picked named; which arm was taken
 --   "W: climb out" shows in the top of a shaft on the way out of every run, never on the way down or in a passage
 --   the controller's refusals inside a drain (Space, Q, a click, E: the motor's hints) read as a drain's
---   the place names, the cue points inside their pipes, every cue named in docs/AUDIO_BUDGET.md with no id yet
+--   the place names, the cue points inside their pipes, every cue named in docs/AUDIO_BUDGET.md with its library sound
 -- The engine part (the look, the lamps, the reverb, the words on screen and the cues over whole runs, Lighting never
 -- touched) is in tests/isolated/sewer_ambience.luau, run in its own Lune process (tests/lib/Isolated says why); each
 -- of its cases is reported here as its own test.
@@ -270,15 +270,24 @@ return function(t)
 		t.truthy((per["sewer.bowllane sewer.drip"] or 0) >= 20, "Bowl Lane drips along its length")
 	end)
 
-	t.test("every cue is named in docs/AUDIO_BUDGET.md and none has a sound yet (nothing uploaded)", function()
+	t.test("every cue is named in docs/AUDIO_BUDGET.md and has a library sound and a volume (none silent)", function()
 		local doc = fs.readFile("docs/AUDIO_BUDGET.md")
 		local n = 0
 		for cue, id in SewerAmbience.CUES do
 			n += 1
-			t.eq(id, "", `{cue}: no asset id yet`)
+			t.truthy(string.match(id, "^rbxassetid://%d+$") ~= nil, `{cue}: a library asset id`)
+			t.truthy(
+				string.find(doc, string.match(id, "%d+") or "?", 1, true) ~= nil,
+				`{cue}: its id is in docs/AUDIO_BUDGET.md`
+			)
+			local v = SewerAmbience.VOLUME[cue]
+			t.truthy(type(v) == "number" and v > 0 and v <= 1, `{cue}: a volume`)
 			t.truthy(string.find(doc, "`" .. cue .. "`", 1, true) ~= nil, `{cue} is in docs/AUDIO_BUDGET.md`)
 		end
 		t.eq(n, 11)
+		-- the per-stride and per-stud cues are kept under the one-off ones
+		t.truthy(SewerAmbience.VOLUME["sewer.footEcho"] < SewerAmbience.VOLUME["sewer.grateIn"])
+		t.truthy(SewerAmbience.VOLUME["sewer.rung"] < SewerAmbience.VOLUME["sewer.grateIn"])
 	end)
 
 	t.test("the look: nothing at all outside, darker, cooler and closer inside, never black", function()

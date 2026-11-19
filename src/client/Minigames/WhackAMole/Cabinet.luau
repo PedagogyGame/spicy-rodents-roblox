@@ -59,10 +59,22 @@ Cabinet.HOVER = 1.0
 Cabinet.HOME = 0.25
 Cabinet.SAY = 0.6 -- seconds a NICE! or a MISS stays on the status line
 
+-- each cue's sound: Roblox's licensed library (ProSoundEffects) and Roblox's own (its pinball and interface sets;
+-- docs/AUDIO_BUDGET.md "Whack-a-mole"); nothing uploaded
+local IDS: { [string]: string } = {
+	pop = "rbxassetid://9117834439", -- a mole comes up: Pop Airy 16 (hollow, small)
+	swing = "rbxassetid://9119702970", -- the mallet swings: Swish, Paddle Swish, Soft
+	bonk = "rbxassetid://9113854411", -- a hit: Comic Boinks 2 (springy, funny)
+	thud = "rbxassetid://9117973587", -- a miss on the deck: Punch Wood Box 1 (a hollow wooden knock)
+	count = "rbxassetid://16480580064", -- the count-in: Roblox Pinball 8Bit Blip 02
+	go = "rbxassetid://16480578169", -- GO: Roblox Pinball 8Bit Riser 01
+	hurry = "rbxassetid://16480578434", -- the last five seconds: Roblox Pinball 8Bit Blip 09
+	over = "rbxassetid://15675043410", -- TIME: Roblox UI Tonal Stinger
+}
 local CUES = { "pop", "swing", "bonk", "thud", "count", "go", "hurry", "over" }
 Cabinet.SOUNDS = {} :: { [string]: string }
 for _, cue in CUES do
-	Cabinet.SOUNDS[`whack_a_mole.{cue}`] = ""
+	Cabinet.SOUNDS[`whack_a_mole.{cue}`] = IDS[cue]
 end
 
 local function sound(cue: string)

@@ -10,8 +10,9 @@
 --   * Its body moves at MOVE_HZ, again only near a player: one BulkMoveTo for every near dog's parts. Poses: a
 --     walking trot, sitting and wagging while a treat lasts, lying in front of its house at night, the head up for
 --     a bark.
---   * A bark (YardDogs.BARK_EVERY apart, at a squirrel on the ground in its yard): the cue "Dogs.Bark" (a Sound
---     with an empty id: the lead picks a library bark), a computer squirrel bolts (its brain's "startle", away from the dog), a player
+--   * A bark (YardDogs.BARK_EVERY apart, at a squirrel on the ground in its yard): the cue "Dogs.Bark" (the game's
+--     own bark, Shared/Audio/Uploads "dog_bark": owner #36; silent until the lead uploads it), a computer squirrel
+--     bolts (its brain's "startle", away from the dog), a player
 --     on a squirrel or the rodent is told to clear off (a notice: no shove, no harm), and at the Spicy Rodent the
 --     computer-run people within YardDogs.ALERT_RADIUS notice it (their brain's "witness": v5.4's bark alert).
 --   * A dog treat (Items/ItemWorld "calm_dog", the corner store's dog treats): near(x, z, r) lists the dogs as
@@ -24,6 +25,7 @@
 local Import = require("../Import")
 local YardDogs = Import.shared("Wildlife/YardDogs") :: typeof(require("../../shared/Wildlife/YardDogs"))
 local Clock = Import.shared("Time/Clock") :: typeof(require("../../shared/Time/Clock"))
+local Uploads = Import.shared("Audio/Uploads") :: typeof(require("../../shared/Audio/Uploads"))
 
 local YardHazards = {}
 
@@ -31,7 +33,7 @@ YardHazards.FOLDER = "YardDogs"
 YardHazards.MOVE_HZ = 15 -- body updates a second for a dog near a player
 YardHazards.ID_BASE = 900000 -- the dogs' ids on the town's scheduler (never a town actor's)
 YardHazards.SOUNDS = table.freeze({
-	["Dogs.Bark"] = "", -- a friendly bark from Roblox's library (the lead fills it; never uploaded)
+	["Dogs.Bark"] = Uploads.id("dog_bark"), -- the game's own friendly "woof woof" (owner #36: a custom upload)
 })
 YardHazards.WORDS = table.freeze({
 	chased = "WOOF! A yard dog chases you out of its yard.",
