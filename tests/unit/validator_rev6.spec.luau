@@ -197,22 +197,10 @@ return function(t)
 			Height.configure(Data.default():module("TerrainExtensions"))
 			local town = BakedWorld.load("build/Town.rbxm")
 			local w = town:motorWorld(Data.default())
-			-- the live server's rays (ValidatorWorld.engineRays): the wall and the floor both look past the bough cylinders
-			local function live(p: BakedWorld.Part): boolean
-				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
-				return p.squirrelSolid and not ValidatorWorld.isBough(p.name, parentName)
-			end
-			local function wall(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-				return town.raycast(ox, oy, oz, dx, dy, dz, live) ~= nil
-			end
-			local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-				if town.raycast(ox, oy, oz, dx, dy, dz, live) ~= nil then
-					return true
-				end
-				local g = town.terrainAt(ox, oz)
-				return g >= oy + dy and g <= oy
-			end
-			local vworld = ValidatorWorld.build(w, { wall = wall, down = down })
+			-- the live server's rays (ValidatorWorld.engineRays, by its own rule: BakedWorld.validatorRays). Round 6 had the
+			-- floor ray look past the bough cylinders as the wall ray does; the floor now counts them (validator fix 7)
+			local wall, down, cover = BakedWorld.validatorRays(town)
+			local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
 			-- branches of the first big tree (Tree_220) and a wire over Tree_359, at two points each, 20 packets a second
 			local rows, dirty = {}, 0
 			for _, id in { 221, 224, 227, 65 } do

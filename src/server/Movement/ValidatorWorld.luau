@@ -14,24 +14,33 @@
 --     plates the client's motor stands on as drawn (Shared/World/GroundPlate: up to 3.3 st over the terrain, measured).
 -- What the client's motor treats as a wall (Client/World/ClientWorld) and what these rays see must agree in one
 -- direction only: a ray may miss a wall the client sees (that lets a cheat through, it never snaps an honest body),
--- it must never stop where the client's body went. So the engine rays look past a tree's invisible bough cylinders
--- (ClientWorld.isBough), the bodies, the vehicles and the terrain (no wall for the client), and run in the squirrel's
--- collision group (Shared/World/CollisionGroups.SQUIRREL_PROBE).
+-- it must never stop where the client's body went. So the engine's wall ray looks past a tree's invisible bough
+-- cylinders (ClientWorld.isBough), the bodies, the vehicles and the terrain (no wall for the client), and runs in the
+-- squirrel's collision group (Shared/World/CollisionGroups.SQUIRREL_PROBE). For floors the direction is the other one:
+-- the server's floor ray must meet every floor the client stands on, and the client's ground (ClientWorld.groundAt) is
+-- the first colliding part under the feet, a bough cylinder included (a drop, Q, off a branch stands the body on its
+-- bough's cylinder; validator round 6: the floor ray looked past them and snapped 515 of 766 drops). So the floor ray
+-- counts the bough cylinders as floor, and only the cover check (a roof over a wall's far end) looks past them, as the
+-- wall ray does: a bough over a garden wall is no roof. One rule decides what each ray stops at (stops), and the
+-- specs' rays over the baked parts use it too (tests/lib/BakedWorld.validatorRays), so they see what the server sees.
 -- The town's cars (owner's playtest 2026-11-18: "I did run right through a car"): they are no parts on the server, and
 -- the client's motor now treats the cars it draws as walls and their roofs as ground (Shared/Traffic/Solid). So the
 -- rays meet the traffic service's car boxes as well (opts.cars, Server/Traffic/TrafficService.solids): the walls only
 -- where a car has stood still long enough for every client to draw it there (a moving car, drawn behind where the
 -- server has it, is never a wall: no honest body is snapped for it), the floors wherever a client may still draw one
 -- (withCars).
--- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray; opts.cars: { walls, floors },
+-- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down, opts.cover: Ray (cover: the down
+--   ray the roof check casts, default `down`); opts.cars: { walls, floors },
 --   Traffic/Solid sets); withCars(wall?, down?, cars) -> (wall?, down?); crosses(wall, down?) ->
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?, endY?) -> boolean (a rise only as high as the far end is open above:
 --   cover(down) -> (x, z, footY, top) -> number?); crossesLong(wall, down?) -> the same, chord by chord, for any
 --   length; floor(down, depth?) -> (x, y, z) -> boolean (the world's floorBelow, and floorNear at C.FLOOR_NEAR);
+--   stops(kind, name, parentName) -> boolean (the one rule: does a ray of `kind` "wall" | "floor" | "cover" stop at a
+--   colliding part of that name under that parent);
 --   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
 --   maxChord (the world's: C.MAX_CHORD); landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
---   (wall: Ray, down: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
+--   (wall: Ray, down: Ray, cover: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
 -- Ray: (ox, oy, oz, dx, dy, dz) -> boolean, true when the segment origin -> origin + d meets a solid.
 -- Pure but for engineRays. No side effects on require.
 
@@ -85,10 +94,20 @@ function ValidatorWorld.isBough(name: string, parentName: string): boolean
 	return string.match(name, "^R%d") ~= nil and string.sub(parentName, 1, 5) == "Tree_"
 end
 
+-- stops(kind, name, parentName): does a ray of `kind` stop at a colliding part (in the squirrel's collision group) of
+-- this name under a parent of this name? "floor": every one (the client's ground stands on a bough's cylinder); "wall"
+-- and "cover": not a tree's bough cylinders (no wall for the client's motor; a bough over a wall is no roof).
+function ValidatorWorld.stops(kind: string, name: string, parentName: string): boolean
+	if kind == "floor" then
+		return true
+	end
+	return not ValidatorWorld.isBough(name, parentName)
+end
+
 -- cover(down)(x, z, footY, top) -> number?: is (x, z) under a roof between a body's top standing there (footY + C.TOP)
 -- and `top`? nil when open; else the highest height found open over it (C.COVER_RAYS down rays bisect it). Down rays
--- only (each from a height to footY + C.TOP: something whose top lies between): the engine's look past a tree's bough
--- cylinders as the floor ray does, and a trampoline's bed lies under the feet, never between.
+-- only (each from a height to footY + C.TOP: something whose top lies between); in the engine the cover ray, which looks
+-- past a tree's bough cylinders (stops "cover"), and a trampoline's bed lies under the feet, never between.
 function ValidatorWorld.cover(down: Ray): (number, number, number, number) -> number?
 	return function(x: number, z: number, footY: number, top: number): number?
 		local base = footY + C.TOP
@@ -291,12 +310,12 @@ end
 -- The car boxes the rays meet (Traffic/Solid sets; exported types do not cross Import)
 export type Cars = { walls: any, floors: any }
 
-export type Options = { wall: Ray?, down: Ray?, cars: Cars? }
+export type Options = { wall: Ray?, down: Ray?, cover: Ray?, cars: Cars? }
 
--- withCars(wall?, down?, cars): the two rays, each also stopped by the cars' boxes (the walls set for `wall`, the
--- floors set for `down`); a ray the world has none of is the cars' alone. The boxes are read at each ray (the sets are
--- refilled every traffic tick).
-function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars): (Ray, Ray)
+-- withCars(wall?, down?, cars, cover?): the rays, each also stopped by the cars' boxes (the walls set for `wall`, the
+-- floors set for `down` and `cover`: a car's roof over a wall's far end is a roof); a ray the world has none of is the
+-- cars' alone. The boxes are read at each ray (the sets are refilled every traffic tick).
+function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars, cover: Ray?): (Ray, Ray, Ray)
 	local walls, floors = cars.walls, cars.floors
 	local function over(set: any, ray: Ray?): Ray
 		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
@@ -306,16 +325,16 @@ function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars): (Ray, Ray)
 			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz)
 		end
 	end
-	return over(walls, wall), over(floors, down)
+	return over(walls, wall), over(floors, down), over(floors, cover or down)
 end
 
 -- build(rail, opts?): MoveValidator's world over a rail world (Movement/RailWorld: registry, index, graph,
 -- trampolines). A fresh table, so Motion's caches on it are the validator's own.
 function ValidatorWorld.build(rail: any, opts: Options?): any
 	local o: Options = opts or {}
-	local wall, down = o.wall, o.down
+	local wall, down, cover = o.wall, o.down, o.cover or o.down
 	if o.cars then
-		wall, down = ValidatorWorld.withCars(wall, down, o.cars)
+		wall, down, cover = ValidatorWorld.withCars(wall, down, o.cars, cover)
 	end
 	return {
 		registry = rail.registry,
@@ -325,8 +344,8 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		groundAt = function(_x: number, _z: number, refY: number): number
 			return refY
 		end,
-		crosses = if wall then ValidatorWorld.crosses(wall, down) else nil,
-		crossesLong = if wall then ValidatorWorld.crossesLong(wall, down) else nil,
+		crosses = if wall then ValidatorWorld.crosses(wall, cover) else nil,
+		crossesLong = if wall then ValidatorWorld.crossesLong(wall, cover) else nil,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
 		floorNear = if down then ValidatorWorld.floor(down, C.FLOOR_NEAR) else nil,
 		-- a car's roof within C.CAR_SLACK under the feet (the climb and float flags weigh a third there)
@@ -341,9 +360,10 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 	}
 end
 
--- engineRays(exclude): the two rays on the live server. `wall`: colliding parts in the squirrel's group, past the
--- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: the same, with the
--- terrain, the water, the vehicles and the town's ground plates (Shared/World/GroundPlate) counted as floor.
+-- engineRays(exclude): the three rays on the live server. `wall`: colliding parts in the squirrel's group, past the
+-- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: colliding parts
+-- in the squirrel's group, the bough cylinders included, the terrain, the water, the vehicles and the town's ground
+-- plates (Shared/World/GroundPlate) counted as floor. `cover`: `down` past the bough cylinders (stops: one rule each).
 function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 	local function params(list: { Instance }): RaycastParams
 		local p = RaycastParams.new()
@@ -366,7 +386,7 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 	end
 	local floorParams = params(floorList)
 	floorParams.IgnoreWater = false
-	local function cast(p: RaycastParams): Ray
+	local function cast(p: RaycastParams, kind: string): Ray
 		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 			local origin = Vector3.new(ox, oy, oz)
 			local left = Vector3.new(dx, dy, dz)
@@ -377,7 +397,7 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 				end
 				local part = hit.Instance
 				local parent = part.Parent
-				if not ValidatorWorld.isBough(part.Name, if parent then parent.Name else "") then
+				if ValidatorWorld.stops(kind, part.Name, if parent then parent.Name else "") then
 					return true
 				end
 				-- through the bough and on along the rest of the segment
@@ -437,11 +457,14 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray)
 		end
 		return false
 	end
-	local solidDown = cast(floorParams)
+	local solidDown, solidCover = cast(floorParams, "floor"), cast(floorParams, "cover")
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	return cast(wallParams), down
+	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	end
+	return cast(wallParams, "wall"), down, cover
 end
 
 return ValidatorWorld

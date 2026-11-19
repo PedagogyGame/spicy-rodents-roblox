@@ -47,16 +47,10 @@ return function(t)
 				local p = town.raycast(x, from, z, 0, solidY - from, 0, isPlate)
 				return if p then math.max(solidY, from + (solidY - from) * p) else solidY, solidY
 			end
-			-- the server's floorNear (ValidatorWorld.floor at FLOOR_NEAR over engineRays' down: colliders, terrain, plates)
-			local function serverFloorNear(x: number, y: number, z: number): boolean
-				local from = y + ValidatorWorld.C.RAY_ABOVE
-				local depth = ValidatorWorld.C.RAY_ABOVE + ValidatorWorld.C.FLOOR_NEAR
-				if town.raycast(x, from, z, 0, -depth, 0, solid) or town.raycast(x, from, z, 0, -depth, 0, isPlate) then
-					return true
-				end
-				local g = town.terrainAt(x, z)
-				return g <= from and g >= from - depth
-			end
+			-- the server's floorNear: ValidatorWorld.floor at FLOOR_NEAR over the live floor ray, by the server's own rule
+			-- (BakedWorld.validatorRays: colliders, the bough cylinders included, terrain, water, plates)
+			local _, down = BakedWorld.validatorRays(town)
+			local serverFloorNear = ValidatorWorld.floor(down, ValidatorWorld.C.FLOOR_NEAR)
 			local plates, samples, worst, worstAt, overBefore = 0, 0, -math.huge, "", 0
 			local missed: { string } = {}
 			local byFolder: { [string]: number } = {}
