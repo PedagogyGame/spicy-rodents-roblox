@@ -22,6 +22,11 @@
 --             truck 8.4 wide); mid-turn the follower's front end is 3 studs from those points, so room = 0; the
 --             truck brakes for the emergency vehicle in front of it (bracesFor). Neither moves until the case is
 --             given up (155 s in infection_service's "no way to walk" case at be30746, victim by (300, 300))
+--   fencetop  (merge interaction) InfectionService now hands Combat/CombatService the town's WalkWay boxes as its sight
+--             colliders (`infection.colliders` = way.colliders), and WalkWay added 1,384 fence pieces (1,379 of them
+--             3.5+ studs tall) to that set: a rodent standing on a fence rail is inside a fence box, so inSight is
+--             false for everyone: nobody squares up to it, and no blow lands on it (at 2343c1c a tough person 4
+--             studs off fence_11 squares up to it on the rail)
 --   rounds    (holds on the merged tree; kept as a guard) every Staff brain's round, the shop workers' new pavement
 --             rounds included, misses every baked wall
 --   audit     tools/sim/wall_audit --seeds 1,2 --minutes 30 crossed 3 walls on the merged tree: a shop worker walking
@@ -39,6 +44,7 @@ local Height = require("@shared/World/Height")
 local TownAI = require("@server/AI/TownAI")
 local WallAudit = require("@tests/lib/WallAudit")
 local TrafficService = require("@server/Traffic/TrafficService")
+local BiteRig = require("@tests/lib/BiteRig")
 local LaneMath = require("@shared/Traffic/LaneMath")
 
 local DT = 1 / 30
@@ -403,5 +409,36 @@ return function(t)
 		local s0 = amb.s
 		traffic:step(10, { people = {} })
 		t.truthy(amb.s > s0 + 20, `the ambulance drove {amb.s - s0} studs in 10 s (the truck {truck.speed} st/s)`)
+	end)
+
+	t.test("fencetop: a rodent on a fence rail 4 studs from a tough person is seen by the duel", function()
+		local rig = BiteRig.new({
+			seed = 2,
+			duelRand = function(): number
+				return 0
+			end,
+		})
+		rig.step(5)
+		rig.holdRodent()
+		local tough = nil
+		for _, a in rig.world.actors do
+			if a.post == "townsperson" and rig.combat:temperOf(a.id) == "tough" then
+				tough = a
+				break
+			end
+		end
+		assert(tough, "a tough townsperson")
+		-- fence_11's piece by (-207.5, -101.5): a rail 5.25 studs up, running along z
+		local fx, fz, top = -207.5, -101.483, 5.25
+		local px, pz = fx + 4, fz
+		rig.put(tough.id, px, pz, math.atan2(fx - px, 0))
+		rig.hold(tough.id)
+		rig.let(tough.id)
+		rig.put(rig.rodent, fx, fz)
+		local rod = rig.world.actorsById[rig.rodent]
+		rod.y = top + rod.hip
+		rig.step(1)
+		local g = rig.combat.guards[tough.id]
+		t.truthy(g ~= nil, "the tough person squares up to the rodent on the rail")
 	end)
 end
