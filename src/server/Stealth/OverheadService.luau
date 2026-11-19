@@ -530,9 +530,11 @@ function OverheadService.spotFor(self: any, a: any, s: Overhead, mode: string): 
 end
 
 -- walkTo(self, id, x, z, faceX, faceZ, secs, speed): THE one way this service sends a person somewhere (to `x`, `z`
--- at `speed`, facing the squirrel at `faceX`, `faceZ` once there, for `secs`). Today the brains walk the straight line (spotFor has checked it); once the
--- town's walking route-finder lands (World/WalkWay, feat/no-wall-walk), this is the one place to switch to it.
--- An officer's own order comes first: a chase, a sewer stakeout (review L6). False when no order was given.
+-- at `speed`, facing the squirrel at `faceX`, `faceZ` once there, for `secs`), by the town's way on foot (World/WalkWay:
+-- the brains walk every such order through Brains/Common.toward, the Pedestrian's "overhead" approach and the Officer's
+-- "respond", round a fence or a garden wall spotFor's building test does not know; with no way there they stand and
+-- look up where they are). An officer's own order comes first: a chase, a sewer stakeout (review L6). False when no
+-- order was given.
 function OverheadService.walkTo(
 	self: any,
 	id: number,

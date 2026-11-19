@@ -51,6 +51,9 @@ return function(t)
 			local victim = rig.calmNear(0, 0)
 			local id = victim.id
 			t.truthy(biteBeside(rig, victim), "the bite starts a case")
+			-- the player runs off (a crowd never gathers within InfectionService.CROWD_SCARE of the rodent, and the
+			-- victim runs only a few seconds from it: where it stopped decided whether a crowd stayed)
+			rig.put(rig.rodent, victim.x + 150, victim.z + 150)
 			-- the shout, at once
 			t.truthy(
 				table.find(Lines.GROUPS.bitten, rig.attrs[id].Say) ~= nil,

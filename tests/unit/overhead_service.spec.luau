@@ -3,7 +3,9 @@
 -- town AI, its 80 people on the real lanes, the real wires, the duel asking who has spotted the rodent overhead). Owner
 -- playtest 2026-11-19: "awareness and discussion and chatter, if i (spicy rodent) am prowling and stalking from above on
 -- a powerline or branch etc."
---   * the headless sim: the player's rodent walks a powerline 42 studs over the busiest crossing for a minute: it draws
+--   * the headless sim (seed 2, with three townspeople talking on the corner under the wire: since the lanes were cut
+--     where buildings stand on them, who happens to walk under it differs, so the test puts the people it counts on
+--     there): the player's rodent walks a powerline 42 studs over the busiest crossing for a minute: it draws
 --     looks, pointing and chatter (two-person exchanges among it), and its own eye fills; creeping along the same wire
 --     for a minute, lingering over whoever passes under it (as a stalking player does), it draws uneasy glances and
 --     murmurs ("Did you hear something?") and is pointed out rarely (the numbers are printed);
@@ -21,6 +23,9 @@ local AreaPace = require("@shared/Speech/AreaPace")
 local Lines = require("@shared/Speech/Lines")
 
 local WIRE = 163 -- an east-side utility wire over the town's busiest crossing (x 41, z -41 to 41; 42 studs up)
+-- the group on the corner by the wire's foot (rigWithLog), and where they stand facing
+local GROUP = { { 33, -36 }, { 36, -33 }, { 33, -30 } }
+local GROUP_AT = { 35, -34 }
 local SECS = 60
 local OVERHEAD = {
 	overhead = true,
@@ -123,6 +128,20 @@ local function rigWithLog(seed: number): (any, { Log })
 		setAttr(id, name, value)
 	end
 	rig.step(20)
+	-- three townspeople talking on the corner under the wire (who happens to walk by depends on where the lanes run:
+	-- the test puts a few people it can count on there)
+	local used: { [number]: boolean } = {}
+	for _, q in GROUP do
+		local a = rig.calmNear(q[1], q[2], used)
+		if a then
+			used[a.id] = true
+			rig.hold(a.id)
+			rig.put(a.id, q[1], q[2])
+			rig.let(a.id)
+			local brain = rig.world.brains[a.id] :: any
+			brain:onEvent({ type = "gather", x = GROUP_AT[1], z = GROUP_AT[2], untilTime = rig.world.now + 200 })
+		end
+	end
 	return rig, log
 end
 
@@ -174,7 +193,7 @@ return function(t)
 		function()
 			local rows = {}
 			for _, mode in { { name = "walk", speed = 18 }, { name = "creep", speed = 3, prowl = true } } do
-				local rig, log = rigWithLog(1)
+				local rig, log = rigWithLog(2)
 				local eye = 0
 				local spotters: { [number]: boolean } = {}
 				onWire(rig, mode.speed, SECS, function()
