@@ -5,7 +5,7 @@
 -- Usage (repo root): lune run tools/review/rides.luau [--out build/review/rides] [--res 1600x620] [--rows N] entry ...
 --   rider:<slot>      Server/AI/Puppets.build("human", "rider", 100 + slot, ..., slot): a street rider (1-8)
 --   device:<kind>     Shared/Vehicles/Placeholder.build(kind): a player vehicle (car, cart, bike, pickup, suv, jetski)
---   vehicle:<kind>    Shared/Traffic/VehiclePuppet.spec(kind): a traffic vehicle
+--   vehicle:<kind>    Shared/Traffic/VehiclePuppet.spec(kind): a traffic vehicle (a motorcycle with its rider)
 --   prop:<name>       the first model in build/Town.rbxm whose name contains <name> (run tools/bake/main.luau first)
 -- The engine-side builders run on @lune/roblox instances (the engine globals are put in place for them here). Each
 -- entry stands on y = 0 (its lowest visible part), facing -Z, in rows; each row gets a front and a rear three-quarter
@@ -96,7 +96,9 @@ local function build(entry: string): (any, string)
 		local Placeholder = (require :: any)("../../src/shared/Vehicles/Placeholder")
 		return Placeholder.build(arg), `{arg} (player)`
 	elseif what == "vehicle" then
-		return PartBuilder.instantiate(VehiclePuppet.spec(arg :: string), lib), arg :: string
+		-- a motorcycle carries its rider, as the traffic draws it (Traffic/Ghost: Morgan Rider)
+		local rider = if arg == "motorcycle" then 7 else nil
+		return PartBuilder.instantiate(VehiclePuppet.spec(arg :: string, { rider = rider }), lib), arg :: string
 	elseif what == "prop" then
 		return fromTown(arg :: string), arg :: string
 	end
