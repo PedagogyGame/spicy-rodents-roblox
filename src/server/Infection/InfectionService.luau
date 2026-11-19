@@ -157,6 +157,7 @@ InfectionService.CREW_WALK_SECS = 12 -- the crew walks this long to a patient; a
 InfectionService.AWAY_SECS = 2 -- a cured person with no way home on foot is out of sight this long, then home
 InfectionService.RUN = 30 -- studs: the run of a bitten person who has no lane to run along
 InfectionService.RUN_MIN = 8 -- studs: with less room than this there is no run
+InfectionService.ON_ROUND = 2.5 -- studs from their round's legs: an indoor run along it starts only this near it
 InfectionService.STRAY = 60 -- studs from their own round: staff further off than this are walked back by a real way
 InfectionService.CROWD_SCARE = 30 -- studs: a bystander this near the rodent leaves the crowd and runs
 InfectionService.LOAD_LINGER = 1.5 -- s the ambulance stays after its patient is aboard, before it pulls away
@@ -786,7 +787,11 @@ local function runFrom(self: Service, id: number, threat: any, after: string?): 
 	if a and loop and inAlley(self, a.x, a.z) then
 		way = alleyRun(self, a.x, a.z, threat.x, threat.z, loop)
 	elseif a then
+		-- (their own round only when they are on it: a guard bitten in the hospital has no run back to the locker room)
 		local round = if brain and brain.kind == "Staff" then brain.points else nil
+		if round and offRound(round, a.x, a.z) > InfectionService.ON_ROUND then
+			round = nil
+		end
 		way = runWay(self, a.x, a.z, threat.x, threat.z, round)
 	end
 	if way == nil then
