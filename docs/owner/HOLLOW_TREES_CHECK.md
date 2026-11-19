@@ -30,7 +30,7 @@ Everything below was tested without a screen, on the real squirrel controls and 
 - **A claim belongs to the player, not the body.** If you let your squirrel go, your claim stays yours (it lapses if you stay away three game days), and the computer squirrel that takes the body back does not own your tree. Nuts are carried by the body: letting it go, or being knocked out, loses them.
 - A squirrel carries **at most nine nuts**.
 
-**Not built yet:** anywhere to pick nuts up. The gardens, feeders and trash cans, with their nuts limited per season, are the foraging work, and that does not exist. The claim is ready for it. Also not built yet: taking nuts back out, the winter survival check on the meter, and the squirrel rank's nut count.
+**Nuts to pick up are now built** (19 November): 49 piles under the acorn oaks, in yards and in the park, and a nut meter on screen; see `docs/owner/NUTS_CHECK.md`. Still not built: taking nuts back out, the winter survival check on the meter, and the squirrel rank's nut count.
 
 ## What only you can judge
 - **H1 is in the HIGHLAND ELM giant, not the park tree by the Tabasco garden.** The park tree's trunk is 4 studs across and the squirrel is 1.6 wide, so no ramp fits inside it. The giant is 9.4 across. H1's premium garden and bird feeder are listed beside the giant but are not built, the same as H2's. *Default: the giant, as built.*
