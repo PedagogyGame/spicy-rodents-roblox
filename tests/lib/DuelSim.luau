@@ -71,6 +71,10 @@ export type Options = {
 	boosted: boolean?, -- near a fresh bite
 	params: CombatRules.Params?,
 	trace: ((now: number, dist: number, phase: string, meter: number, flying: boolean) -> ())?,
+	-- the stalker's play (review of the overhead watch): the distance it pounces from (default 9) and its creep's
+	-- speed (default DuelSim.CREEP)
+	pounceFrom: number?,
+	creep: number?,
 }
 
 export type Result = {
@@ -308,9 +312,9 @@ function DuelSim.run(opts: Options): Result
 		elseif stalking and (opts.rodent == "stalker" or not onWire) then
 			-- walk in while it cannot be heard, then creep; pounce from 9 studs
 			local creep = d <= 27
-			local sp = if creep then DuelSim.CREEP else DuelSim.WALK
+			local sp = if creep then (opts.creep or DuelSim.CREEP) else DuelSim.WALK
 			vx, vz = ux * sp, uz * sp
-			if d <= 9 and canPounce() then
+			if d <= (opts.pounceFrom or 9) and canPounce() then
 				startPounce()
 			end
 		elseif stalking and opts.rodent == "dropper" then
