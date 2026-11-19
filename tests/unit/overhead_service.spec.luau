@@ -94,7 +94,6 @@ end
 
 return function(t)
 	local walk: any, walkLog: { Log } = nil, {}
-	local walkEye = 0
 	local walkSpotters: { [number]: boolean } = {}
 
 	t.test(
@@ -144,7 +143,7 @@ return function(t)
 					)
 				)
 				if mode.name == "walk" then
-					walk, walkLog, walkEye, walkSpotters = rig, log, eye, spotters
+					walk, walkLog, walkSpotters = rig, log, spotters
 				end
 			end
 			local w, c = rows.walk, rows.creep
