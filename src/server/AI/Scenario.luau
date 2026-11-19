@@ -297,9 +297,10 @@ function Scenario.build(opts: Opts): World
 			end
 		end
 	end
-	for _ = 1, riders do
+	for k = 1, riders do
 		local actor = add("human", "rider", "Pedestrian", humanDef.hipHeight)
 		actor.post = "rider"
+		actor.ride = k
 		register(actor, Pedestrian.new(actor, riderParams))
 	end
 	local squirrelDef = Species.def("squirrel")

@@ -32,6 +32,7 @@ export type PartSpec = {
 	material: string?, -- Enum.Material name (default SmoothPlastic)
 	transparency: number?,
 	reflectance: number?,
+	castShadow: boolean?, -- default: every visible part but the PrimaryPart casts a shadow
 	attributes: { [string]: any }?, -- e.g. Region = "Body" on the extra fur parts of a part-built animal
 }
 
@@ -125,7 +126,10 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 		inst.Reflectance = p.reflectance or 0
 		inst.TopSurface = Enum.SurfaceType.Smooth
 		inst.BottomSurface = Enum.SurfaceType.Smooth
-		inst.CastShadow = if p.name == spec.primary then false else (p.transparency or 0) < 1
+		inst.CastShadow = if p.name == spec.primary
+			then false
+			elseif p.castShadow ~= nil then p.castShadow
+			else (p.transparency or 0) < 1
 		inst.CanCollide = false
 		inst.CanTouch = false
 		inst.CanQuery = p.name == spec.primary

@@ -110,7 +110,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	local t0 = workspace:GetServerTimeNow()
 
 	for _, a in world.actors do
-		local model = BodyFactory.build(a.species, a.variant, a.id, a.post)
+		local model = BodyFactory.build(a.species, a.variant, a.id, a.post, a.ride)
 		local id = `{a.species}_{a.id}`
 		model.Name = id
 		model:SetAttribute(PossessionState.ATTR.ActorId, id)

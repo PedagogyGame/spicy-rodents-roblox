@@ -13,11 +13,13 @@
 -- (4) the S5 part-built puppet (Server/AI/Puppets) if that fails. A stock R15 is dressed as a rounded
 -- townsperson (Assets/PeopleArt, Shared/Avatar/PeopleLooks: its post's role, the same colours) once those Models
 -- are uploaded and loaded; a dress that fails leaves the stock body. The novelty riders and motorcyclists
--- (variant "rider") are not dressed, on purpose: each is a part-built rider welded onto its bike with no R15 joints
--- (Infection/InfectionService: never a patient), so there is no rig to swap the art onto. Every body is readied by
+-- (variant "rider") are not given that art, on purpose: each is a part-built rider welded onto its ride with no R15
+-- joints (Infection/InfectionService: never a patient), so there is no rig to swap the art onto. They are drawn in its
+-- likeness instead (Shared/Vehicles/RidePuppet: PeopleLooks' colours, hair and hat, a round build, a riding pose), the
+-- ride and look picked by the actor's ride slot (AI/TownAI). Every body is readied by
 -- ActorService.prepareBody (anchored root, Atomic streaming, no server Animator, Dead disabled, no name
 -- label, replicated ActorId/Species attributes) and stamped with Variant and Post.
--- Interface: build(species, variant, index, post?) -> Model; template(species) -> Model?;
+-- Interface: build(species, variant, index, post?, ride?) -> Model; template(species) -> Model?;
 --   applyLook(body, look) (stock colours by species look; the blend is AvatarBlendService's)
 -- Engine only inside the functions. No side effects on require.
 
@@ -153,7 +155,7 @@ local function stockHuman(index: number, post: string?): Model
 	return model
 end
 
-function BodyFactory.build(species: string, variant: string, index: number, post: string?): Model
+function BodyFactory.build(species: string, variant: string, index: number, post: string?, ride: number?): Model
 	local templateSpecies = if species == "squirrel" and variant == "spicy" then "rodent" else species
 	local model: Model
 	local t = BodyFactory.template(templateSpecies) or BodyFactory.template(species)
@@ -179,7 +181,7 @@ function BodyFactory.build(species: string, variant: string, index: number, post
 		end)
 		model = if ok then result else Puppets.build(species, variant, index, workspace).model
 	else
-		model = Puppets.build(species, variant, index, workspace).model
+		model = Puppets.build(species, variant, index, workspace, ride).model
 	end
 	local id = `{species}_{index}`
 	ActorService.prepareBody(model, id, species)

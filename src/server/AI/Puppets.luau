@@ -8,11 +8,13 @@
 --            the roots only, and the assembly carries the limbs (if the engine does; the spike checks)
 -- Engine-only inside the functions (Instance.new, CFrame); requiring the module is side-effect free
 -- so the Lune skeleton test and BootSmoke both pass.
--- Interface: build(species, variant, index, parent) -> Rig, buildVehicle(...), move(rigs, poses, mode),
+-- Interface: build(species, variant, index, parent, slot?) -> Rig (slot: a street rider's, RidePuppet.rider), buildVehicle(...), move(rigs, poses, mode),
 -- anchorAll(rigs, anchored), partCount(rigs), checkFollow(rig)
 
 local Import = require("../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local PartBuilder = Import.shared("Avatar/PartBuilder") :: typeof(require("../../shared/Avatar/PartBuilder"))
+local RidePuppet = Import.shared("Vehicles/RidePuppet") :: typeof(require("../../shared/Vehicles/RidePuppet"))
 
 export type Rig = {
 	model: Model,
@@ -161,18 +163,24 @@ local function buildHuman(index: number, parent: Instance): Rig
 	return rig
 end
 
--- A non-Humanoid rider (mime, kid cyclist, motorcyclist): 6 body parts plus 2 wheels.
-local function buildRider(index: number, parent: Instance): Rig
-	local color = Color3.fromHSV((index * 0.21) % 1, 0.5, 0.7)
-	local specs: { Spec } = {
-		{ name = "Torso", size = Vector3.new(1.6, 1.6, 0.9), offset = CFrame.new(0, 0.6, 0), joint = "Waist" },
-		{ name = "Head", size = Vector3.new(1, 1, 1), offset = CFrame.new(0, 1.9, 0), joint = "Neck" },
-		{ name = "LeftLeg", size = Vector3.new(0.6, 1.6, 0.6), offset = CFrame.new(-0.4, -1.0, 0), joint = "LeftHip" },
-		{ name = "RightLeg", size = Vector3.new(0.6, 1.6, 0.6), offset = CFrame.new(0.4, -1.0, 0), joint = "RightHip" },
-		{ name = "WheelF", size = Vector3.new(0.2, 1.4, 1.4), offset = CFrame.new(0, -1.5, -1.4), joint = "WheelF" },
-		{ name = "WheelB", size = Vector3.new(0.2, 1.4, 1.4), offset = CFrame.new(0, -1.5, 1.2), joint = "WheelB" },
-	}
-	return assemble("human", `Rider_{index}`, Vector3.new(1, 1, 1), specs, parent, color)
+-- A non-Humanoid street rider (the mime on his unicycle, a kid on a bicycle, a motorcyclist on a scooter): the shaped
+-- ride and rounded rider of Shared/Vehicles/RidePuppet for town slot `slot` (1-8; by default from the index), every
+-- part welded to the invisible 1 x 1 x 1 root (the only part that can be queried), the tyres on Motor6Ds WheelF, WheelB.
+local function buildRider(index: number, parent: Instance, slot: number?): Rig
+	local spec = RidePuppet.rider(slot or (index % #RidePuppet.RIDERS + 1), index)
+	local model = PartBuilder.instantiate(spec, PartBuilder.engineLib()) :: Model
+	local root = model.PrimaryPart :: BasePart
+	local parts: { BasePart } = { root }
+	local offsets: { CFrame } = { CFrame.new() }
+	for _, d in model:GetChildren() do
+		if d:IsA("BasePart") and d ~= root then
+			d.Anchored = true -- as every puppet part is built; ActorService.prepareBody frees all but the root
+			table.insert(parts, d)
+			table.insert(offsets, root.CFrame:ToObjectSpace(d.CFrame))
+		end
+	end
+	model.Parent = parent
+	return { model = model, root = root, parts = parts, offsets = offsets, species = "human" }
 end
 
 -- Animal puppets: Body, Head, Tail1..n, four legs with the final bone names on the Motor6Ds.
@@ -229,10 +237,10 @@ local function buildAnimal(
 	return assemble(species, `{species}_{index}`, Vector3.new(0.5 * s, 0.5 * s, 0.5 * s), specs, parent, color)
 end
 
-function Puppets.build(species: string, variant: string, index: number, parent: Instance): Rig
+function Puppets.build(species: string, variant: string, index: number, parent: Instance, slot: number?): Rig
 	if species == "human" then
 		if variant == "rider" then
-			return buildRider(index, parent)
+			return buildRider(index, parent, slot)
 		end
 		return buildHuman(index, parent)
 	elseif species == "squirrel" then
