@@ -46,6 +46,10 @@ The simulation plays the duel as the server does (ten times a second), with the 
 | skilled | a calm person | 86 % | 87 % | 75 % |
 | straight sprint | a calm person | 88 % | 86 % | 88 % |
 | skilled, right after a bite nearby | calm / wary / vigilante | | 8 % / 4 % / 3 % | |
+| **stalked from behind** (creeps up, pounces from 9 studs) | calm / wary | 98 / 95 % | 96 / 92 % | 96 / 93 % |
+| **dropped from above** (creeps along a wire or bough, drops behind them, pounces) | calm / wary | 96 / 94 % | 97 / 94 % | 97 / 91 % |
+
+**Stalking (added 19 November, after the overhead watch):** people now notice the rodent the way the town sees it: in front of them, or heard when it moves faster than a creep (about 21 studs), or felt when it brushes them (4 studs). A rodent creeping or keeping still behind someone is no longer noticed just for being within 17 studs, and nobody turns round for the pounce itself. So in those two rows about **8 bites in 10 land on a person who never saw it coming** (unaware: 80 to 86 % of all duels, at every link); a rodent that runs straight in is noticed every time (0 % unaware). The first five rows are unchanged.
 
 Against a vigilante, a skilled rodent takes almost two blows per fight on average (two blows knock it out). A runner no longer reaches "a door": a person runs about six seconds, as the town's people do, and stays on guard if the rodent is still on them.
 
