@@ -44,6 +44,8 @@ return function(t)
 		-- a squirrel packet goes through it: a 30-stud jump in one tick is a violation
 		local s = SquirrelMotor.new(0, 0.45, 0)
 		s.clock = 1
+		-- (the first packet is judged from a place the server holds, never taken where it says: validator round 6)
+		m:teleported("squirrel_1", 0, 0.45, 0, "spawn", 9.9)
 		m:packet("squirrel_1", "squirrel", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 10)
 		s.clock += 1 / 20
 		s.x += 30

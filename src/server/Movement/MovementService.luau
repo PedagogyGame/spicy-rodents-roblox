@@ -143,6 +143,7 @@ type Squirrel = {
 	lastX: number,
 	lastY: number,
 	lastZ: number,
+	placed: boolean, -- lastX/Y/Z hold a packet the server accepted (false: never yet; they are no place then)
 	suspended: boolean,
 	heldUntil: number?,
 	held: Gate?,
@@ -363,6 +364,7 @@ function MovementService.new(deps: Deps): Movement
 				lastX = 0,
 				lastY = 0,
 				lastZ = 0,
+				placed = false,
 				suspended = false,
 				heldUntil = nil,
 				held = nil,
@@ -451,7 +453,25 @@ function MovementService.new(deps: Deps): Movement
 		self.histories[id] = nil
 	end
 
-	-- snap the body back to `target` (default: the last clean packet), tell its driver, hold it after a run of snaps
+	-- anchorOf(sq): a place the server itself holds for the body, to judge a packet the validator has no baseline for
+	-- (validator round 6, invariant A): where it keeps a pinned body, else the root it last saw this epoch, else the last
+	-- packet it accepted; nil when it knows none (never an uninitialised 0, 0, 0: the round-5 review)
+	local function anchorOf(sq: Squirrel): Gate?
+		local pin = sq.pinAt
+		if sq.pinned and pin then
+			return { x = pin.x, y = pin.y, z = pin.z, at = pin.at }
+		end
+		if sq.rootX then
+			return { x = sq.rootX :: number, y = sq.rootY, z = sq.rootZ, at = sq.rootAt }
+		end
+		if sq.placed then
+			return { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = 0 }
+		end
+		return nil
+	end
+
+	-- snap the body back to `target` (default: the last clean packet, else the gate, else a place the server holds:
+	-- anchorOf), tell its driver, hold it after a run of snaps. With no place known at all nothing is moved (logged)
 	local function snap(self: Movement, id: any, why: string, now: number, target: Gate?)
 		local sq = squirrel(self, id)
 		local to = target
@@ -459,11 +479,13 @@ function MovementService.new(deps: Deps): Movement
 			local good = sq.good
 			if good then
 				to = { x = good.x :: number, y = good.y :: number, z = good.z :: number, at = now, snapshot = good }
-			elseif sq.gate then
-				to = sq.gate
 			else
-				to = { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = now }
+				to = sq.gate or anchorOf(sq)
 			end
+		end
+		if to == nil then
+			self.log:every(`snap:{id}`, 1, "warn", `{id}: no place to snap back to ({why}); not moved`)
+			return
 		end
 		local t = to :: Gate
 		local gate: Gate = { x = t.x, y = t.y, z = t.z, at = now, snapshot = t.snapshot }
@@ -1088,19 +1110,34 @@ function MovementService.new(deps: Deps): Movement
 			end
 			local px, py, pz = snapshot.x :: number, snapshot.y :: number, snapshot.z :: number
 			local gate = sq.gate
+			if gate == nil and validator:last(actorId) == nil then
+				-- (validator round 6, invariant A: a packet the validator has no baseline for is judged against a place the
+				-- server holds, never taken where it says: the root the server last saw, else the last place it accepted)
+				gate = anchorOf(sq)
+				sq.gate = gate
+				if gate == nil then
+					self._stats.stale += 1
+					self.log:every(`anchor:{actorId}`, 5, "warn", `{actorId}: a first packet with no place to judge it from`)
+					return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
+				end
+			end
 			if gate and validator:last(actorId) == nil then
 				if gate.at == 0 then
 					gate.at = now
 				end
 				local span = math.min(math.max(0, now - gate.at), C.GATE_MOVE)
 				local reach = C.GATE_SLACK + fastest(self, actorId) * span
-				local violations: { any } = {}
-				if dist(px, py, pz, gate.x, gate.y, gate.z) > reach then
+				-- every field in bounds and the rail it claims where its x, y, z are, before the gate is cleared and the body
+				-- handed back (the round-5 review: a field fault found after both snapped the new body to 0, 0, 0)
+				-- (a fault is snapped to the gate below, as a gate failure is)
+				local violations: { any } = SquirrelMotor.fieldCheck(snapshot, validator.world)
+				local away = dist(px, py, pz, gate.x, gate.y, gate.z) > reach
+				if away then
 					table.insert(
 						violations,
 						{ code = "gate", severity = 1, detail = "first packet away from the body" }
 					)
-				else
+				elseif #violations == 0 then
 					-- the move from the gate as a whole: no climb, no hanging in the air, no wall
 					local from: any = { x = gate.x, y = gate.y, z = gate.z }
 					if gate.snapshot then
@@ -1181,7 +1218,7 @@ function MovementService.new(deps: Deps): Movement
 						)
 					end
 				end
-				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
+				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ, sq.placed = now, px, py, pz, true
 				sq.shot = snapshot
 				-- (a click's copy riding in the packet, newer than the last click taken: the caller takes it as it takes
 				-- the Duel remote's, clickNew counting it once; its motor clock is the packet's less its age)

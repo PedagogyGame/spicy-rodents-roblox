@@ -301,7 +301,15 @@ return function(t)
 				local r = ms:packet("a", "squirrel", { seq = 1, epoch = e, snapshot = dec }, 100.6)
 				t.eq(r.accepted, false, "not taken")
 				t.eq(ms:isPinned("a"), true, "still the server's")
-				t.eq(ms:stats().reasons["gate:wall"], 1, "snapped at the gate for the wall")
+				-- (validator round 6: a route claimed where the body is not is a field fault at the gate too, so the reason
+				-- may name the rail pose with the wall)
+				local gateSnaps = 0
+				for why, n in ms:stats().reasons do
+					if string.sub(why, 1, 5) == "gate:" and (string.find(why, "wall") or string.find(why, "railPose")) then
+						gateSnaps += n
+					end
+				end
+				t.eq(gateSnaps, 1, "snapped at the gate for the wall or the rail it claims")
 				t.eq(#corrections, 1)
 			end
 		)

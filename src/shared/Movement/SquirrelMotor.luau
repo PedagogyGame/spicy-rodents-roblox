@@ -1621,9 +1621,51 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	clickAgo = "[0, SquirrelWire.CLICK_COPY], 0 with no click (fieldCheck); the click dated as the remote's (clickAt)",
 })
 
+-- poseAgreement(world, r, railT, x, y, z, b, out): a packet on rail `r` is where its rail parameter says (validator
+-- round 6, the round-5 review's CRITICAL: a packet the envelope did not judge kept any railT, and the next one was
+-- judged by it alone): the body within posSlack of the centreline at railT, or, in a transfer, the transfer's target
+-- there, its easing in range and the body on its segment at the eased fraction. One pointAt. The drawn pose (a unit
+-- trunk normal) is the only place off the centreline, and it is the server's own (Motion.visualPose).
+local function poseAgreement(
+	world: World,
+	r: Registry.Route,
+	railT: number,
+	x: number,
+	y: number,
+	z: number,
+	b: Bridge?,
+	out: { Violation }
+)
+	local dest = world.registry:pointAt(r, math.clamp(railT, 0, 1))
+	if b then
+		if hypot2(b.tx - dest.x, b.tz - dest.z) > E.posSlack or math.abs(b.ty - dest.y) > E.posSlack then
+			add(out, "railPose", 1, "transfer target off the rail")
+		end
+		if
+			b.elapsed > b.duration + 1e-9
+			or b.elapsed < -1e-6
+			or b.duration < C.bridgeMin - 1e-9
+			or b.duration > C.bridgeMax + 1e-9
+		then
+			add(out, "railPose", 1, "transfer easing out of range")
+			return
+		end
+		local p = Motion.ease(b.elapsed / b.duration)
+		local ex, ey, ez = b.fx + (b.tx - b.fx) * p, b.fy + (b.ty - b.fy) * p, b.fz + (b.tz - b.fz) * p
+		if hypot2(ex - x, ez - z) > E.posSlack or math.abs(ey - y) > E.posSlack then
+			add(out, "railPose", 1, "body off the transfer segment")
+		end
+	else
+		local off = math.sqrt((dest.x - x) ^ 2 + (dest.y - y) ^ 2 + (dest.z - z) ^ 2)
+		if off > E.posSlack then
+			add(out, "railPose", math.min(1, Units.u(off)), `body {off} st off the rail centreline at t {railT}`)
+		end
+	end
+end
+
 -- fieldCheck(snapshot, world) -> violations: the ranges, enums and lengths of FIELD_BOUNDS for one packet as it came
 -- off the wire (SquirrelWire.fromRecord's snapshot, numbers already finite: SquirrelWire.sane), any packet, judged or
--- not. Pure arithmetic, but for one registry look-up per id.
+-- not. Arithmetic, one registry look-up per id, and on a rail one pointAt (the pose agreement: poseAgreement).
 function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violation }
 	local out: { Violation } = {}
 	local function range(k: string, lo: number, hi: number)
@@ -1675,6 +1717,32 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 			add(out, "field", 1, `{k} {id}: no such route`)
 		end
 	end
+	-- the rail it claims: -1, or a route of the world where its x, y, z are (every packet: the first, after a silence,
+	-- at the gate; the round-5 review's CRITICAL)
+	local rid = s.routeId
+	local onRoute: Registry.Route? = nil
+	if rid ~= -1 then
+		onRoute = if type(rid) == "number" then reg:get(rid) else nil
+		if onRoute == nil then
+			add(out, "route", 1, `routeId {rid}: no such route`)
+		end
+	end
+	if onRoute and type(s.railT) == "number" then
+		local b: Bridge? = nil
+		if s.bridgeActive == true then
+			b = {
+				fx = s.bfx,
+				fy = s.bfy,
+				fz = s.bfz,
+				tx = s.btx,
+				ty = s.bty,
+				tz = s.btz,
+				elapsed = s.bElapsed,
+				duration = s.bDuration,
+			}
+		end
+		poseAgreement(world, onRoute, s.railT, s.x, s.y, s.z, b, out)
+	end
 	if s.bridgeActive == true then
 		if type(s.routeId) ~= "number" or s.routeId < 0 then
 			add(out, "railPose", 1, "a transfer off any rail")
@@ -1693,9 +1761,7 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 		if math.abs((s.bDuration :: number) - Motion.bridgeDuration(gap)) > 1e-3 then
 			add(out, "railPose", 1, `transfer easing {s.bDuration} s for {gap} st`)
 		end
-		if (s.bElapsed :: number) < -1e-6 then
-			add(out, "railPose", 1, "transfer easing before its start")
-		end
+		-- (its easing in [0, bDuration] and the body on it: poseAgreement below)
 	end
 	local seq = s.clickSeq
 	if seq ~= nil then
@@ -1947,17 +2013,12 @@ function SquirrelMotor.envelope(
 	end
 	local pounce: number? = nil
 
-	-- 1. Position agreement with the claimed rail.
+	-- 1. Position agreement with the claimed rail (poseAgreement: fieldCheck asks it of every packet, judged or not), and
+	-- a transfer's start and easing against the last packet.
 	if nextRoute then
-		local dest = reg:pointAt(nextRoute, next.railT)
+		poseAgreement(world, nextRoute, next.railT, next.x, next.y, next.z, next.bridge, out)
 		local b = next.bridge
 		if b then
-			if hypot2(b.tx - dest.x, b.tz - dest.z) > E.posSlack or math.abs(b.ty - dest.y) > E.posSlack then
-				add(out, "railPose", 1, "transfer target off the rail")
-			end
-			if b.elapsed > b.duration + 1e-9 or b.duration < C.bridgeMin - 1e-9 or b.duration > C.bridgeMax + 1e-9 then
-				add(out, "railPose", 1, "transfer easing out of range")
-			end
 			-- (the transfer's start and its easing are the client's numbers: the start is where the body was when it began,
 			-- inside the gap and within its reach of the last packet, and the easing runs on by the gap's time, so a body
 			-- kept at a transfer's start floats beside a rail no longer than a transfer lasts)
@@ -1997,17 +2058,6 @@ function SquirrelMotor.envelope(
 				if from > reach then
 					add(out, "railPose", 1, `a transfer from {from} st away from the last packet in {dt} s`)
 				end
-			end
-			-- the body lies on the from->to segment at the eased fraction
-			local p = Motion.ease(b.elapsed / b.duration)
-			local ex, ey, ez = b.fx + (b.tx - b.fx) * p, b.fy + (b.ty - b.fy) * p, b.fz + (b.tz - b.fz) * p
-			if hypot2(ex - next.x, ez - next.z) > E.posSlack or math.abs(ey - next.y) > E.posSlack then
-				add(out, "railPose", 1, "body off the transfer segment")
-			end
-		else
-			local off = math.sqrt((dest.x - next.x) ^ 2 + (dest.y - next.y) ^ 2 + (dest.z - next.z) ^ 2)
-			if off > E.posSlack then
-				add(out, "railPose", math.min(1, Units.u(off)), `body {off} st off the rail centreline`)
 			end
 		end
 		if next.railT < -1e-9 or next.railT > 1 + 1e-9 then

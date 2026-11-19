@@ -199,7 +199,7 @@ return function(t)
 		local r2 = send(2, onRail(world, wire, 0.95, 5.05), 100.15)
 		local r3 = send(3, onRail(world, wire, 0.951, 5.1), 100.2)
 		local snap = ms:motorOf("a")
-		local d = flat(snap :: any, p)
+		local d = if snap then flat(snap :: any, p) else 0
 		print(
 			`      gate: [{codesOf(r1.violations or {})}|{codesOf(r2.violations or {})}|{codesOf(r3.violations or {})}], {corrections} corrections; the duel's pose {string.format(
 				"%.0f",
