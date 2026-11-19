@@ -223,6 +223,9 @@ MoveValidator.C = table.freeze({
 	GOV_SLOTS = 64,
 	-- studs: the farthest the drawn pose lies off a rail's centreline (a big trunk's bark, 5.95; a lookout's lift)
 	DRAWN_MAX = 6.5,
+	-- seconds: the most of a move's time the governor's "near a rail" and "near a trampoline" reach from the last place
+	-- stands for (a quarter second of the fastest pace)
+	GOV_NEAR_T = 0.25,
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -416,7 +419,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			actorId,
 			first.marks,
 			first.last,
-			if gov then serverTime - gov.S else 0,
+			if gov then math.max(0, serverTime - gov.S) else 0,
 			serverTime,
 			self.clockSlack,
 			govFaults
@@ -691,7 +694,18 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			)
 		end
 	end
-	MoveValidator._govern(self, actorId, actor.marks, next, dtEff, serverTime, swing, violations)
+	-- (the clock check's swing for the governor's windows: never the ping-widened one, the base slack at most; validator
+	-- round 7: a clock run ahead by an inflated ping's swing bought 42.7 st on top of the one-off)
+	MoveValidator._govern(
+		self,
+		actorId,
+		actor.marks,
+		next,
+		dtEff,
+		serverTime,
+		math.min(swing, self.clockSlack),
+		violations
+	)
 
 	local ok = #violations == 0
 	for _, v in violations do
@@ -1333,12 +1347,16 @@ function MoveValidator._govern(
 	local B = self:governorBounds(self.boostOf(actorId))
 	local t = math.max(0, tau)
 	local x, y, z = next.x, next.y, next.z
+	-- (near a trampoline, near a rail: from the server's own last place, by what the gap's time covers, capped at
+	-- C.GOV_NEAR_T of it; validator round 7: at 1 to 2 packets a second the uncapped radius was 39 to 62 st, almost
+	-- anywhere in a wooded town)
+	local tNear = math.min(t, MoveValidator.C.GOV_NEAR_T)
 	local tramps = self.world.trampolines
 	local tramp = tramps ~= nil
 		and #tramps > 0
 		and (
-			MoveValidator.nearTrampoline(self.world, x, z, B.vh * t + 2)
-			or MoveValidator.nearTrampoline(self.world, g.X, g.Z, B.vh * t + 2)
+			MoveValidator.nearTrampoline(self.world, x, z, 2)
+			or MoveValidator.nearTrampoline(self.world, g.X, g.Z, B.vh * tNear + 2)
 		)
 	local vv = 0
 	if y > g.Y then
@@ -1349,9 +1367,14 @@ function MoveValidator._govern(
 			vv = B.vRail
 		else
 			local index = self.world.index
-			local reach =
-				math.min(Motion.C.airGrab + MoveValidator.C.DRAWN_MAX + B.vh * t, MoveValidator.C.RAIL_REACH_MAX)
-			vv = if index ~= nil and index:nearest(x, y, z, reach) ~= nil then B.vRail else B.vLedge
+			local grab = Motion.C.airGrab + MoveValidator.C.DRAWN_MAX
+			local near = index ~= nil
+				and (
+					index:nearest(x, y, z, grab) ~= nil
+					or index:nearest(g.X, g.Y, g.Z, math.min(grab + B.vh * tNear, MoveValidator.C.RAIL_REACH_MAX))
+						~= nil
+				)
+			vv = if near then B.vRail else B.vLedge
 		end
 	end
 	local G, S = g.G + t, serverTime
