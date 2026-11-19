@@ -1,0 +1,208 @@
+--!strict
+-- Adversarial review, round 6 (the displacement governor): failing cases.
+local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local MoveValidator = require("@server/Movement/MoveValidator")
+local ValidatorWorld = require("@server/Movement/ValidatorWorld")
+local TestWorld = require("@tests/cheat/TestWorld")
+local Height = require("@shared/World/Height")
+local Data = require("@shared/Data")
+local BakedWorld = require("@tests/lib/BakedWorld")
+local LiveRig = require("@tests/lib/LiveRig")
+local fs = require("@lune/fs")
+
+type State = SquirrelMotor.State
+
+local S = Height.STUDS_PER_UNIT
+local RIVER = Height.RIVER
+
+local function worldWith(boxes: { TestWorld.Box }): (any, any)
+	local world = TestWorld.build({ boxes = boxes })
+	local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
+		return TestWorld.segmentCrossesBox(boxes, ox, oz, ox + dx, oz + dz, oy)
+	end
+	local function down(_ox: number, oy: number, _oz: number, _dx: number, dy: number, _dz: number): boolean
+		local lo = oy + dy
+		return lo <= 0 and oy >= 0
+	end
+	return world, ValidatorWorld.build(world, { wall = wall, down = down })
+end
+
+-- the west quay's line at z (studs): where Recovery.riverFall puts a body that fell in from the west
+local function quayX(z: number): number
+	return (Height.riverCenterU(z / S) - (RIVER.halfWidth + 5)) * S
+end
+local BANK = (RIVER.bankY + 0.18) * S
+
+return function(t)
+	t.test("river: claimed quay landings, one a packet, run the quay at 300 st/s and reset the governor", function()
+		local _, vworld = worldWith({})
+		local fastest = 0
+		for _, rate in { 2, 4, 10, 20 } do
+			local v = MoveValidator.new(vworld)
+			local dt = 1 / rate
+			local z = -200 * S
+			local s = SquirrelMotor.new(quayX(z), BANK, z)
+			s.grounded, s.clock = true, 1
+			local codes = {}
+			v:accept("a", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 1)
+			local z0 = z
+			for i = 1, rate * 5 do
+				local reach = 8.5 + v:fastest("a") * dt + 1
+				local slack = v:fastest("a") * math.min(dt, 0.5) + 1
+				-- the next landing: as far along as the quay rule's reach and slack allow, toward the water by the slack
+				local nz = z + (reach + slack) * 0.97
+				local nx = quayX(nz) + slack * 0.9
+				local ns = SquirrelMotor.clone(s)
+				ns.x, ns.y, ns.z, ns.clock = nx, BANK + 2 + slack, nz, 1 + i * dt
+				local r = v:accept("a", { seq = i + 1, snapshot = SquirrelMotor.serialize(ns) }, 1 + i * dt)
+				for _, x in r.violations do
+					codes[x.code] = (codes[x.code] or 0) + 1
+				end
+				if r.accepted then
+					s, z = ns, nz
+				end
+			end
+			local c = {}
+			for code, k in codes do
+				table.insert(c, `{code}={k}`)
+			end
+			local pace = (z - z0) / 5
+			fastest = math.max(fastest, pace)
+			print(
+				string.format(
+					"      %d/s: %.0f st along the quay in 5 s (%.0f st/s), %s",
+					rate,
+					z - z0,
+					pace,
+					table.concat(c, " ")
+				)
+			)
+		end
+		local v = MoveValidator.new(vworld)
+		local b = v:governorBounds(false)
+		t.truthy(fastest <= b.vh + b.dh / 3, `the quay run at {fastest} st/s, the governor's bound {b.vh}`)
+	end)
+
+	t.test(
+		"river: on the rig, the client runs the west quay at 150 st/s by claiming a river landing every packet",
+		function()
+			-- the quay as ground (the bank), the rest of the S3 world as it is
+			local base = TestWorld.build()
+			local world: any = table.clone(base)
+			world.groundAt = function(x: number, z: number, refY: number): number
+				return if x > 1800 then BANK else base.groundAt(x, z, refY)
+			end
+			local function wall(): boolean
+				return false
+			end
+			local function down(ox: number, oy: number, _oz: number, _dx: number, dy: number, _dz: number): boolean
+				local g = if ox > 1800 then BANK else 0
+				return g >= oy + dy and g <= oy
+			end
+			local vworld = ValidatorWorld.build(world, { wall = wall, down = down })
+			local z0 = -200 * S
+			local started: number? = nil
+			local rig = LiveRig.new({
+				world = world,
+				vworld = vworld,
+				link = { latency = 0.1, jitter = 0.01, loss = 0 },
+				seed = 3,
+				cheat = function(s: State, _i: SquirrelMotor.Input, now: number, _w: any)
+					if now < 3 then
+						return
+					end
+					started = started or now
+					local z = z0 + 150 * (now - (started :: number))
+					s.x, s.y, s.z = quayX(z) + 2.5, BANK, z
+					s.vx, s.vy, s.vz, s.grounded = 0, 0, 0, true
+				end,
+			})
+			rig:possess(SquirrelMotor.new(quayX(z0), BANK, z0), function(): SquirrelMotor.Input
+				return SquirrelMotor.idleInput(0)
+			end)
+			rig:run(8)
+			local r = rig:result()
+			local along = r.root.z - z0
+			print(
+				`      {LiveRig.describe("a river landing every packet", r)}; the root {string.format("%.0f", along)} st along the quay in 5 s`
+			)
+			t.truthy(along < 47.4 * 5 + 50, `the root ran {along} st along the quay in 5 s ({along / 5} st/s)`)
+		end
+	)
+
+	t.test(
+		"bough: an honest drop (Q) off a branch stands on its bough cylinder, which the live floor ray looks past",
+		function()
+			if not fs.isFile("build/Town.rbxm") then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			Height.configure(Data.default():module("TerrainExtensions"))
+			local town = BakedWorld.load("build/Town.rbxm")
+			local w = town:motorWorld(Data.default())
+			-- the live server's rays (ValidatorWorld.engineRays): the wall and the floor both look past the bough cylinders
+			local function live(p: BakedWorld.Part): boolean
+				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
+				return p.squirrelSolid and not ValidatorWorld.isBough(p.name, parentName)
+			end
+			local function wall(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+				return town.raycast(ox, oy, oz, dx, dy, dz, live) ~= nil
+			end
+			local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+				if town.raycast(ox, oy, oz, dx, dy, dz, live) ~= nil then
+					return true
+				end
+				local g = town.terrainAt(ox, oz)
+				return g >= oy + dy and g <= oy
+			end
+			local vworld = ValidatorWorld.build(w, { wall = wall, down = down })
+			-- branches of the first big tree (Tree_220) and a wire over Tree_359, at two points each, 20 packets a second
+			local rows, dirty = {}, 0
+			for _, id in { 221, 224, 227, 65 } do
+				local r = w.registry:get(id)
+				for _, tt in { 0.35, 0.7 } do
+					local p = w.registry:pointAt(r, tt)
+					local s = SquirrelMotor.new(p.x, p.y, p.z)
+					s.routeId, s.railT, s.grounded, s.clock = r.id, tt, false, 1
+					local v = MoveValidator.new(vworld)
+					local seq, codes, n = 0, {}, 0
+					v:accept("a", { seq = 0, snapshot = SquirrelMotor.serialize(s) }, 1)
+					for f = 1, 120 do
+						local i = SquirrelMotor.idleInput(0)
+						i.drop = f == 2
+						SquirrelMotor.step(s, i, 1 / 60, w)
+						if f % 3 == 0 then
+							seq += 1
+							local res = v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, s.clock)
+							for _, x in res.violations do
+								codes[x.code] = (codes[x.code] or 0) + 1
+								n += 1
+							end
+						end
+					end
+					local _, part = town.groundPart(s.x, s.z, s.y)
+					local c = {}
+					for code, k in codes do
+						table.insert(c, `{code}={k}`)
+					end
+					dirty += n
+					table.insert(
+						rows,
+						string.format(
+							"route %d t %.2f: stands %.1f st up on %s; %s",
+							id,
+							tt,
+							s.y - town.terrainAt(s.x, s.z),
+							if part then part.path else "terrain",
+							table.concat(c, " ")
+						)
+					)
+				end
+			end
+			for _, row in rows do
+				print("      " .. row)
+			end
+			t.eq(dirty, 0, "an honest drop off a branch is never a violation")
+		end
+	)
+end
