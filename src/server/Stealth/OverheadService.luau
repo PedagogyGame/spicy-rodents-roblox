@@ -13,9 +13,9 @@
 --     landing). A leap from the ground (its top is about 7 studs) is neither. The route is the motor's (a held rodent:
 --     `motorOf`, the validator's last clean packet; the AI: its rail intent); with no word on it the height alone
 --     decides. So nothing over a person's head is left out: the duel leaves anything higher than duel.overheadY over a
---     person's feet to this watch (Combat/Duel.notices). A held body's speed is the fastest tenth of a second since the last tick (Stealth/Pace,
---     sampled every frame: tapping W is walking, as on the rafters); the AI's is its motor's. On a branch or a trunk the
---     leaves cover it (OverheadWatch C.canopy).
+--     person's feet to this watch (Combat/Duel.notices). A held body's speed is the fastest tenth of a second since the
+--     last tick (Stealth/Pace, sampled every frame: tapping W is walking, as on the rafters); the AI's is its motor's.
+--     On a branch or a trunk the leaves cover it (OverheadWatch C.canopy).
 --   * the people: every AI townsperson, member of staff and officer (Pedestrian, Staff, Officer brains; not a patient,
 --     not a body a player holds) within OverheadWatch.C.far of a squirrel overhead, found through a spatial grid
 --     (Actors/Perception's) rebuilt only on a tick with a squirrel overhead. Each rates their best squirrel
@@ -529,8 +529,8 @@ function OverheadService.spotFor(self: any, a: any, s: Overhead, mode: string): 
 	return nil, nil
 end
 
--- walkTo(self, id, x, z, faceX, faceZ, secs, speed): THE one way this service sends a person somewhere (to `x`, `z` at `speed`, facing the squirrel at
--- `faceX`, `faceZ` once there, for `secs`). Today the brains walk the straight line (spotFor has checked it); once the
+-- walkTo(self, id, x, z, faceX, faceZ, secs, speed): THE one way this service sends a person somewhere (to `x`, `z`
+-- at `speed`, facing the squirrel at `faceX`, `faceZ` once there, for `secs`). Today the brains walk the straight line (spotFor has checked it); once the
 -- town's walking route-finder lands (World/WalkWay, feat/no-wall-walk), this is the one place to switch to it.
 -- An officer's own order comes first: a chase, a sewer stakeout (review L6). False when no order was given.
 function OverheadService.walkTo(

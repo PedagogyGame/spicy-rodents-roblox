@@ -14,7 +14,8 @@
 --   Rig.hold(id); Rig.let(id); Rig.put(id, x, z, yaw?); Rig.near(x, z, post?, skip?) -> actor; Rig.calmNear(x, z, skip?) -> actor; Rig.responders() -> { vehicle };
 --   Rig.saidBy(situation) -> { said }; Rig.dice(list) (the sequence's next dice); Rig.lunge(victimId, from?) ->
 --   boolean (a player's pounce through the duel); Rig.now(); fields world, traffic, speech (the town's one
---   Speech/SpeechRules state), infection, combat (Combat/CombatService, unless opts.duel is false), health, blows, duelNews, motor, attrs, medLog, toasts, said, time
+--   Speech/SpeechRules state), infection, combat (Combat/CombatService, unless opts.duel is false), health, blows,
+--   duelNews, motor, attrs, medLog, toasts, said, time
 -- Studs throughout.
 local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")

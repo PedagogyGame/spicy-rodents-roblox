@@ -19,10 +19,15 @@
 -- duel.feintCost of a feint meter that refills at duel.feintRefill a second, and no pounce follows for feintRecover.
 -- THE PEOPLE. Every AI townsperson (Pedestrian, not a rider) and police officer near a player's rodent runs a Combat/Duel
 -- Guard: it notices as the town perceives (Combat/Duel.notices: seen in its view cone, heard when the rodent moves faster
--- than a creep, felt when it brushes them, or pointed out overhead: opts.overhead), reacts to tells, squares up, strikes,
+-- than a creep, felt when it brushes them, or pointed out overhead once it comes down: opts.overhead; the rodent's
+-- pace is the one it kept up by its validated packets, opts.paceOf, Stealth/Pace.stretch), reacts to tells, squares up,
+-- strikes,
 -- backs off, flinches or flees, and the service turns the Guard's move into the brain's orders (Pedestrian "duel" and
 -- "witness" events, Officer "respond") and its stance into the body's Stance attribute (clients draw it; the vigilante's
--- "squared" stance is the visible tell). A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
+-- "squared" stance is the visible tell). Nobody closes in on or strikes at a rodent out of reach (higher or lower than
+-- duel.contactHeight: Combat/Duel lets it go after LETGO_SECS, `lapsed` is kept here across its Guard's churn, and an
+-- officer holds his ground meanwhile); a chasing officer waits for one up out of reach at open ground by it
+-- (opts.under), never under it in the road. A blow that lands calls `hurt` (CombatRules.damage; rodent.iFrames between
 -- blows); Boot/Game applies the health, the Power and the knock-out as it does for a player's kick. A person a player
 -- holds is never ordered: they kick with F on their own timing (`heldKick`: a kick aimed at the rodent raises a leg for
 -- HELD_GUARD seconds, no bite lands into it; their kick shares the duel's i-frames, `takeBlow`), and a bite on them is

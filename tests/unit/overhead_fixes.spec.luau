@@ -16,6 +16,7 @@
 --   7. The town's chatter is paced as one (L4): the lines of the bite-to-hospital sequence, the drains and the rafters
 --      count in the overhead watch's cap by place, every service shares the per-person cooldown and the town window,
 --      on one clock.
+--   8. The duel's ear (M2): a creep with late or bunched positions reads as a creep; tapping W reads as walking.
 local BiteRig = require("@tests/lib/BiteRig")
 local CombatRules = require("@shared/Combat/CombatRules")
 local Duel = require("@shared/Combat/Duel")
@@ -27,6 +28,8 @@ local Officer = require("@server/Actors/Brains/Officer")
 local Common = require("@server/Actors/Brains/Common")
 local SpeechRules = require("@shared/Speech/SpeechRules")
 local AreaPace = require("@shared/Speech/AreaPace")
+local Pace = require("@shared/Stealth/Pace")
+local DuelSim = require("@tests/lib/DuelSim")
 
 local WIRE = 163 -- the spec's wire over the busiest crossing (overhead_service.spec)
 
@@ -463,4 +466,86 @@ return function(t)
 			t.truthy(OverheadService.say(svc, people[6].id, "overheadLost"), "another corner is its own")
 		end
 	)
+
+	t.test("the duel's ear: late or bunched positions leave a creep a creep; tapping W is walking (M2)", function()
+		local P = CombatRules.params()
+		-- a body's track as the server gets it: `pos(t)` where it really is, sampled every `every` s; a sample `isLate`
+		-- names still shows the one before (it arrives with the next); read with Pace.stretch at every sample
+		local function loudest(
+			pos: (number) -> number,
+			every: number,
+			secs: number,
+			isLate: (number) -> boolean
+		): number
+			local track: { Pace.Point } = {}
+			local most = 0
+			local k = 0
+			local t0 = 0
+			while t0 < secs do
+				k += 1
+				t0 += every
+				local x = if isLate(k) and #track > 0 then track[#track].x else pos(t0)
+				table.insert(track, { t = t0, x = x, z = 0 })
+				local v = Pace.stretch(function(t: number): (number, number)
+					return Pace.along(track, t)
+				end, t0, track[1].t)
+				if v then
+					most = math.max(most, v)
+				end
+			end
+			return most
+		end
+		local creep = function(t: number): number
+			return 4.1 * t
+		end
+		local never = function(_: number): boolean
+			return false
+		end
+		local hitch = function(k: number): boolean
+			return k % 10 == 5
+		end
+		local bunched = function(k: number): boolean
+			return k % 7 == 3 or k % 7 == 4 -- (two packets in a row held back, then all three at once)
+		end
+		local smooth = loudest(creep, 0.1, 10, never)
+		local hitched = loudest(creep, 0.1, 10, hitch)
+		local packets = loudest(creep, 0.05, 10, bunched)
+		-- tapping W: the walk (18) for 0.18 s, still for 0.23 s: 7.9 studs/s on average
+		local tap = function(t: number): number
+			local n = math.floor(t / 0.41)
+			local r = t - n * 0.41
+			return n * 18 * 0.18 + 18 * math.min(r, 0.18)
+		end
+		local tapped = loudest(tap, 0.05, 10, never)
+		print(
+			string.format(
+				"      the ear: a 4.1 st/s creep reads %.1f smooth, %.1f with a hitch a second, %.1f with packets bunched; tapping W (7.9 on average) reads %.1f",
+				smooth,
+				hitched,
+				packets,
+				tapped
+			)
+		)
+		t.truthy(hitched <= P.quietSpeed * 0.8, "a hitch leaves a creep well under the creep line")
+		t.truthy(packets <= P.quietSpeed * 0.8, "and so do bunched packets")
+		t.truthy(tapped > P.quietSpeed + 1, "tapping W is loud")
+		-- in the duel: a stalk by tapping W (DuelSim, calm, 100 ms) is heard
+		local function row(o: { [string]: any }): any
+			local opts: any = { temper = "calm", rodent = "stalker", seed = 11, lag = 0.1 }
+			for k, v in o do
+				opts[k] = v
+			end
+			return DuelSim.batch(200, opts)
+		end
+		local crept, tapW = row({}), row({ tap = { on = 0.18, off = 0.23 } })
+		print(
+			string.format(
+				"      stalked by a creep: %d %% unaware; by tapping W: %d %% unaware",
+				math.floor(crept.unawareRate * 100 + 0.5),
+				math.floor(tapW.unawareRate * 100 + 0.5)
+			)
+		)
+		t.truthy(crept.unawareRate >= 0.4, "a creep still often bites unaware")
+		t.truthy(tapW.unawareRate <= 0.1, "tapping W almost never does")
+	end)
 end
