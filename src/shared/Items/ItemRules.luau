@@ -6,8 +6,9 @@
 -- What each one does when its owner uses it (a click, a tap or the gamepad's trigger with it in hand):
 --   water gun   a squirt ahead: a person hit is wet and reacts; the first time a given player's squirt hits the
 --               rodent it is stunned 1.3 s (once per player, ever on this server)
---   frisbee, football   thrown ahead in an arc; whoever picks it up (or catches it) has it; the newspaper too,
---               once read
+--   frisbee, football   thrown ahead in an arc; it stays its buyer's (owner, D16 #26): anyone else who catches or
+--               picks it up only borrows it to throw back, and it goes home to the buyer (Server/Items/Lending);
+--               the newspaper is thrown too, once read (litter, gone)
 --   bubbles     a stream of bubbles for a few seconds (30 blows to a bottle)
 --   chalk       asks for up to 20 letters and writes them on the ground (filtered like any player's text)
 --   flashlight  on and off; a strong beam at night, hardly anything by day
@@ -26,7 +27,10 @@
 --   lawn chair  set down and sat in, anywhere; folded back up with E
 --   radio       on and off: plays the stock-library playlist (RADIO_PLAYLIST: cue names)
 --   kite        flown in the park or on the beach (KITE_ZONES), nowhere else
--- Interface: CATALOG; def(itemId) -> Def?; onSale(itemId) -> boolean; use(def, ctx) -> { Effect };
+-- Bought things stay the buyer's: a def with findersKeep = true would go to whoever picks it up (for a thing the
+-- game gives rather than sells; none of the store's).
+-- Interface: CATALOG; def(itemId) -> Def?; onSale(itemId) -> boolean; findersKeep(itemId) -> boolean;
+--   use(def, ctx) -> { Effect };
 --   validate(def) -> (ok, err?); cut(text, n);
 --   USES (uses to one bought, nil: it lasts); COOLDOWN (seconds between uses); CUES; RADIO_PLAYLIST; HEADLINES;
 --   KITE_ZONES; FORBIDDEN_EFFECTS
@@ -147,6 +151,12 @@ end
 function ItemRules.onSale(itemId: string): boolean
 	local d = byId[itemId]
 	return d ~= nil and d.onSale ~= false
+end
+
+-- Whether whoever picks it up keeps it (false for everything bought: it stays the buyer's, owner D16 #26).
+function ItemRules.findersKeep(itemId: string): boolean
+	local d = byId[itemId]
+	return d ~= nil and d.findersKeep == true
 end
 
 function ItemRules.validate(d: Def): (boolean, string?)
