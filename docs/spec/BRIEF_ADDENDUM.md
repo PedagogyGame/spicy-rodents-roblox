@@ -114,3 +114,14 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   - **#11 Police range:** "Do not limit their pursuit radius; instead, require a distance of two average blocks for them to lose track of you." No reach limit on which officers respond and no leash round the bite; an officer chasing the rodent loses it only once it is more than 2 blocks (about 880 studs) from that officer.
   - **#13 Real names on signs:** "Yes to renaming if it is a restaurant; no if it relates to the theme of your game." CHILI'S (a restaurant) is now **CHILI PEPPER GRILL**; WEST TOPEKA POLICE (the police, part of the game's theme) stays.
   - Everything else on that list keeps its default until the owner says otherwise.
+- **D16. More answers to the open questions (owner, 2026-11-19, evening).** The owner repeated D15's #3-#13 (unchanged) and answered more of the 18 Nov list:
+  - **#14 Pinball "JACKPOT":** reword it. The players' text now says SUPER SHOT (the callout, the two goal lines and the board's lamp); the internal names stay.
+  - **#16 Two swapped trees:** yes, the Pump Elm and Estate Oak South 2 stay as the stand-ins (no change).
+  - **#21 Hollow trees:** a squirrel may claim only one tree.
+  - **#22 Nut foraging and a nut meter:** build next.
+  - **#25 What is kept between servers:** clothing carries over; every other bought item stays on the server it was bought on.
+  - **#26 Thrown frisbees and footballs:** no: a bought item (unless said otherwise) stays the buyer's; anyone else who picks it up does not keep it.
+  - **#27 Kites:** Sycamore Park and the beach only, for now (no change). **#29 Kite steering:** stand still while flying (no change).
+  - **#35 Dogs:** a notice only, never a push (no change). **#36 The bark:** use an audio upload for a custom bark.
+  - **#50 Silent sounds:** do not leave them silent: place the most fitting reasonable sound for each, with uploads where the licensed library has nothing (within the audio budget: 40/month working, at least 50 kept for other games).
+  - **Street riders:** players must never possess the street riders (already so since the bikes merge: riders are AI-only; the motorcycle riders are drawn on the traffic cars, not bodies).

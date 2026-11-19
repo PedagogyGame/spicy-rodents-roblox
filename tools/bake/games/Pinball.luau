@@ -212,7 +212,7 @@ Bake.ART = {
 		{ text = "1", lamp = "count_3", dx = 0, dy = -0.13, w = 0.11, h = 0.11 },
 		{ text = "LAUNCH", lamp = "count_2", dx = 0, dy = -0.24, w = 0.4, h = 0.07 },
 		{ text = "COMBO", lamp = "combo_3", dx = 0, dy = -0.1, w = 0.36, h = 0.07 },
-		{ text = "JACKPOT", lamp = "jackpot", dx = 0, dy = 0.38, w = 0.4, h = 0.07 },
+		{ text = "SUPER SHOT", lamp = "jackpot", dx = 0, dy = 0.38, w = 0.4, h = 0.07 },
 		{ text = "ORBIT", lamp = "orbit_l", dx = 0.21, dy = -0.15, w = 0.24, h = 0.06 },
 		{ text = "ORBIT", lamp = "orbit_r", dx = -0.21, dy = -0.15, w = 0.24, h = 0.06 },
 		{ text = "RAMP", lamp = "ramp_l", dx = -0.03, dy = -0.1, w = 0.22, h = 0.06 },

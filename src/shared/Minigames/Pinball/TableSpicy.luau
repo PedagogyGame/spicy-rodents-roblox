@@ -445,7 +445,7 @@ local sheet: Machine.Sheet = {
 			return "EXTRA BALL IS LIT AT THE BITE"
 		end
 		if t.biteLit == 1 then
-			return "THE BITE IS LIT: SHOOT THE HOLE FOR THE JACKPOT"
+			return "THE BITE IS LIT: SHOOT THE HOLE FOR A SUPER SHOT"
 		end
 		local name = if lv == 3 then "RABID 3X" elseif lv == 2 then "FERAL 2X" else "CALM"
 		return `HEAT {math.floor(t.heat)}% ({name}): SHOOT THE WIRE TO FEED THE RODENT`
