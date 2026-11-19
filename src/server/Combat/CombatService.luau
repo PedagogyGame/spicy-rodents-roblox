@@ -826,13 +826,14 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		local boosted = self:inAlert(a.x, a.z, now)
 		local dy = (best.y - best.hip) - (a.y - a.hip)
 		local seen = false
+		local pace = paceOf(r)
 		if not hidden then
 			local f = self.opts.overhead
 			seen = Duel.notices(P, guard, {
 				dist = bestD,
 				dy = dy,
 				inView = facing >= 0.28,
-				speed = paceOf(r),
+				speed = pace,
 				lunging = r.tell ~= nil and now >= r.tell and now < r.windowUntil,
 				spottedOverhead = f ~= nil and f(a.id, best.id),
 			})
@@ -849,6 +850,7 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			recovering = now < r.recoverUntil,
 			zigzag = CombatRules.zigzag(P, r.history, dx, dz, now),
 			boosted = boosted,
+			sneaking = pace ~= nil and pace <= P.quietSpeed,
 		}
 		local out = Duel.think(P, guard, view, self.rand)
 		if guard.phase == "idle" then

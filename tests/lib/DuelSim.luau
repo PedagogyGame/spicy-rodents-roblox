@@ -500,6 +500,7 @@ function DuelSim.run(opts: Options): Result
 			end
 			local seenNow: boolean
 			local dy = 0
+			local sneaking = false
 			if stealth then
 				-- the rodent's flat speed over the step (Server/Combat/CombatService paceOf); in view by the facing
 				local n = #history
@@ -525,6 +526,7 @@ function DuelSim.run(opts: Options): Result
 					end
 				end
 				dy = ry
+				sneaking = speed ~= nil and speed <= P.quietSpeed
 				seenNow = Duel.notices(P, g, {
 					dist = d,
 					dy = ry,
@@ -542,6 +544,7 @@ function DuelSim.run(opts: Options): Result
 				dist = d,
 				dy = dy,
 				seen = seenNow,
+				sneaking = sneaking,
 				tell = tell,
 				tellFeint = tellFeint,
 				committed = flying,

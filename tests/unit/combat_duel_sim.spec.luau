@@ -10,7 +10,10 @@
 -- loses to a vigilante almost always; and near a fresh bite (alert.bitePenalty) a bite is close to impossible.
 -- A STALK (the combat review, 19 Nov: "a well-stalked pounce lands on an UNAWARE person"): the people notice the rodent
 -- as the town perceives (Combat/Duel.notices), so a rodent that creeps up from behind, or drops from a wire behind them,
--- bites most of them unaware; one that runs straight in is noticed every time.
+-- bites about half of them unaware; one that runs straight in is noticed every time. Still possible, but harder: a
+-- person may hear the wind-up and turn at the last moment (duel.tellHeard), and one who finds it sneaking up close is
+-- alarmed for the rest of the duel (Combat/Duel), so a stalk wins about as often as an open skilled duel, and more
+-- cleanly.
 local DuelSim = require("@tests/lib/DuelSim")
 
 local N = 400
@@ -133,14 +136,18 @@ return function(t)
 	)
 
 	t.test(
-		"stalked from behind or dropped from above: most bites on a calm or wary person land unaware; a straight run never does",
+		"stalked or dropped (100, 150 ms): about half the duels end in an unaware bite; still possible, but harder (calm 75-88 %, wary 60-78 %); a straight run is never unaware",
 		function()
 			for _, lag in LINKS do
 				for _, temper in { "calm", "wary" } do
 					for _, rodent in { "stalker", "dropper" } do
 						local s = batch(temper, rodent, lag)
-						t.truthy(s.unawareRate >= 0.65, `{rodent} vs {temper} at {lag} s: {s.unawareRate} unaware`)
-						t.truthy(s.rate >= 0.8, `{rodent} vs {temper} at {lag} s: wins {s.rate}`)
+						t.truthy(
+							s.unawareRate >= 0.4 and s.unawareRate <= 0.7,
+							`{rodent} vs {temper} at {lag} s: {s.unawareRate} unaware`
+						)
+						local lo, hi = if temper == "calm" then 0.75 else 0.6, if temper == "calm" then 0.88 else 0.78
+						t.truthy(s.rate >= lo and s.rate <= hi, `{rodent} vs {temper} at {lag} s: wins {s.rate}`)
 					end
 				end
 				local sprint = batch("calm", "sprinter", lag)
