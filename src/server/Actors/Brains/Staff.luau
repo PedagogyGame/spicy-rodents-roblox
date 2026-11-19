@@ -15,6 +15,10 @@
 -- the employee gets back to the loop from anywhere else: let go by a player on the lawn, at the end of a bitten run,
 -- back from the hospital, they walk that way (by the doors and the alley's routes) to the nearest leg's end, never
 -- straight through the walls; let go at the stop they were working at, they carry on with the work.
+-- Off the round (more than OFF_ROUND from its legs: let go by a player, the end of a run, back from the hospital)
+-- every member of staff walks back by the town's way (ctx.way: World/WalkWay through Common.toward, by the doors of
+-- the buildings they work in), never straight through a wall; with no way they wait. The round's own legs are clear
+-- (the bake keeps them so) and are walked straight.
 -- Interface: new(actor, params), think, suspend, resume, rejoin, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -45,16 +49,32 @@ type Brain = Common.Brain & {
 	directive: Directive.State,
 	back: { { number } }?, -- the way back to the loop being walked (work stops with a `way`)
 	backAt: number,
+	leg: Common.Leg, -- the town's way back to the round from off it
 }
 
 local Staff = {}
 
 local REACH = Units.st(0.75)
+local OFF_ROUND = 2 -- studs from the round's legs: further off, the way back is the town's (never straight)
 local PAUSE_STAFF, PAUSE_PATIENT = 0.24, 0.48
 local PACE = Units.st(1.4)
 
 local Methods = {}
 Methods.__index = Methods
+
+-- how far (x, z) is from the closed loop of the round's points
+local function offRound(points: { { number } }, x: number, z: number): number
+	local best = math.huge
+	local n = #points
+	for i = 1, n do
+		local p, q = points[i], points[i % n + 1]
+		local ex, ez = q[1] - p[1], q[2] - p[2]
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((x - p[1]) * ex + (z - p[2]) * ez) / l2, 0, 1) else 0
+		best = math.min(best, Common.dist2d(x, z, p[1] + ex * t, p[2] + ez * t))
+	end
+	return best
+end
 
 -- Back to the work loop from where the body stands now (work stops only): still at the stop being worked, the
 -- work goes on (its act and facing); otherwise on to the end of the nearest leg, by the `way` when there is one
@@ -155,8 +175,18 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		return
 	end
 	actor.task = nil
+	local tx, tz = p[1], p[2]
+	if offRound(self.points, actor.x, actor.z) > OFF_ROUND then
+		-- off the round (let go by a player somewhere, the end of a run, back from the hospital): the town's way
+		local wx, wz = Common.toward(self.leg, actor, ctx, tx, tz)
+		if wx == nil or wz == nil then
+			intent.mode = "stand"
+			return
+		end
+		tx, tz = wx, wz
+	end
 	intent.mode = "walk"
-	intent.tx, intent.tz = p[1], p[2]
+	intent.tx, intent.tz = tx, tz
 	intent.laneAxis = nil
 	intent.speed = PACE
 	intent.turnRate = 6
@@ -174,6 +204,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.pause = snapshot.pause or 0
 	Directive.restore(self.directive, snapshot.directive)
 	Common.halt(self.actor) -- no walking on the old intent before the next think
+	Common.forget(self.leg)
 	rejoin(self)
 end
 
@@ -215,6 +246,7 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 		directive = Directive.new(),
 		back = nil,
 		backAt = 1,
+		leg = Common.newLeg(),
 	}, Methods)
 	actor.x, actor.z = points[start][1], points[start][2]
 	return (self :: any) :: Common.Brain

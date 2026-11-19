@@ -42,8 +42,8 @@ local HospitalLayout =
 	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
 local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
-local AlleyWalk = Import.shared("Attractions/AlleyWalk") :: typeof(require("../../shared/Attractions/AlleyWalk"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
+local WalkWay = Import.shared("World/WalkWay") :: typeof(require("../../shared/World/WalkWay"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -105,11 +105,13 @@ export type World = {
 	listeners: { (ev: Event) -> () }, -- told of every event as it is emitted
 	covers: { Cover }, -- what hides squirrels (addCover), in the order added
 	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
+	way: WalkWay.Way, -- the town's way on foot (every walk that is not a lane or a round goes by it)
 }
 
 local TownAI = {}
 
 TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
+TownAI.WAY_NODES = 1500 -- cells a brain's way search may open (World/FootPath): a brain thinks inside a frame
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins
@@ -137,8 +139,20 @@ local function lotPos(data: any, id: string, fallbackU: { number }): (number, nu
 	return st(fallbackU[1]), st(fallbackU[2])
 end
 
--- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant
-local function shopSites(data: any): { { number } }
+local FACING = { ["+Z"] = { 0, 1 }, ["-Z"] = { 0, -1 }, ["+X"] = { 1, 0 }, ["-X"] = { -1, 0 } }
+TownAI.FRONT = 4 -- studs in front of a building's front wall where its outdoor staff's round starts
+
+-- the spot `out` studs in front of a lot's front wall (its `facing`; +Z when it names none)
+local function frontOf(lot: any, out: number): (number, number)
+	local f = FACING[lot.facing or "+Z"] or FACING["+Z"]
+	local fp = lot.footprint or { w = 0, d = 0 }
+	local half = if f[1] ~= 0 then fp.w / 2 else fp.d / 2
+	return lot.x + f[1] * (half + out), lot.z + f[2] * (half + out)
+end
+
+-- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant. A shop is a solid
+-- box (nobody walks in): its worker's round is in front of it, on the pavement before its front wall.
+local function shopSites(data: any, way: WalkWay.Way): { { number } }
 	local out = {}
 	for _, lot in data:lots() do
 		local t = lot.type
@@ -149,11 +163,19 @@ local function shopSites(data: any): { { number } }
 			or string.find(t, "restaurant", 1, true)
 			or string.find(t, "bakery", 1, true)
 		then
-			table.insert(out, { lot.x, lot.z })
+			local x, z = frontOf(lot, TownAI.FRONT)
+			local f = FACING[lot.facing or "+Z"] or FACING["+Z"]
+			local fx, fz = f[1], f[2]
+			-- a shop inside a bigger building (the galleria's): in front of that building's nearest wall
+			local px, pz, nx, nz = WalkWay.putBack(way, x, z)
+			if nx ~= 0 or nz ~= 0 then
+				x, z, fx, fz = px, pz, nx, nz
+			end
+			table.insert(out, { x, z, lot.x * lot.x + lot.z * lot.z, fx, fz })
 		end
 	end
 	table.sort(out, function(a, b)
-		return a[1] * a[1] + a[2] * a[2] < b[1] * b[1] + b[2] * b[2]
+		return a[3] < b[3]
 	end)
 	return out
 end
@@ -202,6 +224,8 @@ function TownAI.build(opts: Opts): World
 	local config = Population.fromData(data:population(), opts.phase)
 	local town = Town.fromData(data)
 	local nav = Nav.build(town, data:module("Interiors") :: any)
+	local okLayout, layout = pcall(HospitalLayout.fromData, data, Tunables.get("hospital.beds"))
+	local way = WalkWay.new({ data = data, hospital = if okLayout then layout else nil })
 	local ground = Ground.world({ town = town })
 	local rail = opts.rail or RailWorld.get(data, Height.at)
 	local routes = RouteAdapter.new(rail)
@@ -236,6 +260,12 @@ function TownAI.build(opts: Opts): World
 		bounds = bounds,
 		routes = routes,
 		queryBuffer = table.create(32),
+		way = function(x0: number, z0: number, x1: number, z1: number): { { number } }?
+			return (WalkWay.find(way, x0, z0, x1, z1, { maxNodes = TownAI.WAY_NODES }))
+		end,
+		clear = function(x0: number, z0: number, x1: number, z1: number): boolean
+			return WalkWay.clear(way, x0, z0, x1, z1)
+		end,
 	}
 	local world: World = {
 		opts = opts,
@@ -259,6 +289,7 @@ function TownAI.build(opts: Opts): World
 		listeners = {},
 		covers = {},
 		covered = {},
+		way = way,
 	}
 	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
 		TownAI.emit(world, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
@@ -283,11 +314,19 @@ function TownAI.build(opts: Opts): World
 		return actor
 	end
 	local function register(actor: Common.Actor, brain: Common.Brain)
+		-- (a brain may seat the body somewhere else: its first step is not a jump up or down to there)
+		actor.y = ctx.groundAt(actor.x, actor.z) + actor.hip
 		brains[actor.id] = brain
 		scheduler:register(actor.id, brain, actor, 0)
 	end
 
-	local lanes = Nav.lanes(nav)
+	-- the sidewalk lanes, in the pieces that miss every building, shelter and fence standing on them
+	local lanes = {}
+	for _, lane in Nav.lanes(nav) do
+		for _, piece in WalkWay.splitLane(way, lane) do
+			table.insert(lanes, piece)
+		end
+	end
 	local pedParams: Pedestrian.Params = {
 		lanes = lanes,
 		coreLanes = math.min(4, #lanes),
@@ -319,7 +358,6 @@ function TownAI.build(opts: Opts): World
 	-- the hospital's posts: the round behind the reception desk and the rounds of the wards
 	local deskRound: any = nil
 	local wardRounds: { any } = {}
-	local okLayout, layout = pcall(HospitalLayout.fromData, data, Tunables.get("hospital.beds"))
 	if okLayout and layout then
 		for _, round in layout.posts do
 			if round.room == "reception" then
@@ -329,7 +367,7 @@ function TownAI.build(opts: Opts): World
 			end
 		end
 	end
-	local shops = shopSites(data)
+	local shops = shopSites(data, way)
 	local counters: { { x: number, z: number, round: { { number } } } } = {}
 	for _, v in venues do
 		if v.post then
@@ -372,8 +410,24 @@ function TownAI.build(opts: Opts): World
 			elseif id == "police" then
 				local officers = (post :: any).officerFloor or 6
 				if k <= officers then
-					actor = add("human", id, "Officer", hipH, px + k * 3, pz + 8)
-					register(actor, Officer.new(actor, { stationX = px, stationZ = pz, index = k }))
+					-- the beat is about the station's front (the building itself is walked into by its door)
+					local sx, sz = px, pz
+					local station = data:lot("west_police_station")
+					if station then
+						sx, sz = frontOf(station, TownAI.FRONT)
+					end
+					actor = add("human", id, "Officer", hipH, sx + k * 3, sz)
+					register(
+						actor,
+						Officer.new(actor, {
+							stationX = sx,
+							stationZ = sz,
+							index = k,
+							settle = function(x: number, z: number): (number, number)
+								return WalkWay.putBack(way, x, z)
+							end,
+						})
+					)
 				else
 					-- the guard and the car crew: in the locker room (Actors/StaffRounds.POLICE: the bake
 					-- keeps their round clear)
@@ -402,15 +456,25 @@ function TownAI.build(opts: Opts): World
 						stationZ = stops[1].z,
 						index = k,
 						stops = stops,
+						-- (in the alley by its own ways; from anywhere else by the town's, in by its main doors)
 						way = function(x0: number, z0: number, x1: number, z1: number): { { number } }
-							return AlleyWalk.way(alley, x0, z0, x1, z1)
+							return WalkWay.find(way, x0, z0, x1, z1, { maxNodes = TownAI.WAY_NODES }) or {}
 						end,
 					})
 				)
 			elseif id == "shop_worker" or id == "attraction_staff" then
-				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }
+				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0, 0, 0, 1 }
+				-- the v5.4 circuit turned to face out from the shop's front (its back leg away from the wall)
+				local fx, fz = shop[4], shop[5]
+				local circuit = {}
+				for _, p in StaffRounds.points(0, 0, k) do
+					table.insert(circuit, { -fz * p[1] - fx * p[2], fx * p[1] - fz * p[2] })
+				end
 				actor = add("human", id, "Staff", hipH, shop[1], shop[2])
-				register(actor, Staff.new(actor, { stationX = shop[1], stationZ = shop[2], index = k }))
+				register(
+					actor,
+					Staff.new(actor, { stationX = shop[1], stationZ = shop[2], index = k, circuit = circuit })
+				)
 			else
 				local x, z = laneSpot(idx)
 				actor = add("human", id, "Pedestrian", hipH, x, z)
@@ -556,6 +620,15 @@ end
 function TownAI.resume(world: World, id: number, x: number, y: number, z: number, yaw: number?)
 	local actor = world.actorsById[id]
 	world.possessed[id] = nil
+	-- let go inside a building nobody walks in (a house shell, a shop: a player found a way in), the computer takes
+	-- the body at the nearest spot outside its walls, where its way on foot starts (World/WalkWay.putBack)
+	if actor.species == "human" then
+		local px, pz = WalkWay.putBack(world.way, x, z)
+		if px ~= x or pz ~= z then
+			x, z = px, pz
+			y = world.ctx.groundAt(x, z) + actor.hip
+		end
+	end
 	-- let go where the cover hides it (down a drain): the AI takes it at the way out
 	for _, cover in world.covers do
 		if cover.under(x, y, z) then

@@ -16,10 +16,12 @@
 --     Store: the first shop worker, AI/TownAI): venues(expansion) lists them, with the post's short round along
 --     the counter (POST_ROUND, local X and D about the post), and floorAt says which floor a point is on. A
 --     "venue_staff_post" is a post the venue staffs itself (THE GILDED ACORN's baked bartender): no town worker.
--- Interface: CIRCUIT; POLICE { x, z }; points(stationX, stationZ, index) -> { {x, z} } (studs);
+-- Interface: CIRCUIT; POLICE { x, z }; POLICE_EXIT; points(stationX, stationZ, index) -> { {x, z} } (studs);
 --   bounds(stationX, stationZ) -> cx, cz, r (a disc that holds the round for every index);
 --   POST_ROUND; venues(expansion?) -> { Venue { id, place, hw, hd, floorY, post: { x, z, round } ? } };
---   floorAt(venues, x, z) -> floorY? (inside a built venue's footprint)
+--   floorAt(venues, x, z) -> floorY? (inside a built venue's footprint). A staffed post also has its way out
+--   (`exit`, world studs, the post first): along behind the counter past its end (POST_CLEAR), to a step inside the
+--   venue's first entrance and out to the spot in front of it (World/WalkWay walks the shopkeeper by it).
 -- Pure; studs out. No side effects on require.
 
 local AlleyLayout = require("../Attractions/AlleyLayout")
@@ -36,6 +38,19 @@ StaffRounds.CIRCUIT = table.freeze({
 })
 
 StaffRounds.POLICE = table.freeze({ x = 6, z = -12 })
+
+-- The way out of the police station from the locker room (World/WalkWay: how its indoor staff leave and come back):
+-- studs from the centre of the station's lot, in world axes, the deepest first. Through the gap in the locker room's
+-- front wall, round the east end of the front desk, out of the glass entrance to the spot in front of it.
+StaffRounds.POLICE_EXIT = table.freeze({
+	table.freeze({ 3, -12 }),
+	table.freeze({ 0, 1.5 }),
+	table.freeze({ 0, 8.5 }),
+	table.freeze({ 8, 14.5 }),
+	table.freeze({ 8, 27.5 }),
+	table.freeze({ 0, 34.5 }),
+	table.freeze({ 0, 45 }),
+})
 
 -- The round of staff member `index` about a station: the circuit, mirrored for every other member.
 function StaffRounds.points(stationX: number, stationZ: number, index: number): { { number } }
@@ -76,8 +91,12 @@ export type Venue = {
 	hw: number,
 	hd: number,
 	floorY: number,
-	post: { x: number, z: number, round: { { number } } }?, -- world studs; round as offsets from (x, z)
+	-- world studs; round as offsets from (x, z); exit: the way out, the post first, the spot outside last
+	post: { x: number, z: number, round: { { number } }, exit: { { number } }? }?,
 }
+
+StaffRounds.POST_CLEAR = 5.5 -- studs along the counter from the post to past its end
+StaffRounds.DOOR_IN, StaffRounds.DOOR_OUT = 3, 6 -- studs inside and outside an entrance its way passes
 
 function StaffRounds.venues(expansion: any?): { Venue }
 	local out: { Venue } = {}
@@ -100,7 +119,28 @@ function StaffRounds.venues(expansion: any?): { Venue }
 					local x, _, z = AlleyLayout.toWorld(v.place, a.at[1] + r[1], 0, a.at[3] + r[2])
 					table.insert(round, { x - px, z - pz })
 				end
-				venue.post = { x = px, z = pz, round = round }
+				local exit: { { number } }? = nil
+				local door = v.entrances and v.entrances[1]
+				if door and door.at then
+					local ex, ed = door.at[1], door.at[2]
+					-- the entrance's wall: the side of the footprint it is nearest to; inward is away from it
+					local alongD = math.abs(math.abs(ed) - venue.hd) < math.abs(math.abs(ex) - venue.hw)
+					local nx = if alongD then 0 else -math.sign(ex)
+					local nd = if alongD then -math.sign(ed) else 0
+					local side = math.sign(ex - a.at[1])
+					local points = {
+						{ a.at[1], a.at[3] },
+						{ a.at[1] + side * StaffRounds.POST_CLEAR, a.at[3] },
+						{ ex + nx * StaffRounds.DOOR_IN, ed + nd * StaffRounds.DOOR_IN },
+						{ ex - nx * StaffRounds.DOOR_OUT, ed - nd * StaffRounds.DOOR_OUT },
+					}
+					exit = {}
+					for _, p in points do
+						local x, _, z = AlleyLayout.toWorld(v.place, p[1], 0, p[2])
+						table.insert(exit :: { { number } }, { x, z })
+					end
+				end
+				venue.post = { x = px, z = pz, round = round, exit = exit }
 			end
 		end
 		table.insert(out, venue)
