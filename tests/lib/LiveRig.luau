@@ -462,9 +462,9 @@ function LiveRig.new(opts: Options): Rig
 	-- (as Actors/Possession.releaseNow does: the body let go at the place the server holds for it, MovementService.heldPlace,
 	-- and put there at once; never its root. Returns that place: the AI's from then on)
 	rig.release = function(self: any): { x: number, y: number, z: number }?
-		local at = self:place()
-		if at then
-			server.root = table.clone(at)
+		local held = self:place()
+		if held then
+			server.root = table.clone(held)
 			server.rootSent = rig.t
 		end
 		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "release")
@@ -472,7 +472,7 @@ function LiveRig.new(opts: Options): Rig
 		reliable(function()
 			client.running = false
 		end)
-		return at
+		return held
 	end
 	-- the place every server system reads for the held body (invariant D: MovementService.heldPlace, never the root)
 	rig.place = function(_self: any): { x: number, y: number, z: number }?
