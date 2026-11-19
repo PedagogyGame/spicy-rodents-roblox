@@ -198,7 +198,7 @@ return function(t)
 				rows[mode.name] = { st = st, eye = eye, spotters = count(spotters), lines = lines }
 				print(
 					string.format(
-						"      %s along the wire for %d s: %d glances, %d stop and look, %d point it out (%d people), %d exchanges, %d wary, %d lost; %d lines, %d of them uneasy murmurs (%d held back by the caps); the rodent's eye up to %.2f; a busy tick %.3f ms on average, %.3f at worst",
+						"      %s along the wire for %d s: %d glances, %d stop and look, %d point it out (%d people), %d exchanges, %d wary, %d lost; %d lines, %d of them uneasy murmurs (%d held back by the caps); the rodent's eye up to %.2f; a busy tick %.3f ms on average, %.3f at worst; Gaze %.1f writes a second",
 						mode.name,
 						SECS,
 						st.glances,
@@ -213,7 +213,8 @@ return function(t)
 						st.refused,
 						eye,
 						st.busyMs / math.max(1, st.busyTicks),
-						st.peakMs
+						st.peakMs,
+						st.gazeWrites / SECS
 					)
 				)
 				if mode.name == "walk" then
