@@ -2628,8 +2628,9 @@ function SquirrelMotor.envelope(
 	-- a rail leaves at 0 or more). A long gap may hide a visit to a rail: only one near `next`, high enough that a launch
 	-- off it explains `next`, and reachable from the launch points by a launch and a grab (railVisit; the grab's reach
 	-- only onto another rail: on the same one it lands at the nearest point)
-	-- (a move off the rail the launch points do not explain: "teleport", unless in a short gap the motor's own leap off the
-	-- rail and its grabs inside the gap explain it: section 5's grab search, seeded with the leap)
+	-- (a move off the rail the launch points (and in a long gap the rail-visit geometry) do not explain: "teleport", unless
+	-- in a gap of up to grabSimDt the motor's own leap off the rail and its grabs inside the gap explain it: section 5's
+	-- grab search, seeded with the leap)
 	local leftOver: { string } = {}
 	if prevRoute and not nextRoute then
 		launchUsed = true
@@ -2867,7 +2868,7 @@ function SquirrelMotor.envelope(
 		judged.xz = launchXZ
 	end
 
-	-- 5. Off rail to off rail: ground and air motion. (Its grab search also judges a short gap off a rail: section 4's
+	-- 5. Off rail to off rail: ground and air motion. (Its grab search also judges a gap off a rail: section 4's
 	-- leftOver)
 	local arcVy: number? = nil
 	if not nextRoute then
@@ -2935,7 +2936,7 @@ function SquirrelMotor.envelope(
 			local vmax = math.max(v0, leapXZ)
 			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
 			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
-			-- (off a rail, section 4's short gap: the motor's leap off it at the start of frame j, from its drawn pose at a
+			-- (off a rail, section 4's gap: the motor's leap off it at the start of frame j, from its drawn pose at a
 			-- point of the stretch it ran in the frames before: within seedR[j] across of the drawn pose at `prev`, between
 			-- seedLow[j] and seedTop[j] high. The arc's entries then only bound the gather: the lowest launch point and each
 			-- frame the highest a leap at the first frame reaches, as far across as the latest launch and its flight allow;
@@ -3706,10 +3707,11 @@ function SquirrelMotor.envelope(
 			end
 		end
 		if prevRoute then
-			-- (section 4: a short gap off the rail the launch points do not explain is the motor's leap off it and its
-			-- grabs inside the gap, or a teleport; validator round 17, the round-16 review's MEDIUM 1a: a packet that left a
-			-- bough and grabbed again inside three frames had no hidden grab)
-			if #leftOver > 0 and not hidden() then
+			-- (section 4: a gap off the rail the launch points do not explain is, up to grabSimDt, the motor's leap off it
+			-- and its grabs inside the gap, or a teleport; validator round 17, the round-16 review's MEDIUM 1a: a packet that
+			-- left a bough and grabbed again inside three frames had no hidden grab; at 0.08-0.1 s packets the same off the
+			-- climb's first trunk)
+			if #leftOver > 0 and not grasped() then
 				for _, why in leftOver do
 					add(out, "teleport", 1, why)
 				end
