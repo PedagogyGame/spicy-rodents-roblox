@@ -2,6 +2,7 @@
 -- ReplicatedStorage.Shared.Movement.SquirrelMotor
 -- Squirrel rail/ground motor shared by AI (server) and players (client).
 -- Interface (BUILD_PLAN §1.4, D2): new(params), step(state, input, dt, world) -> state, events, serialize, deserialize, envelope
+--   speedBound(u, s, goal, grounded, t, hold?, floor?): the most the motor's speed step covers (the server's meter)
 --   place(state, x, y, z, grounded): the body somewhere else at rest (river recovery, a server teleport)
 --
 -- A port of v5.4's `updatePlayer` (reference/v5_4_game.js L6573-6770) and the launch helpers

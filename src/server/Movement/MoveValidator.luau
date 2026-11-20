@@ -60,6 +60,11 @@
 --     charged, winded as the motor's, refilled only on the ground or a rail, a gap from the ground charged whatever its
 --     end), railSlab's column up to the rail past the rails' own props, and a ray budget per actor for the ways round a
 --     corner (budgeted).
+--   * Round 12 (2026-11-20, the round-11 review): the meter and the air bound step the motor's own speed model
+--     (SquirrelMotor.speedBound from the speed the server keeps, marks.speedU / speedS): a sprint slowing to a walk, a
+--     landing's carry and a flight coasting from its launch drain nothing, the rest the least sprint the motor covers it
+--     with; gaps from the air pay their flight's carry and any launch they hid; a flight past the sprint-steered step is a
+--     "speed" violation; the rail rule's slab columns look past up to ValidatorWorld.C.RAIL_HOPS props, then fail closed.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
