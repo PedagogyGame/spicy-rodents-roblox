@@ -4,7 +4,7 @@
 --                     0.05 s: the same verdict (LOW 2: it was a long gap, a hidden rail visit's geometry with no grab search)
 --   honest climb      the motor's own E+Space chain up that trunk, every second to every sixth frame (E is an edge: a
 --                     person or a key-repeat macro presses it every second frame at most), sent at 60, 20 and 4 packets a
---                     second: clean (the held height is the motor's own leap's, a little under the sent at times)
+--                     second: clean (the bark rule, the band and the gaps judged by the grab search hold no honest climb)
 --   first gather      the grab search's first gather of samples is within the work too (LOW 3): past it, fail safe before
 --                     any entry is walked
 -- About 5 s: `lune run tests/run.luau validator_r16`.

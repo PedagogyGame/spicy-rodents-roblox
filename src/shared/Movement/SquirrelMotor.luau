@@ -3164,17 +3164,13 @@ function SquirrelMotor.envelope(
 				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
-			-- bound starts). The end kept is the motor's own leap off the grabbed sample (ye: leapUp, a frame of gravity in
-			-- the leap's frame, as SquirrelMotor.step), the explanation the launch's tolerance (y: launchUp): validator
-			-- round 16, the round-15 review's LOW 2, the tolerance taken every packet let a crafted climb up a trunk run
-			-- 35 st/s where the motor's own runs 31
+			-- bound starts)
 			local bestLast, bestTop = math.huge, -math.huge
 			local bestFrom: { clock: number, x: number, z: number, reach: number }? = nil
 			local bestRoute: number? = nil
 			-- (a pattern after a grab and the leap's first frame: `f` frames stepped, the body at x, z within r across,
 			-- y its height, vy, `drop` how much lower a leap off the lowest sample of its grab starts, `last` the grab's clock,
-			-- ye and vye the motor's own leap's height and speed, bx, bz and bark the grabbed trunk's sample and drawn
-			-- offset, 0 off a trunk)
+			-- bx, bz and bark the grabbed trunk's sample and drawn offset, 0 off a trunk)
 			type Pattern = {
 				f: number,
 				x: number,
@@ -3186,8 +3182,6 @@ function SquirrelMotor.envelope(
 				last: number,
 				route: number,
 				snap: number,
-				ye: number,
-				vye: number,
 				bx: number,
 				bz: number,
 				bark: number,
@@ -3195,12 +3189,9 @@ function SquirrelMotor.envelope(
 			}
 			local function finish(s: Pattern)
 				local y, vy, r = s.y, s.vy, s.r
-				local ye, vye = s.ye, s.vye
 				for _ = s.f + 1, frames do
 					vy = math.max(vy - g * h, -P.terminalFall)
 					y += vy * h
-					vye = math.max(vye - g * h, -P.terminalFall)
-					ye += vye * h
 					r += leapXZ * h
 				end
 				-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own leap
@@ -3222,7 +3213,7 @@ function SquirrelMotor.envelope(
 					if s.last < bestLast then
 						bestLast, bestFrom, bestRoute = s.last, s.from, s.route
 					end
-					bestTop = math.max(bestTop, ye)
+					bestTop = math.max(bestTop, y)
 				end
 			end
 			local function leap(
@@ -3247,8 +3238,6 @@ function SquirrelMotor.envelope(
 					last = at,
 					route = grabbedId,
 					snap = snap,
-					ye = gy + (P.leapUp - g * h) * h,
-					vye = P.leapUp - g * h,
 					bx = barkX,
 					bz = barkZ,
 					bark = bark,
