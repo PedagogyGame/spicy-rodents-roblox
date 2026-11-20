@@ -3235,14 +3235,23 @@ local function envelopeCore(
 			-- `prev`'s flight is the server's own rail launch: `chained`): chainCarry across, steered toward a sprint or
 			-- v5.4's sprint at that carry, and chainLift up)
 			local boostM = if boosted then P.boostMult else 1
-			local chainXZ = math.max(
-				(if boosted then P.leapForwardBoost else P.leapForward) * P.chainCarry,
-				P.sprint * boostM,
-				SquirrelMotor.V54.sprint * boostM * P.chainCarry
-			) * C_STEP
+			-- (its speed across `tau` s after the leap: from chainCarry of a leap, steered at accelAir toward the faster of a
+			-- sprint and v5.4's sprint at that carry; a hair over for the substeps)
+			local chainLaunch = (if boosted then P.leapForwardBoost else P.leapForward) * P.chainCarry
+			local chainSteer = math.max(P.sprint * boostM, SquirrelMotor.V54.sprint * boostM * P.chainCarry)
+			local function chainAt(tau: number): number
+				return math.max(
+					chainLaunch,
+					chainLaunch + (chainSteer - chainLaunch) * (1 - math.exp(-P.accelAir * tau))
+				) * C_STEP
+			end
+			local chainXZ = chainAt(math.max(E.grabSimDt, dt))
 			local chainUp = launchUp * P.chainLift
 			local anyFull = false -- (an explanation with a full leap after a grab: no chained cap kept)
 			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
+			-- (how far across from `prev` the body can be after each frame of its own arc: owner D19, a pattern's reach
+			-- from `prev` is that to its first grab and its leaps' flights after)
+			local reach0 = { 0 }
 			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
 			-- (off a rail, section 4's gap: the motor's leap off it at the start of frame j, from its drawn pose at a
 			-- point of the stretch it ran in the frames before: within seedR[j] across of the drawn pose at `prev`, between
@@ -3309,6 +3318,7 @@ local function envelopeCore(
 					local x, z = prev.x + ux * mid, prev.z + uz * mid
 					local r = math.max((hi - lo) / 2, lat) + (v0 * aimAcross + aimUp) * t
 					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
+					reach0[f + 1] = hypot2(x - prev.x, z - prev.z) + r
 					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
 					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
 				end
@@ -3674,6 +3684,8 @@ local function envelopeCore(
 				from: { clock: number, x: number, z: number, reach: number },
 				seed: boolean?, -- (a leap off the rail `prev` is on: its next grab is the first)
 				lx: number, -- (the leap in the air now: its rate across, a full leap's or a chained one's)
+				base: number, -- (how far across from `prev` the body can be at its first grab or leap, and that time)
+				t1: number,
 				full: boolean, -- (a full leap after some grab of the pattern)
 			}
 			local function finish(s: Pattern)
@@ -3696,7 +3708,9 @@ local function envelopeCore(
 					next.y <= y + E.posSlack
 					and next.y >= floorY
 					and hypot2(next.x - s.x, next.z - s.z) <= r + E.posSlack
-					and hypot2(next.x - prev.x, next.z - prev.z) <= math.max(v0, if s.full then leapXZ else chainXZ) * dt + s.snap + E.posSlack
+					and hypot2(next.x - prev.x, next.z - prev.z) <= s.base + s.snap + (if s.full
+						then leapXZ
+						else chainXZ) * (dt - s.t1) + E.posSlack
 					and hypot2(next.x - s.bx, next.z - s.bz) >= s.bark - st(0.4) - E.posSlack
 				then
 					if s.last < bestLast then
@@ -3717,7 +3731,9 @@ local function envelopeCore(
 				snap: number,
 				from: { clock: number, x: number, z: number, reach: number },
 				chain: boolean,
-				full: boolean
+				full: boolean,
+				base: number,
+				t1: number
 			): Pattern
 				local up, lx = if chain then chainUp else launchUp, if chain then chainXZ else leapXZ
 				return {
@@ -3728,6 +3744,8 @@ local function envelopeCore(
 					vy = up,
 					r = spread + lx * h,
 					lx = lx,
+					base = base,
+					t1 = t1,
 					full = full or not chain,
 					drop = gy - lowY,
 					last = at,
@@ -3782,6 +3800,8 @@ local function envelopeCore(
 						from = { clock = prev.clock + (j - 1) * h, x = vis.x, z = vis.z, reach = seedR[j] },
 						seed = true,
 						lx = leapXZ,
+						base = 0,
+						t1 = 0,
 						full = true,
 					})
 				end
@@ -3806,10 +3826,12 @@ local function envelopeCore(
 								gz,
 								lowY,
 								spread,
-								math.min(snapAcross, math.max(0, leaveFar - math.max(v0, chainXZ) * f * h)),
+								math.min(snapAcross, math.max(0, leaveFar - reach0[f + 1])),
 								{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread },
 								chained == true,
-								false
+								false,
+								reach0[f + 1],
+								f * h
 							)
 							finish(s)
 							if bestFrom then
@@ -3862,7 +3884,9 @@ local function envelopeCore(
 									s.snap + (if s.seed then snap3 else d + E.sampleSpacing / 2),
 									s.from,
 									true,
-									s.full
+									s.full,
+									s.base,
+									s.t1
 								)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
@@ -3895,7 +3919,7 @@ local function envelopeCore(
 				judged.grabFrom = bestFrom
 				judged.grabRoute = bestRoute
 				judged.y = math.min(judged.y or next.y, bestTop)
-				judged.chainXZ = if anyFull then nil else chainXZ
+				judged.chainXZ = if anyFull then nil else chainAt(next.clock - bestLast)
 			end
 			return hiddenMemo :: boolean
 		end
