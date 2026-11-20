@@ -1,10 +1,12 @@
 --!strict
 -- ReplicatedStorage.Shared.Movement.AirTrick
 -- The air trick as everyone sees and hears it (owner D17, 2026-11-20: "a barrel roll and a twitch and twerk in the air
--- the squirrel can do with an extra button"). The rule itself is the motor's (Movement/SquirrelMotor: params trickRoll,
--- trickWiggle, trickTurn; state trickKind, trickTime; the packet carries both): one button, only in the air; the first
--- press in a flight is a barrel roll, the second a twitch-and-wiggle, and while either plays the flight's heading swings
--- toward the keys faster, at the speed it already has. This module is the rest:
+-- the squirrel can do with an extra button"; redone by D18: "barrel roll should be when you press as you land, twitch
+-- wiggle re-aim ... from the moment the button is pushed mid jump"). The rule itself is the motor's
+-- (Movement/SquirrelMotor: doTrick, reaim; params trick*; state trickKind, trickTime, aimYaw, aimReach; the packet
+-- carries them): one button; pressed as the body lands, a barrel roll carried along the ground at the speed it landed
+-- with; pressed mid-jump, once a flight, a twitch-and-wiggle, and from then the camera re-aims the rest of the jump.
+-- This module is the rest:
 --   * pose(kind, elapsed) -> { [bone] = { rx, ry, rz, tx?, ty?, tz? } }: the joint offsets on the hero rig's own axes
 --     (+X right, +Y up, -Z ahead; rz + rolls the left side down; Animation/Liveliness's convention) that the animation
 --     layer multiplies onto the clip, as Animation/AnimationDriver.heroLayers does with its other layers: the roll is a

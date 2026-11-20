@@ -215,6 +215,8 @@ export type State = {
 	-- seconds since the body last left or touched its footing (the ground or a rail): its time in the air, or on the
 	-- ground since its landing
 	footAgo: number,
+	-- studs across since the body last left its footing (0 on it): the flight's carry so far
+	airDist: number,
 	-- seconds before a leap off a rail is allowed again (grabLeapCooldown)
 	railLeapWait: number,
 }
@@ -308,7 +310,7 @@ SquirrelMotor.params = {
 	trickLandGrace = 0.1,
 	trickAimYaw = math.rad(30),
 	trickOut = 0.09,
-	trickOutPeak = 0.18,
+	trickOutPeak = 0.25,
 	trickIn = 0.15,
 	trickDown = st(6),
 	trickYawRate = 4,
@@ -387,7 +389,8 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		aimYaw = 0,
 		aimReach = 0,
 		trickReach = 0,
-		footAgo = 0,
+		footAgo = 10, -- (a new body has stood a while: no landing's roll)
+		airDist = 0,
 		railLeapWait = 0,
 	}
 end
@@ -414,7 +417,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.airFromRoute = nil
 	state.trickKind, state.trickTime = 0, 0
 	state.aimYaw, state.aimReach, state.trickReach = 0, 0, 0
-	state.footAgo = 0
+	state.footAgo, state.airDist = if grounded then 10 else 0, 0
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -501,8 +504,10 @@ local SCALARS = {
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
 -- (numbers a snapshot from before the air trick lacks: 0 when absent; the wire always carries them)
--- (aimYaw, aimReach on the wire too; trickReach, footAgo, railLeapWait the client's own: a handover or clone keeps them)
-local LATER_SCALARS = { "trickKind", "trickTime", "aimYaw", "aimReach", "trickReach", "footAgo", "railLeapWait" }
+-- (aimYaw, aimReach on the wire too; trickReach, footAgo, airDist, railLeapWait the client's own: a handover or clone
+-- keeps them)
+local LATER_SCALARS =
+	{ "trickKind", "trickTime", "aimYaw", "aimReach", "trickReach", "footAgo", "airDist", "railLeapWait" }
 
 function SquirrelMotor.serialize(state: State): Snapshot
 	local s: Snapshot = {}
@@ -1107,14 +1112,16 @@ function SquirrelMotor.landingIn(
 	return t
 end
 
--- SquirrelMotor.trickReachAt(airTime, landIn): how far out a wiggle pressed `airTime` s into a flight with `landIn` s
--- of it left may scale the horizontal speed (the scale's top, 1 + this). Timing: it grows to trickOutPeak at a leap's
--- apex (leapUp / gravity in), none at the takeoff; and never more than trickOut of the whole flight: the speed scaled
--- for the time left adds reach x landIn of carry against (airTime + landIn) of it. A leap's best is its apex: half the
--- flight left at the peak scale, 9 %. Pure.
-function SquirrelMotor.trickReachAt(airTime: number, landIn: number): number
+-- SquirrelMotor.trickReachAt(airTime, carried, rest): how far out a wiggle pressed `airTime` s into a flight that has
+-- carried `carried` studs across and has about `rest` studs to go (its speed across for the time to its landing) may
+-- scale the horizontal speed (the scale's top, 1 + this). Timing: it grows to trickOutPeak at a leap's apex (leapUp /
+-- gravity in), none at the takeoff; and never more than trickOut of the whole carry: the rest scaled adds reach x rest
+-- against carried + rest. The air steers toward the same scale (reaim), so the rest is that same flight scaled; a flight
+-- slows across (the air's drag and steering), so its true rest is no longer than the estimate and the lengthening no
+-- more than trickOut. The server, knowing no landing, takes the timing's bound alone (rest 0). Pure.
+function SquirrelMotor.trickReachAt(airTime: number, carried: number, rest: number): number
 	local timing = P.trickOutPeak * math.clamp(airTime / (P.leapUp / P.gravity), 0, 1)
-	local whole = P.trickOut * (1 + math.max(airTime, 0) / math.max(landIn, 1e-3))
+	local whole = if rest > 1e-3 then P.trickOut * (1 + math.max(carried, 0) / rest) else math.huge
 	return math.clamp(math.min(timing, whole), 0, P.trickOutPeak)
 end
 
@@ -1181,7 +1188,8 @@ local function doTrick(state: State, world: World, events: { Event })
 		elseif state.trickKind == 0 then
 			state.trickKind, state.trickTime = 2, P.trickWiggle
 			state.aimYaw, state.aimReach = 0, 0
-			state.trickReach = SquirrelMotor.trickReachAt(state.footAgo, landIn)
+			local across = math.sqrt(state.vx * state.vx + state.vz * state.vz)
+			state.trickReach = SquirrelMotor.trickReachAt(state.footAgo, state.airDist, across * landIn)
 			if not state.tireless and state.stamina > 0 then
 				state.stamina = math.max(0, state.stamina - P.trickCost)
 				if state.stamina == 0 and not state.winded then
@@ -1573,6 +1581,11 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 				local v54 = if input.sprint then SquirrelMotor.V54.sprint else SquirrelMotor.V54.walk
 				steer = math.max(steer, v54 * (if state.boostRemaining > 0 then P.boostMult else 1))
 			end
+			if state.aimReach ~= 0 and not state.grounded then
+				-- (the air trick's re-aim scales what the air steers toward as it scaled the speed: the flight's rest is the
+				-- same flight, that much longer or shorter)
+				steer *= SquirrelMotor.aimScale(state.aimReach, state.trickReach)
+			end
 			state.vx += (dx * steer - state.vx) * a
 			state.vz += (dz * steer - state.vz) * a
 			state.yaw = Motion.turnToward(
@@ -1648,6 +1661,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 	-- the air trick: the footing's clock; leaving the ground ends a roll's carry; a rail ends every move; a landing ends
 	-- the flight's wiggle and its re-aim, while a roll plays on along the ground
 	local foot = state.grounded or state.routeId ~= nil
+	state.airDist = if foot then 0 else state.airDist + math.sqrt((state.x - oldX) ^ 2 + (state.z - oldZ) ^ 2)
 	if foot ~= wasFoot then
 		state.footAgo = 0
 		if not foot and state.trickKind == 1 then
