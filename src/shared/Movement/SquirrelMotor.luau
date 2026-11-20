@@ -3215,6 +3215,13 @@ function SquirrelMotor.envelope(
 				local nx, nz = X[bi], Z[bi]
 				local top, topY = bi, Y[bi]
 				local lowY = topY
+				-- (the highest drawn: a sample's height and its route's lift, so where a trunk and a bough meet the bough's
+				-- lift is kept whichever sample is N; validator round 17)
+				local function liftOf(id: number): number
+					local r = reg:get(id)
+					return if r then drawnOf(world, r).lift else 0
+				end
+				local topDrawn = topY + liftOf(sId[bi])
 				local w2 = w * w + 1e-9
 				local nb = 0
 				local bLo, b1 = binOf(y - w), binOf(y + w)
@@ -3263,9 +3270,11 @@ function SquirrelMotor.envelope(
 								nb += 1
 								band[nb] = e
 								local sy = Y[e]
-								if sy > topY then
-									top, topY = e, sy
-								elseif sy < lowY then
+								local drawnY = sy + (if sId[e] == sId[top] then topDrawn - topY else liftOf(sId[e]))
+								if drawnY > topDrawn then
+									top, topY, topDrawn = e, sy, drawnY
+								end
+								if sy < lowY then
 									lowY = sy
 								end
 							end
