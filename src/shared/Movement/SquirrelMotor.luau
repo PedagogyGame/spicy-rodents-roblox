@@ -1991,13 +1991,12 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 		-- (its easing in [0, bDuration] and the body on it: poseAgreement below)
 	end
 	-- the air trick: a move, its time within its length, and only in the air (the motor ends both on a landing or a rail)
-	-- (a snapshot from before the trick has neither field: as 0, deserialize's reading; the wire always carries both)
-	local tk = if s.trickKind == nil and s.trickTime == nil then 0 else s.trickKind
-	if tk == 0 and s.trickTime == nil then
-		-- (nothing to judge)
-	elseif tk ~= 0 and tk ~= 1 and tk ~= 2 then
+	-- (a snapshot from before the trick has neither field: none, deserialize's reading; the wire always carries both)
+	local tk = s.trickKind
+	local old = tk == nil and s.trickTime == nil
+	if not old and tk ~= 0 and tk ~= 1 and tk ~= 2 then
 		add(out, "field", 1, `trickKind {tk}`)
-	else
+	elseif not old then
 		range("trickTime", 0, if tk == 1 then P.trickRoll elseif tk == 2 then P.trickWiggle else 0)
 		if tk ~= 0 and (s.grounded == true or (type(rid) == "number" and rid ~= -1)) then
 			add(out, "field", 1, `trickKind {tk} on the ground or a rail`)
