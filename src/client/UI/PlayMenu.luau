@@ -71,6 +71,7 @@ local CLIMB = {
 	"W into a tree, pole or downspout  climb it",
 	"A / D  choose the way at a fork",
 	"Space  leap   ·   Q  drop   ·   E  grab",
+	"G (pad R1, the TRICK button)  in the air: a barrel roll, again: a wiggle; steer the landing with WASD",
 }
 
 -- The help panel's lines for a role and device (device: nil | "vehicle" | "drone").

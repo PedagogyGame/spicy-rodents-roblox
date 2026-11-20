@@ -295,7 +295,10 @@ return function(t)
 		local full = average("leap", 0, 6)
 		print(`      walk {walk}, hop on landing: winded {hop}, the first 6 s on a full meter {full} st/s`)
 		t.truthy(hopWinded < 10, `hopping empties the meter in {hopWinded} s`)
-		t.truthy(hop >= walk * 1.05 and hop <= walk * 1.2, `winded hopping averages {hop} st/s: a slight edge (walk {walk})`)
+		t.truthy(
+			hop >= walk * 1.05 and hop <= walk * 1.2,
+			`winded hopping averages {hop} st/s: a slight edge (walk {walk})`
+		)
 		t.truthy(full >= hop * 1.1, `hopping with meter ({full} st/s) stays well over winded hopping ({hop})`)
 		for _, every in { 0.7, 0.72, 1.0 } do
 			local pounce, pounceWinded = average("pounce", every)

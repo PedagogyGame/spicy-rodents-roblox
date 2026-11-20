@@ -31,6 +31,9 @@
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
 -- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
+-- The air trick (owner D17): G, gamepad R1, or on a touch screen UI/AirTrickButton (shown only in the air with a move
+-- left) goes to the motor as `trick`; the move and its time left go to the animation layer (KinematicPose trick,
+-- trickLeft: Shared/Movement/AirTrick poses it).
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -61,6 +64,7 @@ local PossessionState =
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
+local AirTrickButton = require("../UI/AirTrickButton")
 
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 
@@ -307,6 +311,10 @@ function Squirrel.start(
 	local windupSecs = Tunables.get("pounce.windup")
 	local pounceAt: number? = nil
 	local vision: NightVision.Handle? = nil
+	local trickButton: AirTrickButton.Handle? = nil
+	if game:GetService("UserInputService").TouchEnabled then
+		trickButton = AirTrickButton.start()
+	end
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
 		if not railLive and state.routeId == nil then
@@ -362,6 +370,7 @@ function Squirrel.start(
 			grab = f.grab,
 			choose = if state.routeId then f.choose else 0,
 			pounce = f.pounce,
+			trick = f.trick or (trickButton ~= nil and trickButton.consume()),
 		}
 		if spicy then
 			local now, pend, tell = Squirrel.windup(pounceAt, state.clock, f.pounce, windupSecs, state.cooldown <= 0)
@@ -374,7 +383,7 @@ function Squirrel.start(
 				end
 			end
 		end
-		local any = f.fw ~= 0 or f.side ~= 0 or f.leap or f.drop or f.grab or f.pounce
+		local any = f.fw ~= 0 or f.side ~= 0 or f.leap or f.drop or f.grab or f.pounce or mi.trick
 		if any then
 			holding = false
 		elseif holding and os.clock() < holdUntil then
@@ -435,6 +444,10 @@ function Squirrel.start(
 		kin.mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk)
 		kin.stalk = state.focus
 		kin.winded = state.winded
+		kin.trick, kin.trickLeft = state.trickKind, state.trickTime
+		if trickButton then
+			trickButton.set(AirTrickButton.shows(state :: any))
+		end
 		local action, airSeconds = Squirrel.launch(events :: any, state.vy)
 		if action or kin.mode ~= "air" then
 			kin.action, kin.airSeconds = action, airSeconds
@@ -455,6 +468,9 @@ function Squirrel.start(
 		end
 		if vision then
 			vision.stop() -- the next body, and the menu, see the town as everyone else does
+		end
+		if trickButton then
+			trickButton.stop()
 		end
 	end
 end

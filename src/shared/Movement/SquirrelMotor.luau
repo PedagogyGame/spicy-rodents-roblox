@@ -1844,6 +1844,8 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	bDuration = "Motion.bridgeDuration of the transfer's own length (fieldCheck)",
 	clickSeq = "0 (none) or 1..255, a click counted once, the newer only (MovementService.clickNew)",
 	clickAgo = "[0, SquirrelWire.CLICK_COPY], 0 with no click (fieldCheck); the click dated as the remote's (clickAt)",
+	trickKind = "enum 0, 1 or 2; 0 on the ground and on a rail (fieldCheck); worth no speed: it widens only the grab search's swing of the heading (envelope 5)",
+	trickTime = "[0, the move's own length] (trickRoll, trickWiggle), 0 with no move (fieldCheck); the swing's time (envelope 5)",
 })
 
 -- poseAgreement(world, r, railT, x, y, z, b, out): a packet on rail `r` is where its rail parameter says (validator
@@ -1987,6 +1989,19 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 			add(out, "railPose", 1, `transfer easing {s.bDuration} s for {gap} st`)
 		end
 		-- (its easing in [0, bDuration] and the body on it: poseAgreement below)
+	end
+	-- the air trick: a move, its time within its length, and only in the air (the motor ends both on a landing or a rail)
+	-- (a snapshot from before the trick has neither field: as 0, deserialize's reading; the wire always carries both)
+	local tk = if s.trickKind == nil and s.trickTime == nil then 0 else s.trickKind
+	if tk == 0 and s.trickTime == nil then
+		-- (nothing to judge)
+	elseif tk ~= 0 and tk ~= 1 and tk ~= 2 then
+		add(out, "field", 1, `trickKind {tk}`)
+	else
+		range("trickTime", 0, if tk == 1 then P.trickRoll elseif tk == 2 then P.trickWiggle else 0)
+		if tk ~= 0 and (s.grounded == true or (type(rid) == "number" and rid ~= -1)) then
+			add(out, "field", 1, `trickKind {tk} on the ground or a rail`)
+		end
 	end
 	local seq = s.clickSeq
 	if seq ~= nil then
@@ -2894,6 +2909,17 @@ function SquirrelMotor.envelope(
 			-- past the faster of the two speeds (validator round 15: a reach growing with the speed had and the steering
 			-- both, any way, let a crafted grab-leap chain along a long rail run 44 st/s where the motor's own runs 41)
 			local v0 = hypot2(prev.vx, prev.vz)
+			-- (the air trick, owner D17: while a move plays the motor swings the heading toward the keys at up to
+			-- P.trickTurn rad/s, the speed kept (trickSteer). A move plays in the gap when one was playing at `prev`, or
+			-- `next` claims a later one of the same flight; for at most `trickFor` of it (the whole gap, unless `prev`'s
+			-- was its last move). The speed had, turned by at most trickTurn x tau, lies no further than v0 x trickTurn x
+			-- tau^2 / 2 from where it would be unturned: that much more across, no more speed)
+			local trickFor = 0
+			if prev.trickTime > 0 or next.trickKind > prev.trickKind then
+				trickFor = if prev.trickKind >= 2 and next.trickKind <= prev.trickKind
+					then prev.trickTime
+					else math.huge
+			end
 			-- (the air steers toward moveSpeed, a sprint's at most, or v5.4's sprint in a rail leap's flight)
 			local steerTo = math.max(P.sprint * (if boosted then P.boostMult else 1), SquirrelMotor.V54.sprint)
 			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
@@ -2922,10 +2948,11 @@ function SquirrelMotor.envelope(
 					local steer = steerTo * (t - th - ta)
 					local lo = v0 * (th + ta) - steer
 					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
+					local tau = math.min(t, trickFor)
 					local lat = steer
 					local mid = (lo + hi) / 2
 					local x, z = prev.x + ux * mid, prev.z + uz * mid
-					local r = math.max((hi - lo) / 2, lat)
+					local r = math.max((hi - lo) / 2, lat) + v0 * P.trickTurn * tau * tau / 2
 					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
 					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
 					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
