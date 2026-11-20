@@ -1490,11 +1490,22 @@ function MoveValidator._stamina(
 		end
 		return d, nu, ns
 	end
+	-- (a rail within a grab and a leap's reach over the move's time of either end: a gap may hide the motor's free leaps
+	-- off it)
+	local function nearRail(): boolean
+		local reach =
+			math.min(Motion.C.airGrab + SquirrelMotor.launchCapXZ(false) * E.launchTol * span, C.RAIL_REACH_MAX)
+		local index = self.world.index
+		return railAbove(index, prev.x, prev.y, prev.z, reach, -math.huge)
+			or railAbove(index, next.x, next.y, next.z, reach, -math.huge)
+	end
 	-- (the least sprint a distance past the walk-steered step needs: the sprint steers it no more than this faster)
 	local rate = math.max(P.sprint - P.walk, if free then V54.sprint - V54.walk else 0, 1e-3)
 	local sprinted = 0
 	local refill = 0
 	local airT, airFirst = 0, true
+	-- (the speed kept after the move, when a branch sets it: u, s, hold, rail)
+	local after: { any }? = nil
 	if launched then
 		-- (the launch's own packet: the moments on the ground before it refill; the flight starts at the launch's speed)
 		if footA then
@@ -1541,27 +1552,72 @@ function MoveValidator._stamina(
 			refill = math.max(0, span - sprinted)
 		end
 	elseif unjudged then
-		-- (a gap from the air, validator round 12: the flight in progress at its walk-steered carry until its arc comes
-		-- down to the gap's end, a walk after; past an honest burst all its time after that drains when faster)
-		airT = if groundB then fallTo(next.y) else span
-		airFirst = true
-		local dW = stepped(airT, true, false)
-		local over = across - math.max(P.walk * span, dW) * tol - E.posSlack
+		-- (a gap from the air, validator round 12, the round-11 review's HIGH: the flight in progress at its walk-steered
+		-- carry until its arc comes down to the gap's end, then a walk; a gap that ends in a fresh flight (its vertical speed
+		-- is no continuation of the arc) hid a launch, a leap whose flight is the time its speed has fallen since leapUp,
+		-- charged leapCost off the ground; beside a rail (within a leap's reach of an end) the time between is a chain of the
+		-- motor's free leaps off it, at v5.4's walk, and the hidden launch is free. The rest is the least sprint, as from the
+		-- ground; past an honest burst all its time on the ground drains when faster)
+		local launchCap = SquirrelMotor.launchCapXZ(false) * E.launchTol
+		local relaunch = not footB and next.vy > prev.vy - P.gravity * span + P.gravity * E.gravityEps
+		local tau = if relaunch then math.clamp((P.leapUp * E.launchTol - next.vy) / P.gravity, 0, span) else 0
+		local railNear = nearRail()
+		local t1 = if groundB then fallTo(next.y) else span - tau
+		local rest = math.max(0, span - t1 - tau)
+		local d1, u1, s1 = SquirrelMotor.speedBound(u, s, P.walk, false, t1, holdLeft, walkLo)
+		local d2, u2, s2 = 0, u1, s1
+		if rest > 0 then
+			if railNear then
+				d2, u2, s2 =
+					SquirrelMotor.speedBound(launchCap, math.max(s1, V54.walk), P.walk, false, rest, nil, V54.walk)
+			else
+				d2, u2, s2 = SquirrelMotor.speedBound(u1, s1, P.walk, true, rest)
+			end
+		end
+		local d3, u3, s3 = 0, u2, s2
+		if tau > 0 then
+			d3, u3, s3 = SquirrelMotor.speedBound(
+				if railNear then launchCap else P.leapForward * E.launchTol,
+				s2,
+				P.walk,
+				false,
+				tau,
+				nil,
+				if railNear then V54.walk else nil
+			)
+			if not railNear then
+				marks.stamina = math.max(marks.stamina - P.leapCost, -C.STAMINA_SLACK)
+			end
+		end
+		if railNear then
+			rate = math.max(rate, V54.sprint - V54.walk)
+		end
+		local over = across - math.max(P.walk * span, d1 + d2 + d3) * tol - E.posSlack
 		if over > 0 then
 			if span <= C.STAMINA_BURST then
-				local after = span - airT
-				local flight = math.min(after, 2 * P.leapUp / P.gravity)
+				local flight = math.min(rest, 2 * P.leapUp / P.gravity)
 				local carry = math.max(0, P.leapForward * E.launchTol - P.walk * tol) * flight
-				local byLeap = if after > 0
+				local byLeap = if rest > 0 and tau <= 0
 					then P.leapCost * P.sprintSeconds + math.max(0, over - carry) / rate
 					else math.huge
 				sprinted = math.clamp(math.min(over / rate, byLeap), 0, span)
 			else
-				sprinted = if airT < span then span - airT else math.clamp(over / rate, 0, span)
+				sprinted = if rest > 0 then rest else math.clamp(over / rate, 0, span)
 			end
 		end
 		if groundB and span <= C.STAMINA_BURST then
-			refill = math.max(0, span - airT - sprinted)
+			refill = math.max(0, rest - sprinted)
+		end
+		if tau > 0 then
+			after = { math.min(hxz, u3), s3, nil, railNear }
+		elseif groundB then
+			after = { u2, s2, nil, nil }
+		else
+			after = { u1, s1, nil, free }
+		end
+		if sprinted > 0 then
+			after[1] = math.max(after[1], P.sprint)
+			after[2] = P.sprint
 		end
 	else
 		-- a move judged move by move: on the ground, in the air, or one that lands or walks off an edge
@@ -1616,8 +1672,10 @@ function MoveValidator._stamina(
 	marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
 	-- (the speed kept: stepped as the move was judged; a gap from the ground that ends in the air hid a launch)
 	local _, nu, ns = stepped(airT, airFirst, sprinted > 0)
-	if unjudged and groundA and not footB then
-		keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), ns, nil, nil)
+	if after then
+		keepModel(after[1], after[2], after[3], after[4])
+	elseif unjudged and groundA and not footB then
+		keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), ns, nil, nearRail())
 	elseif groundB then
 		keepModel(nu, ns, nil, nil)
 	else
