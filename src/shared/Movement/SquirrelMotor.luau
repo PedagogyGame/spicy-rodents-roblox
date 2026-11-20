@@ -3915,14 +3915,17 @@ function SquirrelMotor.envelope(
 			-- (a packet the grab search explained with no launch seen, the motor's grab-leap chain sent in phase with its
 			-- grabs: each packet ends a frame after a leap, at the vertical speed of the last. A launch off the rail the
 			-- search grabbed all the same, free, for the meter and the speed kept, its flight from the first grab, when the
-			-- vertical speed is a leap's at the search's last grab, gravity since; validator round 17, the round-16
-			-- review's LOW 3)
+			-- vertical speed is a leap's at the search's last grab, gravity since, and no air trick plays in the gap (a grab
+			-- ends a flight and its moves: a claimed one's swing widens the search, and bought a crafted chain along a rail
+			-- free flights); validator round 17, the round-16 review's LOW 3)
 			local grabAt = judged.grab
 			if
 				grabAt
 				and not launched
 				and not prev.grounded
 				and pounce == nil
+				and prev.trickTime <= 0
+				and next.trickKind == 0
 				and next.vy >= P.leapUp - P.gravity * (next.clock - grabAt) - gEps
 			then
 				launchUsed = true
