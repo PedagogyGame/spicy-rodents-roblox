@@ -2,7 +2,7 @@
 -- ServerScriptService.Server.Movement.MoveValidator
 -- Validates client motor packets; log-only until W7.
 -- Interface (BUILD_PLAN §1.4): accept(actor, packet) -> ok, correction; pose(id, t); also new(world, opts); reset;
---   forget; hop; reachable; meterOf; wallGap; fastest; clearFlag; isFlagged; last; stats; the shared bounds leapRise, apexAllowance,
+--   forget; hop; reachable; throughSlab; meterOf; wallGap; fastest; clearFlag; isFlagged; last; stats; the shared bounds leapRise, apexAllowance,
 --   leapUpAllowance, gravity, nearTrampoline; C
 --
 -- The server side of D2: players move their own squirrel with the shared SquirrelMotor and stream its
@@ -51,6 +51,11 @@
 --     service's gate, root or last accepted place: never taken where it says); (B) the displacement governor (_govern):
 --     every window of up to C.GOV_WINDOW of accepted places stays within the motor's honest pace across and up
 --     (governorBounds), its history kept across a snap (anchor). Every grounded packet off the rails needs floorNear.
+--   * Round 10 (2026-11-20, the round-9 review): reachable() no more lenient than the envelope (riseFrom, both legs of
+--     a way round with cover, no rail rule), the gate's rail rule only for the route its first packet claims, a move
+--     with one end on a rail slab-judged at the off-rail end's column (world.railSlab), a way round a corner or a
+--     building's end up to ValidatorWorld.C.AROUND_GAP explains a gap's wall (a third, never escalated: verdict.cornered),
+--     the sprint meter on the packets' own clocks (a gap drains the least sprint that covers it), gapMax 6.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -90,6 +95,9 @@ export type Verdict = {
 	-- (Movement/MovementService) a click's copy the packet carried, not taken yet: its number and motor clock
 	click: { seq: number, clock: number }?,
 	river: boolean?, -- the packet is the client's own river recovery (the quay spot of a fall it could have made)
+	-- the packet's only doubts are a gap too long to judge move by move and a wall third a way round a corner explains
+	-- (judged from the last packet, both ends off the rails): reached from it (MovementService: invariant E's chain)
+	cornered: boolean?,
 }
 
 export type Options = {
@@ -100,7 +108,9 @@ export type Options = {
 	clockLag: number?, -- the mark is the lowest offset at least this old (default 3: a 1.12 x hack still shows)
 	clockSlack: number?, -- how far (s) the offset may fall below that lowest (default 0.35: 80 to 300 ms and jitter)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of the chili boost (default: never)
-	gapMax: number?, -- gaps too long to judge move by move allowed inside gapWindow (default 4)
+	-- gaps too long to judge move by move allowed inside gapWindow (default 6: an honest link's loss bursts every 2 s,
+	-- validator round 10; each gap is judged as a whole by hop(), and by invariant E never the held place but by a chain)
+	gapMax: number?,
 	gapWindow: number?, -- seconds of server time (default 10)
 	clockStepMax: number?, -- the most (s) the offset may ever fall below a mark, whatever the ping (default 0.9)
 	-- the link's round trip in seconds as the engine measures it (Player:GetNetworkPing): a latency that drops can lower
@@ -136,6 +146,8 @@ type Marks = {
 	wallX: number?,
 	wallY: number?,
 	wallZ: number?,
+	wallAt: number?, -- (server time the anchor was set, and its client clock: the run a way round from it may stand for)
+	wallClock: number?,
 }
 
 -- What a body keeps of its last driver when no one drives it (forget), for the next (takeOver): the constraints, never
@@ -249,14 +261,22 @@ MoveValidator.C = table.freeze({
 	-- seconds: the most of a move's time the governor's "near a rail" and "near a trampoline" reach from the last place
 	-- stands for (a quarter second of the fastest pace)
 	GOV_NEAR_T = 0.25,
+	-- seconds: what an arrival's jitter may add to the server's time since the wall anchor (creep's way round)
+	CREEP_JITTER = 0.35,
 })
 
-local creep: (world: World, marks: Marks, prev: State?, next: State, violations: { Violation }) -> ()
+local creep: (
+	world: World,
+	marks: Marks,
+	prev: State?,
+	next: State,
+	violations: { Violation },
+	serverTime: number,
+	pace: number
+) -> ()
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
--- (ValidatorWorld.C's chord bounds: a shorter move is no chord, a longer one is crossesLong's)
+-- (ValidatorWorld.C's chord bound: a shorter move is no chord)
 local MIN_CHORD = 0.05
-local MAX_CHORD = 4
-local CREEP_BACK = 0.1 -- studs: a creep's wall line starts this far behind its anchor
 local HISTORY_SLOTS = 64 -- 1 s at 60 Hz, with room for bursts
 
 local function newHistory(): History
@@ -317,7 +337,7 @@ function MoveValidator.new(world: World, opts: Options?): MoveValidator
 		boostOf = o.boostOf or function(_actorId: any): boolean
 			return false
 		end,
-		gapMax = o.gapMax or 4,
+		gapMax = o.gapMax or 6,
 		gapWindow = o.gapWindow or 10,
 		clockStepMax = o.clockStepMax or 0.9,
 		pingOf = o.pingOf or function(_actorId: any): number?
@@ -454,7 +474,15 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		local gov = first.marks.gov
 		local govFaults: { Violation } = {}
 		-- (the first packet after a snap or a hand-off: a creep's walls from the kept anchor, as any packet's)
-		creep(self.world, first.marks, nil, first.last, govFaults)
+		creep(
+			self.world,
+			first.marks,
+			nil,
+			first.last,
+			govFaults,
+			serverTime,
+			SquirrelMotor.runCap(self.boostOf(actorId))
+		)
 		MoveValidator._govern(
 			self,
 			actorId,
@@ -579,6 +607,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local dtEff = math.min(dt, serverGap + math.max(0, actor.lastOffset - mark) + swing)
 
 	local resync = false
+	local cornered = false -- (a wall third a way round a corner explains: verdict.cornered)
 	local launched = false
 	local pounceAt: number? = nil
 	-- what the validator keeps of the packet's speeds (the round-3 review: no later packet is judged by a speed only the
@@ -615,11 +644,15 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		-- the quay spot is the new baseline; the move to it is the move into the water (the governor below)
 		resync = true
 		actor.resyncs += 1
+		-- (the client's own recovery puts the body on the quay: the walls are judged from there on)
+		actor.marks.wallX, actor.marks.wallY, actor.marks.wallZ, actor.marks.wallAt, actor.marks.wallClock =
+			next.x, next.y, next.z, serverTime, next.clock
 	elseif dt > SquirrelMotor.envelopeParams.maxDt then
 		-- too long to judge move by move (a stall, a long loss burst): the new baseline, judged as a whole (gap())
 		resync = true
 		actor.resyncs += 1
-		self:_gap(actorId, actor, prev, next, dtEff, serverTime, violations)
+		cornered = self:_gap(actorId, actor, prev, next, dtEff, serverTime, violations)
+		creep(self.world, actor.marks, prev, next, violations, serverTime, SquirrelMotor.runCap(boosted))
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
@@ -638,15 +671,21 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			next.y = judged.y :: number
 		end
 		if judged.longWall then
-			-- a line too long for the short wall test went through a wall: weighed as a gap's (one may be a corner)
-			local n = self:wallGap(actorId, serverTime)
+			-- a line too long for the short wall test went through a wall: weighed as a gap's (one may be a corner). A
+			-- way round a corner clear (judged.cornered: validator round 10) is a third whatever the count, the doubt E
+			-- keeps from the held place (the round-9 review: an honest body running close round a house through loss
+			-- bursts was snapped for its second gap in WALL_GAP_WINDOW); one too long to tell, the second a whole flag
+			local n = if judged.cornered then #actor.marks.wallGaps else self:wallGap(actorId, serverTime)
+			cornered = judged.cornered == true
 			table.insert(violations, {
 				code = "wall",
-				severity = if n >= 2 then 1 else 0.34,
-				detail = `a {dt} s move's straight line goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
+				severity = if n >= 2 and not judged.cornered then 1 else 0.34,
+				detail = `a {dt} s move's straight line goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s{if judged.cornered
+					then ", a way round a corner"
+					else ""})`,
 			})
 		end
-		creep(self.world, actor.marks, prev, next, violations)
+		creep(self.world, actor.marks, prev, next, violations, serverTime, SquirrelMotor.runCap(boosted))
 		-- the pounce rate: the motor pounces only once its cooldown is over, wherever the body is and however long the gap
 		-- (the window dates each launch exactly)
 		if pounceAgo then
@@ -789,6 +828,14 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	v.pounce = pounceAt
 	v.pounceGap = if pounceAt then dt else nil
 	v.river = riverLanding or nil
+	-- (validator round 10, invariant E's chain: the packet's only doubts are a gap too long to judge move by move and a
+	-- wall third a way round a corner explains, judged from the last packet, both ends off the rails: the place it stands
+	-- for is reached from that one, MovementService.packet)
+	local only = true
+	for _, x in violations do
+		only = only and x.code == "wall" and cornered
+	end
+	v.cornered = only and prev.routeId == nil and next.routeId == nil and (resync or cornered) and not riverLanding
 	return v
 end
 
@@ -829,8 +876,11 @@ function MoveValidator.nearTrampoline(world: World, x: number, z: number, margin
 end
 
 -- throughSlab(world, from, next) -> boolean: the move from `from` to `next` went through a floor, a roof or a ceiling
--- (world.slab; `standY`: the height it last stood at, for a long slanting fall), both ends off the rails and neither by
--- a trampoline's bed
+-- (world.slab; `standY`: the height it last stood at, for a long slanting fall), neither end by a trampoline's bed. Both
+-- ends off the rails: world.slab. One end on a rail (validator round 10, the round-9 review's MEDIUM: such a move was
+-- never judged, so a drop off a bridge over a house with its packets held back landed in the sealed storey under it):
+-- world.railSlab at the off-rail end's column, from just over its feet to C.RAIL_CLEAR under the rail. Both on rails:
+-- the rails' own (the envelope's transfers).
 function MoveValidator.throughSlab(
 	world: World,
 	from: { x: number, y: number, z: number, routeId: number? },
@@ -838,60 +888,113 @@ function MoveValidator.throughSlab(
 	standY: number?
 ): boolean
 	local slab = (world :: any).slab
-	return slab ~= nil
-		and from.routeId == nil
-		and next.routeId == nil
-		and not MoveValidator.nearTrampoline(world, next.x, next.z, 2)
-		and not MoveValidator.nearTrampoline(world, from.x, from.z, 2)
-		and slab(from.x, from.y, from.z, next.x, next.y, next.z, standY)
+	if
+		slab == nil
+		or MoveValidator.nearTrampoline(world, next.x, next.z, 2)
+		or MoveValidator.nearTrampoline(world, from.x, from.z, 2)
+	then
+		return false
+	end
+	local fromRail, nextRail = from.routeId ~= nil, next.routeId ~= nil
+	if not fromRail and not nextRail then
+		return slab(from.x, from.y, from.z, next.x, next.y, next.z, standY)
+	end
+	local railSlab = (world :: any).railSlab
+	if railSlab == nil or (fromRail and nextRail) then
+		return false
+	end
+	if fromRail then
+		return railSlab(next.x, next.y, next.z, from.x, from.y, from.z)
+	end
+	return railSlab(from.x, from.y, from.z, next.x, next.y, next.z)
 end
 
--- creep(world, marks, prev?, next, violations): the walls of a move shorter than a chord (no wall test judges one),
--- judged from where they were last judged (marks.wallX..), once that line is a chord: a creep of under 0.05 st a
--- packet, and the first packet after a snap or a hand-off, cross no wall unjudged. Off the rails (a rail's line is the
--- route's); a move of a chord or more was the envelope's (or hop's) to judge: the anchor moves to it
-function creep(world: World, marks: Marks, prev: State?, next: State, violations: { Violation })
+-- riseFrom(fromY, toY, rise) -> number: the rise over the higher end that puts a line's high rays a leap over its START
+-- (validator round 10, the round-9 review's MEDIUM: a line was given the higher end's height plus a whole leap's rise,
+-- so a low end on the ground outside and a high end mid-leap inside cleared a 17-st wall): a climbing line rises a leap
+-- over its low end, a descending one over its high end, as a body that leapt from where it was
+local function riseFrom(fromY: number, toY: number, rise: number): number
+	return math.max(0, fromY + rise - math.max(fromY, toY))
+end
+
+-- creep(world, marks, prev?, next, violations, serverTime, pace): every move's walls judged again from where the body
+-- was last clear of them (marks.wallX..: the anchor), once that line is a chord. Validator round 9: a move shorter than a
+-- chord was judged by no wall test, so a creep of under 0.05 st a packet, and the first packet after a snap or a
+-- hand-off, crossed walls unjudged. Round 10: the anchor moves only to a packet whose CENTRE line from it is clear
+-- (world.crossesCenter; the round-9 review's face case, and more: a move whose side ray alone missed a wall, a packet a
+-- little way into a wall obliquely, is no crossing for the lenient test, and every ray of the next move starts inside
+-- the wall, where the engine's ray meets nothing: two oblique packets walked through a 1-st wall). A centre line from the
+-- anchor through a wall is a wall, unless a way round no longer than the run since explains it (world.around: a
+-- corner the chord between two packets clipped; then the anchor moves on): an honest body's centre never goes through a
+-- wall (the client's narrow probe keeps it 0.35 off one). Off the rails (a rail's line is the route's: the anchor moves
+-- to it); never past a wall the packet went through
+function creep(
+	world: World,
+	marks: Marks,
+	prev: State?,
+	next: State,
+	violations: { Violation },
+	serverTime: number,
+	pace: number
+)
 	-- (never past a wall the packet went through: the anchor stays on the near side, a snap's target with it)
 	for _, v in violations do
 		if v.code == "wall" or v.code == "slab" then
 			return
 		end
 	end
-	local crosses = world.crosses
+	local center = world.crossesCenter
+	if marks.wallX == nil and prev and prev.routeId == nil then
+		-- (no anchor yet, a validator no service anchored: from the baseline)
+		marks.wallX, marks.wallY, marks.wallZ, marks.wallAt, marks.wallClock =
+			prev.x, prev.y, prev.z, serverTime, prev.clock
+	end
 	local wx, wy, wz = marks.wallX, marks.wallY, marks.wallZ
 	if
-		crosses == nil
+		center == nil
 		or next.routeId ~= nil
 		or (prev and prev.routeId ~= nil)
 		or wx == nil
 		or wy == nil
 		or wz == nil
-		or (prev and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) >= MIN_CHORD)
 	then
-		marks.wallX, marks.wallY, marks.wallZ = next.x, next.y, next.z
+		marks.wallX, marks.wallY, marks.wallZ, marks.wallAt, marks.wallClock =
+			next.x, next.y, next.z, serverTime, next.clock
 		return
 	end
 	local far = math.sqrt((next.x - wx) ^ 2 + (next.z - wz) ^ 2)
 	if far < MIN_CHORD then
 		return
 	end
-	if far <= MAX_CHORD then
-		local lo, hi = math.min(wy, next.y), math.max(wy, next.y)
-		-- (from a little behind the anchor along the line: a ray that starts on a wall's face, or inside it, meets
-		-- nothing; the body's centre is never that near a wall, BODY_HALF; over the higher end by a leap only for a move
-		-- in the air: a creep on the ground clears nothing over its top)
-		local bx, bz = wx - (next.x - wx) / far * CREEP_BACK, wz - (next.z - wz) / far * CREEP_BACK
-		local rise = if next.grounded and (prev == nil or prev.grounded) then 0 else MoveValidator.leapRise()
-		if crosses(bx, bz, next.x, next.z, lo, hi, rise, next.y) then
-			table.insert(violations, {
-				code = "wall",
-				severity = 1,
-				detail = "a creep of moves each shorter than a chord crosses a wall collider",
-			})
-			return
-		end
+	local lo, hi = math.min(wy, next.y), math.max(wy, next.y)
+	-- (over the line's start by a leap only for a move in the air: a creep on the ground clears nothing over its top)
+	local leap = if next.grounded and (prev == nil or prev.grounded) then 0 else MoveValidator.leapRise()
+	local rise = riseFrom(wy, next.y, leap)
+	if not center(wx, wz, next.x, next.z, lo, hi, rise, next.y) then
+		marks.wallX, marks.wallY, marks.wallZ, marks.wallAt, marks.wallClock =
+			next.x, next.y, next.z, serverTime, next.clock
+		return
 	end
-	marks.wallX, marks.wallY, marks.wallZ = next.x, next.y, next.z
+	local round = world.around
+	-- (the packets' own clocks since the anchor, never more than the server's arrivals and an arrival's jitter allow)
+	local since = math.max(
+		0,
+		math.min(
+			next.clock - (marks.wallClock or next.clock),
+			serverTime - (marks.wallAt or serverTime) + MoveValidator.C.CREEP_JITTER
+		)
+	)
+	local path = pace * since + 1 + 2 * SquirrelMotor.envelopeParams.posSlack
+	if round ~= nil and far <= (world.aroundMax or 0) and round(wx, wz, next.x, next.z, lo, hi, rise, next.y, path) then
+		marks.wallX, marks.wallY, marks.wallZ, marks.wallAt, marks.wallClock =
+			next.x, next.y, next.z, serverTime, next.clock
+		return
+	end
+	table.insert(violations, {
+		code = "wall",
+		severity = 1,
+		detail = "the centre line from where the body was last clear of walls crosses a wall collider",
+	})
 end
 
 local function marksOf(self: MoveValidator, actorId: any): Marks
@@ -936,21 +1039,19 @@ local function nearRoute(index: any, id: any, x: number, y: number, z: number): 
 end
 
 -- onRails(index, from, next, along): the straight line from `from` to `next` is on the rails (hop): an end near the
--- route it claims, or with `along`, both ends near the route one of them claims
+-- route it claims, or with `along` (a gate), the route NEXT claims near both ends (the body put there got on it or ran
+-- along it; validator round 10, the round-9 review's MEDIUM: a gate on a trunk let an off-rail first packet within
+-- C.ROUTE_NEAR of the trunk, inside a closed room, through with no wall test)
 local function onRails(index: any, from: any, next: any, along: boolean): boolean
 	if not along then
 		return nearRoute(index, next.routeId, next.x, next.y, next.z)
 			or nearRoute(index, from.routeId, from.x, from.y, from.z)
 	end
-	for _, id in { from.routeId or false, next.routeId or false } do
-		if id and nearRoute(index, id, from.x, from.y, from.z) and nearRoute(index, id, next.x, next.y, next.z) then
-			return true
-		end
-	end
-	return false
+	local id = next.routeId
+	return id ~= nil and nearRoute(index, id, from.x, from.y, from.z) and nearRoute(index, id, next.x, next.y, next.z)
 end
 
--- hop(actorId, from, next, dt, serverTime, along?) -> violations: a move judged as a whole, not tick by tick, over `dt` (the
+-- hop(actorId, from, next, dt, serverTime, along?) -> (violations, cornered): a move judged as a whole, not tick by tick, over `dt` (the
 -- time it can stand for): a gap too long for the envelope (gap()), and the first packet after a move the server
 -- made, from where it put the body (MovementService's gate). `from` holds x, y, z and routeId (nil: off the rails).
 --   * reach: no further than the fastest the squirrel goes in that time (arithmetic only: a long gap costs nothing);
@@ -959,10 +1060,13 @@ end
 --     it, or is on it), or a trampoline bounced it;
 --   * the air (and a body on a rail): no higher above a floor than a leap, unless such a rail or a trampoline explains it;
 --   * walls: the straight line, chord by chord (world.crossesLong, its chords bounded), only when within reach (a
---     longer one is a teleport already); an honest body may have gone round a corner, so one is a third of a flag and
---     a second inside C.WALL_GAP_WINDOW a whole one. A line on the rails is not judged for walls, and a route id is
---     only a rail where that route runs (within C.ROUTE_NEAR: a made-up or far one is no rail): for a gap, an end on
---     the rail it claims; for a gate (`along`), both ends near one rail (the body put there got on it or ran along it).
+--     longer one is a teleport already), its high rays a leap over its start (riseFrom); an honest body may have gone
+--     round a corner: a way round no longer than the reach clear (world.around) is a third of a flag, none a whole one,
+--     and a line too long to tell a third, the second inside C.WALL_GAP_WINDOW a whole one. A line on the rails is not
+--     judged for walls, and a route id is only a rail where that route runs (within C.ROUTE_NEAR: a made-up or far one
+--     is no rail): for a gap, an end on the rail it claims; for a gate (`along`), the route the first packet claims near
+--     both ends (validator round 10).
+-- Returns the violations and whether a crossing was explained by a way round (`cornered`: MovementService's chain).
 -- Its cost is bounded whatever dt and the packet hold: the rail scans by C.RAIL_REACH_MAX, the walls by the chords.
 function MoveValidator.hop(
 	self: MoveValidator,
@@ -972,8 +1076,9 @@ function MoveValidator.hop(
 	dt: number,
 	serverTime: number,
 	along: boolean?
-): { Violation }
+): ({ Violation }, boolean)
 	local violations: { Violation } = {}
+	local explained = false -- (a wall crossed, and a way round a corner clear)
 	local E = SquirrelMotor.envelopeParams
 	local world = self.world
 	local fastest = self:fastest(actorId)
@@ -1049,47 +1154,68 @@ function MoveValidator.hop(
 			next.z,
 			math.min(from.y, next.y),
 			math.max(from.y, next.y),
-			apex,
+			riseFrom(from.y, next.y, apex),
 			next.y
 		)
 	then
 		-- (validator round 9: a third only when a corner rounded unseen explains it, world.around; else a whole flag)
 		local round = world.around
 		local cornered = round == nil
-			or round(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex, next.y)
-		local n = self:wallGap(actorId, serverTime)
+			or round(
+				from.x,
+				from.z,
+				next.x,
+				next.z,
+				math.min(from.y, next.y),
+				math.max(from.y, next.y),
+				riseFrom(from.y, next.y, apex),
+				next.y,
+				-- (no way round longer than a run covers in the gap: a leap goes straight)
+				SquirrelMotor.runCap(self.boostOf(actorId)) * math.max(dt, 0) + 1 + 2 * E.posSlack
+			)
+		-- (validator round 10: a way round a corner clear is a third whatever the count; a line too long to tell, the
+		-- second in C.WALL_GAP_WINDOW a whole flag)
+		local far = round == nil or moved > (world.aroundMax or 0)
+		explained = cornered and not far
+		local n = if explained then #marksOf(self, actorId).wallGaps else self:wallGap(actorId, serverTime)
 		table.insert(violations, {
 			code = "wall",
-			severity = if n >= 2 or not cornered then 1 else 0.34,
-			detail = `the straight line of a {dt} s gap goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s{if cornered
-				then ""
-				else ", no way round a corner"})`,
+			severity = if (n >= 2 and far) or not cornered then 1 else 0.34,
+			detail = `the straight line of a {dt} s gap goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s{if not cornered
+				then ", no way round a corner"
+				elseif explained then ", a way round a corner"
+				else ""})`,
 		})
 	end
-	return violations
+	return violations, explained
 end
 
--- reachable(from, next) -> boolean: could a body have gone from `from` to `next` with no wall and no slab between, by
--- the line or a way round a corner (world.around)? (Invariant E, validator round 9: after a doubtful packet a clean one
--- becomes the held place only when the held place reaches it; the packets between were judged from the doubtful one.)
--- A line on the rails (both ends near one rail one of them claims) is not judged for walls, as a gate's is not. Pure
--- (no wall gap counted); its cost only after a doubtful packet: one slab ray, a line's chords, the corners only when the
+-- reachable(from, next, path?) -> boolean: could a body have gone from `from` to `next` with no wall and no slab
+-- between, by the line or a way round a corner (world.aroundFar) no longer than `path` (studs; nil: any)? (Invariant E, validator round 9: after a doubtful packet a clean
+-- one becomes the held place only when the held place reaches it; the packets between were judged from the doubtful
+-- one.) No more lenient than the envelope it stands in for (validator round 10, the round-9 review's MEDIUM): the line's
+-- high rays a leap over its START (riseFrom), its centre line judged (crossesCenter: a chord's side ray that misses a
+-- wall is no way through), both legs of a way round asked with the cover over their far ends, and no rail rule (a held place on a rail reaches an off-rail packet only by the wall test, as any line does). Pure (no wall
+-- gap counted); its cost only after a doubtful packet: a slab ray or two, a line's chords, the corners only when the
 -- line is through a wall
 function MoveValidator.reachable(
 	self: MoveValidator,
 	from: { x: number, y: number, z: number, routeId: number? },
-	next: State
+	next: State,
+	path: number?
 ): boolean
 	local world = self.world
 	if MoveValidator.throughSlab(world, from, next) then
 		return false
 	end
-	local crossesLong = world.crossesLong
-	if crossesLong == nil or onRails(world.index, from, next, true) then
+	-- (the centre line, chord by chord: where the body's centre would have gone; a corner it clipped is a way round)
+	local center = world.crossesCenter
+	if center == nil then
 		return true
 	end
-	local lo, hi, rise = math.min(from.y, next.y), math.max(from.y, next.y), MoveValidator.leapRise()
-	if not crossesLong(from.x, from.z, next.x, next.z, lo, hi, rise, next.y) then
+	local lo, hi = math.min(from.y, next.y), math.max(from.y, next.y)
+	local rise = riseFrom(from.y, next.y, MoveValidator.leapRise())
+	if not center(from.x, from.z, next.x, next.z, lo, hi, rise, next.y) then
 		return true
 	end
 	-- (a way round a corner, for a line no longer than the world's AROUND_FAR: a longer one through a wall is none)
@@ -1098,20 +1224,25 @@ function MoveValidator.reachable(
 	if round == nil or (next.x - from.x) ^ 2 + (next.z - from.z) ^ 2 > most * most then
 		return false
 	end
-	return round(from.x, from.z, next.x, next.z, lo, hi, rise, next.y)
+	return round(from.x, from.z, next.x, next.z, lo, hi, rise, next.y, path)
 end
 
 -- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full). Faster
 -- on the ground than a walk can explain (MoveValidator.C.STAMINA_WALK times the walk) between two packets off the
 -- rails drains it as the motor's sprint does (a full meter is sprintSeconds). On the ground: grounded, or a packet
 -- that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
--- flipping its grounded flag to hide a sprint); a leap or a pounce in the air is not. A gap too long to judge move by
--- move drains by its own distance over the time it stands for, and never refills. Anything else refills it by the
--- server's own time at the motor's rate (sprintRefill), so a ride, a stall or a respawn never leaves it short. The
--- server's meter never drains where the client's does not, but for a landing's carry and a sprint's slowing down
--- (a moment faster than a walk with the key let go), which C.STAMINA_SLACK covers. Below -C.STAMINA_SLACK the client
--- is sprinting on credit: half a flag a packet (a gap's span, a whole one), and the meter held there. The chili rush (boostOf) runs faster than a
--- sprint and is left out, and so is the client's own river recovery.
+-- flipping its grounded flag to hide a sprint); a leap or a pounce in the air is not. Anything else refills it at the
+-- motor's rate (sprintRefill), so a ride, a stall or a respawn never leaves it short. The time a move stands for is
+-- the packets' own clocks (validator round 10, the round-9 review: refilled by the server's arrivals, a loss burst's
+-- time was lost to the meter, and a run of packets held up and delivered together refilled nothing after the first; 18
+-- honest "stamina" snaps sprinting through 0.5 s bursts): the client clock's gap, never more than the clock check lets
+-- it stand for (dtEff). A gap too long to judge move by move (`unjudged`) drains the least sprint that covers its
+-- distance (the rest of its time at a walk, which refills): a client that hides a sprint in a gap pays for every stud
+-- of it. The server's meter never drains where the client's does not, but for a landing's carry and a sprint's
+-- slowing down (a moment faster than a walk with the key let go), which C.STAMINA_SLACK covers. Below
+-- -C.STAMINA_SLACK the client is sprinting on credit: half a flag a packet's worth of sprint (a gap's span, a whole
+-- one), and the meter held there. The chili rush (boostOf) runs faster than a sprint and is left out, and so is the
+-- client's own river recovery.
 function MoveValidator._stamina(
 	self: MoveValidator,
 	actor: Actor,
@@ -1126,7 +1257,6 @@ function MoveValidator._stamina(
 	violations: { Violation }
 )
 	local marks = actor.marks
-	local elapsed = math.max(0, serverTime - marks.staminaAt)
 	marks.staminaAt = serverTime
 	local P = SquirrelMotor.params
 	local C = MoveValidator.C
@@ -1138,31 +1268,38 @@ function MoveValidator._stamina(
 			or hidden
 			or (math.abs(s.vy) < C.STAMINA_AIR_VY and landable ~= nil and landable(s.x, s.y, s.z, C.STAMINA_GROUND))
 	end
-	local span = if unjudged then dtEff else dt
-	local running = not exempt
-		and dt > 0
-		and span > 1e-3
+	local span = math.min(math.max(dt, 0), math.max(dtEff, 0))
+	if span <= 1e-3 then
+		return
+	end
+	local walk = P.walk * C.STAMINA_WALK
+	local across = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+	local sprinted = 0
+	if
+		not exempt
 		and prev.routeId == nil
 		and next.routeId == nil
 		and onGround(prev, actor.lastLanded)
 		and onGround(next, landed)
-		and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) / span > P.walk * C.STAMINA_WALK
-	if not running then
-		if not unjudged then
-			marks.stamina = math.min(1, marks.stamina + elapsed / P.sprintRefill)
-		end
-		return
+		and across / span > walk
+	then
+		-- (a move judged packet by packet: all of it; a gap: the least sprint that covers its distance)
+		sprinted = if unjudged
+			then math.clamp((across - walk * span) / math.max(P.sprint - walk, 1e-3), 0, span)
+			else math.max(dt, 0)
 	end
-	marks.stamina -= span / P.sprintSeconds
+	marks.stamina -= sprinted / P.sprintSeconds
 	if marks.stamina < -C.STAMINA_SLACK then
 		marks.stamina = -C.STAMINA_SLACK
 		table.insert(violations, {
 			code = "stamina",
 			-- (half a flag a packet's worth of sprint on credit: a gap's whole span is a whole flag)
-			severity = math.min(1, 0.5 * span / SquirrelWire.SEND_EVERY),
+			severity = math.min(1, 0.5 * sprinted / SquirrelWire.SEND_EVERY),
 			detail = "faster than a walk on the ground for longer than the sprint meter lasts",
 		})
 	end
+	-- (the rest of the move's time refills, as the motor's does off the sprint)
+	marks.stamina = math.min(1, marks.stamina + math.max(0, span - sprinted) / P.sprintRefill)
 end
 
 -- wallGap(actorId, now) -> n: a straight line too long to be sure of (a gap, a jump of the root) went through a wall;
@@ -1186,7 +1323,7 @@ function MoveValidator._gap(
 	dt: number,
 	serverTime: number,
 	violations: { Violation }
-)
+): boolean
 	local marks = actor.marks
 	table.insert(marks.gaps, serverTime)
 	prune(marks.gaps, serverTime, self.gapWindow)
@@ -1197,9 +1334,11 @@ function MoveValidator._gap(
 			detail = `{#marks.gaps} gaps too long to judge in {self.gapWindow} s`,
 		})
 	end
-	for _, v in self:hop(actorId, prev, next, dt, serverTime) do
+	local found, cornered = self:hop(actorId, prev, next, dt, serverTime)
+	for _, v in found do
 		table.insert(violations, v)
 	end
+	return cornered
 end
 
 -- pose(actorId, clock) -> x, y, z at a client clock within the last second (linear interpolation; the
@@ -1447,7 +1586,7 @@ function MoveValidator.relocate(self: MoveValidator, actorId: any, x: number, y:
 		marks.wallX, marks.wallY, marks.wallZ = parked.wallX, parked.wallY, parked.wallZ
 	end
 	if wx == nil or wz == nil or math.sqrt((x - wx) ^ 2 + (z - wz) ^ 2) >= MIN_CHORD then
-		marks.wallX, marks.wallY, marks.wallZ = x, y, z
+		marks.wallX, marks.wallY, marks.wallZ, marks.wallAt, marks.wallClock = x, y, z, serverTime, nil
 	end
 	self._parked[actorId] = nil
 	local gov = marks.gov

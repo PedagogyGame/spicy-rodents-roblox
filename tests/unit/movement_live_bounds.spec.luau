@@ -234,15 +234,102 @@ return function(t)
 		-- C.COVER_WALLS of them (C.COVER_RAYS + 1 down rays and three wall rays each; one of them was always counted)
 		local C = ValidatorWorld.C
 		local most = C.MAX_CHORDS * 6 + 12 + (C.COVER_WALLS - 1) * (C.COVER_RAYS + 4)
-		-- (validator round 9: a line of at most C.AROUND_MAX through a wall is asked for a way round a corner,
-		-- ValidatorWorld.around: 4 corners, two legs of at most 2 chords each, the first leg asked for no cover)
-		local chords = math.ceil(C.AROUND_MAX / C.MAX_CHORD)
-		local perChord = 6 + C.COVER_RAYS + 1 + 3
-		most = math.max(most, 12 + chords * perChord + 4 * (chords * 6 + chords * perChord))
+		-- (validator round 10: a line through a wall is asked for a way round a corner or a building's end up to
+		-- C.AROUND_GAP, ValidatorWorld.around: legs started while fewer than C.AROUND_RAYS wall rays are cast, the last
+		-- one at most ceil(AROUND_GAP / MAX_CHORD) chords, and the cover down rays of at most 20 legs)
+		local aroundMost = C.AROUND_RAYS
+			+ math.ceil(C.AROUND_GAP / C.MAX_CHORD) * 6
+			+ C.COVER_WALLS * 3
+			+ 20 * C.COVER_WALLS * (C.COVER_RAYS + 1)
+		most += aroundMost
 		t.truthy(worstRays <= most, `rays per call bounded ({worstRays} of {most})`)
-		-- (Lune's time; generous for a loaded machine: the bound is what matters, before this fix 60 s cost 1,200 ms)
-		t.truthy(worstMs < 8, `the worst call {worstName} took {worstMs} ms`)
+		-- (Lune's time, loose: the ray counts are the deterministic bound; a loaded machine stalls a call for 17 ms and
+		-- more, the round-9 review measured the worst path at 0.6 ms)
+		t.truthy(worstMs < 100, `the worst call {worstName} took {worstMs} ms`)
 	end)
+
+	t.test(
+		"cost: a way round (the held place's reach, a gap's corner) into a closed room, its rays measured at the worst: bounded",
+		function()
+			-- a closed room 60 x 60 st (walls 1 st thick, 14 high, a roof) with counted rays; the held place outside, a clean
+			-- packet inside: every line of 2 to 40 st through every wall and across the corners, asked as the server asks it
+			-- (MoveValidator.reachable, the 16-st AROUND_FAR; the envelope's and hop's AROUND_GAP way round)
+			local C = ValidatorWorld.C
+			local n = 0
+			local function box(ox: number, oy: number, oz: number, dx: number, dz: number, b: { number }): boolean
+				local x0, x1, z0, z1 = b[1], b[2], b[3], b[4]
+				if oy < 0 or oy > 14 then
+					return false
+				end
+				-- (slab test of the segment against the box's rectangle)
+				local t0, t1 = 0, 1
+				for _, a in { { ox, dx, x0, x1 }, { oz, dz, z0, z1 } } do
+					local o, d, lo, hi = a[1], a[2], a[3], a[4]
+					if math.abs(d) < 1e-12 then
+						if o < lo or o > hi then
+							return false
+						end
+					else
+						local ta, tb = (lo - o) / d, (hi - o) / d
+						if ta > tb then
+							ta, tb = tb, ta
+						end
+						t0, t1 = math.max(t0, ta), math.min(t1, tb)
+						if t0 > t1 then
+							return false
+						end
+					end
+				end
+				return true
+			end
+			local walls = { { -1, 0, -31, 31 }, { 60, 61, -31, 31 }, { -1, 61, -31, -30 }, { -1, 61, 30, 31 } }
+			local function wall(ox: number, oy: number, oz: number, dx: number, _dy: number, dz: number): boolean
+				n += 1
+				for _, b in walls do
+					if box(ox, oy, oz, dx, dz, b) then
+						return true
+					end
+				end
+				return false
+			end
+			local function down(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
+				n += 1
+				local lo, hi = math.min(oy, oy + dy), math.max(oy, oy + dy)
+				if lo <= 0 and oy >= 0 then
+					return true
+				end
+				return ox > -1 and ox < 61 and oz > -31 and oz < 31 and lo <= 14.6 and hi >= 14
+			end
+			local vworld = ValidatorWorld.build(rail, { wall = wall, down = down })
+			local v = MoveValidator.new(vworld)
+			local worstReach, worstAround, calls = 0, 0, 0
+			for _, off in { 0.5, 3, 10 } do
+				for _, z in { -36, -20, 0, 20, 36 } do
+					for _, len in { 2, 6, 12, 16, 24, 40 } do
+						for _, ang in { -1, -0.5, 0, 0.5, 1 } do
+							local from = { x = -1 - off, y = 0, z = z }
+							local next = SquirrelMotor.new(from.x + len * math.cos(ang), 0, z + len * math.sin(ang))
+							calls += 1
+							n = 0
+							v:reachable(from, next, 80)
+							worstReach = math.max(worstReach, n)
+							n = 0
+							vworld.around(from.x, from.z, next.x, next.z, 0, 0, MoveValidator.leapRise(), 0, 80)
+							worstAround = math.max(worstAround, n)
+						end
+					end
+				end
+			end
+			local legMost = math.ceil(C.AROUND_GAP / C.MAX_CHORD) * 6 + C.COVER_WALLS * 3
+			local aroundMost = C.AROUND_RAYS + legMost + 20 * C.COVER_WALLS * (C.COVER_RAYS + 1)
+			local reachMost = C.MAX_CHORDS * 6 + C.COVER_WALLS * (C.COVER_RAYS + 4) + 4 + aroundMost
+			print(
+				`      {calls} lines: reachable at most {worstReach} rays (bound {reachMost}), a gap's way round at most {worstAround} (bound {aroundMost})`
+			)
+			t.truthy(worstReach <= reachMost, `reachable's rays bounded ({worstReach} of {reachMost})`)
+			t.truthy(worstAround <= aroundMost, `a way round's rays bounded ({worstAround} of {aroundMost})`)
+		end
+	)
 
 	-- 2. A CLIENT THAT NEVER SENDS ---------------------------------------------------------------------------------------
 	local town = LiveRig.town()

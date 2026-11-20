@@ -101,8 +101,11 @@ export type World = Motion.World & {
 		y: number,
 		yHigh: number?,
 		rise: number?,
-		endY: number?
+		endY: number?,
+		path: number?
 	) -> boolean)?,
+	-- ... asked only for a line no longer than this (studs; a longer one is "too long to tell": true)
+	aroundMax: number?,
 	-- optional floor test for validators: is there something to stand on under feet at (x, y, z)?
 	floorBelow: ((x: number, y: number, z: number) -> boolean)?,
 	-- optional, for validators: is there ground within `depth` under feet at (x, y, z)? (else groundAt is asked)
@@ -1551,6 +1554,12 @@ function SquirrelMotor.groundCap(boosted: boolean): number
 	)
 end
 
+-- runCap(boosted): the fastest the body runs on the ground (a sprint, the chili rush's), no leap's carry: a way round a
+-- corner is run (validator round 10: the budget of a way round, world.around)
+function SquirrelMotor.runCap(boosted: boolean): number
+	return P.sprint * (if boosted then P.boostMult else 1)
+end
+
 function SquirrelMotor.railCap(treeTravel: boolean, boosted: boolean): number
 	return Motion.railSpeed(treeTravel, true, false, boosted)
 end
@@ -1576,9 +1585,19 @@ end
 --   y: after a plain arc, the height to keep: no higher than the arc (nil: the packet's own);
 --   landed: the body came down on a floor inside the gap and walked off its edge (on the ground, for the sprint meter);
 --   longWall: the straight line was too long for the short wall test and a chord of it went through a wall (the
---       validator weighs it as a gap's: one may be a corner rounded unseen).
+--       validator weighs it as a gap's: one may be a corner rounded unseen);
+--   cornered: ... and a way round a corner is clear (world.around asked, the line within world.aroundMax: not "too long
+--       to tell"; validator round 10).
 -- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
-export type Judged = { vy: number, xz: number, y: number?, landed: boolean, longWall: boolean, grab: number? }
+export type Judged = {
+	vy: number,
+	xz: number,
+	y: number?,
+	landed: boolean,
+	longWall: boolean,
+	cornered: boolean?,
+	grab: number?,
+}
 
 -- The motor packet, field by field (validator round 5: the round-4 review's worst hole came from a field nobody checked,
 -- the trunk normal): what bounds every field of Shared/Movement/SquirrelWire, so that no number the validator or the
@@ -2129,10 +2148,13 @@ function SquirrelMotor.envelope(
 			-- (validator round 9, the round-8 review's MEDIUM: a long line through a wall was always weighed a third and
 			-- kept; now only when a corner rounded unseen explains it, ValidatorWorld.around: else a whole flag)
 			local round = world.around
-			if straight or (round ~= nil and not round(fx, fz, next.x, next.z, lo, hi, rise, next.y)) then
+			-- (no way round longer than the body could have run in the gap: a leap goes straight; validator round 10)
+			local path = SquirrelMotor.runCap(boosted) * dt + 1 + 2 * E.posSlack
+			if straight or (round ~= nil and not round(fx, fz, next.x, next.z, lo, hi, rise, next.y, path)) then
 				add(out, "wall", 1, "move crosses a wall collider")
 			else
 				judged.longWall = true
+				judged.cornered = round ~= nil and hypot2(next.x - fx, next.z - fz) <= (world.aroundMax or 0)
 			end
 		end
 	end
@@ -2181,12 +2203,23 @@ function SquirrelMotor.envelope(
 			-- from the closest point of that reachable stretch (sampled), not from the stale position
 			local reachT = railCap * E.railTol * dt / math.max(prevRoute.length, 1e-6)
 			local gap = math.huge
+			local fromY = prev.y
 			for k = -4, 4 do
 				local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
 				local q = reg:pointAt(prevRoute, tt)
-				gap = math.min(gap, math.sqrt((dest.x - q.x) ^ 2 + (dest.y - q.y) ^ 2 + (dest.z - q.z) ^ 2))
+				local d = math.sqrt((dest.x - q.x) ^ 2 + (dest.y - q.y) ^ 2 + (dest.z - q.z) ^ 2)
+				if d < gap then
+					gap, fromY = d, q.y
+				end
 			end
 			local travel = E.posSlack + railCap * E.railTol * dt / 4 -- between the sampled points
+			-- (a gap of half the longest judged, a loss burst, can hide a leap off that stretch onto the new rail, as a leap
+			-- along one rail above: across no further than a launch carries in the gap, up no more than the run's climb and
+			-- a launch rises; validator round 10: an honest transfer through a loss burst of half a second was a whole
+			-- flag. A packet or two lost, never: the transfer limits stand there)
+			if dt >= E.maxDt / 2 and dest.y - fromY <= climbThenLaunch(railCap * E.railTol, 1) + E.posSlack then
+				travel += launchXZ * dt
+			end
 			local graph = world.graph
 			local relation = graph:relation(prevRoute.id, nextRoute.id)
 			-- a hidden intermediate route B (two transfers inside one long gap) is legal when B passes within

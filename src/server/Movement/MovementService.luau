@@ -52,7 +52,12 @@
 -- after a doubtful one that is reachable from it (no wall, or a way round a corner, and no slab between:
 -- MoveValidator.reachable). A doubtful packet is accepted for the motion only (the drift's reference, the pace, the
 -- duel's pose while fresh); a doubt the clean packets after it do not clear within C.DOUBT_SNAP is snapped back to the
--- held place ("unreached"). A packet with a number that is
+-- held place ("unreached"). Validator round 10 (the round-9 review): watch() snaps such a doubt too once no packet has
+-- come for C.DOUBT_QUIET (a client that sent one doubtful packet and stopped kept it); a doubt that is one packet judged
+-- from the held place itself, a gap or a wall third a way round explains (verdict.cornered), is reached by that judgement,
+-- and the clean packets after it are held (the chain: an honest body running round a house through loss bursts); and
+-- the root is judged from where it was last judged clear (rootWall) or where the server put it (rootPut), so a root
+-- moved less than a chord a sample, or kept inside after a snap, is judged. A packet with a number that is
 -- not finite (SquirrelWire.sane) is snapped and never judged. No packet and no root sample costs more than a bounded
 -- time: the validator's rail scans and long lines are bounded (MoveValidator.C.RAIL_REACH_MAX, ValidatorWorld.C).
 -- Validator round 3 (2026-11-19, the rule: nothing judged by a number only the client claimed): the duel's pose of the
@@ -156,6 +161,10 @@ type Squirrel = {
 	-- server time of the first doubtful packet accepted since the held place last advanced (nil: none; invariant E)
 	doubtAt: number?,
 	reachAt: number?, -- server time the held place was last asked to reach a clean packet (C.REACH_EVERY)
+	-- the standing doubt is one packet reached from the held place by its own judgement (verdict.cornered: a gap, or a
+	-- wall third a way round a corner explains, judged from the held place itself): the clean packets after it are
+	-- reached through it (validator round 10)
+	chain: boolean?,
 	lastX: number,
 	lastY: number,
 	lastZ: number,
@@ -170,6 +179,12 @@ type Squirrel = {
 	rootY: number,
 	rootZ: number,
 	rootAt: number,
+	-- the root's wall anchors (validator round 10, the round-9 review's LOW-MEDIUM: a root moved less than a chord a sample
+	-- was never wall-tested, and after a snap its next sample never was): where the root was last judged clear of walls
+	-- (kept across the server's moves: its own updates in flight continue from there) ...
+	rootWall: Gate?,
+	-- ... and where the server last put the body (a snap, a teleport, a hand-off), until a root sample is clear of it
+	rootPut: Gate?,
 	highSince: number?, -- the root has been high in the air with nothing near since then (its C.HIGH_LAG runs from it)
 	highY: number, -- ... from this height ...
 	highFrom: number, -- ... at this time (highSince, or the last move the server made since: rebase)
@@ -256,6 +271,10 @@ MovementService.C = table.freeze({
 	-- seconds a doubtful packet's doubt may stand with no clean packet reachable from the held place before the body is
 	-- snapped back there (invariant E: "unreached")
 	DOUBT_SNAP = 1,
+	-- seconds with no packet accepted after which watch() snaps such a doubt back itself (validator round 10, the round-9
+	-- review's LOW-MEDIUM: a client that stopped sending after a doubtful packet kept it for good): longer than a loss
+	-- burst an honest link has (1 s) and its jitter, so the packet after one still clears it
+	DOUBT_QUIET = 1.5,
 	-- seconds: while a doubt stands, the held place is asked to reach a clean packet at most this often (its rays bounded)
 	REACH_EVERY = 0.2,
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
@@ -270,7 +289,9 @@ MovementService.C = table.freeze({
 	DRIFT_PERSIST = 0.6, -- seconds the root may stay beyond the packets' own pace (a leap's start) before it is drift
 	SPREAD_WINDOW = 2, -- seconds of packet arrivals whose spread (latest less earliest arrival offset) is the jitter ...
 	SPREAD_MAX = 0.5, -- ... never counted above this (nor half the link's round trip)
-	ROOT_STALE_MAX = 1, -- seconds a root standing still may be judged against older packets (its updates held up)
+	-- seconds a root standing still may be judged against older packets (its updates held up: validator round 10, an
+	-- honest loss burst of 1 s loses the root's updates as well, and the packets after it may come in first)
+	ROOT_STALE_MAX = 1.5,
 	PACE_PAIRS = 4, -- the pace is the fastest of this many recent packets (their own velocity, or their step)
 	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
 	PIN_LOG = 20, -- seconds a new body may stay pinned with no packet past the gate before it is logged (it stays)
@@ -470,6 +491,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.priorUntil = now + ignoredFor(self, id)
 		sq.toldAt = nil
 		sq.rootX = nil
+		sq.rootPut = { x = target.x, y = target.y, z = target.z, at = now }
 		table.clear(sq.crossings)
 		table.clear(sq.rails)
 		if sq.highSince ~= nil then
@@ -486,6 +508,7 @@ function MovementService.new(deps: Deps): Movement
 		sq.good = nil -- (a snap from here on goes to the gate, never back over the move)
 		sq.base = nil
 		sq.doubtAt = nil
+		sq.chain = nil
 		sq.shot = nil
 		sq.cleanAt = nil
 		sq.pounceAt = nil
@@ -626,6 +649,7 @@ function MovementService.new(deps: Deps): Movement
 				if x and y and z then
 					sq.gate = { x = x, y = y, z = z, at = 0 } -- (its time is set by the first packet or watch)
 					sq.handoff = { x = x, y = y, z = z, at = 0 }
+					sq.rootPut = { x = x, y = y, z = z, at = 0 }
 				end
 			end
 			sq.possessedAt = 0
@@ -746,6 +770,7 @@ function MovementService.new(deps: Deps): Movement
 			-- (the root stays where it was pinned until the driver's own updates come, a round trip on)
 			sq.prior = { x = at.x, y = at.y, z = at.z, at = now }
 			sq.priorUntil = math.max(sq.priorUntil, now + ignoredFor(self, id))
+			sq.rootPut = { x = at.x, y = at.y, z = at.z, at = now }
 		end
 	end
 
@@ -1088,12 +1113,33 @@ function MovementService.new(deps: Deps): Movement
 		if why == nil then
 			why = self:_rootPath(actorId, sq, x, y, z, now)
 		end
+		-- a doubt no packet came to clear (invariant E; validator round 10, the round-9 review's LOW-MEDIUM: judged only
+		-- when a packet arrived, so a client that sent one doubtful packet and then nothing, or only under a stale epoch,
+		-- kept it for good): back to the held place once it has stood C.DOUBT_SNAP and no packet came for C.DOUBT_QUIET
+		local noHold: boolean? = nil
+		local doubtAt = sq.doubtAt
+		if
+			why == nil
+			and doubtAt ~= nil
+			and not sq.chain -- (a doubt the chain reaches: the place it stands for is reached from the held place)
+			and now - doubtAt > C.DOUBT_SNAP
+			and now - (sq.lastAt or doubtAt) > C.DOUBT_QUIET
+		then
+			why = "unreached"
+			noHold = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+			self.log:every(
+				`unreached:{actorId}`,
+				5,
+				"warn",
+				`{actorId}: a doubt standing {now - doubtAt} s and no packet for {now - (sq.lastAt or doubtAt)} s; snapped back`
+			)
+		end
 		if moved then
 			sq.rootMovedAt = now
 		end
 		sq.rootX, sq.rootY, sq.rootZ, sq.rootAt = x, y, z, now
 		if why then
-			snap(self, actorId, why, now, nil)
+			snap(self, actorId, why, now, nil, noHold)
 		end
 	end
 
@@ -1160,7 +1206,7 @@ function MovementService.new(deps: Deps): Movement
 
 	-- _reached(actorId, sq, snapshot) -> boolean: the held place (invariant E) reaches this packet with no wall (or a way
 	-- round a corner) and no slab between (MoveValidator.reachable); no held place: nothing to reach from (true)
-	function m._reached(self: Movement, _actorId: any, sq: Squirrel, snapshot: { [string]: number | boolean }): boolean
+	function m._reached(self: Movement, actorId: any, sq: Squirrel, snapshot: { [string]: number | boolean }): boolean
 		local validator = self.deps.validator
 		if validator == nil then
 			return true
@@ -1176,7 +1222,13 @@ function MovementService.new(deps: Deps): Movement
 			end
 			from = { x = g.x, y = g.y, z = g.z }
 		end
-		return validator:reachable(from, SquirrelMotor.deserialize(snapshot))
+		-- (no way round longer than the fastest pace covers since the held place, and a gate's slack)
+		local since = math.max(0, (sq.lastAt or 0) - (sq.cleanAt or sq.lastAt or 0))
+		return validator:reachable(
+			from,
+			SquirrelMotor.deserialize(snapshot),
+			C.GATE_SLACK + fastest(self, actorId) * (since + C.REACH_EVERY)
+		)
 	end
 
 	-- _rootPath(actorId, sq, x, y, z, now) -> why?: the root's own path between two samples: no wall (once the epoch has
@@ -1200,8 +1252,6 @@ function MovementService.new(deps: Deps): Movement
 		-- (the root itself near a rail: a packet on a rail with the root far from any is still judged)
 		local onRail = index and index:nearest(x, y, z, reach) ~= nil
 		local apex = MoveValidator.apexAllowance()
-		-- walls between consecutive samples, once the epoch has settled and the town has streamed in
-		local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
 		-- (the stream grace, validator round 9: only further than C.STREAMED from where the body was handed over)
 		local handoff = sq.handoff
 		local fresh = sq.possessedAt ~= nil
@@ -1209,7 +1259,6 @@ function MovementService.new(deps: Deps): Movement
 			and now - (sq.possessedAt :: number) < C.STREAM_GRACE
 			and handoff ~= nil
 			and dist(x, y, z, handoff.x, handoff.y, handoff.z) > C.STREAMED
-		local px = sq.rootX
 		-- (a wall the root passed by a rail that no packet on a rail has explained within C.RAIL_RECENT of it: a wall)
 		local crossings = sq.crossings
 		for _, c in crossings do
@@ -1218,37 +1267,76 @@ function MovementService.new(deps: Deps): Movement
 				return "wall"
 			end
 		end
-		-- a root by a rail (the feet drawn on a big trunk's bark, a downspout on a house's wall) may pass a wall's
-		-- collider where a packet on a rail has the body drawn: every crossing by a rail is kept until a packet on a rail
-		-- within C.RAIL_RECENT of it (before or after: the root may lead the packets) explains it (_explained). (The
-		-- round-3 review: any packet on a rail used to turn the test off for a second, and a root walked through a wall
-		-- in that second was never recorded)
-		local byRail = onRail or (index and index:nearest(px or x, sq.rootY, sq.rootZ, reach) ~= nil)
-		if px and settled and not fresh and now - sq.rootAt <= C.ROOT_STEP then
-			local y0, y1 = math.min(sq.rootY, y), math.max(sq.rootY, y)
-			-- (over the higher end, what a leap rises in the time between the samples)
-			local rise = MoveValidator.leapUpAllowance() * (now - sq.rootAt)
-			local crossed = world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise, y)
-			-- a jump of the root longer than a chord (its updates held up, or a hop): judged chord by chord, weighed as a
-			-- gap is (one may be a corner rounded unseen)
-			if
-				not crossed
-				and world.crossesLong
-				and dist(px, sq.rootY, sq.rootZ, x, y, z) > ValidatorWorld.C.MAX_CHORD
-				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise(), y)
-			then
-				crossed = byRail or (validator :: any):wallGap(actorId, now) >= 2
-			end
-			if crossed then
-				if not byRail then
-					return "wall"
+		-- walls: the line from where the root was last judged clear (rootWall) to this sample, once it is a chord, or from
+		-- where the server last put the body (rootPut: a sample clear of it is the client's own update after the move;
+		-- one clear of rootWall only, its update sent before it knew). Validator round 10 (the round-9 review's LOW-
+		-- MEDIUM): a root moved less than a chord a sample was judged by no line, nor the first sample after a snap, so a
+		-- root crept through a wall and sat inside while clean packets stood outside. A root by a rail (the feet drawn on a
+		-- big trunk's bark, a downspout on a house's wall) may pass a wall's collider where a packet on a rail has the body
+		-- drawn: every crossing by a rail is kept until a packet on a rail within C.RAIL_RECENT of it (before or after: the
+		-- root may lead the packets) explains it (_explained). (The round-3 review: any packet on a rail used to turn the
+		-- test off for a second, and a root walked through a wall in that second was never recorded)
+		local here: Gate = { x = x, y = y, z = z, at = now }
+		local anchor, put = sq.rootWall, sq.rootPut
+		if fresh or (anchor == nil and put == nil) then
+			sq.rootWall, sq.rootPut = here, nil
+		else
+			-- line(p) -> crossed, explained: the root's centre line from p through a wall (where the body's centre went:
+			-- ValidatorWorld crossesCenter, chord by chord; an honest centre never goes through a wall, the client's narrow
+			-- probe keeps it 0.35 off one), over the higher end by what a leap rises in the time since; `explained`: a way
+			-- round a corner no longer than the fastest pace covers since p is clear (ValidatorWorld.around), or the line
+			-- is too long to tell and the first in C.WALL_GAP_WINDOW
+			local function line(p: Gate): (boolean, boolean)
+				local d = math.sqrt((x - p.x) ^ 2 + (z - p.z) ^ 2)
+				if d < ValidatorWorld.C.MIN_CHORD then
+					return false, false
 				end
-				local c = { at = now, x = x, y = y, z = z }
-				if not self:_explained(sq, c, nil) then
-					if #crossings >= C.CROSSINGS_MAX then
+				local y0, y1 = math.min(p.y, y), math.max(p.y, y)
+				local rise =
+					math.min(MoveValidator.leapUpAllowance() * math.max(now - p.at, 1 / 60), MoveValidator.leapRise())
+				local center = world.crossesCenter
+				if center == nil or not center(p.x, p.z, x, z, y0, y1, rise, y) then
+					return false, false
+				end
+				local round = world.around
+				local far = d > (world.aroundMax or 0)
+				if round ~= nil and not far then
+					local path = fastest(self, actorId) * math.max(0, now - p.at) + 2
+					return true, round(p.x, p.z, x, z, y0, y1, rise, y, path)
+				end
+				return true, far and (validator :: any):wallGap(actorId, now) < 2
+			end
+			local clear = false
+			if put then
+				clear = not (line(put))
+				if clear then
+					sq.rootWall, sq.rootPut = here, nil
+				end
+			end
+			if not clear then
+				local crossed, explained = true, false
+				if anchor then
+					crossed, explained = line(anchor)
+				end
+				if anchor and math.sqrt((x - anchor.x) ^ 2 + (z - anchor.z) ^ 2) < ValidatorWorld.C.MIN_CHORD then
+					-- (less than a chord from where it was last judged: no line yet, the anchor stays: a creep's)
+					sq.rootWall = anchor
+				elseif not crossed or explained then
+					sq.rootWall = here
+				else
+					local from: Gate = anchor or here
+					local byRail = onRail or (index and index:nearest(from.x, from.y, from.z, reach) ~= nil)
+					if not byRail then
 						return "wall"
 					end
-					table.insert(crossings, c)
+					local c = { at = now, x = x, y = y, z = z }
+					if not self:_explained(sq, c, nil) then
+						if #crossings >= C.CROSSINGS_MAX then
+							return "wall"
+						end
+						table.insert(crossings, c)
+					end
+					sq.rootWall = here
 				end
 			end
 		end
@@ -1362,7 +1450,7 @@ function MovementService.new(deps: Deps): Movement
 					-- the line is on a rail only with both ends near the route claimed, so a route id buys no way through)
 					local next = SquirrelMotor.deserialize(snapshot)
 					local falling = fallsFrom(validator, gate, next, fastest(self, actorId))
-					for _, v in validator:hop(actorId, from, next, span + 0.1, now, true) do
+					for _, v in (validator:hop(actorId, from, next, span + 0.1, now, true)) do
 						local code: string = v.code
 						local fell = falling and code == "fly" -- (a fall from a gate high in the air: fallsFrom)
 						if (v.severity >= 1 or code == "wall") and not fell then
@@ -1415,6 +1503,8 @@ function MovementService.new(deps: Deps): Movement
 				and handoff ~= nil
 				and dist(px, py, pz, handoff.x, handoff.y, handoff.z) > C.STREAMED
 			if v.accepted then
+				-- (the packet before this one was the held place: invariant E's chain)
+				local fromHeld = sq.good ~= nil and sq.doubtAt == nil and sq.cleanAt ~= nil and sq.cleanAt == sq.lastAt
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
 				-- (its pace by the speeds the validator kept, never one only the client claimed)
 				pace(self, actorId, sq, validator:last(actorId) or snapshot, now)
@@ -1504,10 +1594,11 @@ function MovementService.new(deps: Deps): Movement
 					if ask then
 						sq.reachAt = now
 					end
-					if sq.doubtAt == nil or (ask and self:_reached(actorId, sq, snapshot)) then
+					if sq.doubtAt == nil or sq.chain or (ask and self:_reached(actorId, sq, snapshot)) then
 						sq.good = snapshot
 						sq.cleanAt = now
 						sq.doubtAt = nil
+						sq.chain = nil
 						-- a place a Reset may put the body back on: held, grounded, off the rails, a floor under the feet
 						-- (the server's own floor ray; validator round 7: the raw root was recorded, so a root held still
 						-- in the air was "safe")
@@ -1522,6 +1613,12 @@ function MovementService.new(deps: Deps): Movement
 					end
 				elseif sq.doubtAt == nil then
 					sq.doubtAt = now
+					-- (a gap, or a wall third a way round a corner explains, judged from the held place itself: reached by
+					-- that judgement, so the clean packets after it are too; validator round 10, the round-9 review's
+					-- honest lag spikes round a house: a burst at a sprint is longer than AROUND_FAR)
+					sq.chain = fromHeld and v.cornered == true and not graced
+				else
+					sq.chain = nil -- (a second doubt: the held place must reach a clean packet itself)
 				end
 				sq.lastRiver = v.river == true
 			end
