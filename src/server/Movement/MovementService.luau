@@ -1149,7 +1149,13 @@ function MovementService.new(deps: Deps): Movement
 			why = "silent"
 		end
 		if why == nil then
-			why = self:_rootPath(actorId, sq, x, y, z, now)
+			-- (its ways round a corner within the actor's ray budget: MoveValidator.budgeted)
+			local validator = self.deps.validator
+			why = if validator
+				then validator:budgeted(actorId, now, function(): any
+					return self:_rootPath(actorId, sq, x, y, z, now)
+				end)
+				else self:_rootPath(actorId, sq, x, y, z, now)
 		end
 		-- a doubt no packet came to clear (invariant E; validator round 10, the round-9 review's LOW-MEDIUM: judged only
 		-- when a packet arrived, so a client that sent one doubtful packet and then nothing, or only under a stale epoch,
@@ -1275,11 +1281,11 @@ function MovementService.new(deps: Deps): Movement
 		end
 		-- (no way round longer than the fastest pace covers since the held place, and a gate's slack)
 		local since = math.max(0, (sq.lastAt or 0) - (sq.cleanAt or sq.lastAt or 0))
-		return validator:reachable(
-			from,
-			SquirrelMotor.deserialize(snapshot),
-			C.GATE_SLACK + fastest(self, actorId) * (since + C.REACH_EVERY)
-		)
+		local path = C.GATE_SLACK + fastest(self, actorId) * (since + C.REACH_EVERY)
+		local next = SquirrelMotor.deserialize(snapshot)
+		return validator:budgeted(actorId, sq.lastAt or 0, function(): any
+			return validator:reachable(from, next, path)
+		end)
 	end
 
 	-- _rootPath(actorId, sq, x, y, z, now) -> why?: the root's own path between two samples: no wall (once the epoch has
@@ -1501,7 +1507,10 @@ function MovementService.new(deps: Deps): Movement
 					-- the line is on a rail only with both ends near the route claimed, so a route id buys no way through)
 					local next = SquirrelMotor.deserialize(snapshot)
 					local falling = fallsFrom(validator, gate, next, fastest(self, actorId))
-					for _, v in (validator:hop(actorId, from, next, span + 0.1, now, true)) do
+					local found = validator:budgeted(actorId, now, function(): any
+						return (validator:hop(actorId, from, next, span + 0.1, now, true))
+					end)
+					for _, v in found do
 						local code: string = v.code
 						local fell = falling and code == "fly" -- (a fall from a gate high in the air: fallsFrom)
 						if (v.severity >= 1 or code == "wall") and not fell then

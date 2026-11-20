@@ -131,6 +131,10 @@ ValidatorWorld.C = table.freeze({
 	-- ... and the most wall rays one such search casts before a leg (the cost bound: the legs tried in order, the cheap
 	-- L-shaped ways first; a way not reached in it is none). A leg is at most ceil(AROUND_GAP / MAX_CHORD) chords
 	AROUND_RAYS = 360,
+	-- ... and the most wall rays the ways round of one actor's packets and root may cast in a second (MoveValidator.budgeted
+	-- refills a pool of it at that rate, up to that much; validator round 11): four of the dearest searches, where honest
+	-- play on the lossy links measured spent at most 275 in any second (round a house, 0.65 to 0.8 s bursts)
+	AROUND_BUDGET = 1500,
 	-- studs: how near a rail a body must get to take it (railReach; Routes/Motion.C.airGrab, 3.4 st)
 	RAIL_GRAB = 3.4,
 	-- the props the rails are made of (railSlab's stop rule, "rail": validator round 11): a part whose parent's name starts
@@ -375,14 +379,20 @@ end
 -- No way longer than `path` (studs: what the body could have run in the time; validator round 10) is tried.
 -- A line longer than `maxLen` (default C.AROUND_MAX) is not asked (true: a gap's third, as before; invariant E keeps it
 -- from the held place). Cost: only for a line already through a wall; legs started while fewer than C.AROUND_RAYS
--- wall rays are cast, each at most ceil(maxLen / C.MAX_CHORD) chords and C.COVER_WALLS covers
+-- wall rays are cast, each at most ceil(maxLen / C.MAX_CHORD) chords and C.COVER_WALLS covers. `pool` (validator round
+-- 11, the round-10 review's LOW: a contrived client could make a few thousand rays a second): the wall rays the actor
+-- being judged has left (MoveValidator.budgeted fills it per actor, C.AROUND_BUDGET a second); a call casts no more than
+-- it holds (a leg started under it may finish past it) and takes what it cast; an empty pool tries no way (none found)
 function ValidatorWorld.around(
 	wall: Ray,
 	down: Ray?,
-	maxLen: number?
+	maxLen: number?,
+	pool: { left: number }?
 ): (number, number, number, number, number, number?, number?, number?, number?) -> boolean
-	-- (the wall rays one call has cast: no leg starts past C.AROUND_RAYS, a way not tried is none)
+	-- (the wall rays one call has cast: no leg starts past `cap`, C.AROUND_RAYS or what the pool holds, a way not tried
+	-- is none)
 	local cast = 0
+	local cap = C.AROUND_RAYS
 	local function counted(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		cast += 1
 		return wall(ox, oy, oz, dx, dy, dz)
@@ -395,13 +405,13 @@ function ValidatorWorld.around(
 	local function leg(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, top: number): boolean
 		-- (past the ray budget, or longer than its chords cover end to end: crossesLong samples a longer line, and a
 		-- way round's leg must be judged whole)
-		if cast > C.AROUND_RAYS or (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > (C.MAX_CHORDS * C.MAX_CHORD) ^ 2 then
+		if cast > cap or (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > (C.MAX_CHORDS * C.MAX_CHORD) ^ 2 then
 			return true
 		end
 		local lo, hi = math.min(y0, y1), math.max(y0, y1)
 		return long(x0, z0, x1, z1, lo, hi, math.max(0, top - hi), y1)
 	end
-	return function(
+	local function search(
 		x0: number,
 		z0: number,
 		x1: number,
@@ -489,6 +499,32 @@ function ValidatorWorld.around(
 			end
 		end
 		return false
+	end
+	if pool == nil then
+		return search
+	end
+	return function(
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		yLow: number,
+		yHigh: number?,
+		rise: number?,
+		endY: number?,
+		path: number?
+	): boolean
+		if (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > most * most then
+			return true -- (too long to tell, as search has it)
+		end
+		if pool.left <= 0 then
+			return false -- (the actor's rays for this second are spent: no way tried, none found)
+		end
+		cap = math.min(C.AROUND_RAYS, pool.left)
+		local found = search(x0, z0, x1, z1, yLow, yHigh, rise, endY, path)
+		cap = C.AROUND_RAYS
+		pool.left -= cast
+		return found
 	end
 end
 
@@ -667,6 +703,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 	local o: Options = opts or {}
 	local wall, down, cover = o.wall, o.down, o.cover or o.down
 	local slabRay = cover -- (before the cars: a car is drawn behind the server's box)
+	local pool = { left = math.huge }
 	if o.cars then
 		wall, down, cover = ValidatorWorld.withCars(wall, down, o.cars, cover)
 	end
@@ -683,9 +720,12 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		-- (the centre line alone, chord by chord: where a body's centre went, validator round 10; MoveValidator's
 		-- wall anchor and reachable, the root's anchor)
 		crossesCenter = if wall then ValidatorWorld.crossesLong(wall, cover, "center") else nil,
-		around = if wall then ValidatorWorld.around(wall, cover, C.AROUND_GAP) else nil,
+		around = if wall then ValidatorWorld.around(wall, cover, C.AROUND_GAP, pool) else nil,
 		aroundMax = C.AROUND_GAP,
-		aroundFar = if wall then ValidatorWorld.around(wall, cover, C.AROUND_FAR) else nil,
+		aroundFar = if wall then ValidatorWorld.around(wall, cover, C.AROUND_FAR, pool) else nil,
+		-- (the rays the actor being judged has left for ways round, and how many a second: MoveValidator.budgeted)
+		aroundPool = pool,
+		aroundBudget = C.AROUND_BUDGET,
 		aroundFarMax = C.AROUND_FAR,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
 		floorNear = if down then ValidatorWorld.floorNear(down) else nil,
