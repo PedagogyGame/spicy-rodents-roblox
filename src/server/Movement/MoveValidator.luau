@@ -71,6 +71,13 @@
 --     the server knows of (the envelope's judged.railLaunch, a packet on a rail, a rail at hand where a hidden launch
 --     ends) and ends when its arc must have come down. A charge that takes the meter to its floor winds it before any
 --     refill; a launch packet's time before its launch is judged as a move of its own.
+--   * Round 14 (2026-11-20, the round-13 review), two structural rules for every rail credit (a free launch, a free flight,
+--     rail-leap time, a refill as on a rail): (S1) given only where the server itself has the body on the rail: the last
+--     accepted packet on it (its claim checked), the packet's own checked claim, or a grab the motor's own step from the
+--     last accepted place explains (the envelope's grab search, up to SquirrelMotor.envelopeParams.grabSimDt); a rail
+--     merely near earns nothing, and a gap's hidden time is charged as if no rail were there; (S2) charge first, credit
+--     second: every hidden or claimed launch pays leapCost unless S1 holds, time credited as a flight is never refilled,
+--     one carry per flight. A move with an end on a rail judges its off-rail leg as a move of its own (legOf).
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -1406,6 +1413,11 @@ end
 --     its arc comes down to the gap's end, a walk after, the rest as from the ground. One as long as an honest loss burst
 --     (C.STAMINA_BURST) refills the rest of its time on the ground; a longer one drains all of its time on the ground when
 --     faster than that, and never refills (a client that hides its moves gets no credit for them).
+--   * A move with an end on a rail (validator round 14): the rail's own pace, refilled; the off-rail end's distance from the
+--     nearest point of the claimed route (less a grab onto it, or the drawn pose's offset off it) a move of its own in the
+--     time the run along the route leaves: off the rail the body was on, one free leap off it and then the ground; onto a
+--     rail, the flight in progress and then the ground; a launch a gap hid off a rail is free only off that same route,
+--     reached in time (hiddenLaunch). No other gap takes a rail credit.
 -- The server's meter never drains where the client's does not, but for rounding, which C.STAMINA_SLACK covers. Below
 -- -C.STAMINA_SLACK the client is sprinting on credit: half a flag a packet's worth of sprint (a gap's span, a whole one),
 -- and the meter held there. The chili rush (boostOf) runs faster than a sprint and is left out, and so is the client's

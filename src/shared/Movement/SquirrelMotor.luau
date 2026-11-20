@@ -1640,10 +1640,11 @@ end
 --   cornered: ... and a way round a corner is clear (world.around asked, the line within world.aroundMax: not "too long
 --       to tell"; validator round 10);
 --   charge: a launch the motor's sprint meter pays for (validator round 11, the round-10 review's HIGH): "leap" (leapCost)
---       or "pounce" (pounceCost) off the ground, or a pounce in the air; nil for none, or one off a rail (seen, or a visit
---       the gap may hide) or a trampoline's bounce, which are free.
---   railLaunch: the launch is off a rail, seen or a visit the gap may hide (validator round 13: the motor's railLeap, a
---       free flight; a bounce alone is none).
+--       or "pounce" (pounceCost) off the ground, or a pounce in the air; nil for none, or one off a rail the server has the
+--       body on (seen, or a grab the motor's own step from the last packet explains: validator round 14) or a
+--       trampoline's bounce, which are free. A launch a long gap's rail visit only explains (a rail near) is charged.
+--   railLaunch: the launch is off a rail the server has the body on, as for `charge` (validator round 13: the motor's
+--       railLeap, a free flight; round 14: never a rail merely near; a bounce alone is none).
 -- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
 export type Judged = {
 	vy: number,
