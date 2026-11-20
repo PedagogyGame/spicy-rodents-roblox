@@ -60,6 +60,11 @@
 --     charged, winded as the motor's, refilled only on the ground or a rail, a gap from the ground charged whatever its
 --     end), railSlab's column up to the rail past the rails' own props, and a ray budget per actor for the ways round a
 --     corner (budgeted).
+--   * Round 12 (2026-11-20, the round-11 review): the meter and the air bound step the motor's own speed model
+--     (SquirrelMotor.speedBound from the speed the server keeps, marks.speedU / speedS): a sprint slowing to a walk, a
+--     landing's carry and a flight coasting from its launch drain nothing, the rest the least sprint the motor covers it
+--     with; gaps from the air pay their flight's carry and any launch they hid; a flight past the sprint-steered step is a
+--     "speed" violation; the rail rule's slab columns look past up to ValidatorWorld.C.RAIL_HOPS props, then fail closed.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -137,10 +142,17 @@ type Marks = {
 	stamina: number, -- the server's own sprint meter (stamina()): 1 full, below 0 the client sprints on credit
 	staminaAt: number, -- server time it was last brought up to date
 	-- the server's meter ran out (at -C.STAMINA_SLACK) and has not come back by the motor's sprintRecover since (_stamina:
-	-- a launch now is a winded one); the body is in the flight of such a launch; the last pounce was such a one
+	-- a launch now is a winded one); the last pounce was such a one
 	winded: boolean?,
-	tiredFlight: boolean?,
 	tiredLunge: boolean?,
+	-- the motor's speed as the server bounds it at the last packet (_stamina, validator round 12: SquirrelMotor.speedBound
+	-- stepped over each move and gap): the most horizontal speed and moveSpeed the body can have; the client clock its
+	-- pounce's window holds the speed until; its flight steers at v5.4's speeds (a launch off a rail or a bed: free). nil:
+	-- unknown (a reset, a ride), taken at the most an honest body has there
+	speedU: number?,
+	speedS: number?,
+	speedHold: number?,
+	speedRail: boolean?,
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -257,6 +269,9 @@ MoveValidator.C = table.freeze({
 	-- seconds: the longest gap the meter takes for an honest loss burst (the least sprint that covers it drains, the rest
 	-- refills); a longer one drains all of its time when faster than a walk, and never refills (validator round 10)
 	STAMINA_BURST = 1.2,
+	-- how far over the motor's own speed step (SquirrelMotor.speedBound from the speed kept) a move may go before it needs
+	-- the sprint: the motor's substeps of other lengths, rounding (validator round 12)
+	STAMINA_STEP = 1.02,
 	-- studs: the widest any rail query of the validator looks (its world's index is bounded to it: a packet's numbers,
 	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
 	-- leaving the tallest trunk is within this of it
@@ -754,6 +769,8 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		boosted or riverLanding,
 		landed,
 		charge,
+		launched,
+		pounceAt,
 		violations
 	)
 
@@ -1288,37 +1305,45 @@ function MoveValidator.reachable(
 end
 
 -- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full), on the
--- motor's own rules (SquirrelMotor.params: sprintSeconds, sprintRefill, leapCost, pounceCost, leapForwardWinded):
---   * Drain. Faster on the ground than a walk can explain (C.STAMINA_WALK times the walk) between two packets off the
---     rails drains it as the motor's sprint does (a full meter is sprintSeconds). On the ground: grounded, or a packet
---     that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
---     flipping its grounded flag to hide a sprint).
---   * Launches (validator round 11, the round-10 review's HIGH: a client that kept its own meter full hopped at 35 st/s
---     for good): a leap off the ground costs leapCost, a pounce anywhere off a rail pounceCost (the envelope's
---     judged.charge); off a rail or a trampoline's bed both are free. A launch made while the meter is winded (it ran
---     out, at -C.STAMINA_SLACK, and has not come back by the motor's sprintRecover since, less C.STAMINA_RECOVER_SLACK:
---     the motor's own rule, or a pounce every cooldown refilled the little it needed between) is a winded one, which the
---     motor carries no faster than leapForwardWinded: the launch, and every packet of its flight until it lands, faster
---     than that is a sprint on credit.
+-- motor's own rules (SquirrelMotor.params: sprintSeconds, sprintRefill, leapCost, pounceCost, leapForwardWinded) and its
+-- own speed step (validator round 12, the round-11 review: SquirrelMotor.speedBound, stepped by the server over each move
+-- and each gap from the speed it keeps, marks.speedU / speedS):
+--   * The speed kept. The most horizontal speed and moveSpeed the body can have, stepped with the walk as moveSpeed's goal
+--     where the move needed no sprint and with the sprint where it did; a launch sets it to the launch's speed (the
+--     envelope's cap, a winded one's no more than leapForwardWinded; a pounce's held for pounceWindow), a free launch
+--     (off a rail, a trampoline's bed) steers at v5.4's speeds as the motor's railLeap does.
+--   * Drain: what the walk-steered step does not cover. On the ground a move longer than C.STAMINA_WALK times both a walk
+--     and the walk-steered step from the speed kept (a landing's carry, a sprint slowing to a walk at speedSmooth: the
+--     motor drains none of it) drains all its time, as the motor's sprint does (a full meter is sprintSeconds). In the
+--     air, where the motor steers by accelAir and coasts by dragAir from the launch, the distance past the walk-steered
+--     step drains the least sprint that covers it (the sprint steers no more than the sprint less the walk faster); past
+--     the sprint-steered step it is a flight faster than the motor's (a "speed" violation). On the ground: grounded, or a
+--     packet that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
+--     flipping its grounded flag to hide a sprint). A move that lands or walks off an edge is its two parts (the time
+--     its arc takes to come down to where it ends).
+--   * Launches (validator round 11): a leap off the ground costs leapCost, a pounce anywhere off a rail pounceCost (the
+--     envelope's judged.charge); off a rail or a trampoline's bed both are free. A launch made while the meter is winded
+--     (it ran out, at -C.STAMINA_SLACK, and has not come back by the motor's sprintRecover since, less
+--     C.STAMINA_RECOVER_SLACK) carries no faster than leapForwardWinded: faster is a violation, and its flight steers at a
+--     walk (more is a sprint on credit).
 --   * A pounce's lunge runs on along the ground, unsteered, for the motor's pounceWindow: paid with pounceCost, so the
 --     ground packets inside it no faster than the lunge drain nothing (a winded pounce's lunge is a walk: not exempt).
---   * Refill, at the motor's rate (sprintRefill), only for a move whose ends are both on the ground or on a rail: never
---     in the air ("or a hop would pay for itself"). A ride, a stall or a respawn refill by the server's own time on the
---     first packet after (accept).
+--   * Refill, at the motor's rate (sprintRefill), for the time on the ground or a rail not sprinting: a move whose ends are
+--     both there, and the ground part of one that lands or launches (validator round 12); never in the air ("or a hop
+--     would pay for itself"). A ride, a stall or a respawn refill by the server's own time on the first packet after.
 --   * The time a move stands for is the packets' own clocks (validator round 10): the client clock's gap, never more than
 --     the clock check lets it stand for (dtEff).
---   * A gap too long to judge move by move (`unjudged`) that starts on the ground, whatever its end (validator round 11:
---     a sprint hidden in gaps that ended a moment into a hop drained nothing), pays the least the motor could have
---     covered its distance with: a sprint for what a walk does not cover, or a leap (leapCost) whose carry covers part
---     of it and a sprint for the rest. One as long as an honest loss burst (C.STAMINA_BURST) refills the rest of its
---     time when it ends on the ground; a longer one drains all its time when faster than a walk and never refills (a
---     client that hides its moves gets no credit for them). A gap inside a winded flight faster than a winded leap
---     carries is on credit as a whole.
--- The server's meter never drains where the client's does not, but for a landing's carry and a sprint's slowing down (a
--- moment faster than a walk with the key let go) and the moments on the ground of a packet that lands or launches (not
--- refilled), which C.STAMINA_SLACK covers. Below -C.STAMINA_SLACK the client is sprinting on credit: half a flag a
--- packet's worth of sprint (a gap's span, a whole one), and the meter held there. The chili rush (boostOf) runs faster
--- than a sprint and is left out, and so is the client's own river recovery.
+--   * A gap too long to judge move by move (`unjudged`) pays the least the motor could have covered its distance with,
+--     the most favourable honest reading of what it hid: from the ground (validator round 11), a sprint for what the
+--     walk-steered step does not cover, or a leap (leapCost) whose carry covers part of it and a sprint for the rest; from
+--     the air (validator round 12, the round-11 review's HIGH), the flight in progress at its walk-steered carry until
+--     its arc comes down to the gap's end, a walk after, the rest as from the ground. One as long as an honest loss burst
+--     (C.STAMINA_BURST) refills the rest of its time on the ground; a longer one drains all of its time on the ground when
+--     faster than that, and never refills (a client that hides its moves gets no credit for them).
+-- The server's meter never drains where the client's does not, but for rounding, which C.STAMINA_SLACK covers. Below
+-- -C.STAMINA_SLACK the client is sprinting on credit: half a flag a packet's worth of sprint (a gap's span, a whole one),
+-- and the meter held there. The chili rush (boostOf) runs faster than a sprint and is left out, and so is the client's
+-- own river recovery.
 function MoveValidator._stamina(
 	self: MoveValidator,
 	actor: Actor,
@@ -1331,6 +1356,8 @@ function MoveValidator._stamina(
 	exempt: boolean,
 	landed: boolean,
 	charge: string?,
+	launched: boolean,
+	pounceAt: number?,
 	violations: { Violation }
 )
 	local marks = actor.marks
@@ -1360,30 +1387,6 @@ function MoveValidator._stamina(
 			})
 		end
 	end
-	local span = math.min(math.max(dt, 0), math.max(dtEff, 0))
-	local groundA = onGround(prev, actor.lastLanded)
-	local groundB = onGround(next, landed)
-	local footB = groundB or next.routeId ~= nil
-	-- launches: the motor's leapCost / pounceCost; a winded one (the meter empty before it) carries at a walk
-	if charge ~= nil and not exempt then
-		local tired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
-		marks.stamina -= if charge == "pounce" then P.pounceCost else P.leapCost
-		marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
-		marks.tiredFlight = tired and not footB
-		if charge == "pounce" then
-			marks.tiredLunge = tired
-		end
-		local hxz = math.sqrt(next.vx * next.vx + next.vz * next.vz)
-		if tired and hxz > P.leapForwardWinded * E.launchTol then
-			table.insert(violations, {
-				code = "stamina",
-				severity = 0.5,
-				detail = `a {charge} at {hxz} st/s with the sprint meter empty (a winded one carries at a walk)`,
-			})
-		end
-	elseif footB then
-		marks.tiredFlight = nil
-	end
 	-- (winded once the meter is at its floor, until it is back by the motor's sprintRecover, less a little)
 	local function settle()
 		if marks.stamina <= -C.STAMINA_SLACK + 1e-6 then
@@ -1392,59 +1395,329 @@ function MoveValidator._stamina(
 			marks.winded = nil
 		end
 	end
-	if span <= 1e-3 then
+	local span = math.min(math.max(dt, 0), math.max(dtEff, 0))
+	local groundA = onGround(prev, actor.lastLanded)
+	local groundB = onGround(next, landed)
+	local railA, railB = prev.routeId ~= nil, next.routeId ~= nil
+	local footA = groundA or railA
+	local footB = groundB or railB
+	local hxz = math.sqrt(next.vx * next.vx + next.vz * next.vz)
+	-- launches: the motor's leapCost / pounceCost; a winded one (the meter empty before it) carries at a walk
+	local tired = false
+	if charge ~= nil and not exempt then
+		tired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+		marks.stamina -= if charge == "pounce" then P.pounceCost else P.leapCost
+		marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
+		if charge == "pounce" then
+			marks.tiredLunge = tired
+		end
+		if tired and hxz > P.leapForwardWinded * E.launchTol then
+			table.insert(violations, {
+				code = "stamina",
+				severity = 0.5,
+				detail = `a {charge} at {hxz} st/s with the sprint meter empty (a winded one carries at a walk)`,
+			})
+		end
+	end
+	-- the speed kept (unknown: the most an honest body has there: a sprint on the ground, a launch's in the air)
+	local u = marks.speedU or (if footA then P.sprint else SquirrelMotor.launchCapXZ(false) * E.launchTol)
+	local s = marks.speedS or P.sprint
+	local holdLeft = math.max(0, (marks.speedHold or -math.huge) - prev.clock)
+	local free = marks.speedRail == true
+	local V54 = SquirrelMotor.V54
+	-- (a free launch's flight steers toward v5.4's speeds, the sprint's with the key held whatever the meter says: the
+	-- motor's railLeap)
+	local walkLo: number? = if free then V54.sprint else nil
+	local sprintLo: number? = walkLo
+	local function keepModel(nu: number?, ns: number?, hold: number?, rail: boolean?)
+		marks.speedU, marks.speedS, marks.speedHold, marks.speedRail = nu, ns, hold, rail
+	end
+	-- the launch's speed: the envelope's cap held to the claim (keepXZ), a winded one's no more than a winded leap or pounce
+	local function launchModel()
+		local cap = if tired
+			then (if charge == "pounce" then P.walk else P.leapForwardWinded) * E.launchTol
+			else math.huge
+		keepModel(
+			math.min(hxz, cap),
+			s,
+			if pounceAt then pounceAt + P.pounceWindow else nil,
+			if footB then nil else charge == nil
+		)
+	end
+	if exempt then
+		-- (the chili rush, the river's quay: unknown speed after)
+		keepModel(nil, nil, nil, nil)
+		if footA and footB and not (unjudged and span > C.STAMINA_BURST) and span > 1e-3 then
+			marks.stamina = math.min(1, marks.stamina + span / P.sprintRefill)
+		end
 		settle()
 		return
 	end
-	local walk = P.walk * C.STAMINA_WALK
+	if span <= 1e-3 then
+		if launched then
+			launchModel()
+		end
+		settle()
+		return
+	end
+	local tol = C.STAMINA_WALK
 	local across = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
-	local winded = P.leapForwardWinded * E.speedTol * span + E.posSlack
+	-- (the time an arc from `prev` takes to come down to height y; its apex's when it never reaches it)
+	local function fallTo(y: number): number
+		local vy = prev.vy
+		local disc = vy * vy + 2 * P.gravity * (prev.y - y)
+		local t = if disc >= 0 then (vy + math.sqrt(disc)) / P.gravity else math.max(vy, 0) / P.gravity
+		return math.clamp(t, 0, span)
+	end
+	-- (the move as air then ground (`airFirst`) or ground then air, `airT` of it in the air, moveSpeed's goal the sprint
+	-- from `from` to `to` seconds into it and the walk the rest: the distance the speed step covers and the speed it keeps)
+	local function stepped(airT: number, airFirst: boolean, from: number, to: number): (number, number, number)
+		local d, nu, ns = 0, u, s
+		local at = 0
+		local function piece(grounded: boolean, t: number, sprint: boolean)
+			if t <= 1e-6 then
+				return
+			end
+			local dd: number
+			dd, nu, ns = SquirrelMotor.speedBound(
+				nu,
+				ns,
+				if sprint then P.sprint else P.walk,
+				grounded,
+				t,
+				math.max(0, holdLeft - at),
+				if grounded then nil elseif sprint then sprintLo else walkLo
+			)
+			at += t
+			d += dd
+		end
+		local function part(grounded: boolean, t: number)
+			local p0, p1 = at, at + math.max(t, 0)
+			local a, b = math.clamp(from, p0, p1), math.clamp(to, p0, p1)
+			piece(grounded, a - p0, false)
+			piece(grounded, b - a, true)
+			piece(grounded, p1 - b, false)
+		end
+		if airFirst then
+			part(false, airT)
+			part(true, span - airT)
+		else
+			part(true, span - airT)
+			part(false, airT)
+		end
+		return d, nu, ns
+	end
+	-- (the least sprint the motor covers `across` with: the sprint first, where it carries furthest inside the move, past
+	-- the walk-steered step by C.STAMINA_STEP, with `credit` studs more. Past even the whole move's sprint (a speed the
+	-- motor's step cannot reach from the speed kept: a sprint claimed at once from a walk) the rest is sprint too, at the
+	-- sprint's own pace over the walk: never free)
+	local function least(airT: number, airFirst: boolean, credit: number): number
+		local function covers(t: number): boolean
+			return (stepped(airT, airFirst, 0, t)) * C.STAMINA_STEP + credit >= across
+		end
+		if not covers(span) then
+			local dS = stepped(airT, airFirst, 0, span)
+			return span + math.max(0, across - dS * C.STAMINA_STEP - credit) / math.max(P.sprint - P.walk, 1e-3)
+		end
+		local lo, hi = 0, span
+		for _ = 1, 12 do
+			local mid = (lo + hi) / 2
+			if covers(mid) then
+				hi = mid
+			else
+				lo = mid
+			end
+		end
+		return hi
+	end
+	-- (a rail within a grab and a leap's reach over the move's time of either end: a gap may hide the motor's free leaps
+	-- off it)
+	local function nearRail(): boolean
+		local reach =
+			math.min(Motion.C.airGrab + SquirrelMotor.launchCapXZ(false) * E.launchTol * span, C.RAIL_REACH_MAX)
+		local index = self.world.index
+		return railAbove(index, prev.x, prev.y, prev.z, reach, -math.huge)
+			or railAbove(index, next.x, next.y, next.z, reach, -math.huge)
+	end
+	-- (the least sprint a distance past the walk-steered step needs: the sprint steers it no more than this faster)
+	local rate = math.max(P.sprint - P.walk, if free then V54.sprint - V54.walk else 0, 1e-3)
 	local sprinted = 0
-	if exempt then
-		sprinted = 0
+	local refill = 0
+	local airT, airFirst = 0, true
+	-- (the speed kept after the move, when a branch sets it: u, s, hold, rail)
+	local after: { u: number, s: number, rail: boolean? }? = nil
+	if launched then
+		-- (the launch's own packet: the moments on the ground before it refill; the flight starts at the launch's speed)
+		if footA then
+			local inAir = if pounceAt
+				then next.clock - pounceAt
+				else (P.leapUp - math.min(next.vy, P.leapUp)) / P.gravity
+			refill = if groundB then span else math.clamp(span - inAir, 0, span)
+		end
+		marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
+		launchModel()
+		settle()
+		return
+	elseif railA or railB then
+		-- (on a rail the motor's velocity is none: its pace is the rail's; refilled when both ends are on foot)
+		if footA and footB and not (unjudged and span > C.STAMINA_BURST) then
+			refill = span
+		end
+		marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
+		if railB then
+			keepModel(0, P.sprint, nil, nil)
+		else
+			keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), P.sprint, nil, not footB)
+		end
+		settle()
+		return
 	elseif unjudged and groundA then
-		-- (a gap from the ground, whatever its end)
-		if across / span > walk then
+		-- (a gap from the ground, whatever its end: the least the motor covers it with, a sprint for what the walk-steered
+		-- step does not, or a leap paid with leapCost whose carry, at most a leap's flight at the leap's speed over a walk,
+		-- covers part of it)
+		airT, airFirst = 0, true
+		local dW = stepped(0, true, 0, 0)
+		local over = across - math.max(P.walk * span, dW) * tol
+		if over > 0 then
 			if span <= C.STAMINA_BURST then
-				-- the least the motor covers it with: a sprint for what a walk does not, or a leap paid with leapCost
-				-- whose carry (at most a leap's flight, at the leap's speed over a walk) covers part of it
-				local over = across - walk * span
-				local rate = math.max(P.sprint - walk, 1e-3)
 				local flight = math.min(span, 2 * P.leapUp / P.gravity)
-				local carry = math.max(0, P.leapForward * E.launchTol - walk) * flight
+				local carry = math.max(0, P.leapForward * E.launchTol - P.walk * tol) * flight
 				local byLeap = P.leapCost * P.sprintSeconds + math.max(0, over - carry) / rate
 				sprinted = math.clamp(math.min(over / rate, byLeap), 0, span)
 			else
 				sprinted = span
 			end
 		end
-	elseif marks.tiredFlight and not groundA and (unjudged or not footB) and across > winded then
-		-- a winded flight (a launch made with the meter empty), or a gap inside one: no faster across than a winded
-		-- leap carries
-		marks.stamina -= span / P.sprintSeconds
-		onCredit(
-			span,
-			`{across} st in {span} s in the air ({if unjudged then "a gap" else "a packet"}) with the sprint meter empty`
-		)
-		settle()
-		return
-	elseif not unjudged and groundA and groundB and across / span > walk then
-		-- (a pounce's lunge runs on along the ground for its window, unsteered: paid with pounceCost, not the sprint)
-		local pounced = actor.lastPounce
-		local lunge = pounced ~= nil
-			and not marks.tiredLunge
-			and prev.clock >= pounced - 1e-3
-			and next.clock <= pounced + P.pounceWindow + 1e-3
-			and across <= P.pounceSpeedFast * E.speedTol * span + E.posSlack
-		sprinted = if lunge then 0 else span
+		if footB and span <= C.STAMINA_BURST then
+			refill = math.max(0, span - sprinted)
+		end
+	elseif unjudged then
+		-- (a gap from the air, validator round 12, the round-11 review's HIGH: the flight in progress at its walk-steered
+		-- carry until its arc comes down to the gap's end, then a walk; a gap that ends in a fresh flight (its vertical speed
+		-- is no continuation of the arc) hid a launch, a leap whose flight is the time its speed has fallen since leapUp,
+		-- charged leapCost off the ground; beside a rail (within a leap's reach of an end) the time between is a chain of the
+		-- motor's free leaps off it, at v5.4's walk, and the hidden launch is free. The rest is the least sprint, as from the
+		-- ground; past an honest burst all its time on the ground drains when faster)
+		local launchCap = SquirrelMotor.launchCapXZ(false) * E.launchTol
+		local relaunch = not footB and next.vy > prev.vy - P.gravity * span + P.gravity * E.gravityEps
+		local tau = if relaunch then math.clamp((P.leapUp * E.launchTol - next.vy) / P.gravity, 0, span) else 0
+		local railNear = nearRail()
+		local t1 = if groundB then fallTo(next.y) else span - tau
+		local rest = math.max(0, span - t1 - tau)
+		local d1, u1, s1 = SquirrelMotor.speedBound(u, s, P.walk, false, t1, holdLeft, walkLo)
+		local d2, u2, s2 = 0, u1, s1
+		if rest > 0 then
+			if railNear then
+				d2, u2, s2 =
+					SquirrelMotor.speedBound(launchCap, math.max(s1, V54.walk), P.walk, false, rest, nil, V54.walk)
+			else
+				d2, u2, s2 = SquirrelMotor.speedBound(u1, s1, P.walk, true, rest)
+			end
+		end
+		local d3, u3, s3 = 0, u2, s2
+		if tau > 0 then
+			d3, u3, s3 = SquirrelMotor.speedBound(
+				if railNear then launchCap else P.leapForward * E.launchTol,
+				s2,
+				P.walk,
+				false,
+				tau,
+				nil,
+				if railNear then V54.walk else nil
+			)
+			if not railNear then
+				marks.stamina = math.max(marks.stamina - P.leapCost, -C.STAMINA_SLACK)
+			end
+		end
+		if railNear then
+			rate = math.max(rate, V54.sprint - V54.walk)
+		end
+		local over = across - math.max(P.walk * span, d1 + d2 + d3) * tol - E.posSlack
+		if over > 0 then
+			if span <= C.STAMINA_BURST then
+				local flight = math.min(rest, 2 * P.leapUp / P.gravity)
+				local carry = math.max(0, P.leapForward * E.launchTol - P.walk * tol) * flight
+				local byLeap = if rest > 0 and tau <= 0
+					then P.leapCost * P.sprintSeconds + math.max(0, over - carry) / rate
+					else math.huge
+				sprinted = math.clamp(math.min(over / rate, byLeap), 0, span)
+			else
+				sprinted = if rest > 0 then rest else math.clamp(over / rate, 0, span)
+			end
+		end
+		if groundB and span <= C.STAMINA_BURST then
+			refill = math.max(0, rest - sprinted)
+		end
+		local ku, ks, kr = u1, s1, free
+		if tau > 0 then
+			ku, ks, kr = math.min(hxz, u3), s3, railNear
+		elseif groundB then
+			ku, ks, kr = u2, s2, false
+		end
+		if sprinted > 0 then
+			ku, ks = math.max(ku, P.sprint), P.sprint
+		end
+		after = { u = ku, s = ks, rail = if kr then true else nil }
+	else
+		-- a move judged move by move: on the ground, in the air, or one that lands or walks off an edge
+		if groundA and groundB then
+			airT = 0
+		elseif not groundA and not groundB then
+			airT = span
+		elseif groundB then
+			airT, airFirst = fallTo(next.y), true
+		else
+			-- (off an edge: falling from rest since it left the ground)
+			airT, airFirst = math.clamp(math.max(0, -next.vy) / P.gravity, 0, span), false
+		end
+		-- (a walk, or the walk-steered step: the motor's own, so only C.STAMINA_STEP over it; a sprint slowing to a walk
+		-- at speedSmooth, a landing's carry, a flight coasting from its launch drain nothing)
+		local dW = stepped(airT, airFirst, 0, 0)
+		local credit = math.max(0, P.walk * span * tol - dW * C.STAMINA_STEP)
+		if across > dW * C.STAMINA_STEP + credit then
+			-- (a pounce's lunge runs on along the ground for its window, unsteered: paid with pounceCost, not the sprint)
+			local pounced = actor.lastPounce
+			local lunge = airT <= 0
+				and pounced ~= nil
+				and not marks.tiredLunge
+				and prev.clock >= pounced - 1e-3
+				and next.clock <= pounced + P.pounceWindow + 1e-3
+				and across <= P.pounceSpeedFast * E.speedTol * span + E.posSlack
+			sprinted = if lunge then 0 else least(airT, airFirst, credit)
+			if airT >= span then
+				-- (past what the sprint-steered step covers: a flight faster than the motor's from its launch)
+				local dS = stepped(airT, airFirst, 0, span)
+				local most = dS * E.speedTol + E.posSlack
+				if across > most then
+					table.insert(violations, {
+						code = "speed",
+						severity = math.min(1, across / most - 1),
+						detail = `{across} st across in {span} s in the air (the motor's air step from its speed carries {dS})`,
+					})
+				end
+			end
+		end
+		refill = math.max(0, span - airT - sprinted)
 	end
 	marks.stamina -= sprinted / P.sprintSeconds
-	onCredit(sprinted, "faster than a walk on the ground for longer than the sprint meter lasts")
-	-- (the rest of the move's time refills, as the motor's does off the sprint, only on the ground or a rail; a gap longer
-	-- than an honest loss burst never refills: a client hiding its moves gets no credit for them)
-	local footA = groundA or prev.routeId ~= nil
-	if footA and footB and not (unjudged and span > C.STAMINA_BURST) then
-		marks.stamina = math.min(1, marks.stamina + math.max(0, span - sprinted) / P.sprintRefill)
+	onCredit(
+		sprinted,
+		if airT > 0
+			then `{across} st in {span} s{if unjudged then " (a gap)" else ""} with the air carrying {span} s: faster than the motor's flight at a walk for longer than the sprint meter lasts`
+			else "faster than a walk on the ground for longer than the sprint meter lasts"
+	)
+	marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
+	-- (the speed kept: stepped as the move was judged, its sprint last, where it leaves the most; a gap from the ground that
+	-- ends in the air hid a launch)
+	local _, nu, ns = stepped(airT, airFirst, span - sprinted, span)
+	if after then
+		keepModel(after.u, after.s, nil, after.rail)
+	elseif unjudged and groundA and not footB then
+		keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), ns, nil, nearRail())
+	else
+		-- (a pounce's window holds the speed on the ground too: its lunge)
+		local holdTo = marks.speedHold
+		keepModel(nu, ns, if holdTo and holdTo > next.clock then holdTo else nil, if groundB then nil else free)
 	end
 	settle()
 end

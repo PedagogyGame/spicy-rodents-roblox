@@ -2,6 +2,7 @@
 -- ReplicatedStorage.Shared.Movement.SquirrelMotor
 -- Squirrel rail/ground motor shared by AI (server) and players (client).
 -- Interface (BUILD_PLAN §1.4, D2): new(params), step(state, input, dt, world) -> state, events, serialize, deserialize, envelope
+--   speedBound(u, s, goal, grounded, t, hold?, floor?): the most the motor's speed step covers (the server's meter)
 --   place(state, x, y, z, grounded): the body somewhere else at rest (river recovery, a server teleport)
 --
 -- A port of v5.4's `updatePlayer` (reference/v5_4_game.js L6573-6770) and the launch helpers
@@ -1575,6 +1576,55 @@ function SquirrelMotor.launchCapXZ(boosted: boolean): number
 		if boosted then P.leapForwardBoost else P.leapForward,
 		P.pounceSpeedFast * (if boosted then P.pounceBoostMult else 1)
 	)
+end
+
+-- speedBound(u, s, goal, grounded, t, hold?, floor?) -> (studs, u', s'): the most a body covers across in t seconds by
+-- the motor's own speed step (substep, off the rails; validator round 12: the server's sprint meter and air bound follow
+-- it), from a horizontal speed of at most u and a moveSpeed of at most s whose goal is `goal` (the walk, the sprint):
+-- moveSpeed eases toward the goal at speedSmooth, and the velocity toward moveSpeed at accelGround / accelAir, or, when it
+-- leaves more, coasts under dragGround / dragAir (no key held); the first `hold` seconds it keeps its speed (a pounce's
+-- window: neither steered nor dragged); a leap off a rail steers toward at least `floor` (v5.4's own speeds). Stepped at
+-- the motor's substep, each step's distance no less than the motor's own steps of any length cover. Returns the bound's u and s after.
+function SquirrelMotor.speedBound(
+	u: number,
+	s: number,
+	goal: number,
+	grounded: boolean,
+	t: number,
+	hold: number?,
+	floor: number?
+): (number, number, number)
+	local accel = if grounded then P.accelGround else P.accelAir
+	local drag = if grounded then P.dragGround else P.dragAir
+	local h = P.substep
+	local ks, ka, kd = 1 - math.exp(-h * P.speedSmooth), 1 - math.exp(-h * accel), math.exp(-h * drag)
+	local d = 0
+	local left = math.max(t, 0)
+	local held = math.min(math.max(hold or 0, 0), left)
+	-- (the window: the velocity as it is, moveSpeed easing on)
+	d += u * held
+	left -= held
+	s += (goal - s) * (1 - math.exp(-held * P.speedSmooth))
+	local lo = floor or 0
+	while left > 1e-9 do
+		local step = math.min(h, left)
+		if step < h then
+			ks, ka, kd = 1 - math.exp(-step * P.speedSmooth), 1 - math.exp(-step * accel), math.exp(-step * drag)
+		end
+		s += (goal - s) * ks
+		local u1 = math.max(u + (math.max(s, lo) - u) * ka, u * kd)
+		-- (the motor moves by the new speed; slowing, the mean of the two, which no length of substep exceeds)
+		d += math.max(u1, (u + u1) / 2) * step
+		left -= step
+		local settled = math.abs(u1 - u) < 1e-4 and math.abs(goal - s) < 1e-4
+		u = u1
+		if settled then
+			-- (settled: the rest at that pace, whatever the gap's length)
+			d += u * left
+			break
+		end
+	end
+	return d, u, s
 end
 
 -- What the envelope judged of `next`, for the validator's own baseline (the round-3 review: every number a later

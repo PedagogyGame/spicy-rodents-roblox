@@ -141,6 +141,14 @@ ValidatorWorld.C = table.freeze({
 	-- with one of these is a rail's own (a tree's trunk and boughs, a pole, a wire's mast, a pipe, a fence's rails and
 	-- panels: solid columns and bars, nothing to hide in), never a slab a move off a rail went through
 	RAIL_PROPS = table.freeze({ "Tree_", "Pole_", "Wire_", "Pipe_", "Fence_" }),
+	-- the parts a ray looks past before it gives up (the engine's rays and the specs' baked ones): any ray HOPS, and one
+	-- by the stop rule "rail" (slab's and railSlab's columns: validator round 12, the round-11 review's LOW: past a
+	-- trunk, a wire and the boughs, a column down a crown met a slab only past four or more, and the ray failed open)
+	-- RAIL_HOPS, then fails closed: a column it could not see the whole of is judged to meet a slab. Every rail sample's
+	-- whole column to the ground in the baked town is seen within 24 (31,000 samples); the cost bound is two such
+	-- columns a move with a rail end
+	HOPS = 4,
+	RAIL_HOPS = 32,
 	-- floorUnder's bisection: the most rays, and the height it stops at
 	FLOOR_RAYS = 14,
 	FLOOR_STEP = 0.05,
@@ -746,7 +754,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 end
 
 -- engineRays(exclude): the three rays on the live server (each takes a stop rule in place of its own as a 7th argument:
--- the cover ray's "rail" for railSlab). `wall`: colliding parts in the squirrel's group, past the
+-- the cover ray's "rail" for slab and railSlab, which looks past up to C.RAIL_HOPS parts and then fails closed). `wall`: colliding parts in the squirrel's group, past the
 -- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: colliding parts
 -- in the squirrel's group, the bough cylinders included, the terrain, the water, the vehicles and the town's ground
 -- plates (Shared/World/GroundPlate) counted as floor. `cover`: `down` past the bough cylinders (stops: one rule each).
@@ -777,7 +785,7 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 			local kind = rule or own
 			local origin = Vector3.new(ox, oy, oz)
 			local left = Vector3.new(dx, dy, dz)
-			for _ = 1, 4 do
+			for _ = 1, if kind == "rail" then C.RAIL_HOPS else C.HOPS do
 				local hit = workspace:Raycast(origin, left, p)
 				if hit == nil then
 					return false
@@ -796,7 +804,8 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 					return false
 				end
 			end
-			return false
+			-- (hops spent with the segment not yet seen to its end: a "rail" column fails closed)
+			return kind == "rail"
 		end
 	end
 	-- the town's ground plates (Shared/World/GroundPlate: non-colliding, laid over the terrain), which the client's motor
