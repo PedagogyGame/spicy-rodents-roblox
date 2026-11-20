@@ -214,7 +214,9 @@ local function chordTest(
 	): (boolean, boolean, boolean)
 		local dx, dz = x1 - x0, z1 - z0
 		local len = math.sqrt(dx * dx + dz * dz)
-		if len < C.MIN_CHORD or len > C.MAX_CHORD then
+		-- (a hair over MAX_CHORD is a chord: crossesLong's chords of a line a multiple of it long come out 4.000000000001;
+		-- validator round 10, found by its sweeps: every such chord was judged by no ray)
+		if len < C.MIN_CHORD or len > C.MAX_CHORD + 1e-6 then
 			return false, false, false
 		end
 		local px, pz = -dz / len * C.SIDE, dx / len * C.SIDE
@@ -424,6 +426,33 @@ function ValidatorWorld.around(
 				and not leg(cx, cz, x1, z1, y0, y1, top)
 			then
 				return true
+			end
+		end
+		-- (round an end of a building square to the axes: two corners, out past the line's ends along one axis as far as
+		-- the budget lets the way go, and half that)
+		local spanX, spanZ = math.abs(x1 - x0), math.abs(z1 - z0)
+		local outAxis = math.min((budget - spanX - spanZ) / 2, C.AROUND_GAP)
+		if path and outAxis >= 0.5 then
+			for _, out in { outAxis, outAxis / 2 } do
+				for _, side in { 1, -1 } do
+					-- (past the higher z end or under the lower; past the higher x end or under the lower)
+					local ez = if side > 0 then math.max(z0, z1) + out else math.min(z0, z1) - out
+					if
+						not leg(x0, z0, x0, ez, y0, y0, top)
+						and not leg(x0, ez, x1, ez, y0, y0, top)
+						and not leg(x1, ez, x1, z1, y0, y1, top)
+					then
+						return true
+					end
+					local ex = if side > 0 then math.max(x0, x1) + out else math.min(x0, x1) - out
+					if
+						not leg(x0, z0, ex, z0, y0, y0, top)
+						and not leg(ex, z0, ex, z1, y0, y0, top)
+						and not leg(ex, z1, x1, z1, y0, y1, top)
+					then
+						return true
+					end
+				end
 			end
 		end
 		-- (round an end of a building: two corners, the line's own rectangle to either side, as far out as the budget

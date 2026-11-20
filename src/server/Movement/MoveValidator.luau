@@ -478,7 +478,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		-- server made refill it as the motor's does; validator round 10: the meter is otherwise judged on the packets'
 		-- clocks, and none covers that time)
 		local fm = first.marks
-		fm.stamina = math.min(1, fm.stamina + math.max(0, serverTime - fm.staminaAt) / SquirrelMotor.params.sprintRefill)
+		fm.stamina =
+			math.min(1, fm.stamina + math.max(0, serverTime - fm.staminaAt) / SquirrelMotor.params.sprintRefill)
 		fm.staminaAt = serverTime
 		local gov = first.marks.gov
 		local govFaults: { Violation } = {}
