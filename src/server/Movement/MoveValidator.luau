@@ -180,6 +180,13 @@ type Marks = {
 	-- (the route a free flight left, when the server had the body on it: a relaunch hidden in an air gap off that same
 	-- route is the motor's free leap chain, validator round 15)
 	speedRoute: number?,
+	-- the air trick (owner D18; _stamina): a flight began since the last wiggle charged (the server saw the body on the
+	-- ground or a rail, or a gap long enough to hide a landing), and since the last roll's carry (the server saw it in the
+	-- air); the client clock of the last packet on its footing; the flight's reach out (SquirrelMotor.trickReachAt)
+	trickArmed: boolean?,
+	rollArmed: boolean?,
+	footClock: number?,
+	trickReach: number?,
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -1524,8 +1531,50 @@ function MoveValidator._stamina(
 			})
 		end
 	end
+	-- the air trick (owner D18), by the server's own footing (a flight: from a packet on the ground or a rail, or a gap
+	-- long enough to hide a landing, to the next). A fresh wiggle claimed pays trickCost from a meter with any left, the
+	-- client's own word on its meter aside; the first of a flight earns a reach out, the motor's rule on the server's
+	-- numbers (trickReachAt: its time in the air no less than since the last footing seen; no landing known, so the
+	-- timing's bound alone), the next of the same flight none. While a wiggle's re-aim is live the horizontal speed bound
+	-- scales as the re-aim's reach changed, at that reach (the motor's aimScale; it telescopes, so a re-aim to and fro
+	-- buys nothing). A fresh roll after a flight the server saw holds the speed (neither steered nor dragged) for the
+	-- roll's length from its press, dated within the packet: the motor's carry along the ground
+	local trickScale = 1
+	if not exempt then
+		local freshWiggle = next.trickKind == 2 and (prev.trickKind ~= 2 or next.trickTime > prev.trickTime + 1e-6)
+		local freshRoll = next.trickKind == 1 and (prev.trickKind ~= 1 or next.trickTime > prev.trickTime + 1e-6)
+		if unjudged then
+			marks.trickArmed, marks.rollArmed = true, true
+		end
+		if freshWiggle then
+			if marks.stamina > 0 then
+				spend(P.trickCost)
+			end
+			marks.trickReach = if marks.trickArmed
+				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0)
+				else 0
+			marks.trickArmed = nil
+		end
+		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind == 2) then
+			local R = marks.trickReach or 0
+			local from = if freshWiggle then 0 else prev.aimReach or 0
+			trickScale = SquirrelMotor.aimScale(next.aimReach or 0, R) / SquirrelMotor.aimScale(from, R)
+		end
+		if freshRoll and marks.rollArmed then
+			local at = math.clamp(next.clock - (P.trickRoll - next.trickTime), prev.clock, next.clock)
+			marks.speedHold = math.max(marks.speedHold or -math.huge, at + P.trickRoll)
+			marks.rollArmed = nil
+		end
+		if next.routeId ~= nil or next.grounded then
+			marks.trickArmed = true
+			marks.footClock = next.clock
+		else
+			marks.rollArmed = true
+		end
+	end
 	-- the speed kept (unknown: the most an honest body has there: a sprint on the ground, a launch's in the air)
-	local u = marks.speedU or (if footA then P.sprint else SquirrelMotor.launchCapXZ(false) * E.launchTol)
+	local u = (marks.speedU or (if footA then P.sprint else SquirrelMotor.launchCapXZ(false) * E.launchTol))
+		* trickScale
 	local s = marks.speedS or P.sprint
 	local holdLeft = math.max(0, (marks.speedHold or -math.huge) - prev.clock)
 	-- (a free flight, validator round 13, the round-12 review's HIGH 1: earned only by a launch off a rail the server
