@@ -393,9 +393,9 @@ return function(t)
 				return
 			end
 			Height.configure(Data.default():module("TerrainExtensions"))
-			local town: any = BakedWorld.load("build/Town.rbxm")
-			local bw = town:motorWorld(Data.default())
-			local _, _, cover = BakedWorld.validatorRays(town)
+			local baked: any = BakedWorld.load("build/Town.rbxm")
+			local bw = baked:motorWorld(Data.default())
+			local _, _, cover = BakedWorld.validatorRays(baked)
 			local function parentOf(p: any): string
 				return string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
 			end
@@ -410,13 +410,13 @@ return function(t)
 				local n = math.clamp(math.floor((r.length or 50) / 2), 2, 400)
 				for k = 0, n do
 					local p = bw.registry:pointAt(r, k / n)
-					local tt, part = town.raycast(p.x, p.y, p.z, 0, -40, 0, real)
+					local tt, part = baked.raycast(p.x, p.y, p.z, 0, -40, 0, real)
 					if tt and part then
 						local hitY = p.y - 40 * tt
 						-- (the props the column passes before the slab)
 						local props, from = 0, p.y
 						while props < 64 do
-							local t2 = town.raycast(p.x, from, p.z, 0, hitY - from, 0, prop)
+							local t2 = baked.raycast(p.x, from, p.z, 0, hitY - from, 0, prop)
 							if not t2 then
 								break
 							end
