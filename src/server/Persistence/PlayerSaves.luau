@@ -39,8 +39,8 @@
 -- Every DataStore call runs in its own thread (deps.spawn: task.spawn in the engine) through one queue per
 -- player, so two writes for the same key never overlap, a rejoin's load waits for the leave's release, and a
 -- frame never waits on a DataStore. In Lune deps.spawn runs the job at once, so specs are synchronous.
--- Shutdown (closeAll): queued loads and saves are dropped (each release writes the latest data), every session is
--- released, and the store is told it is closing (one retry per call, no lock waits), inside CLOSE_SECONDS.
+-- Shutdown (closeAll): every session is left, so queued loads and saves do nothing (each release writes the latest
+-- data), and the store is told it is closing (one retry per call, no lock waits): the releases fit in CLOSE_SECONDS.
 -- Interface: new(deps) -> Saves; Saves:join(player); Saves:leave(player); Saves:dirty(player, purchase?);
 --   Saves:data(player) -> ProfileSchema.Data? (only while `saved`); Saves:status(player) -> State?;
 --   Saves:step(now); Saves:closeAll(timeoutSeconds?) (yields until every release is done or the time is up);
@@ -96,8 +96,7 @@ type Session = {
 	told: { [string]: boolean? },
 }
 
-type Job = { kind: string, run: () -> () }
-type Queue = { jobs: { Job }, running: boolean }
+type Queue = { jobs: { () -> () }, running: boolean }
 
 export type Saves = {
 	deps: Deps,
@@ -197,23 +196,23 @@ local function shout(self: Saves, line: string)
 end
 
 -- one queue per player: jobs run one after another on a spawned thread
-local function enqueue(self: Saves, id: number, kind: string, job: () -> ())
+local function enqueue(self: Saves, id: number, job: () -> ())
 	local q = self.queues[id]
 	if q == nil then
 		q = { jobs = {}, running = false }
 		self.queues[id] = q
 	end
 	local queue = q :: Queue
-	table.insert(queue.jobs, { kind = kind, run = job })
+	table.insert(queue.jobs, job)
 	if queue.running then
 		return
 	end
 	queue.running = true
 	self.deps.spawn(function()
 		while #queue.jobs > 0 do
-			local nextJob = table.remove(queue.jobs, 1) :: Job
+			local nextJob = table.remove(queue.jobs, 1) :: () -> ()
 			local ok, err = pcall(function()
-				nextJob.run()
+				nextJob()
 			end)
 			if not ok then
 				shout(self, `a job for {id} failed: {err}`)
@@ -249,7 +248,7 @@ end
 local function saveJob(self: Saves, s: Session)
 	s.saveQueued = false
 	local profile = s.profile
-	if s.state ~= "saved" or profile == nil or s.left or self.closing then
+	if s.state ~= "saved" or profile == nil or s.left then
 		return
 	end
 	local ok, err = profile:save()
@@ -282,7 +281,7 @@ local function queueSave(self: Saves, s: Session, now: number)
 	end
 	s.saveQueued = true
 	s.lastWriteAt = now
-	enqueue(self, s.id, "save", function()
+	enqueue(self, s.id, function()
 		saveJob(self, s)
 	end)
 end
@@ -314,7 +313,7 @@ end
 
 local function loadJob(self: Saves, s: Session)
 	s.loadQueued = false
-	if s.left or self.closing or (s.state ~= "loading" and s.state ~= "unsaved") then
+	if s.left or (s.state ~= "loading" and s.state ~= "unsaved") then
 		return
 	end
 	local store = self.profiles :: ProfileStore.Store
@@ -370,7 +369,7 @@ local function queueLoad(self: Saves, s: Session)
 		return
 	end
 	s.loadQueued = true
-	enqueue(self, s.id, "load", function()
+	enqueue(self, s.id, function()
 		loadJob(self, s)
 	end)
 end
@@ -494,7 +493,7 @@ function PlayerSaves.new(deps: Deps): Saves
 		end
 		s.left = true
 		me.sessions[id] = nil
-		enqueue(me, id, "release", function()
+		enqueue(me, id, function()
 			releaseJob(me, s)
 		end)
 	end
@@ -567,14 +566,7 @@ function PlayerSaves.new(deps: Deps): Saves
 		if me.profiles then
 			me.profiles.closing = true -- one retry per call, no lock waits, sleeps cut short
 		end
-		-- releases first: queued loads and saves are dropped (each release writes the latest data)
-		for _, q in me.queues do
-			for i = #q.jobs, 1, -1 do
-				if q.jobs[i].kind ~= "release" then
-					table.remove(q.jobs, i)
-				end
-			end
-		end
+		-- (a queued load or save then finds its session left and does nothing: each release writes the latest data)
 		local players = {}
 		for _, s in me.sessions do
 			table.insert(players, s.player)

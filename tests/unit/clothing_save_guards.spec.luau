@@ -283,6 +283,33 @@ return function(t)
 		t.falsy(sv.saves:busy())
 	end)
 
+	-- Bought while the profile was loading, and gone before the load came back: the release that hands the lock
+	-- straight back carries the purchase.
+	t.test("a purchase made while loading is in the record when the player leaves before the load returns", function()
+		local store = MockDataStore.new()
+		local _c, now, sleep = clock()
+		local p = { UserId = 58 }
+		local sv: any = nil
+		local left = false
+		local real = store.UpdateAsync
+		store.UpdateAsync = function(self: any, key: string, fn: any): (any, any)
+			if not left then
+				left = true
+				sv.wardrobe:give(p, SHIRT) -- (bought while the load is out)
+				sv.wardrobe:leave(p)
+				sv.saves:leave(p)
+			end
+			return real(self, key, fn)
+		end
+		sv = server(store, "A", now, sleep)
+		sv.saves:join(p)
+		local rec = store:peek("p_58")
+		t.eq(rec.meta.lock, nil, "handed straight back")
+		t.eq(rec.data.wardrobe[SHIRT], true, "with the purchase")
+		t.eq(rec.data.worn.shirt, SHIRT)
+		t.falsy(sv.saves:busy())
+	end)
+
 	-- PASSES (a guard the builder's spec lacks: it compares against the template, whose other fields are all empty,
 	-- so a change that reset them would go unseen). A record holding money, receipts, items, reputation and stats
 	-- goes through load, a purchase, an autosave and a release with every non-clothing field exactly as it was.
@@ -496,17 +523,20 @@ return function(t)
 					return {}
 				end,
 			})
-			local p1, p2 = { UserId = 61 }, { UserId = 62 }
+			local p1, p2, p3 = { UserId = 61 }, { UserId = 62 }, { UserId = 63 }
 			sv.saves:join(p1)
 			sv.saves:join(p2)
-			S.run(S.t + 4)
+			S.run(S.t + latency + 0.5)
 			t.eq(sv.saves:status(p1), "saved")
-			t.eq(sv.saves:status(p2), "loading", "(p2 is in its lock waits)")
+			t.eq(sv.saves:status(p2), "loading", "(p2 is early in a 4 s lock wait)")
 			sv.wardrobe:give(p1, SHIRT)
 			if slow then
 				store:fail("throttle", 100) -- the store fails every call from here on, three seconds each
 			end
+			sv.saves:join(p3)
+			S.run(S.t) -- (its load is in flight when the server closes)
 			local start = S.t
+			local p2Calls = calls.p_62
 			local doneAt: number? = nil
 			S.spawn(function()
 				sv.saves:closeAll()
@@ -518,12 +548,16 @@ return function(t)
 			t.falsy(sv.saves:busy(), "every release finished inside the window")
 			t.truthy(took < PlayerSaves.CLOSE_SECONDS, `closeAll took {took} s`)
 			t.eq(store:peek("p_62").meta.lock.jobId, "B", "the other server's lock is never touched")
+			t.eq(calls.p_62, p2Calls, "a lock wait cut short by the shutdown makes no further call")
 			if slow then
+				-- the in-flight load gives up (no retry), then its maybe-lock is cleared with one retry: 3 calls
 				t.truthy(took <= 3 * latency + 2, `a failing store: {took} s`)
+				t.eq(calls.p_63, 3)
 			else
-				t.truthy(took <= 5, `not behind the lock wait: {took} s`)
+				t.truthy(took <= 2, `not behind the lock wait: {took} s`)
 				t.eq(store:peek("p_61").meta.lock, nil, "released")
 				t.eq(store:peek("p_61").data.wardrobe[SHIRT], true, "with the latest change")
+				t.eq(store:peek("p_63").meta.lock, nil, "the load that landed after the close is handed back")
 			end
 			t.truthy((calls.p_61 or 0) <= 3, `p_61: {calls.p_61} calls (a load, a release and one retry)`)
 		end

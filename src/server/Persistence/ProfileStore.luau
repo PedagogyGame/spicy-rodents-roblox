@@ -290,9 +290,11 @@ local function load(self: Store, key: string, sessionId: string?, lockWaits: num
 			return nil, "error", err
 		end
 		if outcome == "locked" then
-			if wait < waits and not self.closing then
+			if wait < waits then
 				pause(self, self.lockWait)
-				continue
+				if not self.closing then
+					continue -- (a wait cut short by the shutdown makes no further call)
+				end
 			end
 			return nil, "locked", detail
 		end
