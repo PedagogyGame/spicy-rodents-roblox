@@ -10,7 +10,7 @@
 -- out of an enclosed run (Shared/Routes/Enclosure: the ball return, a hollow tree) is kept only where the enclosure's
 -- rules allow it at that pair (Enclosure.allows: a mouth that names the other route, or one enclosure), so a brain
 -- never steps through a wall; with no enclosed routes every link is as before.
--- Interface: new(railWorld) -> Adapter { routes, byId(id), count }
+-- Interface: new(railWorld) -> Adapter { routes, byId(id), count, index (the rail world's), enclosed(id) }
 -- Pure; studs. No side effects on require.
 
 local Import = require("../Import")
@@ -22,6 +22,8 @@ export type Adapter = {
 	routes: { RouteLike },
 	byId: (id: number) -> RouteLike?,
 	count: number,
+	index: any?, -- the rail world's SpatialIndex over these routes (Squirrel.reseat's nearest-first search)
+	enclosed: (id: number) -> boolean, -- an enclosed run (a drain, a hollow, the ball return): entered only at a mouth
 }
 
 local RouteAdapter = {}
@@ -115,6 +117,11 @@ function RouteAdapter.new(rail: any): Adapter
 			return byId[id]
 		end,
 		count = #list,
+		index = rail.index,
+		enclosed = function(id: number): boolean
+			local r = registry:get(id)
+			return r ~= nil and (r :: any).enclosure ~= nil
+		end,
 	}
 end
 

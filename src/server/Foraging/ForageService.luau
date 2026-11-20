@@ -5,9 +5,9 @@
 --     once a second). start() lays each spot's acorns on the ground under Workspace.NutSpots (a Model per spot with
 --     attributes Nuts, Kind and Near; one acorn shown per nut there).
 --   * Pick-ups are the server's alone: no remote asks for one. Ten times a second (C.look) each player's squirrel is
---     looked for at the spots where the server holds it: opts.placeOf(id), the place of its last accepted motor
---     packet when that one was clean (Boot/Game: Movement/MovementService.motorOf), never the root its client moves
---     (no packet yet, or a flagged one, picks nothing up). Within ForageRules reach of a spot with nuts, with room in
+--     looked for at the spots where the server holds it: opts.placeOf(id), the held place while it is the newest
+--     accepted packet (Boot/Game: Movement/MovementService.heldPlace, strict mode), never the root its client moves
+--     (no packet yet, or a doubtful one, picks nothing up). Within ForageRules reach of a spot with nuts, with room in
 --     its paws and C.gap since its last nut, it picks one up: HollowService.carry (the carried count lives there:
 --     the body carries the nuts, and the hollow deposit reads it), then opts.onPick (the body's PickAt stamp for the
 --     dip, the HUD). With its paws full there it is told once (opts.onFull) until it leaves the spot.

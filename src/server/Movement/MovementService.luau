@@ -63,7 +63,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:meterOf(actorId, now) -> (stamina, winded) (the grant's sprint meter); M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
+--   M:epochOf(actorId) -> number; M:meterOf(actorId, now) -> (stamina, winded) (the grant's sprint meter); M:railReach(x0, y0, z0, x1, y1, z1) (a release's re-seat); M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
 --   -> (x, y, z)? (THE place the server holds for a held squirrel: invariant D); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
 --   M:clickAt(actorId, clock, now) ->
 --   number?; M:clickNew(actorId, seq) -> boolean (a click's number not taken yet: the first copy of a click to arrive,
@@ -217,6 +217,7 @@ export type Movement = {
 	) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
 	meterOf: (self: Movement, actorId: any, now: number) -> (number, boolean),
+	railReach: (self: Movement, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean,
 	safeTarget: (self: Movement, actorId: any) -> (number?, number?, number?),
 	heldPlace: (self: Movement, actorId: any, current: boolean?) -> (number?, number?, number?),
 	clickAt: (self: Movement, actorId: any, clock: any, now: number) -> number?,
@@ -899,6 +900,23 @@ function MovementService.new(deps: Deps): Movement
 		return validator:meterOf(actorId, now)
 	end
 
+	-- railReach(x0, y0, z0, x1, y1, z1) -> boolean: could a body standing at the first place get onto a rail at the second
+	-- (no wall, floor, roof or ceiling between: ValidatorWorld.railReach; true with no rays). A release's re-seat
+	-- (Brains/Squirrel.reseat, through AI/TownAI.setReach)
+	function m.railReach(
+		self: Movement,
+		x0: number,
+		y0: number,
+		z0: number,
+		x1: number,
+		y1: number,
+		z1: number
+	): boolean
+		local validator = self.deps.validator
+		local f = if validator then validator.world.railReach else nil
+		return f == nil or f(x0, y0, z0, x1, y1, z1)
+	end
+
 	function m.epochOf(self: Movement, actorId: any): number
 		return squirrel(self, actorId).epoch
 	end
@@ -1342,10 +1360,13 @@ function MovementService.new(deps: Deps): Movement
 				if #violations > 0 then
 					if enforce then
 						local codes = {}
+						-- (a wall or slab at the gate in the old grace window: not counted toward a hold, validator round 9)
+						local crossing = sq.possessedAt ~= nil and now - (sq.possessedAt :: number) < C.STREAM_GRACE
 						for _, v in violations do
 							table.insert(codes, v.code)
+							crossing = crossing and (v.code == "wall" or v.code == "slab")
 						end
-						snap(self, actorId, "gate:" .. table.concat(codes, "+"), now, gate)
+						snap(self, actorId, "gate:" .. table.concat(codes, "+"), now, gate, crossing)
 					end
 					return { ok = false, accepted = false, violations = violations, flagged = true }
 				end

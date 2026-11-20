@@ -411,7 +411,7 @@ return function(t)
 	)
 
 	t.test(
-		"pose: packets each with a tiny violation keep the duel's pose of the rodent where it last was clean",
+		"pose: packets each with a tiny violation: the duel's pose of the rodent follows them; the held place never does (E)",
 		function()
 			local rig: any
 			local walkFrom = CHEAT_AT
@@ -443,21 +443,36 @@ return function(t)
 					return inp
 				end
 			)
+			-- (sampled every 0.1 s: the duel's pose against the last accepted packet, and the held place against it)
+			local worst, fresh, heldOff = 0, 0, 0
+			for k = 1, 40 do
+				rig:at(CHEAT_AT + 0.1 * k, function()
+					local id = heldId(rig)
+					local shot, at = (rig.movement :: any):motorOf(id)
+					local sq = (rig.movement :: any).squirrels[id]
+					if shot and at and sq and rig.t - at <= CP.motorFresh then
+						fresh += 1
+						worst = math.max(worst, math.sqrt((shot.x - sq.lastX) ^ 2 + (shot.z - sq.lastZ) ^ 2))
+						local hx, _, hz = (rig.movement :: any):heldPlace(id)
+						heldOff = math.max(heldOff, math.sqrt((hx - sq.lastX) ^ 2 + (hz - sq.lastZ) ^ 2))
+					end
+				end)
+			end
 			rig:run(CHEAT_AT + 4)
 			local r = rig:result()
-			local id = heldId(rig)
-			local good, at = (rig.movement :: any):motorOf(id)
-			local sq = (rig.movement :: any).squirrels[id]
-			local off = math.sqrt((good.x - sq.lastX) ^ 2 + (good.z - sq.lastZ) ^ 2)
 			print(
-				`      {LiveRig.describe("dirty packets", r)}; the last accepted packet {string.format(
-					"%.2f",
-					rig.t - at
-				)} s ago, the duel's pose of the rodent {string.format("%.1f", off)} st from it`
+				`      {LiveRig.describe("dirty packets", r)}; fresh in {fresh} of 40 samples, the duel's pose of the rodent at most {string.format(
+					"%.1f",
+					worst
+				)} st from the last accepted packet, the held place up to {string.format("%.1f", heldOff)} st behind it`
 			)
-			t.eq(r.snaps, 0, "(accepted, never flagged)")
-			t.truthy(rig.t - at <= CP.motorFresh, "(the packets are fresh)")
-			t.truthy(off <= 3, "the duel judges bites and blows where the accepted packets have the rodent")
+			-- (validator round 9, invariant E: the dirty packets never become the held place, and a doubt no clean packet
+			-- clears is snapped back to it within MovementService.C.DOUBT_SNAP: "unreached", never "speed")
+			for why in r.reasons do
+				t.eq(why, "unreached", "only a doubt left standing is snapped")
+			end
+			t.truthy(fresh > 0, "(the packets are fresh)")
+			t.truthy(worst <= 3, "the duel judges bites and blows where the accepted packets have the rodent")
 		end
 	)
 

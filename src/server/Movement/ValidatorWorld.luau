@@ -41,7 +41,8 @@
 --   colliding part of that name under that parent);
 --   the world's carFloor (x, y, z) -> boolean (a car's roof within C.CAR_SLACK under the feet, with opts.cars);
 --   maxChord (the world's: C.MAX_CHORD); floorUnder(down) -> (x, y, z, depth) -> number? (the first floor's height under
---   feet at y); slab(cover) -> (x0, y0, z0, x1, y1, z1, standY?) -> boolean (a move through a floor, a roof or a ceiling);
+--   feet at y); railReach(wall, cover) -> (x0, y0, z0, x1, y1, z1) -> boolean (a rail a body there could get onto: a
+--   release's re-seat); slab(cover) -> (x0, y0, z0, x1, y1, z1, standY?) -> boolean (a move through a floor, a roof or a ceiling);
 --   landable(down) ->
 --   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray, cover: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
@@ -99,6 +100,13 @@ ValidatorWorld.C = table.freeze({
 	SLAB_REACH = 4,
 	-- ... and a move rising less than this is no vertical move (no ray; validator round 9: every fall is judged)
 	SLAB_DY = 0.05,
+	-- around (validator round 9): the longest line a way round a corner is looked for on (studs). A longer line through a
+	-- wall stays a gap's third (a lag spike that rounded a corner), never the held place (MovementService, invariant E).
+	-- Its cost: each leg at most ceil(AROUND_MAX * 0.71 / MAX_CHORD) = 2 chords, 4 corners: at most 16 chords (96 wall
+	-- rays) and C.COVER_WALLS covers per second leg
+	AROUND_MAX = 8,
+	-- studs: how near a rail a body must get to take it (railReach; Routes/Motion.C.airGrab, 3.4 st)
+	RAIL_GRAB = 3.4,
 	-- floorUnder's bisection: the most rays, and the height it stops at
 	FLOOR_RAYS = 14,
 	FLOOR_STEP = 0.05,
@@ -311,7 +319,8 @@ end
 -- right-angle corners in the line's own frame (its middle, half its length to either side: a corner of a building
 -- that is not square to the axes). An honest gap that cut a corner has one of them clear; a line into a closed room has
 -- none. The first leg is asked for no cover (its corner's height is unknown: the lenient way), the second as the line.
--- Cost: only for a line already through a wall (rare); at most 8 legs, each bounded as crossesLong is
+-- A line longer than C.AROUND_MAX is not asked (true: a gap's third, as before; invariant E keeps it from the held
+-- place). Cost: only for a line already through a wall; at most 8 legs of at most 2 chords
 function ValidatorWorld.around(
 	wall: Ray,
 	down: Ray?
@@ -327,6 +336,9 @@ function ValidatorWorld.around(
 		rise: number?,
 		endY: number?
 	): boolean
+		if (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > C.AROUND_MAX * C.AROUND_MAX then
+			return true -- (too long to tell: weighed as a gap's, never held)
+		end
 		local mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
 		local hx, hz = (x1 - x0) / 2, (z1 - z0) / 2
 		for _, c in { { x1, z0 }, { x0, z1 }, { mx - hz, mz + hx }, { mx + hz, mz - hx } } do
@@ -339,6 +351,31 @@ function ValidatorWorld.around(
 			end
 		end
 		return false
+	end
+end
+
+-- railReach(wall, cover)(x0, y0, z0, x1, y1, z1) -> boolean: could a body standing at (x0, y0, z0) (feet) get onto a
+-- rail at (x1, y1, z1)? (Validator round 9, the round-8 review's LOW: a body let go on the street was re-seated in the
+-- storm drain under it.) No wall on the way to within a rail's grab of it (C.RAIL_GRAB: the body stands at a trunk's
+-- bark, not in it; crossesLong), and no floor, roof or ceiling between the heights: for a rail lower, a cover ray down
+-- the far column from SLAB_ON over the feet to SLAB_ON over the rail (the street over a drain); for one higher than the
+-- body's top, up the near column (a ceiling over a body let go indoors). Cost: a line's chords and one ray
+function ValidatorWorld.railReach(wall: Ray, cover: Ray): (number, number, number, number, number, number) -> boolean
+	local long = ValidatorWorld.crossesLong(wall, cover)
+	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean
+		local dx, dz = x1 - x0, z1 - z0
+		local d = math.sqrt(dx * dx + dz * dz)
+		local k = if d > C.RAIL_GRAB then (d - C.RAIL_GRAB) / d else 0
+		local ex, ez = x0 + dx * k, z0 + dz * k
+		if k > 0 and long(x0, z0, ex, ez, math.min(y0, y1), math.max(y0, y1), 0, y1) then
+			return false
+		end
+		if y1 < y0 then
+			return not cover(ex, y0 + C.SLAB_ON, ez, 0, y1 - y0, 0)
+		elseif y1 > y0 + C.TOP then
+			return not cover(x0, y0 + C.TOP, z0, 0, y1 - y0 - C.TOP, 0)
+		end
+		return true
 	end
 end
 
@@ -490,6 +527,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		landable = if down then ValidatorWorld.landable(down) else nil,
 		floorUnder = if down then ValidatorWorld.floorUnder(down) else nil,
 		slab = if slabRay then ValidatorWorld.slab(slabRay) else nil,
+		railReach = if wall and slabRay then ValidatorWorld.railReach(wall, slabRay) else nil,
 		maxChord = C.MAX_CHORD, -- (the longest line `crosses` judges; a longer one is crossesLong's)
 	}
 end

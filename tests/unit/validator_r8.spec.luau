@@ -277,7 +277,12 @@ return function(t)
 				{ id = 1, kind = "branch", length = 10, points = { { 100, g + 4, 0 }, { 110, g + 4, 0 } }, links = {} },
 				{ id = 2, kind = "branch", length = 10, points = { { -5, g + 2, 3 }, { 5, g + 2, 3 } }, links = {} },
 			}
-			local near, s = Squirrel.reseat(routes :: any, 0, g, 0)
+			local near, s = Squirrel.reseat({
+				routes = routes :: any,
+				byId = function(id: number): any
+					return routes[id]
+				end,
+			}, 0, g, 0)
 			t.eq(near and near.id, 2, "the nearest rail")
 			t.truthy(math.abs(s - 5) < 1e-6, `at its nearest point ({s})`)
 		end
@@ -285,38 +290,53 @@ return function(t)
 
 	-- audit -----------------------------------------------------------------------------------------------------------
 	t.test("audit: every read of a body's root in src/server is one the round-8 audit classified", function()
-		-- (file -> the number of lines reading PrimaryPart, GetPivot, a registry's poseOf or HumanoidRootPart; each
-		-- classified in the round-8 report: art and props (never a body), the AI's bodies (the server's own place),
-		-- a held person, deer or fox (a kind the validator does not watch), the watch itself (it judges the root), a
-		-- body the server has just put somewhere (read in the same thread), a rotation or a parent kept. A held
-		-- squirrel's place is ActorsRuntime.placeOf / MovementService.heldPlace)
+		-- (file -> the number of READS of a body's root: each occurrence, not each line (validator round 9, the round-8
+		-- review's LOW: a second read on a counted line, or a new call of a root helper, hid), of PrimaryPart, GetPivot, a
+		-- registry's poseOf, HumanoidRootPart, FindFirstChild("Root"), and the call sites (and definitions) of the root
+		-- helpers rootOf, aheadOf and pivotOf; each classified in the round-8 and round-9 reports: art and props (never a
+		-- body; the yard dogs' own CFrame, PeopleArt's figure), the AI's bodies (the server's own place), a held person,
+		-- deer or fox (a kind the validator does not watch: ItemWorld's users, the lounge's guests and drinks, the sky
+		-- lift's riders, paintball's players put where the service decided, the rafters' people), the watch itself (it
+		-- judges the root), the network owner (Possession's setOwner: no place), a body the server has just put somewhere
+		-- (read in the same thread), a rotation or a parent kept. A held squirrel's place is ActorsRuntime.placeOf /
+		-- MovementService.heldPlace)
 		local AUDITED: { [string]: number } = {
 			["AI/Puppets.luau"] = 3,
-			["Actors/ActorService.luau"] = 8,
+			["Actors/ActorService.luau"] = 12,
 			["Actors/ActorsRuntime.luau"] = 3,
 			["Actors/BodyFactory.luau"] = 1,
 			["Actors/DeviceService.luau"] = 8,
-			["Actors/Possession.luau"] = 6,
+			["Actors/Possession.luau"] = 9,
 			["Assets/HeroArt.luau"] = 3,
-			["Assets/PeopleArt.luau"] = 4,
+			["Assets/PeopleArt.luau"] = 5,
 			["Assets/PinballArt.luau"] = 3,
 			["Assets/TreeArt.luau"] = 2,
 			["Assets/WhackArt.luau"] = 1,
 			["Attractions/AttractionService.luau"] = 4,
-			["Attractions/LoungeService.luau"] = 5,
-			["Attractions/RafterService.luau"] = 1,
+			["Attractions/LoungeService.luau"] = 11,
+			["Attractions/RafterService.luau"] = 5,
 			["Boot/Game.luau"] = 11,
 			["Items/CornerStore.luau"] = 1,
-			["Items/ItemWorld.luau"] = 2,
+			["Items/ItemWorld.luau"] = 13,
 			["Minigames/BowlingLane.luau"] = 2,
 			["Minigames/FortuneCabinet.luau"] = 1,
 			["Minigames/Games/AirHockey.luau"] = 1,
 			["Minigames/MinigameService.luau"] = 3,
-			["Minigames/Paintball/RealEngine.luau"] = 2,
+			["Minigames/Paintball/RealEngine.luau"] = 6,
 			["Minigames/Pool/Hardware.luau"] = 1,
 			["Movement/BodyPin.luau"] = 1,
-			["Rides/SkyLiftService.luau"] = 8,
-			["Wildlife/YardHazards.luau"] = 1,
+			["Rides/SkyLiftService.luau"] = 13,
+			["Wildlife/YardHazards.luau"] = 4,
+		}
+		local NEEDLES = {
+			"PrimaryPart",
+			"GetPivot",
+			":poseOf(",
+			"HumanoidRootPart",
+			'FindFirstChild("Root")',
+			"rootOf(",
+			"aheadOf(",
+			"pivotOf(",
 		}
 		local counts: { [string]: number } = {}
 		local function scan(dir: string, rel: string)
@@ -329,13 +349,16 @@ return function(t)
 					local n = 0
 					for line in string.gmatch(fs.readFile(path), "[^\n]+") do
 						local code = string.gsub(line, "%-%-.*$", "")
-						if
-							string.find(code, "PrimaryPart", 1, true)
-							or string.find(code, "GetPivot", 1, true)
-							or string.find(code, ":poseOf(", 1, true)
-							or string.find(code, "HumanoidRootPart", 1, true)
-						then
-							n += 1
+						for _, needle in NEEDLES do
+							local from = 1
+							while true do
+								local at = string.find(code, needle, from, true)
+								if at == nil then
+									break
+								end
+								n += 1
+								from = at + #needle
+							end
 						end
 					end
 					if n > 0 then

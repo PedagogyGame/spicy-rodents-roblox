@@ -492,6 +492,13 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		end
 	end
 
+	-- a plain squirrel let go re-seats only on a rail it could get onto from there (validator round 9: the server's own
+	-- rays, Movement/MovementService.railReach)
+	if movement and movement.railReach then
+		TownAI.setReach(world, function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean
+			return movement:railReach(x0, y0, z0, x1, y1, z1)
+		end)
+	end
 	TownAI.setFocus(world, function()
 		local out = {}
 		for _, p in Players:GetPlayers() do
