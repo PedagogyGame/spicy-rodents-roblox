@@ -110,6 +110,35 @@ local function onRail(world: any, r: any, tt: number): State
 	return s
 end
 
+-- the motor's own highest off a trunk in a short gap over the drawn pose: Space at the first frame, E and Space at a later
+-- one (W, sprint and up held), any heading, the trunk's normal unknown or that way
+local function motorExit(world: any, r: any, tt: number, dt: number): number
+	local frames = math.floor(dt * 60 + 0.5)
+	local best = -math.huge
+	for a = 0, 15 do
+		for _, normal in { false, true } do
+			for g = 2, frames do
+				local s = onRail(world, r, tt)
+				s.yaw = a * math.pi / 8
+				if normal then
+					s.trunkNormalX, s.trunkNormalZ = math.sin(s.yaw), math.cos(s.yaw)
+				end
+				local vis = SquirrelMotor.visualPose(s, world)
+				for f = 1, frames do
+					local i = SquirrelMotor.idleInput(s.yaw)
+					i.fw, i.sprint, i.up = 1, true, 1
+					i.leap, i.grab = f == 1 or f == g, f == g
+					SquirrelMotor.step(s, i, 1 / 60, world)
+				end
+				if s.routeId == nil then
+					best = math.max(best, s.y - vis.y)
+				end
+			end
+		end
+	end
+	return best
+end
+
 return function(t)
 	local base = TestWorld.build()
 	local trunks = Driver.targetsAround(base, 0, 0, 2000)
@@ -547,7 +576,9 @@ return function(t)
 					end) or 0
 					local railCap = SquirrelMotor.routeCap(tall, false)
 					-- (an honest body: up the trunk, a leap, a grab of a bough a grab's reach higher and a leap off it, the
-					-- gap's time shared between the climb and the two leaps; a short gap hides no grab)
+					-- gap's time shared between the climb and the two leaps; a short gap hides the motor's own leap and grab
+					-- (validator round 17, the round-16 review's MEDIUM 1a): no higher than the motor's own, the grab search's
+					-- band (a sample spacing over the nearest, round 16's) and a stud)
 					local capT = railCap * E.railTol
 					local n = if dt > E.shortDt then 2 else 1
 					local t2 = math.clamp(n * (launchUp - capT) / P.gravity, 0, dt)
@@ -558,6 +589,9 @@ return function(t)
 						-- (and the gravity tolerance on the launch's speed: E.gravityEps of gravity, about a stud of rise)
 						+ P.gravity * E.gravityEps * launchUp / P.gravity
 						+ 0.2
+					if dt <= E.shortDt + E.dtEps then
+						honestUp = math.max(honestUp, motorExit(world, tall, tt, dt) + E.sampleSpacing + 1)
+					end
 					local honestAcross = launchXZ * dt + 2 * Motion.C.airGrab + railCap * dt + 2
 					table.insert(
 						rows,
