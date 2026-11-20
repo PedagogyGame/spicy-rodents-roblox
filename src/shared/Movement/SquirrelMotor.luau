@@ -30,8 +30,9 @@
 -- applied (aimYaw, aimReach), which the packet carries, so the server undoes exactly that (envelope 0c). A wiggle with
 -- meter left costs trickCost of it. trickKind: 0 none, 1 roll, 2 wiggle (this flight); trickTime: seconds of the move
 -- left. Movement/AirTrick draws it.
--- GRAB-LEAP COOLDOWN (owner D18): a leap off a rail comes at most every grabLeapCooldown s (the macro's E+Space every
--- second frame runs no faster than a person's chain; a person's and every honest climb never meet it).
+-- GRAB-LEAP COOLDOWN (owner D18): E in the air grabs nothing until grabLeapCooldown s after a leap off a rail, so a
+-- grab-leap (E+Space) follows the last one no sooner: a macro's E+Space every second frame chains at a person's pace (a
+-- person's every sixth frame, and every honest climb, never meet it).
 -- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
 -- moving into it (walking, falling, leaping or pouncing: the flight's swept path counts and going in ends the
 -- attack), eased like a transfer (a hatch mouth, a storm drain's grate, takes only E from a body standing at it, never
@@ -217,7 +218,7 @@ export type State = {
 	footAgo: number,
 	-- studs across since the body last left its footing (0 on it): the flight's carry so far
 	airDist: number,
-	-- seconds before a leap off a rail is allowed again (grabLeapCooldown)
+	-- seconds before E grabs in the air again after a leap off a rail (grabLeapCooldown)
 	railLeapWait: number,
 }
 
@@ -316,13 +317,15 @@ SquirrelMotor.params = {
 	trickYawRate = 4,
 	trickReachRate = 6,
 	trickCost = 0.1,
-	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds between two leaps off a rail. Measured at 60 fps, W and
-	-- sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue cable 660 / up trunk 604):
+	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds after a leap off a rail before E grabs in the air again.
+	-- Measured at 60 fps, W and sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue
+	-- cable 660 / up trunk 604):
 	--   no cooldown   n=2 47.3 / 49.9 / 30.7   n=3 35.7 / 49.9 / 30.3   n=6 (a person's) 41.6 / 41.6 / 28.7
-	--   0.25 s        n=2 25.5 / 25.7 / 19.2   n=6 28.1 / 28.2 / 20.6 (a person's chain and climb cut by a third)
-	--   0.08 s        n=2 29.2 / 29.3 / 20.9   n=3 32.0 / 31.2 / 23.3   n=6 41.6 / 41.6 / 28.7 (unchanged)
-	-- Under five frames: a person's chain never meets it, a macro's grab lands back on the rail before the cooldown is out
-	-- and loses the leap's carry, so mashing runs slower than a person's rhythm
+	--   0.08 s        n=2 41.6 / 41.6 / 28.7   n=3 41.6 / 41.6 / 28.7   n=6 41.6 / 41.6 / 28.7 (unchanged)
+	-- Under five frames: a person's chain never meets it, and a macro's grabs wait to a person's rhythm (0.25 s held a
+	-- person's every-sixth-frame grabs back too: the parapet chain moved, 41.6 -> 42.1 st/s, at a slower rhythm). A first
+	-- try refused the leap off the rail instead: the macro then sat on the rail between a 1-frame hop and the next grab,
+	-- which the validator's short gaps judge as rail pace (validator_r16's honest climb: 17 railSpeed flags)
 	grabLeapCooldown = 0.08,
 	-- transfer heading hold (§10)
 	freeLookAfterTransfer = 0.65,
@@ -769,9 +772,6 @@ end
 -- Edge actions (key handler L5659-5681, leap L5922, attemptPounce L6482) --------------------------------
 
 local function doLeap(state: State, world: World, events: { Event })
-	if state.routeId and state.railLeapWait > 0 then
-		return -- (the grab-leap cooldown: a leap off a rail at most every grabLeapCooldown)
-	end
 	if state.routeId or state.grounded then
 		local allowed, mouth, mouthRoute = launchGate(state, world, events)
 		if not allowed then
@@ -1071,6 +1071,8 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 		local found: Motion.Candidate? = nil
 		if state.grounded then
 			found = Motion.groundTrunkCandidate(world, state.x, state.y, state.z, C.groundReachE)
+		elseif state.railLeapWait > 0 then
+			return -- (the grab-and-jump cooldown: no grab in the air this soon after a leap off a rail)
 		end
 		if not found then
 			found = Motion.nearestRoute(world, state.x, state.y, state.z, C.airGrab, nil, Motion.openOnly(world))
