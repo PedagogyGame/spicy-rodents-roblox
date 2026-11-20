@@ -125,3 +125,7 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   - **#35 Dogs:** a notice only, never a push (no change). **#36 The bark:** use an audio upload for a custom bark.
   - **#50 Silent sounds:** do not leave them silent: place the most fitting reasonable sound for each, with uploads where the licensed library has nothing (within the audio budget: 40/month working, at least 50 kept for other games).
   - **Street riders:** players must never possess the street riders (already so since the bikes merge: riders are AI-only; the motorcycle riders are drawn on the traffic cars, not bodies).
+- **D17. Hopping speed and an air trick (owner, 2026-11-20, after version 50 went live).**
+  - **Hopping speed:** "a combination between a and b, slight advantage even if there is empty meter, but not the same". Hopping (leap, walk, leap) on an empty meter keeps a slight edge over walking, but well short of hopping with meter (measured before: leap-then-walk held 32-34 st/s even on an empty meter).
+  - **Air trick:** "a barrel roll and a twitch and twerk in the air the squirrel can do with an extra button, which, when you push the button mid jump, or while in the air, allows player to control the direction of the jumps land more, mid-air". One extra button, only in the air: a barrel roll and a twitch-and-wiggle (cartoon tail-and-hips shimmy; mild rating), each giving stronger steering of where the jump lands.
+  - Not answered yet: a short cooldown on grab-and-jump (E+Space) so mashing or a macro gives no edge.
