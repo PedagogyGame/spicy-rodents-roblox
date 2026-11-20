@@ -131,7 +131,7 @@ return function(t)
 					t.truthy(math.abs(m.stamina - (0.05 - P.leapCost)) < 1e-6, "a full leap pays leapCost")
 				else
 					t.truthy(math.abs(m.stamina) < 1e-6, "a winded leap takes the meter to empty, no further")
-						t.truthy(m.speedU <= P.leapForwardWinded * E.launchTol + 1e-6, "carries at a winded leap's speed")
+					t.truthy(m.speedU <= P.leapForwardWinded * E.launchTol + 1e-6, "carries at a winded leap's speed")
 				end
 			end
 		end
