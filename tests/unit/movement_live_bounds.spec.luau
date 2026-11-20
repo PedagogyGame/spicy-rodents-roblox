@@ -487,7 +487,10 @@ return function(t)
 			},
 			{ name = "every third packet says it is in the air, 44 st/s", speed = 44, flip = 3 },
 			{ name = "one packet every 2.6 s (four gaps in ten seconds), 46 st/s", speed = 46, sparse = 2.6 },
-			{ name = "a walk 1.19 x the walk's pace, for ever", speed = 21.4, walk = true },
+			-- (validator round 12: 1.5 x, past what the motor itself sustains. The meter follows the motor's speed step, and the
+			-- motor sustains 22.6 st/s, 1.26 x the walk, with the sprint key held or tapped at the meter's own ratio, 4 s of
+			-- sprint to 9 of refill: round 11 snapped 1.19 x, 21.4 st/s, which an honest client tapping the key matches)
+			{ name = "a walk 1.5 x the walk's pace, for ever", speed = 27, walk = true },
 		}
 	do
 		t.test(`cheat: an endless sprint, {c.name}: snapped for the sprint meter`, function()

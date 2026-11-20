@@ -4,7 +4,8 @@
 -- accelGround / accelAir, dragGround / dragAir, a pounce's window, railLeap's v5.4 speeds), MoveValidator._stamina.
 --   the motor's step   the motor's own frames (random keys, sprint and focus, leaps and pounces, frames of 1/144 to 0.08
 --                      s) never cover more than speedBound from the true speed, moveSpeed and window, by C.STAMINA_STEP
---   honest, 5 min      W held with the sprint key (the meter running out and back), with hops, hopping whenever the meter
+--   honest, 5 min      W held with the sprint key (the meter running out and back), the key tapped, with hops, hopping
+--                      whenever the meter
 --                      allows with the sprint in the air, and the duel's chaser (sprint held, zig-zags, pounces as often
 --                      as the duel allows with feints' pauses), each on a clean link and on 150 ms, 300 ms jitter, 8 %
 --                      loss: 0 snaps
@@ -154,6 +155,17 @@ return function(t)
 			end,
 		},
 		{
+			name = "the sprint key tapped, 0.15 s in every 0.5 s",
+			keys = function(_rng: Rng.Rng): LiveRig.Keys
+				return function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					local inp =
+						SquirrelMotor.idleInput(if math.floor(now / 12) % 2 == 0 then -math.pi / 2 else math.pi / 2)
+					inp.fw, inp.sprint = 1, (now % 0.5) < 0.15
+					return inp
+				end
+			end,
+		},
+		{
 			name = "sprint held, a hop every 1.5 s",
 			keys = function(_rng: Rng.Rng): LiveRig.Keys
 				local last = -10
@@ -213,11 +225,17 @@ return function(t)
 					seed = 40 + li,
 				})
 				local s0 = town.openStart()
-				rig:possess(s0, pat.keys(Rng.new(7 + li)))
+				-- (the distance run: the client's own frames, turned back every 12 s)
+				local travelled, lx, lz = 0, s0.x, s0.z
+				local keys = pat.keys(Rng.new(7 + li))
+				rig:possess(s0, function(now: number, s: State, e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					travelled += math.sqrt((s.x - lx) ^ 2 + (s.z - lz) ^ 2)
+					lx, lz = s.x, s.z
+					return keys(now, s, e)
+				end)
 				rig:run(300)
 				local r = rig:result()
-				local pace = math.sqrt((r.client.x - s0.x) ^ 2 + (r.client.z - s0.z) ^ 2)
-				print(`      {LiveRig.describe(l.name, r)}; {string.format("%.0f", pace)} st from the start`)
+				print(`      {LiveRig.describe(l.name, r)}; {string.format("%.1f", travelled / 300)} st/s`)
 				for i, v in r.violations do
 					if i <= 4 then
 						print(`        {v}`)
