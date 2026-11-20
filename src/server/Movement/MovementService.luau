@@ -292,8 +292,14 @@ MovementService.C = table.freeze({
 	SPREAD_WINDOW = 2, -- seconds of packet arrivals whose spread (latest less earliest arrival offset) is the jitter ...
 	SPREAD_MAX = 0.5, -- ... never counted above this (nor half the link's round trip)
 	-- seconds a root standing still may be judged against older packets (its updates held up: validator round 10, an
-	-- honest loss burst of 1 s loses the root's updates as well, and the packets after it may come in first)
+	-- honest loss burst of 1 s loses the root's updates as well, and the packets after it may come in first) ...
 	ROOT_STALE_MAX = 1.5,
+	-- ... only when the packets show a burst too (validator round 11, the round-10 review's LOW: a root written every
+	-- 1.4 s while clean packets came steadily stood up to 25 st behind them, never drift): a gap between two packets'
+	-- arrivals at least ROOT_BURST long within a send interval and the arrivals' spread of the root's last move; then for
+	-- no longer than that gap, the spread and ROOT_CATCHUP (the root's updates after a burst may come after its packets)
+	ROOT_BURST = 0.2,
+	ROOT_CATCHUP = 0.3,
 	PACE_PAIRS = 4, -- the pace is the fastest of this many recent packets (their own velocity, or their step)
 	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
 	PIN_LOG = 20, -- seconds a new body may stay pinned with no packet past the gate before it is logged (it stays)
@@ -708,6 +714,28 @@ function MovementService.new(deps: Deps): Movement
 		return if ping > 0 then math.min(spread, ping) else spread
 	end
 
+	-- burstAround(h, t, slack, now) -> seconds: the longest gap between two accepted packets' arrivals (the history's
+	-- times) that comes within `slack` of server time t, or, when none came after it, the silence since the last one
+	-- (0: the packets came steadily round t)
+	local function burstAround(h: PoseHistory.History, t: number, slack: number, now: number): number
+		local cap, ts = h.cap, h.ts
+		local i = h.head
+		local newer = ts[i]
+		local best = if newer <= t + slack then now - newer else 0
+		for _ = 2, h.count do
+			local j = if i == 1 then cap else i - 1
+			local older = ts[j]
+			if newer < t - slack then
+				break
+			end
+			if older <= t + slack then
+				best = math.max(best, newer - older)
+			end
+			newer, i = older, j
+		end
+		return best
+	end
+
 	-- offsetFloor(sq, now): the lowest arrival offset (server time - client clock) of the recent packets: the client clock
 	-- to server time with the link's latency and none of a packet's jitter (0 before any)
 	local function offsetFloor(sq: Squirrel, _now: number): number
@@ -1053,10 +1081,18 @@ function MovementService.new(deps: Deps): Movement
 			local tight, loose = driftBounds(sq, now, fast)
 			local d = dist(x, y, z, refX, refY, refZ)
 			-- a root that has not moved since its last update (held up behind the packets, which came on): judged
-			-- against where the packets were when it last moved, at most C.ROOT_STALE_MAX ago
+			-- against where the packets were when it last moved, at most C.ROOT_STALE_MAX ago, and only when the packets
+			-- show a burst around that moment (an honest burst loses both streams; a client that freezes its root alone
+			-- does not: burstAround)
 			local h = self.histories[actorId]
 			local movedAt = if moved then now else sq.rootMovedAt
+			local held = 0
 			if d > tight and h and h.count > 0 and now - movedAt > 0 and now - movedAt <= C.ROOT_STALE_MAX then
+				local slack = SquirrelWire.SEND_EVERY + spreadOf(self, actorId, sq)
+				local gap = burstAround(h, movedAt, slack, now)
+				held = if gap >= C.ROOT_BURST then math.min(C.ROOT_STALE_MAX, gap + slack + C.ROOT_CATCHUP) else 0
+			end
+			if held > 0 and now - movedAt <= held then
 				local ox, oy, oz = PoseHistory.sample(h, movedAt)
 				if dist(x, y, z, ox, oy, oz) <= C.DRIFT_BASE + reachIn(v, lead + C.DRIFT_FRESH_LAG, fast) then
 					d = 0
