@@ -202,13 +202,17 @@ type Squirrel = {
 	railAt: number?, -- server time of the last accepted packet on a rail
 	-- the recent accepted packets on a rail (their snapshots and arrival), C.RAIL_RECENT and a little back
 	rails: { { at: number, shot: { [string]: number | boolean } } },
-	-- the root's crossings of a wall by a rail not yet explained by a packet on a rail (their time and the root's far end)
-	crossings: { { at: number, x: number, y: number, z: number } },
+	-- the root's crossings of a wall by a rail not yet explained by a packet on a rail (their time, the root's far end, and
+	-- where its line started: the anchor)
+	crossings: { Crossing },
 	-- the last click the duel dated (clickAt): its client clock, arrival, and the link's spread measured before it
 	click: { at: number, clock: number, spread: number }?,
 	-- the newest click number taken (clickNew: the remote's and the packets' copies of one click count once)
 	clickSeq: number?,
 }
+
+-- a crossing of a wall by the root's line, from (fx, fy, fz) to (x, y, z), at server time `at`
+type Crossing = { at: number, x: number, y: number, z: number, fx: number?, fy: number?, fz: number? }
 
 export type Movement = {
 	deps: Deps,
@@ -225,12 +229,7 @@ export type Movement = {
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	_reached: (self: Movement, actorId: any, sq: Squirrel, snapshot: { [string]: number | boolean }) -> boolean,
-	_explained: (
-		self: Movement,
-		sq: Squirrel,
-		c: { at: number, x: number, y: number, z: number },
-		rail: any?
-	) -> boolean,
+	_explained: (self: Movement, sq: Squirrel, c: Crossing, rail: any?) -> boolean,
 	epochOf: (self: Movement, actorId: any) -> number,
 	meterOf: (self: Movement, actorId: any, now: number) -> (number, boolean),
 	railReach: (self: Movement, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean,
@@ -282,6 +281,9 @@ MovementService.C = table.freeze({
 	-- for height, nor for walls while the packets have the body on a rail ...
 	RAIL_NEAR = 6.5,
 	RAIL_RECENT = 1, -- ... one accepted within this many seconds of the root's crossing, before it or after it
+	-- studs (with half the route's sample spacing): a root line this near a route's centreline at both ends and its middle
+	-- ran along that route (_explained: a crossing of the route's own collider, as the fallen log's thresholds)
+	ROUTE_ON = 1,
 
 	DRIFT_FRESH_LAG = 0.1, -- seconds: what the root may lead the packets by beyond their arrivals' spread (the send rates)
 	DRIFT_DV = 55, -- studs/s: a leap's start from standing (the root may show it a moment before a packet does)
@@ -1149,13 +1151,12 @@ function MovementService.new(deps: Deps): Movement
 	-- _explained(sq, c, rail?) -> boolean: the root's crossing of a wall by a rail, ending at c, is where a packet on a
 	-- rail has the body drawn (its feet on a big trunk's bark, a downspout on a wall): the packet's own drawn pose
 	-- (Motion.visualPose) within a chord of c and no wall between them (over the higher end by a leap's rise), the packet
-	-- within C.RAIL_RECENT of the crossing. `rail`: that packet only; else the newest C.RAILS_TRIED kept (sq.rails)
-	function m._explained(
-		self: Movement,
-		sq: Squirrel,
-		c: { at: number, x: number, y: number, z: number },
-		rail: any?
-	): boolean
+	-- within C.RAIL_RECENT of the crossing. Or the root ran along that packet's route itself (validator round 11, the
+	-- round-10 review's LOW-MEDIUM: an honest root on the fallen log's run sampled inside the invisible threshold disc the
+	-- run passes through was snapped "wall" on a lossy link, every drawn pose's line to it ending inside the disc): the
+	-- line's start, middle and end within C.ROUTE_ON of the route's centreline. `rail`: that packet only; else the newest
+	-- C.RAILS_TRIED kept (sq.rails)
+	function m._explained(self: Movement, sq: Squirrel, c: Crossing, rail: any?): boolean
 		local validator = self.deps.validator
 		local world = if validator then validator.world else nil
 		if world == nil or world.crosses == nil then
@@ -1169,6 +1170,17 @@ function MovementService.new(deps: Deps): Movement
 			local route = world.registry:get(shot.routeId :: number)
 			if route == nil then
 				return false
+			end
+			local fx, fy, fz = c.fx, c.fy, c.fz
+			if fx and fy and fz then
+				local index = world.index
+				local near = C.ROUTE_ON + (route.length or 0) / math.max(1, (route.sampleCount or 2) - 1) / 2
+				local function on(x: number, y: number, z: number): boolean
+					return index:nearestOnRoute(route.id, x, y, z, near) ~= nil
+				end
+				if on(c.x, c.y, c.z) and on(fx, fy, fz) and on((fx + c.x) / 2, (fy + c.y) / 2, (fz + c.z) / 2) then
+					return true
+				end
 			end
 			local vis = Motion.visualPose(
 				world,
@@ -1332,7 +1344,7 @@ function MovementService.new(deps: Deps): Movement
 					if not byRail then
 						return "wall"
 					end
-					local c = { at = now, x = x, y = y, z = z }
+					local c: Crossing = { at = now, x = x, y = y, z = z, fx = from.x, fy = from.y, fz = from.z }
 					if not self:_explained(sq, c, nil) then
 						if #crossings >= C.CROSSINGS_MAX then
 							return "wall"

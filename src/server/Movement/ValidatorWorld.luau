@@ -587,7 +587,9 @@ end
 -- judged whatever its drop (SLAB_DY now gates rises only), and a fall the down ray found nothing for casts one ray up,
 -- at the end's column from SLAB_ON over the end's feet to SLAB_ON over the start's: it meets a slab's underside the down
 -- ray started inside (the body's own box swept that column; an honest one has nothing there). A grounded claim stands
--- within SLAB_ON under a top at most (floorNear), so the down ray starts over the top it stood on
+-- within SLAB_ON under a top at most (floorNear), so the down ray starts over the top it stood on. Validator round 11: the
+-- rays run by the stop rule "rail", past the rails' own props (C.RAIL_PROPS): a tree's trunk, a pole or a fence is no
+-- floor, roof or ceiling of anything (an honest Q off trunk 1210 came down on a bough inside its trunk part's box)
 function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number, number, number?) -> boolean
 	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, standY: number?): boolean
 		local fell = y1 < y0
@@ -598,17 +600,17 @@ function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number,
 		local drop = math.max(0, y0 - y1)
 		local part = if across <= C.SLAB_REACH then drop else drop * C.SLAB_REACH / across
 		local top = y1 + C.RAY_ABOVE + part
-		if ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0) then
+		if ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0, "rail") then
 			return true
 		end
 		if standY and across > C.SLAB_REACH and standY - C.SLAB_ON > top then
 			local from = standY + C.SLAB_ON
-			if ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0) then
+			if ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0, "rail") then
 				return true
 			end
 		end
 		-- (the up ray: a slab whose top the down ray started under)
-		return fell and ray(x1, y1 + C.SLAB_ON, z1, 0, drop, 0)
+		return fell and ray(x1, y1 + C.SLAB_ON, z1, 0, drop, 0, "rail")
 	end
 end
 
