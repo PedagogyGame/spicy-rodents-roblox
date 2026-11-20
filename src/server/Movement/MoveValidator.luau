@@ -1756,13 +1756,18 @@ function MoveValidator._stamina(
 	-- (the least sprint a distance past the walk-steered step needs: the sprint steers it no more than this faster)
 	local rate = math.max(P.sprint - P.walk, if free then V54.sprint - V54.walk else 0, 1e-3)
 	-- (`over` studs past the walk-steered step in a gap, inside an honest burst: the least of a sprint and a leap off the
-	-- ground whose carry, at most a leap's flight at `leapXZ` over a walk, covers part of it, leapCost (unless `paid`) as
-	-- the sprint it is worth. Returns that sprint and the time it holds neither on the ground nor on a rail (sprinting, or in
-	-- the leap's flight): validator round 14, the round-13 review's HIGH 2, time credited as a flight is never refilled)
+	-- ground whose carry covers part of it, leapCost (unless `paid`) as the sprint it is worth. The carry: the leap's flight
+	-- from `leapXZ` as the motor's air steps it (toward a sprint, dragged), and its landing's on the ground for the time
+	-- left, over a walk; validator round 17: a leap's speed held for its whole flight let a gap from a step off an edge
+	-- cover 45 st in 1.19 s for one leapCost, 30.8 st/s far from any rail against an honest hop's 20-24. Returns that
+	-- sprint and the time it holds neither on the ground nor on a rail (sprinting, or in the leap's flight): validator
+	-- round 14, the round-13 review's HIGH 2, time credited as a flight is never refilled)
 	local function sprintOrLeap(over: number, leapXZ: number, room: number, paid: boolean, r: number): (number, number)
 		local bySprint = over / r
 		local flight = math.min(room, 2 * P.leapUp / P.gravity)
-		local carry = math.max(0, leapXZ - P.walk * tol) * flight
+		local dFly, uLand, sLand = SquirrelMotor.speedBound(leapXZ, P.sprint, P.sprint, false, flight)
+		local dLand = SquirrelMotor.speedBound(uLand, sLand, P.walk, true, math.max(0, room - flight))
+		local carry = math.max(0, dFly + dLand - P.walk * tol * room)
 		local leapRun = math.max(0, over - carry) / r
 		local byLeap = (if paid then 0 else P.leapCost * P.sprintSeconds) + leapRun
 		if byLeap < bySprint then

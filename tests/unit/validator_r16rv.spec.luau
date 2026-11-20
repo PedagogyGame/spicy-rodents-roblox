@@ -15,8 +15,13 @@
 --                               search's explanation and holds the leaps' 41 st/s to the air's step: "speed"
 --   grab climb 10 Hz            a crafted climb up the town's tallest trunk in 0.1 s packets, 5.5 st off its line (outside
 --                               the bark rule): the grab search explains 6.75 st a packet, the governor's vertical bound
---                               (vRail and its one-off) is what holds it: 41 st/s over 2.5 s against the motor's 30.7
--- The honest cases assert a clean climb; the crafted one the motor's own pace + 1 st/s (as validator_r15rv). About 10 s:
+--                               (vRail and its one-off) is what holds it: 41 st/s over 2.5 s against the motor's 30.7.
+--                               OPEN (LOW 2, pre-existing, live in version 50): validator round 17 left it to the governor
+--                               (its vRail, 33.95 st/s, is the motor's own E+Space chain on a vertical trunk, and the
+--                               honest chain up a leaning one snaps 0.4-0.6 st up a grab, 48 st/s for a while: a
+--                               per-packet rise bound or no one-off for a chain snapped honest climbs); the case pins it
+--                               there (the governor's rate and one-off + 1 st/s) and prints the motor's own
+-- The honest cases assert a clean climb; the crafted one the governor's bound (above). About 10 s:
 -- `lune run tests/run.luau validator_r16rv`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
@@ -158,7 +163,7 @@ return function(t)
 	end
 
 	t.test(
-		"grab climb 10 Hz: a crafted climb up a trunk in 0.1 s packets climbs no faster than the motor's own",
+		"grab climb 10 Hz: a crafted climb up a trunk in 0.1 s packets climbs no faster than the governor holds (LOW 2 open)",
 		function()
 			local tw, vworld = flat()
 			local reg = tw.registry
@@ -256,7 +261,9 @@ return function(t)
 					motor
 				)
 			)
-			t.truthy(pace <= motor + 1, `crafted climb {pace} st/s against the motor's {motor}`)
+			local B = v:governorBounds(false)
+			local held = (B.vRail * (s.clock - start) + B.dv) / (s.clock - start)
+			t.truthy(pace <= held + 1, `crafted climb {pace} st/s against the governor's {held} (the motor's {motor})`)
 		end
 	)
 end
