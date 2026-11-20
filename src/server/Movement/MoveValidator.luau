@@ -1387,6 +1387,15 @@ function MoveValidator._stamina(
 			})
 		end
 	end
+	-- (a charge or a sprint that takes the meter to its floor winds it there and then, before any refill the same packet
+	-- brings, as the motor's doLeap and its sprint wind it at 0; validator round 13, the round-12 review's HIGH 2: a launch
+	-- packet's ground refill lifted the meter a hair over its floor after each leapCost, and no leap was ever winded)
+	local function spend(amount: number)
+		marks.stamina -= amount
+		if marks.stamina <= -C.STAMINA_SLACK + 1e-6 then
+			marks.winded = true
+		end
+	end
 	-- (winded once the meter is at its floor, until it is back by the motor's sprintRecover, less a little)
 	local function settle()
 		if marks.stamina <= -C.STAMINA_SLACK + 1e-6 then
@@ -1406,7 +1415,7 @@ function MoveValidator._stamina(
 	local tired = false
 	if charge ~= nil and not exempt then
 		tired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
-		marks.stamina -= if charge == "pounce" then P.pounceCost else P.leapCost
+		spend(if charge == "pounce" then P.pounceCost else P.leapCost)
 		marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
 		if charge == "pounce" then
 			marks.tiredLunge = tired
@@ -1615,9 +1624,13 @@ function MoveValidator._stamina(
 			end
 		end
 		local d3, u3, s3 = 0, u2, s2
+		-- (a hidden leap off the ground made winded carries at a winded one's speed: validator round 13, the round-12
+		-- review's LOW a)
+		local gapTired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+		local leapXZ = (if gapTired then P.leapForwardWinded else P.leapForward) * E.launchTol
 		if tau > 0 then
 			d3, u3, s3 = SquirrelMotor.speedBound(
-				if railNear then launchCap else P.leapForward * E.launchTol,
+				if railNear then launchCap else leapXZ,
 				s2,
 				P.walk,
 				false,
@@ -1626,7 +1639,9 @@ function MoveValidator._stamina(
 				if railNear then V54.walk else nil
 			)
 			if not railNear then
-				marks.stamina = math.max(marks.stamina - P.leapCost, -C.STAMINA_SLACK)
+				spend(P.leapCost)
+				marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
+				u3 = math.min(u3, leapXZ)
 			end
 		end
 		if railNear then
@@ -1699,7 +1714,7 @@ function MoveValidator._stamina(
 		end
 		refill = math.max(0, span - airT - sprinted)
 	end
-	marks.stamina -= sprinted / P.sprintSeconds
+	spend(sprinted / P.sprintSeconds)
 	onCredit(
 		sprinted,
 		if airT > 0
