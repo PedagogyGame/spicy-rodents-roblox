@@ -36,6 +36,39 @@ Measured on flat open ground, a leap with the aim held full out or full in from 
 
 Hopping across open ground with W and Shift, over 6 s from a full meter: 27.1 studs per second with or without the trick (the 10 % cost uses up the gain). From an empty meter, over 30 s: 20.5 without and 22.0 with the trick pressed at the best moment in every jump.
 
+## 1b. What the twitch looks like: nine moves, picked partly at random by your aim
+
+You asked for "a quick spin, twist, summersault, 360 plus weird strange bizarre body-twists ... a variety ... based on the final aim and direction", "all sorts of variations and combinations", "keep side to side wiggle as primary, and add the others in for other situations or angles", and "make which one occurs partially random". So the mid-jump twitch is now one of nine moves:
+
+| Move | What it looks like |
+|---|---|
+| **Wiggle** (the main one) | the side-to-side shimmy: hips and tail swing, head and ears twitch |
+| Spin | a flat spin, tail flung out, ears laid back |
+| Somersault | a forward flip, tucked tight |
+| Back tuck | a backward flip, back arched |
+| Corkscrew | a roll and a spin at once, the body wrung, the tail in a spiral |
+| Cartwheel | a sideways turn, spread wide, tail fanned |
+| Pretzel | head and hips twisting against each other, twice |
+| Starfish | a snap wide open and shut in the middle of the jump |
+| Tail whip | the tail cracked round in a double spiral |
+
+Which one you get depends on your aim **and** on chance. Measured over 1,024 jumps for each aim:
+
+| Your aim during the twitch | What you mostly get |
+|---|---|
+| Small or no aim (ordinary jumps) | the **wiggle** about 87 % of the time; now and then a pretzel (8 %), a starfish or a tail whip |
+| Hard left or right | a **spin** about 59 %, the wiggle 26 %, sometimes a tail whip or starfish |
+| Full out (looking up) | a **somersault** about 65 %, the wiggle 24 %, sometimes a starfish |
+| Full in (looking down) | a **back tuck** about 64 %, the wiggle 25 %, sometimes a starfish |
+| Out and to a side | a **corkscrew** about 48 %, the wiggle 23 %, sometimes a spin or a somersault |
+| In and to a side | a **cartwheel** about 48 %, the wiggle 24 %, sometimes a spin or a back tuck |
+
+Over ordinary play the wiggle is by far the most common. On top of that, about 4 twitches in 10 lay a second, odd move over the first part-way through (a pretzel, a starfish, a tail whip or a wiggle), so the squirrel rarely does exactly the same thing twice. Turning moves turn twice round (720 degrees) in under half a second. If you move the aim during the twitch, the move blends toward what the new aim would give instead of jumping. Every twitch ends upright and facing the way the jump is going, so the landing (and the landing roll) look normal.
+
+Everyone sees the same move: the "random" pick comes from the moment you pressed the button, which the server passes on to the other players together with your aim. It changes nothing about how far or where you jump.
+
+To change: how often the wiggle comes up, how often a second move is laid over, or any move's shape, are each one number.
+
 ## 2. The aim marker
 
 While you are aiming, a small flat disc lies where your jump will come down. Only you see it.
@@ -75,7 +108,7 @@ One thing still open: the server's movement checks do not use this cooldown yet.
 
 ## What to look at
 
-1. Play a **Squirrel**. Leap with **Space**, press **G** near the top of the jump, then move the mouse left and right. Does the jump follow? Is 30 degrees enough, or too much?
+1. Play a **Squirrel**. Leap with **Space**, press **G** near the top of the jump, then move the mouse left and right. Does the jump follow? Is 30 degrees enough, or too much? Press **G** on several jumps with no aim: mostly the wiggle, sometimes something odd. Then push the aim hard to a side, up or down: spins, somersaults, back tucks, corkscrews and cartwheels. Are they fun and clearly mild?
 2. Leap, press **G** near the top, and look up. Does the jump carry a little further? Look down instead: does it come in and drop?
 3. Is the marker easy to see without getting in the way? (Size, colour and opacity above.)
 4. Fall toward the ground and press **G** just as you land. Does the roll look right, and does it keep your speed nicely?
