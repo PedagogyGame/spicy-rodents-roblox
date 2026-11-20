@@ -220,6 +220,12 @@ export type State = {
 	airDist: number,
 	-- seconds before E grabs in the air again after a leap off a rail (grabLeapCooldown)
 	railLeapWait: number,
+	-- seconds before a leap off this rail carries in full again (chainRest): set when the body came onto it from a leap
+	-- off a rail, 0 otherwise
+	chainWait: number,
+	-- the carry of the leap off a rail in the air now (1, or chainCarry for one that followed another): what the air
+	-- steers toward scales with it
+	leapScale: number,
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -330,6 +336,17 @@ SquirrelMotor.params = {
 	-- macro then sat on the rail between a one-frame hop and the next grab, which short gaps judge at the rail's pace
 	-- (validator_r16: 17 railSpeed flags)
 	grabLeapCooldown = 0.065,
+	-- owner D19 (chains along a rail and climbs up a trunk at a balanced, fun pace, not a sprint and a half): a leap off a
+	-- rail the body came onto from another leap off a rail, less than chainRest s before, carries chainCarry of a leap
+	-- across (what the air steers toward with it) and chainLift of its rise. A leap from rest, or after a moment on the
+	-- rail, is a full one: every gap between branches is crossed as before. Measured at 60 fps, W and sprint held
+	-- (st/s along the parapet 1075 / the avenue cable 660 / up trunk 604; Space held, E+Space every 6 / 3 / 2 frames):
+	--   before       Space 41.4 / 41.4 / -   E+Space 41.6 / 41.6 / 28.7, 41.6 / 41.6 / 28.7, 39.4 / 37.5 / 29.7
+	--   chained      Space 29.7 / 29.8 / -   E+Space 28.0 / 28.2 / 25.0, 28.0 / 28.2 / 25.0, 28.0 / 25.0 / 27.0
+	-- (movement_rail_pace asserts the bands: along a rail 25-32, up a trunk 24-28, a macro about a person's)
+	chainCarry = 0.69,
+	chainLift = 0.88,
+	chainRest = 0.25,
 	-- transfer heading hold (§10)
 	freeLookAfterTransfer = 0.65,
 	-- wall sweep (§8.3)
@@ -398,6 +415,8 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		footAgo = 10, -- (a new body has stood a while: no landing's roll)
 		airDist = 0,
 		railLeapWait = 0,
+		chainWait = 0,
+		leapScale = 1,
 	}
 end
 
@@ -424,6 +443,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.trickKind, state.trickTime = 0, 0
 	state.aimYaw, state.aimReach, state.trickReach = 0, 0, 0
 	state.footAgo, state.airDist = if grounded then 10 else 0, 0
+	state.chainWait, state.leapScale = 0, 1
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -510,10 +530,20 @@ local SCALARS = {
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
 -- (numbers a snapshot from before the air trick lacks: 0 when absent; the wire always carries them)
--- (aimYaw, aimReach on the wire too; trickReach, footAgo, airDist, railLeapWait the client's own: a handover or clone
--- keeps them)
-local LATER_SCALARS =
-	{ "trickKind", "trickTime", "aimYaw", "aimReach", "trickReach", "footAgo", "airDist", "railLeapWait" }
+-- (aimYaw, aimReach on the wire too; trickReach, footAgo, airDist, railLeapWait, chainWait, leapScale the client's
+-- own: a handover or clone keeps them)
+local LATER_SCALARS = {
+	"trickKind",
+	"trickTime",
+	"aimYaw",
+	"aimReach",
+	"trickReach",
+	"footAgo",
+	"airDist",
+	"railLeapWait",
+	"chainWait",
+	"leapScale",
+}
 
 function SquirrelMotor.serialize(state: State): Snapshot
 	local s: Snapshot = {}
@@ -670,6 +700,10 @@ local function enterRoute(
 		clearPendingFork(state)
 	end
 	state.selectedJunction = nil
+	-- (come onto it from a leap off a rail: the next leap off it within chainRest is a chained one; owner D19)
+	if not wasOnRoute then
+		state.chainWait = if state.railLeap and not state.grounded then P.chainRest else 0
+	end
 	state.vx, state.vy, state.vz = 0, 0, 0
 	state.grounded = false
 	state.committedAirborne = false
@@ -805,6 +839,14 @@ local function doLeap(state: State, world: World, events: { Event })
 			vx, vy, vz = hx * hop, mouth.hopUp, hz * hop
 		end
 		local from = state.routeId
+		-- (a leap off a rail that follows another: chainCarry across, chainLift up; owner D19)
+		local scale = 1
+		if from ~= nil and not (mouth and hop) and state.chainWait > 0 then
+			scale = P.chainCarry
+			vx, vy, vz = vx * scale, vy * P.chainLift, vz * scale
+		end
+		state.leapScale = scale
+		state.chainWait = 0
 		if not mouth then
 			launchFromVisibleRoute(state, world)
 		end
@@ -1322,6 +1364,9 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 	local reg = world.registry
 	local wasFoot = if footFrom ~= nil then footFrom else (state.grounded or state.routeId ~= nil)
 	state.railLeapWait = math.max(0, state.railLeapWait - dt)
+	if state.routeId ~= nil then
+		state.chainWait = math.max(0, state.chainWait - dt)
+	end
 	state.cameraCommit = math.max(0, state.cameraCommit - dt)
 	if state.routeId == nil and not state.grounded and state.airFromRoute ~= nil then
 		catchRail(state, world, input, events)
@@ -1597,7 +1642,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			local steer = state.moveSpeed
 			if state.railLeap and not state.grounded then
 				local v54 = if input.sprint then SquirrelMotor.V54.sprint else SquirrelMotor.V54.walk
-				steer = math.max(steer, v54 * (if state.boostRemaining > 0 then P.boostMult else 1))
+				steer = math.max(steer, v54 * (if state.boostRemaining > 0 then P.boostMult else 1) * state.leapScale)
 			end
 			if state.aimReach ~= 0 and not state.grounded then
 				-- (the air trick's re-aim scales what the air steers toward as it scaled the speed: the flight's rest is the

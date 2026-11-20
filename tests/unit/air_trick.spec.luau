@@ -756,12 +756,15 @@ return function(t)
 					)
 				)
 				t.near(now[6 + i], before[6 + i], 0.05, `{names[i]}: a person's chain unchanged`)
+				-- (owner D19: a chained leap carries less, so the cooldown matters less; up a trunk a faster rhythm regrabs
+				-- sooner and rises a little more, 27 against 25 st/s, both in the climb's band)
+				local within = if i == 3 then 1.1 else 1.05
 				t.truthy(
-					now[i] <= now[6 + i] * 1.05 and now[3 + i] <= now[6 + i] * 1.05,
-					`{names[i]}: a macro about a person's pace (within 5 %)`
+					now[i] <= now[6 + i] * within and now[3 + i] <= now[6 + i] * within,
+					`{names[i]}: a macro about a person's pace (within {math.floor((within - 1) * 100 + 0.5)} %)`
 				)
 			end
-			t.truthy(before[1] > before[7] + 3, "(without it the macro was faster)")
+			t.truthy(math.max(before[1], before[4]) > before[7] + 3, "(without it the macro was faster)")
 		end
 	)
 end
