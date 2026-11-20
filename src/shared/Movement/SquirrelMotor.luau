@@ -3709,7 +3709,7 @@ function SquirrelMotor.envelope(
 			-- (section 4: a short gap off the rail the launch points do not explain is the motor's leap off it and its
 			-- grabs inside the gap, or a teleport; validator round 17, the round-16 review's MEDIUM 1a: a packet that left a
 			-- bough and grabbed again inside three frames had no hidden grab)
-			if #leftOver > 0 and not hidden() then
+			if #leftOver > 0 and not grasped() then
 				for _, why in leftOver do
 					add(out, "teleport", 1, why)
 				end
