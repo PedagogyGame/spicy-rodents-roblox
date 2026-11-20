@@ -1518,6 +1518,10 @@ SquirrelMotor.envelopeParams = {
 	forkEnterMaxT = 0.06, -- a fork or sibling hop lands near the bough start (0.018 / 0.03)
 	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
+	-- seconds: a packet's dt within this of a threshold is at it (the clocks are sums of floats: three 1/60 s frames make
+	-- 0.05000000000000004, and a packet of the motor's own three frames was a long gap: validator round 16, the round-15
+	-- review's LOW 2)
+	dtEps = 1e-6,
 	-- seconds: the longest gap the grab search steps (a launch in the air is free only off a grab the motor's own step
 	-- explains): two of the longest packets the client's own send rule makes (a short frame that sends nothing and the
 	-- next, capped, that does), one of them lost (validator round 15, the round-14 review's MEDIUM 2: 0.1 s charged an
@@ -1532,6 +1536,9 @@ SquirrelMotor.envelopeParams = {
 	grabReach = st(3.4),
 	grabWork = 2500,
 	grabBeam = 12,
+	-- studs: a route's sample spacing when the registry has not the route (its own is length / (sampleCount - 1), at
+	-- most a third of an HTML unit: Curve.sampleSteps); the grab search's band along a rail (validator round 16)
+	sampleSpacing = st(1 / 3),
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
@@ -1990,7 +1997,7 @@ function SquirrelMotor.envelope(
 		-- leap's over a long gap, which can hide one and its landing), from within the mouth's rise of its height give
 		-- or take the fall the gap allows (no launch inside the gap)
 		local sprintCap = P.sprint * (if boosted then P.boostMult else 1) * E.speedTol
-		local hatchCap = math.max(if dt > E.shortDt then groundCap else sprintCap, vPrevXZ * E.speedTol)
+		local hatchCap = math.max(if dt > E.shortDt + E.dtEps then groundCap else sprintCap, vPrevXZ * E.speedTol)
 		local hatchVertical = math.max(math.abs(prev.vy), math.abs(next.vy)) * dt
 			+ 0.5 * P.gravity * dt * dt
 			+ E.posSlack
@@ -2029,7 +2036,7 @@ function SquirrelMotor.envelope(
 				local from = math.min(hypot2(next.x - p.x, next.z - p.z), hypot2(next.x - lp.x, next.z - lp.z))
 				local depth = if ox and oz then -((next.x - p.x) * ox + (next.z - p.z) * oz) else 0
 				local need = math.max(0, from - E.posSlack, depth - Enclosure.C.behind - E.posSlack)
-				local outside = dt > E.shortDt or depth <= Enclosure.C.behind + E.posSlack
+				local outside = dt > E.shortDt + E.dtEps or depth <= Enclosure.C.behind + E.posSlack
 				local vy = math.min(math.abs(next.y - p.y), math.abs(next.y - lp.y))
 				if outside and tRail + need / offCap <= budget and vy <= m.rise + m.depth + vertical then
 					ok = true
@@ -2044,7 +2051,7 @@ function SquirrelMotor.envelope(
 			authored = Enclosure.linked(prevRoute, nextRoute)
 			local allowed =
 				Enclosure.allows(prevRoute, prev.railT, nextRoute, next.railT, along(prevRoute), along(nextRoute))
-			if not allowed and dt > E.shortDt then
+			if not allowed and dt > E.shortDt + E.dtEps then
 				-- a late packet can hide two authored hops (a bough, the knothole's shaft, the floor below): through a
 				-- route either record names, connected to both (the transfer gap check below still bounds the distance)
 				local mids = Enclosure.neighbours(prevRoute)
@@ -2186,7 +2193,7 @@ function SquirrelMotor.envelope(
 				-- (a transfer begins on a change of rail; onto the rail it was on only back in through an enclosed run's
 				-- mouth, which a long gap can hide: else a new one every packet kept the body a transfer's reach off it)
 				local enclosed = nextRoute.enclosure ~= nil
-				if prevRoute and prevRoute.id == nextRoute.id and (dt <= E.shortDt or not enclosed) then
+				if prevRoute and prevRoute.id == nextRoute.id and (dt <= E.shortDt + E.dtEps or not enclosed) then
 					add(out, "railPose", 1, `a new transfer onto the rail it was on, route {nextRoute.id}`)
 				end
 				local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
@@ -2215,7 +2222,7 @@ function SquirrelMotor.envelope(
 
 	-- Could the body have visited a rail between the two packets? Long gaps (loss, reordering) hide
 	-- attach/detach pairs, so some checks relax when a route lies within the grab radius of the path.
-	local shortGap = dt <= E.shortDt
+	local shortGap = dt <= E.shortDt + E.dtEps
 	-- (a rail within a grab and the gap's run across of the straight path, at its ends and points along it no further
 	-- apart than that reach: a fall is long, not wide; the round-4 review: a reach sized by the 3-D speed made a falling
 	-- body 67 st/s sideways)
@@ -2319,7 +2326,7 @@ function SquirrelMotor.envelope(
 			-- a launch rises; validator round 10: an honest transfer through a loss burst of half a second was a whole
 			-- flag. A packet or two lost, never: the transfer limits stand there. Validator round 15, the round-14 review's
 			-- LOW a: the run to a point and the leap from it share the gap, the leap only the time the run leaves)
-			local long = dt >= E.maxDt / 2
+			local long = dt >= E.maxDt / 2 - E.dtEps
 			local riseCap = climbThenLaunch(railCap * E.railTol, 1) + E.posSlack
 			local gap = math.huge
 			local leapt = false
@@ -2758,7 +2765,7 @@ function SquirrelMotor.envelope(
 		-- trunk beside it), and none where the far end is under a roof (ValidatorWorld: open sky). A body still in the air
 		-- within two short gaps made one flight from the launch point: a straight line, a crossing a wall whatever its
 		-- length (no time to come down, round a corner and launch again)
-		wallTest(near.x, near.y, near.z, riseInDt, shortGap or (not next.grounded and dt <= 2 * E.shortDt))
+		wallTest(near.x, near.y, near.z, riseInDt, shortGap or (not next.grounded and dt <= 2 * E.shortDt + E.dtEps))
 		pounce = pounceAgo(prevRoute)
 		if pounce ~= nil then
 			-- (the motor's pounce off a rail is free, but its flight is the pounce's, no rail leap's: validator round 15,
@@ -2793,12 +2800,14 @@ function SquirrelMotor.envelope(
 		-- motor's honest leap-and-regrab climb. Round 15, the round-14 review's MEDIUM 3: one gather of the samples the
 		-- grabs can reach, the patterns' grabs scanned over that small list, fewest grabs first, within E.grabWork)
 		local hiddenMemo: boolean? = nil
+		local searchSpent = false -- (the search stopped at its work, or past grabSimDt: it judged nothing)
 		local function search(): boolean
 			if hiddenMemo ~= nil then
 				return hiddenMemo
 			end
 			hiddenMemo = false
-			if dt > math.max(E.shortDt, E.grabSimDt) + 1e-6 then
+			searchSpent = true
+			if dt > math.max(E.shortDt, E.grabSimDt) + E.dtEps then
 				return false
 			end
 			local index = world.index :: any
@@ -2956,7 +2965,16 @@ function SquirrelMotor.envelope(
 				end
 				work += n
 			end
-			gather((cellsFor(R1)), R1)
+			-- (the cells' entries totalled first: past the work before any grab, fail safe, as the ring's: validator round
+			-- 16, the round-15 review's LOW 3, a denser crown walked whatever the first gather's cells held)
+			do
+				local cells, total = cellsFor(R1)
+				if total > E.grabWork then
+					return false
+				end
+				gather(cells, R1)
+			end
+			searchSpent = false
 			local outerDone = false
 			-- (the ring out to Rg, once, when the work allows it: false when it does not)
 			local function gatherOuter(): boolean
@@ -2975,14 +2993,20 @@ function SquirrelMotor.envelope(
 				return math.clamp(math.floor(y - yLo), 0, bins - 1) + 1
 			end
 			-- grab(x, y, z, r): the motor's grab from somewhere within r across of (x, y, z), the height known: the nearest
-			-- sample N, and every sample S that is the nearest to some such place (|S - c|^2 - |N - c|^2 <= 2 r |S - N|
-			-- across, c the place modelled). Returns the highest's drawn pose (where the leap leaves from) across and its
-			-- height, the lowest sample (a leap off it ends no lower: validator round 14), how far the grab's snap took the
-			-- body (N's distance and the drawn pose's offset), and how far across the body may be off that drawn pose (the
-			-- others' spread, their own drawn poses, a trunk's heading in doubt); nil when nothing is within a grab, when
-			-- the gather does not hold all of N's band, or past the work (fail safe)
+			-- sample N, and every sample S that is the nearest to some such place (the band: along N's own stretch of
+			-- route within r across and a sample's spacing of N; any other within the bisector test
+			-- |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the place modelled). Returns where the leap leaves from across (N, the highest's drawn offset)
+			-- and its height (the highest's drawn pose), the lowest sample (a leap off it ends no lower: validator round
+			-- 14), how far across the grab's snap took the body (N's distance across and the drawn pose's offset), and
+			-- how far across the body may be off where the leap leaves (the band's spread off N, their own drawn poses, a
+			-- trunk's heading in doubt; validator round 16, the round-15 review's MEDIUM 1: from the band's highest with
+			-- the whole band as its doubt, a later grab carried the body half a band forward a grab); nil when nothing is
+			-- within a grab, when the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
 			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
+			-- (a trunk's bark the last grab leaves from: its nearest sample across and the drawn pose's offset off it, 0 for
+			-- any other route)
+			local barkX, barkZ, bark = 0, 0, 0
 			local function grab(
 				x: number,
 				y: number,
@@ -3035,7 +3059,7 @@ function SquirrelMotor.envelope(
 					incomplete = true
 					return nil, 0, 0, 0, 0, 0
 				end
-				-- (the band, within d + 2r: its highest and lowest, then how far across its members lie off the highest)
+				-- (the band, within d + 2r: its highest and lowest, then how far across its members lie off N)
 				local nx, nz = X[bi], Z[bi]
 				local top, topY = bi, Y[bi]
 				local lowY = topY
@@ -3047,13 +3071,40 @@ function SquirrelMotor.envelope(
 					over = true
 					return nil, 0, 0, 0, 0, 0
 				end
+				-- (a sample S of N's own route along the same stretch, its arc no longer than the chord between them and a
+				-- sample's spacing: a place within r across of the one modelled lies along the stretch within r of it (the
+				-- horizontal part of the stretch's direction, `across / chord`, of r) and takes as its nearest a sample
+				-- within half a spacing of that, N within half a spacing of the place modelled: S is in the band when
+				-- |S - N| is within that, a spacing and posSlack (`pad`); up a trunk a place across takes the same
+				-- height, so N and its neighbours. Validator round 16, the round-15 review's MEDIUM 1: the bisector test
+				-- against N alone took samples 2r along a rail, and a crafted grab-leap chain ran the governor's ceiling.
+				-- (Half a spacing off the place modelled instead of N snapped an honest grab-leap spam on a jittery link
+				-- once more in the tree fuzz.) Another route, or the same one doubled back, keeps the bisector test)
+				local idN, tN = sId[bi], sT[bi]
+				local routeN = reg:get(idN)
+				local lenN = if routeN then routeN.length else 0
+				local spacing = if routeN then lenN / math.max(1, routeN.sampleCount - 1) else E.sampleSpacing
+				local pad = spacing + E.posSlack
+				local nyN = Y[bi]
 				for b = bLo, b1 do
 					for e = S[b], S[b + 1] - 1 do
 						local ex, ey, ez = X[e] - x, Y[e] - y, Z[e] - z
 						local d2 = ex * ex + ey * ey + ez * ez
 						if d2 <= w2 then
-							local ux, uz = X[e] - nx, Z[e] - nz
-							if e == bi or d2 - best2 <= twoR * math.sqrt(ux * ux + uz * uz) then
+							local ux, uz, uy = X[e] - nx, Z[e] - nz, Y[e] - nyN
+							local across = math.sqrt(ux * ux + uz * uz)
+							local taken
+							if e == bi then
+								taken = true
+							else
+								local chord = math.sqrt(ux * ux + uz * uz + uy * uy)
+								if sId[e] == idN and math.abs(sT[e] - tN) * lenN <= chord + spacing then
+									taken = chord * chord <= r * across + pad * chord
+								else
+									taken = d2 - best2 <= twoR * across
+								end
+							end
+							if taken then
 								nb += 1
 								band[nb] = e
 								local sy = Y[e]
@@ -3092,7 +3143,10 @@ function SquirrelMotor.envelope(
 						doubt = if clear > 1e-6 then math.min(2 * m, m * r / clear) else 2 * m
 					end
 				end
-				-- (the band's others across off the highest; one on another route, its own drawn pose off it as well)
+				barkX, barkZ = X[bi], Z[bi]
+				bark = if grabbed and grabbed.kind == "trunk" and not grabbed.flags.fixedSurfaceZ then m else 0
+				-- (the band's others across off N; one on another route than the highest's, its own drawn pose off it as
+				-- well)
 				local spread, lastId, lastOff = 0, -1, 0
 				for k = 1, nb do
 					local e = band[k]
@@ -3102,11 +3156,12 @@ function SquirrelMotor.envelope(
 						lastId = id
 						lastOff = if id == topId then 0 elseif other then drawnOf(world, other).across + m else m
 					end
-					local ux, uz = X[e] - tx, Z[e] - tz
+					local ux, uz = X[e] - X[bi], Z[e] - Z[bi]
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
 				end
 				grabbedId, grabbedT = topId, sT[top]
-				return px, topY + lift, pz, lowY, d + m, spread + doubt
+				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
+				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
 			-- bound starts)
@@ -3114,7 +3169,8 @@ function SquirrelMotor.envelope(
 			local bestFrom: { clock: number, x: number, z: number, reach: number }? = nil
 			local bestRoute: number? = nil
 			-- (a pattern after a grab and the leap's first frame: `f` frames stepped, the body at x, z within r across,
-			-- y its height, vy, `drop` how much lower a leap off the lowest sample of its grab starts, `last` the grab's clock)
+			-- y its height, vy, `drop` how much lower a leap off the lowest sample of its grab starts, `last` the grab's clock,
+			-- bx, bz and bark the grabbed trunk's sample and drawn offset, 0 off a trunk)
 			type Pattern = {
 				f: number,
 				x: number,
@@ -3126,6 +3182,9 @@ function SquirrelMotor.envelope(
 				last: number,
 				route: number,
 				snap: number,
+				bx: number,
+				bz: number,
+				bark: number,
 				from: { clock: number, x: number, z: number, reach: number },
 			}
 			local function finish(s: Pattern)
@@ -3140,12 +3199,16 @@ function SquirrelMotor.envelope(
 				-- bough "grabbed" it every 0.1 s packet; across within its flight from the sample: round 15)
 				local floorY = y - s.drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
 				-- (and from `prev`, across no further than the fastest the air or a leap carries in the gap and the grabs'
-				-- snaps onto their samples: validator round 15)
+				-- snaps onto their samples: validator round 15. Off a trunk the leap leaves its bark straight out (the
+				-- motor's attackHeading) and the air in a gap of grabSimDt cannot steer it back in: `next` no nearer the
+				-- grabbed sample across than the drawn pose, a stud's slack; validator round 16, a crafted climb inside a
+				-- big trunk's bark took the nearest sample a trunk's lean denies the motor)
 				if
 					next.y <= y + E.posSlack
 					and next.y >= floorY
 					and hypot2(next.x - s.x, next.z - s.z) <= r + E.posSlack
 					and hypot2(next.x - prev.x, next.z - prev.z) <= vmax * dt + s.snap + E.posSlack
+					and hypot2(next.x - s.bx, next.z - s.bz) >= s.bark - st(0.4) - E.posSlack
 				then
 					if s.last < bestLast then
 						bestLast, bestFrom, bestRoute = s.last, s.from, s.route
@@ -3175,6 +3238,9 @@ function SquirrelMotor.envelope(
 					last = at,
 					route = grabbedId,
 					snap = snap,
+					bx = barkX,
+					bz = barkZ,
+					bark = bark,
 					from = from,
 				}
 			end
@@ -3264,7 +3330,7 @@ function SquirrelMotor.envelope(
 							end
 							if gx then
 								local more =
-									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d + r, s.from)
+									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d, s.from)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
 								if was then
@@ -3288,6 +3354,7 @@ function SquirrelMotor.envelope(
 				end
 				level = deeper
 			end
+			searchSpent = spent and bestFrom == nil
 			if bestFrom then
 				hiddenMemo = true
 				judged.grab = bestLast
@@ -3301,7 +3368,7 @@ function SquirrelMotor.envelope(
 			return shortGap and search()
 		end
 		local function grasped(): boolean
-			return dt <= E.grabSimDt + 1e-6 and search()
+			return dt <= E.grabSimDt + E.dtEps and search()
 		end
 		local railPlausible: boolean? = nil
 		local function plausible(): boolean
@@ -3341,6 +3408,23 @@ function SquirrelMotor.envelope(
 				railHighMemo = found
 			end
 			return railHighMemo :: boolean
+		end
+		-- (a rail visit hidden in a gap longer than shortDt: up to grabSimDt the grab search's verdict, the geometry only
+		-- where the search ran past its work; longer, the geometry (plausible() and railHigh() below). Validator round 16,
+		-- the round-15 review's LOW 2: a packet a hair over 0.05 s, or of 0.06-0.25 s, climbed a trunk at the
+		-- governor's vertical bound by the geometry alone, a rise each packet with no grab the motor could make)
+		local railHighMemoV: boolean? = nil
+		local function longVisit(): boolean
+			if railHighMemoV == nil then
+				local v = false
+				if dt <= E.grabSimDt + E.dtEps and search() then
+					v = true
+				elseif dt > E.grabSimDt + E.dtEps or searchSpent then
+					v = plausible() and railHigh()
+				end
+				railHighMemoV = v
+			end
+			return railHighMemoV :: boolean
 		end
 		-- (the most the body can fall in the gap from where it was: a floor that near may have taken it inside the gap;
 		-- prev.vy is the validator's own, never a speed only the client claimed: Judged)
@@ -3432,7 +3516,7 @@ function SquirrelMotor.envelope(
 			-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
 			-- than that leap rises over that floor in the time left (landedIn)
 			local function railVisit(): boolean
-				return if shortGap then hidden() else (plausible() and railHigh())
+				return if shortGap then hidden() else longVisit()
 			end
 			local offGround = landedIn(true)
 			fromGroundOrRail = offGround or railVisit()
@@ -3486,7 +3570,7 @@ function SquirrelMotor.envelope(
 					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
 					local dy = next.y - prev.y
 					local function visited(): boolean
-						return if shortGap then hidden() else plausible() and railHigh()
+						return if shortGap then hidden() else longVisit()
 					end
 					if (dy > hi and not visited()) or (dy < lo and not plausible()) then
 						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
@@ -3502,7 +3586,7 @@ function SquirrelMotor.envelope(
 					-- (a body that came down on something inside the gap and went off its edge falls from rest, from no
 					-- higher than that floor)
 					judged.landed = true
-				elseif not (if shortGap then hidden() else plausible() and railHigh()) then
+				elseif not (if shortGap then hidden() else longVisit()) then
 					-- (a pounce is a launch above; a rail visit zeroes the speed and relaunches it)
 					add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
 				end
@@ -3556,7 +3640,7 @@ function SquirrelMotor.envelope(
 			then
 				upCap = dy
 			end
-			if dy > upCap and fromGroundOrRail and not shortGap and plausible() and railHigh() then
+			if dy > upCap and fromGroundOrRail and not shortGap and longVisit() then
 				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
 				-- the grab having carried the body up to the rail; in a short gap the grab is the motor's own: hidden)
 				upCap = before + math.max(rise, launchUp * dt) + E.posSlack
@@ -3597,7 +3681,7 @@ function SquirrelMotor.envelope(
 			local railVisit = not shortGap
 				and plausible()
 				and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
-				and (dy <= 0 or railHigh())
+				and (dy <= 0 or longVisit())
 			if not landing and not railVisit and (dy > 0 or launched) and hidden() then
 				-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden; down too, a grab's snap
 				-- onto a lower sample: validator round 15)

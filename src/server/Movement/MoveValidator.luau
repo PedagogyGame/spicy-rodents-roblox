@@ -735,7 +735,7 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		-- (the client's own recovery puts the body on the quay: the walls are judged from there on)
 		actor.marks.wallX, actor.marks.wallY, actor.marks.wallZ, actor.marks.wallAt, actor.marks.wallClock =
 			next.x, next.y, next.z, serverTime, next.clock
-	elseif dt > SquirrelMotor.envelopeParams.maxDt then
+	elseif dt > SquirrelMotor.envelopeParams.maxDt + SquirrelMotor.envelopeParams.dtEps then
 		-- too long to judge move by move (a stall, a long loss burst): the new baseline, judged as a whole (gap())
 		resync = true
 		actor.resyncs += 1
@@ -808,7 +808,7 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		dt,
 		dtEff,
 		serverTime,
-		resync or dt > SquirrelMotor.envelopeParams.maxDt,
+		resync or dt > SquirrelMotor.envelopeParams.maxDt + SquirrelMotor.envelopeParams.dtEps,
 		boosted or riverLanding,
 		landed,
 		charge,
@@ -1579,7 +1579,7 @@ function MoveValidator._stamina(
 	if exempt then
 		-- (the chili rush, the river's quay: unknown speed after)
 		keepModel(nil, nil, nil, nil)
-		if footA and footB and not (unjudged and span > C.STAMINA_BURST) and span > 1e-3 then
+		if footA and footB and not (unjudged and span > C.STAMINA_BURST + E.dtEps) and span > 1e-3 then
 			marks.stamina = math.min(1, marks.stamina + span / P.sprintRefill)
 		end
 		settle()
@@ -1790,7 +1790,7 @@ function MoveValidator._stamina(
 		if over <= 0 then
 			return 0, Tg
 		end
-		if unjudged and span > C.STAMINA_BURST then
+		if unjudged and span > C.STAMINA_BURST + E.dtEps then
 			return span, 0
 		end
 		local spent, busy = sprintOrLeap(over, leapXZ, Tg, false, math.max(P.sprint - P.walk, 1e-3))
@@ -2024,7 +2024,7 @@ function MoveValidator._stamina(
 			sprinted,
 			`{across} st in {span} s with an end on a rail: faster off it than a walk for longer than the sprint meter lasts`
 		)
-		if not (unjudged and span > C.STAMINA_BURST) then
+		if not (unjudged and span > C.STAMINA_BURST + E.dtEps) then
 			refill = railT + groundT
 		end
 		marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
@@ -2069,13 +2069,13 @@ function MoveValidator._stamina(
 		local over = across - math.max(P.walk * span, dW) * tol
 		local busy = 0
 		if over > 0 then
-			if span <= C.STAMINA_BURST then
+			if span <= C.STAMINA_BURST + E.dtEps then
 				sprinted, busy = sprintOrLeap(over, leapXZ, span, leapPaid, rate)
 			else
 				sprinted = span
 			end
 		end
-		if footB and span <= C.STAMINA_BURST then
+		if footB and span <= C.STAMINA_BURST + E.dtEps then
 			refill = math.max(0, span - busy)
 		end
 	elseif unjudged then
@@ -2138,7 +2138,7 @@ function MoveValidator._stamina(
 		local over = across - math.max(P.walk * span, d1 + d2 + d3) * tol - E.posSlack
 		local busy = 0
 		if over > 0 then
-			if span <= C.STAMINA_BURST then
+			if span <= C.STAMINA_BURST + E.dtEps then
 				if rest > 0 and not relaunch then
 					sprinted, busy = sprintOrLeap(over, leapXZ, rest, false, rate)
 				else
@@ -2149,7 +2149,7 @@ function MoveValidator._stamina(
 				sprinted = if rest > 0 then rest else math.clamp(over / rate, 0, span)
 			end
 		end
-		if groundB and span <= C.STAMINA_BURST then
+		if groundB and span <= C.STAMINA_BURST + E.dtEps then
 			refill = math.max(0, rest - busy)
 		end
 		local ku, ks, kr = u1, s1, free and onArc(next.clock, next.y)
