@@ -3223,8 +3223,8 @@ function SquirrelMotor.envelope(
 				-- (the highest drawn: a sample's height and its route's lift, so where a trunk and a bough meet the bough's
 				-- lift is kept whichever sample is N; validator round 17)
 				local function liftOf(id: number): number
-					local r = reg:get(id)
-					return if r then drawnOf(world, r).lift else 0
+					local it = reg:get(id)
+					return if it then drawnOf(world, it).lift else 0
 				end
 				local topDrawn = topY + liftOf(sId[bi])
 				local w2 = w * w + 1e-9
