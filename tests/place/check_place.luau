@@ -113,10 +113,34 @@ local function expectedFromFile(entry: string): (string?, string?)
 	return nil, nil
 end
 
+-- The project's own globIgnorePaths: Rojo leaves out what they match, so the check does too. Only the forms the
+-- projects use: "<dir>/**" (a whole directory) and "**/<file name>" (a file anywhere).
+local ignoredDirs: { string } = {}
+local ignoredNames: { [string]: boolean } = {}
+for _, pattern in (project.globIgnorePaths or {}) :: { string } do
+	local dirPrefix = string.match(pattern, "^(.-)/%*%*$")
+	local anyName = string.match(pattern, "^%*%*/([^*/]+)$")
+	if dirPrefix and not string.find(dirPrefix, "%*") then
+		table.insert(ignoredDirs, dirPrefix)
+	elseif anyName then
+		ignoredNames[anyName] = true
+	end
+end
+local function ignored(full: string): boolean
+	for _, prefix in ignoredDirs do
+		if full == prefix or string.sub(full, 1, #prefix + 1) == prefix .. "/" then
+			return true
+		end
+	end
+	return false
+end
+
 local function checkDirectory(dir: string, inst: any, instPath: string)
 	for _, entry in fs.readDir(dir) do
 		local full = `{dir}/{entry}`
-		if fs.isDir(full) then
+		if ignored(full) or ignoredNames[entry] then
+			continue
+		elseif fs.isDir(full) then
 			local child = childByName(inst, entry)
 			check(child ~= nil, `{instPath}.{entry}: missing (from directory {full})`)
 			if child then
