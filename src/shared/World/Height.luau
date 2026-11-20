@@ -10,7 +10,7 @@
 -- ridge, back field, long beach) OUTSIDE the verbatim rectangle, blended in over `blendU` so the
 -- ground stays continuous; inside the rectangle `at` is the verbatim port, bit for bit. Until
 -- configure is called (Data/WorldBoot does it once at boot), `at` is the v5.4 function everywhere.
--- Interface additions: configure(ext?), terrainU(x, z), extensionMaterial(x, z), worldClamp()
+-- Interface additions: configure(ext?), configured() -> ext?, terrainU(x, z), extensionMaterial(x, z), worldClamp()
 -- Building sites: `at` is `natural` (the port and the patches) with a level site cut for each building
 -- in SITES; natural(x, z), SITES, SITE_MARGIN, SITE_BANK.
 -- State: the configured extension table only; no side effects on require.
@@ -124,6 +124,12 @@ function Height.configure(e: any?)
 	for _, s in Height.SITES do
 		s.level = nil
 	end
+end
+
+-- the extensions configured now (nil: none), for a caller that needs the game's ground for a moment and puts back
+-- what it found (Rides/LookoutHill: the bake's layout of the hill)
+function Height.configured(): any?
+	return ext
 end
 
 local function smooth01(t: number): number

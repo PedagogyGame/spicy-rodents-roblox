@@ -11,9 +11,11 @@
 --     fence routes, drawn as panels by WorldGen/Builders/RouteProps), the venues baked by their own bakes that
 --     Colliders leaves out (the TV station's arena, the sky lift's base, the Lookout), the raised decks (the
 --     park's footbridge), the bowling alley's raised rear alley and its yard's house, the farmland under the sky
---     lift (Rides/SkyLiftCountry: hedges, walls, the farm), the sky lift's tower footings (Rides/SkyLift.towers), the
---     river's embankment walls (both banks, past the river's ends), the plinth a clock tower stands on
---     (WorldGen/Builders/Fixtures: PLINTH_OUT past its footprint) and the benches on the bowling alley's front lawn
+--     lift (Rides/SkyLiftCountry: hedges, walls, the farm), the sky lift's tower footings (Rides/SkyLift.towers),
+--     Lookout Hill's rocks, benches and handrails (Rides/LookoutHill.obstacles: the bake's layout, the same numbers;
+--     its trail is walked on, AI/TownAI's ground), the river's embankment walls (both banks, past the river's
+--     ends), the plinth a clock tower stands on (WorldGen/Builders/Fixtures: PLINTH_OUT past its footprint) and the
+--     benches on the bowling alley's front lawn
 --     (Attractions/AlleyLayout.STREET_BENCHES); any of them at least LOW tall (a fountain's rim is a wall to a
 --     walker). The river is closed ground (World/FootPath). tests/unit/wall_walk.spec holds every baked wall a
 --     walker's waist meets to lying inside one of these boxes (tests/lib/WallAudit.uncovered).
@@ -55,6 +57,7 @@ local HospitalLayout = require("../Infection/HospitalLayout")
 local StaffRounds = require("../Actors/StaffRounds")
 local SkyLiftCountry = require("../Rides/SkyLiftCountry")
 local SkyLift = require("../Rides/SkyLift")
+local LookoutHill = require("../Rides/LookoutHill")
 
 export type Room = {
 	id: string,
@@ -384,6 +387,28 @@ local function addFootings(c: Colliders.Colliders): number
 	return #towers
 end
 
+-- Lookout Hill's rocks, benches and handrails (Rides/LookoutHill.obstacles)
+local function addLookoutHill(c: Colliders.Colliders): number
+	local ok, blocks = pcall(LookoutHill.obstacles)
+	if not ok then
+		return 0
+	end
+	for _, b in blocks do
+		Colliders.add(c, {
+			id = b.id,
+			cx = (b.x0 + b.x1) / 2,
+			cz = (b.z0 + b.z1) / 2,
+			hw = (b.x1 - b.x0) / 2,
+			hd = (b.z1 - b.z0) / 2,
+			y0 = b.y0,
+			eave = b.top,
+			peak = b.top,
+			ridge = nil,
+		})
+	end
+	return #blocks
+end
+
 -- the venues in BAKED_VENUES, as Colliders.addBuiltVenues boxes them
 local function addBakedVenues(c: Colliders.Colliders, data: any): number
 	local ex = data:module("Expansion") :: any
@@ -562,6 +587,7 @@ function WalkWay.new(opts: Opts): Way
 	addEmbankments(c)
 	addPlinths(c, data)
 	addFootings(c)
+	addLookoutHill(c)
 	local alleyPlace = AlleyStaff.placeOf(data)
 	if alleyPlace then
 		addAlleyNeighbours(c, alleyPlace)
