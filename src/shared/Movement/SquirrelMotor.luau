@@ -1587,7 +1587,10 @@ end
 --   longWall: the straight line was too long for the short wall test and a chord of it went through a wall (the
 --       validator weighs it as a gap's: one may be a corner rounded unseen);
 --   cornered: ... and a way round a corner is clear (world.around asked, the line within world.aroundMax: not "too long
---       to tell"; validator round 10).
+--       to tell"; validator round 10);
+--   charge: a launch the motor's sprint meter pays for (validator round 11, the round-10 review's HIGH): "leap" (leapCost)
+--       or "pounce" (pounceCost) off the ground, or a pounce in the air; nil for none, or one off a rail (seen, or a visit
+--       the gap may hide) or a trampoline's bounce, which are free.
 -- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
 export type Judged = {
 	vy: number,
@@ -1596,6 +1599,7 @@ export type Judged = {
 	landed: boolean,
 	longWall: boolean,
 	cornered: boolean?,
+	charge: string?,
 	grab: number?,
 }
 
@@ -2888,7 +2892,16 @@ function SquirrelMotor.envelope(
 			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
 			-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
 			-- than that leap rises over that floor in the time left (landedIn)
-			fromGroundOrRail = landedIn(true) or (if shortGap then hidden() else (plausible() and railHigh()))
+			local function railVisit(): boolean
+				return if shortGap then hidden() else (plausible() and railHigh())
+			end
+			local offGround = landedIn(true)
+			fromGroundOrRail = offGround or railVisit()
+			-- (what the meter pays: a launch off the ground, or a pounce anywhere off a rail, as the motor's doLeap and
+			-- doPounce charge; none for a bounce, nor for one a hidden rail visit explains; validator round 11)
+			if not tramp and (prev.grounded or ((offGround or pounce ~= nil) and not railVisit())) then
+				judged.charge = if pounce ~= nil then "pounce" else "leap"
+			end
 			capUp = if fromGroundOrRail then launchUp else pounceUp
 			capXZ = if fromGroundOrRail then launchXZ else pounceXZ
 			if tramp then
@@ -3011,6 +3024,7 @@ function SquirrelMotor.envelope(
 				if u > 0 and dy <= rise + E.posSlack then
 					upCap = dy
 					launchUsed = true
+					judged.charge = "leap"
 				end
 			end
 		end
