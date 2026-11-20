@@ -17,44 +17,37 @@
 --     the town and two signposts;
 --   Dressing: conifers, rocks and shrubs round the crown and along the line, seeded, never on the trail, the
 --     roads, either venue's site or under the cabins.
+-- The trail's pieces, its landings and benches and the dressing are laid out by Shared/Rides/LookoutHill (pure), which
+-- World/WalkWay and AI/TownAI read too (the walkers' boxes and the trail as their ground); this draws them.
 -- Interface: build(roblox, parent) -> Model; trailPieces() -> { Piece } (pure: the trail's pieces); constants
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 local Common = require("./Common")
 local Factory = require("../../../src/worldgen/Factory")
 local Kit = require("../alley/Kit")
+local LookoutHill = require("../../../src/shared/Rides/LookoutHill")
 local Plan = require("../../../src/worldgen/Plan")
 local Road = require("../../../src/worldgen/Builders/Road")
-local SkyLift = require("../../../src/shared/Rides/SkyLift")
 
 local Approach = {}
 
-Approach.TRAIL_WIDTH = 6
-Approach.LIFT = 0.2 -- a piece's top over the highest ground across its ends
-Approach.THICK = 1.2
-Approach.ROLL_MAX = 0.15 -- radians of cross-fall a piece follows (about 9 degrees)
-Approach.BANK_DROP = 0.9 -- a piece standing more than this over the ground at an edge gets a stone bank
-Approach.DROP_RAIL = 2.5 -- ... and a rail on that edge past this
-Approach.PIECE_MAX = 16
-Approach.PIECE_MIN = 2
-Approach.RAIL_GRADE = 0.35
-Approach.STEP_GRADE = 0.42
+-- (the trail's numbers are Shared/Rides/LookoutHill's)
+Approach.TRAIL_WIDTH = LookoutHill.TRAIL_WIDTH
+Approach.LIFT = LookoutHill.LIFT -- a piece's top over the highest ground across its ends
+Approach.THICK = LookoutHill.THICK
+Approach.ROLL_MAX = LookoutHill.ROLL_MAX -- radians of cross-fall a piece follows (about 9 degrees)
+Approach.BANK_DROP = LookoutHill.BANK_DROP -- a piece standing more than this over the ground at an edge gets a bank
+Approach.DROP_RAIL = LookoutHill.DROP_RAIL -- ... and a rail on that edge past this
+Approach.PIECE_MAX = LookoutHill.PIECE_MAX
+Approach.PIECE_MIN = LookoutHill.PIECE_MIN
+Approach.RAIL_GRADE = LookoutHill.RAIL_GRADE
+Approach.STEP_GRADE = LookoutHill.STEP_GRADE
+Approach.TOWER_CLEAR = LookoutHill.TOWER_CLEAR -- trail half-width, the footing's half-diagonal and a rail's width
+Approach.TREES = LookoutHill.TREES
 Approach.SIDEWALK_JOIN = -622.5 -- where the westside sidewalks (rd_072, rd_073) end
 Approach.BUDGET = 600
-Approach.TREES = 32
 
-export type Piece = {
-	ax: number,
-	az: number,
-	ay: number, -- centre-line top at the start (LIFT over the highest ground across it)
-	bx: number,
-	bz: number,
-	by: number,
-	roll: number, -- about the piece's axis: + raises its right side
-	grade: number, -- rise over run
-	leg: number,
-	drop: number, -- the most the piece's top stands over the ground under it
-}
+export type Piece = LookoutHill.Piece
 
 local function ground(x: number, z: number): number
 	return Common.ground(x, z)
@@ -69,176 +62,11 @@ local function record(list: { any }, id: string): any
 	error("skylift approach: no " .. id)
 end
 
--- The trail's pieces. Each leg is cut into pieces of at most PIECE_MAX. A piece is rolled to the ground's cross
--- slope up to ROLL_MAX (a path you can walk), and its ends sit LIFT over the highest ground across it (CROSS
--- offsets): on a gentle slope that is the centre line; where the trail crosses the hill's steep face it is the
--- uphill edge, and the piece stands proud of the slope on its downhill side, built up on a stone bank (`drop`:
--- the most its edge stands over the ground). A piece the ground rises over anywhere between its ends is split at
--- its worst point, down to PIECE_MIN.
--- The trail's polyline: xpath_hill_trail's points, with a bend added wherever a leg passes within TOWER_CLEAR of a
--- line tower (towers 8 and 9 stand on the data's line): the new point stands TOWER_CLEAR + 1 from the tower, on
--- the side the leg passed it. The two ends are the data's.
-Approach.TOWER_CLEAR = 8.5 -- trail half-width, the footing's half-diagonal and a rail's width
-local pointsCache: { { number } }? = nil
-function Approach.trailPoints(): { { number } }
-	if pointsCache then
-		return pointsCache
-	end
-	local P: { { number } } = {}
-	for _, q in record(Common.expansion().paths, "xpath_hill_trail").points do
-		table.insert(P, { q[1], q[2] })
-	end
-	for _ = 1, 8 do
-		local moved = false
-		for _, t in SkyLift.towers() do
-			local best, bi, bx, bz = math.huge, 0, 0, 0
-			for i = 1, #P - 1 do
-				local a, b = P[i], P[i + 1]
-				local dx, dz = b[1] - a[1], b[2] - a[2]
-				local f = math.clamp(((t.x - a[1]) * dx + (t.z - a[2]) * dz) / (dx * dx + dz * dz), 0, 1)
-				local qx, qz = a[1] + dx * f, a[2] + dz * f
-				local d = math.sqrt((qx - t.x) ^ 2 + (qz - t.z) ^ 2)
-				if d < best then
-					best, bi, bx, bz = d, i, qx, qz
-				end
-			end
-			if best < Approach.TOWER_CLEAR then
-				local nx, nz = bx - t.x, bz - t.z
-				if best < 0.01 then
-					local a, b = P[bi], P[bi + 1]
-					nx, nz = -(b[2] - a[2]), b[1] - a[1]
-				end
-				local nl = math.sqrt(nx * nx + nz * nz)
-				local r = Approach.TOWER_CLEAR + 1
-				table.insert(P, bi + 1, { t.x + nx / nl * r, t.z + nz / nl * r })
-				moved = true
-			end
-		end
-		if not moved then
-			break
-		end
-	end
-	pointsCache = P
-	return P
-end
-
-local CROSS = { -1, -0.9, -0.5, 0, 0.5, 0.9, 1 } -- fractions of the half-width
-local trailCache: { Piece }? = nil
-function Approach.trailPieces(): { Piece }
-	if trailCache then
-		return trailCache
-	end
-	local P = Approach.trailPoints()
-	local hw = Approach.TRAIL_WIDTH / 2
-	local out: { Piece } = {}
-	local function rollAt(x: number, z: number, ux: number, uz: number): number
-		-- right of travel = (-uz, ux)
-		local right = ground(x - uz * hw, z + ux * hw)
-		local left = ground(x + uz * hw, z - ux * hw)
-		return math.clamp(math.atan2(right - left, Approach.TRAIL_WIDTH), -Approach.ROLL_MAX, Approach.ROLL_MAX)
-	end
-	-- the centre top over (x, z) for a piece rolled `roll`: LIFT over the highest ground across it
-	local function crossTop(x: number, z: number, ux: number, uz: number, roll: number): number
-		local top = -math.huge
-		for _, f in CROSS do
-			local o = f * hw
-			top = math.max(top, ground(x - uz * o, z + ux * o) - o * math.tan(roll))
-		end
-		return top + Approach.LIFT
-	end
-	-- the worst shortfall of the top under the ground between the ends: (gap, at f); and the largest drop
-	local function survey(ax, az, ay, bx, bz, by, roll): (number, number, number)
-		local dx, dz = bx - ax, bz - az
-		local l = math.sqrt(dx * dx + dz * dz)
-		local ux, uz = dx / l, dz / l
-		local n = math.max(2, math.ceil(l / 0.5))
-		local gap, at, drop = -math.huge, 0.5, 0
-		for i = 0, n do
-			local f = i / n
-			local x, z = ax + dx * f, az + dz * f
-			local top = ay + (by - ay) * f
-			for _, c in CROSS do
-				local o = c * hw
-				local g = ground(x - uz * o, z + ux * o)
-				local t = top + o * math.tan(roll)
-				if i > 0 and i < n and g - t > gap then
-					gap, at = g - t, f
-				end
-				drop = math.max(drop, t - g)
-			end
-		end
-		return gap, at, drop
-	end
-	local function add(ax: number, az: number, bx: number, bz: number, leg: number)
-		local dx, dz = bx - ax, bz - az
-		local l = math.sqrt(dx * dx + dz * dz)
-		local ux, uz = dx / l, dz / l
-		local roll = rollAt((ax + bx) / 2, (az + bz) / 2, ux, uz)
-		local ay, by = crossTop(ax, az, ux, uz, roll), crossTop(bx, bz, ux, uz, roll)
-		local gap, at, drop = survey(ax, az, ay, bx, bz, by, roll)
-		if gap > -0.02 and l > Approach.PIECE_MIN * 2 then
-			at = math.clamp(at, Approach.PIECE_MIN / l, 1 - Approach.PIECE_MIN / l)
-			local mx, mz = ax + dx * at, az + dz * at
-			add(ax, az, mx, mz, leg)
-			add(mx, mz, bx, bz, leg)
-			return
-		end
-		table.insert(out, {
-			ax = ax,
-			az = az,
-			ay = ay,
-			bx = bx,
-			bz = bz,
-			by = by,
-			roll = roll,
-			grade = math.abs(by - ay) / l,
-			leg = leg,
-			drop = drop,
-		})
-	end
-	for i = 1, #P - 1 do
-		local a, b = P[i], P[i + 1]
-		local l = math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
-		local n = math.ceil(l / Approach.PIECE_MAX)
-		for k = 0, n - 1 do
-			local f0, f1 = k / n, (k + 1) / n
-			add(
-				a[1] + (b[1] - a[1]) * f0,
-				a[2] + (b[2] - a[2]) * f0,
-				a[1] + (b[1] - a[1]) * f1,
-				a[2] + (b[2] - a[2]) * f1,
-				i
-			)
-		end
-	end
-	trailCache = out
-	return out
-end
-
--- distance in plan from (x, z) to the trail's centre line
-function Approach.trailDistance(x: number, z: number): number
-	local best = math.huge
-	for _, p in Approach.trailPieces() do
-		local dx, dz = p.bx - p.ax, p.bz - p.az
-		local l2 = dx * dx + dz * dz
-		local f = math.clamp(((x - p.ax) * dx + (z - p.az) * dz) / l2, 0, 1)
-		local ex, ez = p.ax + dx * f - x, p.az + dz * f - z
-		best = math.min(best, math.sqrt(ex * ex + ez * ez))
-	end
-	return best
-end
-
--- inside a venue's site (grown by `grow`)?
-function Approach.inSite(x: number, z: number, grow: number): boolean
-	for _, id in { "f4_lift_base", "f3_hilltop" } do
-		local v = Common.venue(id)
-		local X, _, D = AlleyLayout.toLocal(Common.place(v), x, 0, z)
-		if X >= v.site.x0 - grow and X <= v.site.x1 + grow and D >= v.site.d0 - grow and D <= v.site.d1 + grow then
-			return true
-		end
-	end
-	return false
-end
+-- The trail's polyline, its pieces, the distance to its centre line, a venue's site (Shared/Rides/LookoutHill).
+Approach.trailPoints = LookoutHill.trailPoints
+Approach.trailPieces = LookoutHill.trailPieces
+Approach.trailDistance = LookoutHill.trailDistance
+Approach.inSite = LookoutHill.inSite
 
 -- Lift Road's street lamps: one row on the verges, alternating sides, about 105 apart (side +1: the east verge,
 -- the arm reaching west over the road). Pure.
@@ -516,25 +344,15 @@ function Approach.build(roblox: any, parent: any): any
 	end
 	-- landings at the turns, level with the higher of the two pieces meeting there, built down to the ground
 	local path = record(exp.paths, "xpath_hill_trail")
-	local turns = Approach.trailPoints()
-	for i = 2, #turns - 1 do
-		local q = turns[i]
-		local top, low = -math.huge, math.huge
-		for _, p in pieces do
-			if math.abs(p.bx - q[1]) < 1e-6 and math.abs(p.bz - q[2]) < 1e-6 then
-				top = math.max(top, p.by)
-			elseif math.abs(p.ax - q[1]) < 1e-6 and math.abs(p.az - q[2]) < 1e-6 then
-				top = math.max(top, p.ay)
-			end
-		end
+	for _, q in LookoutHill.landings() do
+		local top, low = q.top, math.huge
 		for k = 0, 7 do
 			local ang = k * math.pi / 4
-			low = math.min(low, ground(q[1] + math.cos(ang) * (hw + 0.2), q[2] + math.sin(ang) * (hw + 0.2)))
+			low = math.min(low, ground(q.x + math.cos(ang) * (hw + 0.2), q.z + math.sin(ang) * (hw + 0.2)))
 		end
-		top -= 0.03
 		local bottom = math.min(low, top - Approach.THICK) - 0.6
-		local d = Approach.TRAIL_WIDTH + 0.4
-		kit0:cyl(trail, "Landing", q[1], (top + bottom) / 2, -q[2], top - bottom, d, "Y", Common.GRAVEL, "Pebble")
+		local d = LookoutHill.LANDING
+		kit0:cyl(trail, "Landing", q.x, (top + bottom) / 2, -q.z, top - bottom, d, "Y", Common.GRAVEL, "Pebble")
 	end
 	-- handrails where steep, timber steps where steeper
 	local railPosts: { [string]: any } = {}
@@ -613,32 +431,19 @@ function Approach.build(roblox: any, parent: any): any
 			end
 		end
 	end
-	-- benches facing the town at three turns, and two signposts
-	local town = { 700, -150 }
-	local function bench(name: string, q: { number }, out: number)
-		-- beside the turn toward the town, stepped out until it is off the trail (bench 5 long: radius 2.6)
-		local tx, tz = town[1] - q[1], town[2] - q[2]
-		local tl = math.sqrt(tx * tx + tz * tz)
-		tx, tz = tx / tl, tz / tl
-		local x, z = q[1] + tx * out, q[2] + tz * out
-		while Approach.trailDistance(x, z) < hw + 3 and out < 40 do
-			out += 1
-			x, z = q[1] + tx * out, q[2] + tz * out
-		end
-		local g = ground(x, z)
-		local yaw = math.atan2(-tx, -tz)
-		local bk = Kit.new(roblox, { x = x, z = z, floorY = g, yaw = yaw })
-		local bm = bk:model(trail, name)
+	-- benches facing the town at three turns (LookoutHill.benches: beside the turn toward the town, off the trail),
+	-- and two signposts
+	local B = LookoutHill.BENCH
+	for _, b in LookoutHill.benches() do
+		local bk = Kit.new(roblox, { x = b.x, z = b.z, floorY = b.ground, yaw = b.yaw })
+		local bm = bk:model(trail, b.name)
 		bm.ModelStreamingMode = roblox.Enum.ModelStreamingMode.Atomic
-		bk:box(bm, "Seat", -2.4, 2.4, 1.3, 1.6, -0.7, 0.7, Common.WOOD, "WoodPlanks")
-		bk:box(bm, "Back", -2.4, 2.4, 1.9, 3.2, -0.95, -0.75, Common.WOOD, "WoodPlanks")
+		bk:box(bm, "Seat", B.x0, B.x1, 1.3, 1.6, -0.7, 0.7, Common.WOOD, "WoodPlanks")
+		bk:box(bm, "Back", B.x0, B.x1, 1.9, B.top, B.d0, -0.75, Common.WOOD, "WoodPlanks")
 		for _, sx in { -1.9, 1.9 } do
-			bk:box(bm, "Leg", sx - 0.2, sx + 0.2, -0.8, 1.3, -0.95, 0.6, Common.FRAME, "Metal")
+			bk:box(bm, "Leg", sx - 0.2, sx + 0.2, -0.8, 1.3, B.d0, 0.6, Common.FRAME, "Metal")
 		end
 	end
-	bench("BenchFoot", path.points[4], 6)
-	bench("BenchTurn", path.points[6], 6.5)
-	bench("BenchTop", path.points[7], 6)
 	local function signpost(name: string, x: number, z: number, lines: { { any } })
 		local g = ground(x, z)
 		local sm = kit0:model(trail, name)
@@ -687,128 +492,21 @@ function Approach.build(roblox: any, parent: any): any
 		})
 	end
 
-	-- the hill's dressing: seeded, off the trail, the roads, the sites and the cabins' way
+	-- the hill's dressing (LookoutHill.dressing: seeded, off the trail, the roads, the sites and the cabins' way)
 	local dress = kit0:folder(m, "Dressing")
-	local seed = 20261113
-	local function rnd(): number
-		seed = (seed * 1103515245 + 12345) % 2147483648
-		return seed / 2147483648
-	end
-	local crown = { -1050, -1710 }
-	local towardTown = { 0.751, 0.659 } -- the Lookout's front: keep the terrace's view clear
-	local function ok(x: number, z: number, h: number, clearR: number): boolean
-		if Approach.trailDistance(x, z) < hw + clearR + 1.5 then
-			return false
-		end
-		if Approach.inSite(x, z, clearR + 3) then
-			return false
-		end
-		for _, tw in SkyLift.towers() do
-			if (tw.x - x) ^ 2 + (tw.z - z) ^ 2 < (5 + clearR) ^ 2 then
-				return false -- the tower's footing
-			end
-		end
-		if x > lot.x0 - 6 and x < lot.x1 + 6 and z > lot.z0 - 6 then
-			return false -- the car park and Lift Road
-		end
-		local g = ground(x, z)
-		for _, y in { g + 1, g + h * 0.5, g + h } do
-			for _, o in { { 0, 0 }, { clearR, 0 }, { -clearR, 0 }, { 0, clearR }, { 0, -clearR } } do
-				if not SkyLift.sweptClear(x + o[1], y, z + o[2], 1.5) then
-					return false
-				end
-			end
-		end
-		-- not in front of the terrace, high on the slope, where a crown would block the view
-		local dx, dz = x - crown[1], z - crown[2]
-		local d = math.sqrt(dx * dx + dz * dz)
-		if d < 260 and (dx * towardTown[1] + dz * towardTown[2]) / d > 0.6 and g + h > 100 then
-			return false
-		end
-		return true
-	end
-	local trees, rocks, shrubs = 0, 0, 0
-	local tries = 0
-	-- conifers in small stands (a lone tree on a bare dome reads as a post from the town)
-	while trees < Approach.TREES and tries < 400 do
-		tries += 1
-		local ang = rnd() * 2 * math.pi
-		local r = 100 + rnd() * 240
-		local cx, cz = crown[1] + math.cos(ang) * r, crown[2] + math.sin(ang) * r
-		local stand = 2 + math.floor(rnd() * 4)
-		for _ = 1, stand * 3 do
-			if stand <= 0 or trees >= Approach.TREES then
-				break
-			end
-			local a2, r2 = rnd() * 2 * math.pi, 4 + rnd() * 14
-			local x, z = cx + math.cos(a2) * r2, cz + math.sin(a2) * r2
-			local h = 15 + rnd() * 11
-			local w = h * (0.4 + rnd() * 0.1)
-			if ok(x, z, h, w / 2) then
-				conifer(kit0, dress, x, z, h, w, rnd())
-				trees += 1
-				stand -= 1
-			end
-		end
-	end
-	tries = 0
-	while rocks < 14 and tries < 2000 do
-		tries += 1
-		local ang = rnd() * 2 * math.pi
-		local r = 60 + rnd() * 300
-		local x, z = crown[1] + math.cos(ang) * r, crown[2] + math.sin(ang) * r
-		local s = 2 + rnd() * 4
-		if ok(x, z, s, s) then
-			local g = ground(x, z)
-			kit0:at(dress, "Rock", x, g + s * 0.2, -z, s * (1 + rnd() * 0.6), s * 0.75, s, Common.ROCK, "Slate", {
-				rot = CFrame.Angles(rnd() * 0.4 - 0.2, rnd() * math.pi, rnd() * 0.4 - 0.2),
+	local trees = 0
+	for _, d in LookoutHill.dressing() do
+		if d.kind == "conifer" then
+			conifer(kit0, dress, d.x, d.z, d.h :: number, d.w :: number, d.tint :: number)
+			trees += 1
+		elseif d.kind == "rock" then
+			local size, rot = d.size :: { number }, d.rot :: { number }
+			kit0:at(dress, "Rock", d.x, d.y, -d.z, size[1], size[2], size[3], Common.ROCK, "Slate", {
+				rot = CFrame.Angles(rot[1], rot[2], rot[3]),
 			})
-			rocks += 1
-		end
-	end
-	tries = 0
-	while shrubs < 16 and tries < 2000 do
-		tries += 1
-		-- shrubs keep to the trail's sides and the foot of the hill
-		local pieces2 = Approach.trailPieces()
-		local p = pieces2[1 + math.floor(rnd() * #pieces2)]
-		local side = if rnd() < 0.5 then -1 else 1
-		local dx, dz = p.bx - p.ax, p.bz - p.az
-		local l = math.sqrt(dx * dx + dz * dz)
-		local o = side * (hw + 3 + rnd() * 6)
-		local f = rnd()
-		local x, z = p.ax + dx * f - dz / l * o, p.az + dz * f + dx / l * o
-		local s = 2.2 + rnd() * 2
-		if ok(x, z, s, s / 2) then
-			local g = ground(x, z)
-			kit0:ball(dress, "Shrub", x, g + s * 0.3, -z, s, Common.SHRUB, "Grass", { collide = false, query = false })
-			shrubs += 1
-		end
-	end
-	-- along the line: a rock and a shrub at the foot of each tower, where the mower cannot reach
-	for _, tw in SkyLift.towers() do
-		local c, s = math.cos(tw.yaw), math.sin(tw.yaw)
-		local rx, rz = tw.x + c * 4.6 + s * 2.2, tw.z - s * 4.6 + c * 2.2
-		local sx, sz = tw.x - c * 4.4 - s * 3.0, tw.z + s * 4.4 - c * 3.0
-		if ok(rx, rz, 2, 1.5) then
-			local r = 1.6 + rnd() * 1.4
-			kit0:at(dress, "Rock", rx, ground(rx, rz) + r * 0.2, -rz, r * 1.4, r * 0.7, r, Common.ROCK, "Slate", {
-				rot = CFrame.Angles(rnd() * 0.3, rnd() * math.pi, rnd() * 0.3),
-			})
-		end
-		if ok(sx, sz, 3, 1.5) then
-			local r = 2.4 + rnd() * 1.2
-			kit0:ball(
-				dress,
-				"Shrub",
-				sx,
-				ground(sx, sz) + r * 0.3,
-				-sz,
-				r,
-				Common.SHRUB,
-				"Grass",
-				{ collide = false, query = false }
-			)
+		else
+			local size = (d.size :: { number })[1]
+			kit0:ball(dress, "Shrub", d.x, d.y, -d.z, size, Common.SHRUB, "Grass", { collide = false, query = false })
 		end
 	end
 	m:SetAttribute("Trees", trees)

@@ -28,7 +28,9 @@
 --   alleyfront WalkWay.clear never calls clear a line into the bowling alley's baked front (an end inside a
 --              building with ways' box, outside its ways, is in a wall)
 --   repeatable the audit's run gives the same report twice (WallAudit.run's think budget is fixed: BUDGET_MS)
---   covered    every baked wall a walker's waist meets lies inside a WalkWay box (WallAudit.uncovered: no luck needed)
+--   covered    every baked wall a walker's waist meets lies inside a WalkWay box (WallAudit.uncovered: no luck needed),
+--              on the plain ground and on the game's (Lookout Hill: its rocks, benches and handrails are boxes, its
+--              trail is the walkers' ground: Rides/LookoutHill, the numbers the sky lift's bake draws)
 --   props      the poles and tree trunks standing on a lane are stepped round (Brains/Pedestrian's lane dodges)
 -- Bakes first: lune run tools/bake/main.luau, attractions.luau and the expansion bakes (as tools/ci.sh).
 local Data = require("@shared/Data")
@@ -621,19 +623,28 @@ return function(t)
 
 	t.test("covered: every baked wall a walker's waist meets lies inside a WalkWay box (static)", function()
 		local tw = baked()
-		local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
-		local gaps = WallAudit.uncovered(tw, world.way, world.ctx.groundAt)
-		local bad, known = {}, 0
-		for _, g in gaps do
-			-- (Lookout Hill's trail terrace, its benches and its seeded boulders: tools/bake/skylift/Approach lays
-			-- them by its own seeded dressing and survey of the hill, which the server does not repeat at boot)
-			if string.sub(g.part.path, 1, 17) == "xs_lift_approach." then
-				known += 1
-			else
-				table.insert(bad, string.format("%s at (%.1f, %.1f) y %.1f", g.part.path, g.x, g.z, g.y))
+		-- on the plain ground the town's specs run on, and on the game's (World/Height with the terrain extensions,
+		-- as the server's boot configures it: Lookout Hill as the sky lift's bake laid its trail, rocks and benches)
+		local bad = {}
+		for _, terrain in { "plain", "game" } do
+			local was = Height.configured()
+			Height.configure(if terrain == "game" then data:module("TerrainExtensions") else nil)
+			local ok, gaps = pcall(function()
+				local world = TownAI.build({ data = data, seed = 1, squirrels = 0, deer = 0, fox = 0 })
+				return WallAudit.uncovered(tw, world.way, world.ctx.groundAt)
+			end)
+			Height.configure(was)
+			if not ok then
+				error(gaps, 0)
 			end
+			for _, g in gaps do
+				table.insert(
+					bad,
+					string.format("%s ground: %s at (%.1f, %.1f) y %.1f", terrain, g.part.path, g.x, g.z, g.y)
+				)
+			end
+			print(`      {terrain} ground: {#gaps} walls outside every WalkWay box`)
 		end
-		print(`      {#gaps} walls outside every WalkWay box, {known} of them on Lookout Hill's trail and dressing`)
 		t.eq(#bad, 0, table.concat(bad, "\n"))
 	end)
 

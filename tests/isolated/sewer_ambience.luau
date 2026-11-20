@@ -8,7 +8,7 @@
 -- (Shared/World/LightingPreset.apply). What the cases show: the words on screen at the right moments; the inside look
 -- comes in and goes; exactly that space's lights are on while inside and every light is back as baked after; the
 -- reverb is set and put back; Lighting is never touched; the cues fire in the right places and never outside; the
--- alligator; a body handed over mid-pipe; stop() leaves nothing behind; the real Controllers/Squirrel puts the side
+-- alligator; a car the client draws crossing over the pipe; a body handed over mid-pipe; stop() leaves nothing behind; the real Controllers/Squirrel puts the side
 -- arm A or D picked on the body (ExitPicked) and clears it. Nothing here shows how it looks or sounds.
 -- Interface: return function(t) (the spec shape)
 local roblox = require("@lune/roblox")
@@ -571,6 +571,48 @@ return function(t)
 				FakeEngine.renderStep(1 / 60)
 			end
 			t.eq(r.handle.level(), 0)
+			r.handle.stop()
+		end)
+	end)
+
+	t.test("the traffic overhead: a car the client draws crossing over the pipe plays its cue once, quietly", function()
+		FakeEngine.with(function()
+			local r = rig()
+			-- the body on drain 1's arm, a ghost car (Render/VehicleView's folder) crossing over it on the street
+			local pass = (layout.pipe("P1") :: any).passages[1]
+			local a, b = pass.points[2], pass.points[3]
+			local x, z = (a.x + b.x) / 2, (a.z + b.z) / 2
+			local dx, dz = b.x - a.x, b.z - a.z
+			local l = math.sqrt(dx * dx + dz * dz)
+			local nx, nz = -dz / l, dx / l
+			local folder = FakeEngine.new("Folder", "TrafficGhosts")
+			folder.Parent = workspace
+			local ghost = FakeEngine.model("Ghost_1", roblox.CFrame.new(x, -500, z), folder)
+			local root = FakeEngine.part("RootPart", roblox.CFrame.new(x, -500, z), ghost)
+			ghost.PrimaryPart = root
+			ghost:SetAttribute("VehicleKind", "sedan")
+			local streetY = (a.y + b.y) / 2 + 12
+			for i = 0, 120 do
+				-- 40 studs across in two seconds (a town car's pace)
+				local off = -20 + i / 3
+				root.CFrame = roblox.CFrame.new(x + nx * off, streetY, z + nz * off)
+				pose(r, { x = x, y = (a.y + b.y) / 2, z = z, yaw = 0 })
+			end
+			t.truthy(r.handle.space() == "sewer.crossroads", "in the arm")
+			t.eq(r.handle.counts()["sewer.carOverhead"], 1, "one car over: one cue")
+			t.eq(r.handle.counts()["sewer.trolleyOverhead"], nil)
+			-- (the fake Sound never ends: it is still in SoundService)
+			local played = r.sound:FindFirstChild("Sewer_sewer.carOverhead")
+			t.truthy(played ~= nil and played.played, "a Sound played")
+			t.eq(played.Volume, SewerAmbience.VOLUME["sewer.carOverhead"], "at the table's volume")
+			-- the same car back over it on the street above an empty pipe: the body out, nothing
+			r.body = nil
+			for i = 0, 120 do
+				root.CFrame = roblox.CFrame.new(x + nx * (20 - i / 3), streetY, z + nz * (20 - i / 3))
+				FakeEngine.renderStep(1 / 60)
+			end
+			t.eq(r.handle.counts()["sewer.carOverhead"], 1, "nobody in the pipe: no cue")
+			folder:Destroy()
 			r.handle.stop()
 		end)
 	end)
