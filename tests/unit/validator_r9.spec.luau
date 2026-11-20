@@ -615,7 +615,10 @@ return function(t)
 			local routes = RouteAdapter.new(rail)
 			local reach = ValidatorWorld.railReach(wall, cover)
 			local spots, intoEnclosed, unreached = 0, 0, 0
-			local scanMs, raysMs = 0, 0
+			local scanMs, raysMs, fullMs = 0, 0, 0
+			-- (the round-8 re-seat: every route's points scanned, the same machine, the same moment: the scan is judged
+			-- against it, as the absolute time swings with the machine's load)
+			local fullRoutes = { routes = routes.routes, byId = routes.byId }
 			for _, r in rail.registry:all() do
 				if (r :: any).enclosure == nil then
 					continue
@@ -631,6 +634,11 @@ return function(t)
 					local c0 = os.clock()
 					Squirrel.reseat(routes, p.x, gy, p.z, nil)
 					scanMs += (os.clock() - c0) * 1000
+					if spots % 10 == 1 then
+						c0 = os.clock()
+						Squirrel.reseat(fullRoutes :: any, p.x, gy, p.z, nil)
+						fullMs += (os.clock() - c0) * 1000 * 10
+					end
 					c0 = os.clock()
 					local got, s = Squirrel.reseat(routes, p.x, gy, p.z, reach)
 					raysMs += (os.clock() - c0) * 1000
@@ -649,17 +657,19 @@ return function(t)
 			Height.configure(nil)
 			print(
 				string.format(
-					"      %d spots over enclosed runs: %d re-seated inside one, %d on a rail the rays do not reach (the fallback); the index scan %.3f ms a release, with the rays %.3f ms (Lune)",
+					"      %d spots over enclosed runs: %d re-seated inside one, %d on a rail the rays do not reach (the fallback); the index scan %.3f ms a release, with the rays %.3f ms, the full scan of every route %.2f ms (Lune)",
 					spots,
 					intoEnclosed,
 					unreached,
 					scanMs / math.max(spots, 1),
-					raysMs / math.max(spots, 1)
+					raysMs / math.max(spots, 1),
+					fullMs / math.max(spots, 1)
 				)
 			)
 			t.truthy(spots > 100, "spots tried")
 			t.eq(intoEnclosed, 0, "never into an enclosed run")
-			t.truthy(scanMs / math.max(spots, 1) < 0.1, "the index scan under 0.1 ms a release")
+			-- (0.06 ms alone on this machine, the full scan 2.4 ms: a twentieth of it at most, whatever the load)
+			t.truthy(scanMs * 20 < fullMs, "the index scan a twentieth of the full scan at most")
 		end
 	)
 end
