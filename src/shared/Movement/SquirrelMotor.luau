@@ -1550,6 +1550,8 @@ SquirrelMotor.envelopeParams = {
 	clickCopy = SquirrelWire.CLICK_COPY,
 }
 local E = SquirrelMotor.envelopeParams
+-- (how far over the motor's own speeds a modelled step may go: its substeps of other lengths, rounding)
+local C_STEP = 1.02
 
 -- the grab search's scratch, reused by every envelope (each runs to its end before another starts): the samples a packet
 -- gathers (id, t, x, y, z, height bin) and the same in order of height, the bins' starts and fills, a grab's band
@@ -2803,18 +2805,44 @@ function SquirrelMotor.envelope(
 			local accept = Motion.openOnly(world)
 			local h, g = P.substep, P.gravity
 			-- the body's own arc from `prev`, no grab, frame by frame (entry f + 1: after f frames), and how far across the
-			-- air's steering can have taken it off that arc (accelAir toward any heading at up to the launch's speed)
+			-- air's steering can have taken it off that arc. The motor's air step per frame either steers the velocity
+			-- toward a heading at moveSpeed (accelAir) or lets it coast (dragAir), or in a pounce's window keeps it: the
+			-- speed it had fades by between the two rates and the steering adds at most its own speed for the rest, never
+			-- past the faster of the two speeds (validator round 15: a reach growing with the speed had and the steering
+			-- both, any way, let a crafted grab-leap chain along a long rail run 44 st/s where the motor's own runs 41)
 			local v0 = hypot2(prev.vx, prev.vz)
 			-- (the air steers toward moveSpeed, a sprint's at most, or v5.4's sprint in a rail leap's flight)
 			local steerTo = math.max(P.sprint * (if boosted then P.boostMult else 1), SquirrelMotor.V54.sprint)
+			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
+			-- its substeps)
+			local leapXZ = math.max(if boosted then P.leapForwardBoost else P.leapForward, steerTo) * C_STEP
+			local vmax = math.max(v0, leapXZ)
 			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
 			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
 			do
-				local x, y, z, vy, r, dv = prev.x, prev.y, prev.z, prev.vy, 0, 0
+				local ux, uz = if v0 > 1e-6 then prev.vx / v0 else 0, if v0 > 1e-6 then prev.vz / v0 else 0
+				local held = math.max(prev.attackWindow, 0)
+				local fa, fd = 1 - (1 - math.exp(-h * P.accelAir)), math.exp(-h * P.dragAir)
+				local ka, kd = 1, 1 -- (what is left of the speed had, steered every frame or coasting every frame)
+				local ta, td, th = 0, 0, 0 -- (the time it has carried the speed had, each way; the time held)
+				local y, vy = prev.y, prev.vy
 				for f = 1, frames do
 					vy = math.max(vy - g * h, -P.terminalFall)
-					dv = math.min(dv + P.accelAir * (v0 + steerTo) * h, v0 + steerTo)
-					x, y, z, r = x + prev.vx * h, y + vy * h, z + prev.vz * h, r + dv * h
+					y += vy * h
+					if th + h <= held + 1e-9 then
+						th += h
+					else
+						ka, kd = ka * fa, kd * fd
+						ta, td = ta + ka * h, td + kd * h
+					end
+					local t = f * h
+					local steer = steerTo * (t - th - ta)
+					local lo = v0 * (th + ta) - steer
+					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
+					local lat = steer
+					local mid = (lo + hi) / 2
+					local x, z = prev.x + ux * mid, prev.z + uz * mid
+					local r = math.max((hi - lo) / 2, lat)
 					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
 					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
 					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
@@ -3097,6 +3125,7 @@ function SquirrelMotor.envelope(
 				drop: number,
 				last: number,
 				route: number,
+				snap: number,
 				from: { clock: number, x: number, z: number, reach: number },
 			}
 			local function finish(s: Pattern)
@@ -3104,16 +3133,19 @@ function SquirrelMotor.envelope(
 				for _ = s.f + 1, frames do
 					vy = math.max(vy - g * h, -P.terminalFall)
 					y += vy * h
-					r += launchXZ * h
+					r += leapXZ * h
 				end
 				-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own leap
 				-- speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body 4 st under a
 				-- bough "grabbed" it every 0.1 s packet; across within its flight from the sample: round 15)
 				local floorY = y - s.drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
+				-- (and from `prev`, across no further than the fastest the air or a leap carries in the gap and the grabs'
+				-- snaps onto their samples: validator round 15)
 				if
 					next.y <= y + E.posSlack
 					and next.y >= floorY
 					and hypot2(next.x - s.x, next.z - s.z) <= r + E.posSlack
+					and hypot2(next.x - prev.x, next.z - prev.z) <= vmax * dt + s.snap + E.posSlack
 				then
 					if s.last < bestLast then
 						bestLast, bestFrom, bestRoute = s.last, s.from, s.route
@@ -3129,6 +3161,7 @@ function SquirrelMotor.envelope(
 				gz: number,
 				lowY: number,
 				spread: number,
+				snap: number,
 				from: { clock: number, x: number, z: number, reach: number }
 			): Pattern
 				return {
@@ -3137,10 +3170,11 @@ function SquirrelMotor.envelope(
 					y = gy + launchUp * h,
 					z = gz,
 					vy = launchUp,
-					r = spread + launchXZ * h,
+					r = spread + leapXZ * h,
 					drop = gy - lowY,
 					last = at,
 					route = grabbedId,
+					snap = snap,
 					from = from,
 				}
 			end
@@ -3187,6 +3221,7 @@ function SquirrelMotor.envelope(
 							gz,
 							lowY,
 							spread,
+							d + ar[f + 1],
 							{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
 						)
 						finish(s)
@@ -3223,16 +3258,18 @@ function SquirrelMotor.envelope(
 								spent = true
 								break
 							end
-							local gx, gy, gz, lowY, _, spread = grabWide(s.x, y, s.z, r)
+							local gx, gy, gz, lowY, d, spread = grabWide(s.x, y, s.z, r)
 							if spent then
 								break
 							end
 							if gx then
-								local more = leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.from)
+								local more =
+									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d + r, s.from)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
 								if was then
 									was.r, was.drop = math.max(was.r, more.r), math.max(was.drop, more.drop)
+									was.snap = math.max(was.snap, more.snap)
 									finish(was)
 								else
 									same[key] = more
@@ -3243,7 +3280,7 @@ function SquirrelMotor.envelope(
 						end
 						vy = math.max(vy - g * h, -P.terminalFall)
 						y += vy * h
-						r += launchXZ * h
+						r += leapXZ * h
 					end
 					if spent then
 						break
