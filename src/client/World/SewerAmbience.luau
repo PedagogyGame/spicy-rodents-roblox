@@ -31,7 +31,11 @@
 --   sewer.streetMurmur (loop)  within C.murmurRadius of a mouth, from below
 --   sewer.hiss                 the small alligator (v5.4's idle predator for the sewer: a sound and a line, nothing
 --                              to see): still for C.hissAfter seconds underground; the toast is HISS_LINE
---   sewer.carOverhead, sewer.trolleyOverhead   chosen, not fired yet (they need the traffic poses over a pipe)
+--   sewer.carOverhead          a town car (a traffic ghost: Render/VehicleView's workspace.TrafficGhosts, the poses
+--                              this client already draws) coming over the pipe the body is in, within C.overheadNear
+--   sewer.trolleyOverhead      the same for the trolley (it crosses drain 3 on the boulevard); each fires as a vehicle
+--                              comes within C.overheadReach of the pipe's line (not while one stands there), at most
+--                              once in C.overheadGap[cue] seconds a pipe (overhead())
 -- Lamps: only the space's lamps within C.lampRadius of the body are on (at most C.maxLit, the nearest), moving with
 -- it as it runs; shadows on the C.shadowLamps nearest. A 370-stud culvert never has all its 34 lights on.
 -- Who goes down: squirrels and the Spicy Rodent (a person, the fox or a deer never sees the prompt and is never
@@ -41,10 +45,12 @@
 --   crossing(layout, view) -> string?; armAt(layout, x, z) -> Mouth?; litLamps(points, at, radius, max) -> { index };
 --   grade(level) -> { brightness, contrast,
 --   saturation, tint }; focus(level) -> { far, distance, radius }; reword(text, underground) -> string;
---   cuePoints(layout) -> { CuePoint }; loopFor(layout, space) -> cue?
+--   cuePoints(layout) -> { CuePoint }; loopFor(layout, space) -> cue?; overheadCue(kind) -> cue;
+--   newOverhead() -> OverheadState; overhead(layout, space?, at?, vehicles, state, now) -> { Overhead }
 -- Engine: start(ctx) -> Handle; ctx = { current: () -> Model?, state: (() -> { species: string? })?,
 --   toast: ((text, seconds?) -> ())?, layout: Layout?, root: Instance? (default Workspace.Sewers),
---   gui: Instance? (default the PlayerGui), seed: number? }
+--   gui: Instance? (default the PlayerGui), seed: number?, vehicles: (() -> { Vehicle })? (default: the traffic
+--   ghosts in workspace.TrafficGhosts, each its root's place and VehicleKind; read every C.overheadEvery inside) }
 --   Handle = { step(dt), space() -> string?, prompt() -> string?, place() -> string?, level() -> number,
 --   filter(text) -> text, counts() -> { [cue]: number }, loops() -> { [cue]: boolean }, stop() }
 --   start binds step to RunService.RenderStepped; the joiner calls it from Client/Main (with PossessionClient's
@@ -88,6 +94,11 @@ SewerAmbience.C = {
 	hissAfter = Ladder.params.afkSecs - Ladder.params.afkWarnSecs, -- s still underground before the hiss (D34's
 	-- warning, v5.4's idle predator)
 	cueSpacing = 12, -- studs between cue points along a passage
+	overheadReach = 5, -- studs (level) from a pipe's line within which a vehicle is over it (half a car and the pipe)
+	overheadNear = 30, -- studs (level) from the body within which a vehicle over its pipe is heard
+	overheadAbove = 3, -- studs: a vehicle counts only this far over the pipe's walkway (a parked ghost is far below)
+	overheadGap = { ["sewer.carOverhead"] = 5, ["sewer.trolleyOverhead"] = 15 } :: { [string]: number }, -- s a pipe
+	overheadEvery = 0.1, -- s between looks at the traffic, inside
 	maxLog = 64, -- the last cue firings kept for a developer (and the specs)
 }
 
@@ -399,6 +410,113 @@ function SewerAmbience.cuePoints(layout: Layout): { CuePoint }
 	return out
 end
 
+-- A vehicle as this client draws it: its id (the ghost's name), its kind (Traffic/Fleet: "trolley", "sedan", ...)
+-- and its root's place.
+export type Vehicle = { id: string, kind: string, x: number, y: number, z: number }
+-- What overhead() keeps between looks: whether each vehicle was over the body's pipe at the last look (a vehicle
+-- first seen over it does not count: it was there already), and when each pipe's cue last played.
+export type OverheadState = { over: { [string]: boolean }, last: { [string]: number } }
+export type Overhead = { cue: string, pipe: string, id: string, x: number, y: number, z: number }
+
+function SewerAmbience.newOverhead(): OverheadState
+	return { over = {}, last = {} }
+end
+
+-- The cue a vehicle of `kind` makes going over a pipe.
+function SewerAmbience.overheadCue(kind: string): string
+	return if kind == "trolley" then "sewer.trolleyOverhead" else "sewer.carOverhead"
+end
+
+-- the point of a pipe's passages nearest (x, z) in plan: (distance, x, y, z)
+local function nearestOnPipe(pipe: Pipe, x: number, z: number): (number, number, number, number)
+	local best, bx, by, bz = math.huge, x, 0, z
+	for _, pass in pipe.passages do
+		local pts = pass.points
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local dx, dz = b.x - a.x, b.z - a.z
+			local l2 = dx * dx + dz * dz
+			local f = if l2 > 0 then math.clamp(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1) else 0
+			local px, pz = a.x + dx * f, a.z + dz * f
+			local d = math.sqrt((px - x) ^ 2 + (pz - z) ^ 2)
+			if d < best then
+				best, bx, by, bz = d, px, a.y + (b.y - a.y) * f, pz
+			end
+		end
+	end
+	return best, bx, by, bz
+end
+
+-- The overhead cues to play now (`now`: seconds on any steady clock). With the body (its feet `at`) in `space`, a
+-- vehicle fires its cue (overheadCue) as it comes over that space's pipe: within C.overheadReach of the pipe's line in
+-- plan, C.overheadAbove over its walkway there, and within C.overheadNear of the body, having not been at the last
+-- look (it was seen, and not over). A pipe's cue plays at most once in C.overheadGap[cue] seconds. Outside a pipe
+-- (space nil) nothing fires and what was seen is forgotten. Each firing is placed on the pipe's line under the vehicle.
+function SewerAmbience.overhead(
+	layout: Layout,
+	space: string?,
+	at: { x: number, z: number }?,
+	vehicles: { Vehicle },
+	state: OverheadState,
+	now: number
+): { Overhead }
+	local out: { Overhead } = {}
+	local pipe: Pipe? = nil
+	if space ~= nil and at ~= nil then
+		for _, p in layout.pipes do
+			if p.space == space then
+				pipe = p
+			end
+		end
+	end
+	if pipe == nil or at == nil then
+		table.clear(state.over)
+		return out
+	end
+	local C = SewerAmbience.C
+	local seen: { [string]: boolean } = {}
+	for _, v in vehicles do
+		local d, px, py, pz = nearestOnPipe(pipe, v.x, v.z)
+		local near = (v.x - at.x) ^ 2 + (v.z - at.z) ^ 2 <= C.overheadNear * C.overheadNear
+		local over = d <= C.overheadReach and v.y >= py + C.overheadAbove and near
+		if over and state.over[v.id] == false then
+			local cue = SewerAmbience.overheadCue(v.kind)
+			local key = `{pipe.id}|{cue}`
+			local last = state.last[key]
+			if last == nil or now - last >= (C.overheadGap[cue] or 5) then
+				state.last[key] = now
+				table.insert(out, { cue = cue, pipe = pipe.id, id = v.id, x = px, y = py, z = pz })
+			end
+		end
+		state.over[v.id] = over
+		seen[v.id] = true
+	end
+	for id in state.over do
+		if not seen[id] then
+			state.over[id] = nil
+		end
+	end
+	return out
+end
+
+-- The town's cars as this client draws them (Render/VehicleView's ghosts): each model's root and VehicleKind.
+local function ghostVehicles(): { Vehicle }
+	local out: { Vehicle } = {}
+	local folder = workspace:FindFirstChild("TrafficGhosts")
+	if folder == nil then
+		return out
+	end
+	for _, m in folder:GetChildren() do
+		local kind = m:GetAttribute("VehicleKind")
+		local root = if m:IsA("Model") then (m :: Model).PrimaryPart else nil
+		if root and type(kind) == "string" then
+			local p = root.Position
+			table.insert(out, { id = m.Name, kind = kind, x = p.X, y = p.Y, z = p.Z })
+		end
+	end
+	return out
+end
+
 -- Engine part ---------------------------------------------------------------------------------------------------------
 
 export type Handle = {
@@ -422,6 +540,7 @@ export type Context = {
 	root: Instance?,
 	gui: Instance?,
 	seed: number?,
+	vehicles: (() -> { Vehicle })?,
 }
 
 type Saved = { enabled: boolean, shadows: boolean? }
@@ -673,6 +792,9 @@ function SewerAmbience.start(ctx: Context): Handle
 	local approachArm: Mouth? = nil -- drain 1: the arm the body ran in along, toward the crossing
 	local flashText: string? = nil
 	local flashLeft = 0
+	local overheadState = SewerAmbience.newOverhead()
+	local overheadClock, overheadNow = 0, 0
+	local readVehicles = ctx.vehicles or ghostVehicles
 
 	local function nearestPoint(cue: string, space: string, at: Vector3): Vector3
 		local best, bestD = at, math.huge
@@ -700,6 +822,7 @@ function SewerAmbience.start(ctx: Context): Handle
 		end
 		echoRun, rungRun, stillFor, hissed = 0, 0, 0, false
 		lampClock, scanClock = 0, 0
+		table.clear(overheadState.over) -- (what stands over the pipe as the body comes in is not passing over it)
 	end
 
 	local function leave(at: Vector3?)
@@ -850,6 +973,17 @@ function SewerAmbience.start(ctx: Context): Handle
 				stillFor += dt
 			else
 				stillFor, hissed = 0, false
+			end
+			-- the traffic overhead (only in the pipe itself: not in the linger after coming out)
+			overheadNow += dt
+			overheadClock += dt
+			if overheadClock >= C.overheadEvery then
+				overheadClock = 0
+				local at = { x = feetPos.X, z = feetPos.Z }
+				local fired = SewerAmbience.overhead(layout, here, at, readVehicles(), overheadState, overheadNow)
+				for _, f in fired do
+					play(f.cue, Vector3.new(f.x, f.y, f.z))
+				end
 			end
 			if stillFor >= C.hissAfter and not hissed then
 				hissed = true

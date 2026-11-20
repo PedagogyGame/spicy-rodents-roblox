@@ -17,6 +17,8 @@ local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
+local Height = require("@shared/World/Height")
+local LaneMath = require("@shared/Traffic/LaneMath")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SewerLayout = require("@shared/World/SewerLayout")
 local SewerAmbience = require("@client/World/SewerAmbience")
@@ -24,6 +26,7 @@ local SquirrelController = require("@client/Controllers/Squirrel")
 local BakedWorld = require("@tests/lib/BakedWorld")
 local Isolated = require("@tests/lib/Isolated")
 local SewerStandIn = require("@tests/lib/SewerStandIn")
+local TrafficService = require("@server/Traffic/TrafficService")
 
 type Mouth = SewerLayout.Mouth
 type State = SquirrelMotor.State
@@ -395,6 +398,139 @@ return function(t)
 		t.eq(#SewerAmbience.litLamps(pts :: any, roblox.Vector3.new(100, 0, 0), 40, 3), 3)
 		t.eq(#SewerAmbience.litLamps(pts :: any, roblox.Vector3.new(5000, 0, 0), 40, 8), 0)
 	end)
+
+	-- a point on pipe `id`'s line (its first passage, `f` of the way along its second segment) and the level
+	-- direction across it there
+	local function onPipe(id: string, f: number): (number, number, number, number, number)
+		local pass = (layout.pipe(id) :: any).passages[1]
+		local a, b = pass.points[2], pass.points[3]
+		local dx, dz = b.x - a.x, b.z - a.z
+		local l = math.sqrt(dx * dx + dz * dz)
+		return a.x + dx * f, a.y + (b.y - a.y) * f, a.z + dz * f, -dz / l, dx / l
+	end
+	-- a vehicle `off` studs across the pipe's line at that point, a street's height over it
+	local function car(id: string, kind: string, x: number, y: number, z: number, nx: number, nz: number, off: number)
+		return { id = id, kind = kind, x = x + nx * off, y = y + 12, z = z + nz * off }
+	end
+
+	t.test("overhead: a car coming over the body's pipe fires once; the pipe's gap; the trolley its own cue", function()
+		local x, y, z, nx, nz = onPipe("P1", 0.5)
+		local body = { x = x, z = z }
+		local st = SewerAmbience.newOverhead()
+		-- the cues fired at this look, joined
+		local function look(now: number, vs: { SewerAmbience.Vehicle }): string
+			local out = {}
+			for _, f in SewerAmbience.overhead(layout, "sewer.crossroads", body, vs, st, now) do
+				table.insert(out, f.cue)
+				t.eq(f.pipe, "P1")
+				t.truthy(math.abs(f.x - x) < 1 and math.abs(f.z - z) < 1, "placed on the pipe under the car")
+			end
+			return table.concat(out, ",")
+		end
+		local cue = "sewer.carOverhead"
+		-- a car crossing over the arm: 20 studs off, over it, past it, away again
+		t.eq(look(0, { car("Ghost_1", "sedan", x, y, z, nx, nz, -20) }), "", "not over yet")
+		t.eq(look(0.1, { car("Ghost_1", "sedan", x, y, z, nx, nz, -2) }), cue, "over it: the cue")
+		t.eq(look(0.2, { car("Ghost_1", "sedan", x, y, z, nx, nz, 2) }), "", "still over it: once")
+		t.eq(look(0.3, { car("Ghost_1", "sedan", x, y, z, nx, nz, 20) }), "", "gone")
+		-- a second car a second later: within the pipe's gap
+		t.eq(look(1.0, { car("Ghost_2", "rv", x, y, z, nx, nz, 20) }), "")
+		t.eq(look(1.1, { car("Ghost_2", "rv", x, y, z, nx, nz, 0) }), "", "within C.overheadGap of the last")
+		-- the trolley has its own cue and gap
+		t.eq(look(1.2, { car("Ghost_13", "trolley", x, y, z, nx, nz, -20) }), "")
+		t.eq(look(1.3, { car("Ghost_13", "trolley", x, y, z, nx, nz, -3) }), "sewer.trolleyOverhead")
+		-- after the gap a car comes over again
+		local later = 0.1 + SewerAmbience.C.overheadGap[cue]
+		t.eq(look(later, { car("Ghost_3", "sedan", x, y, z, nx, nz, 15) }), "")
+		t.eq(look(later + 0.1, { car("Ghost_3", "sedan", x, y, z, nx, nz, 1) }), cue, "after the gap")
+		t.eq(SewerAmbience.overheadCue("motorcycle"), cue)
+		t.eq(SewerAmbience.overheadCue("trolley"), "sewer.trolleyOverhead")
+	end)
+
+	t.test("overhead: nothing for a car parked over it, hidden, far off, over another pipe, or outside", function()
+		local x, y, z, nx, nz = onPipe("P1", 0.5)
+		local body = { x = x, z = z }
+		local function fires(
+			space: string?,
+			frames: { { SewerAmbience.Vehicle } },
+			from: { x: number, z: number }?
+		): number
+			local st = SewerAmbience.newOverhead()
+			local n = 0
+			for i, vs in frames do
+				n += #SewerAmbience.overhead(layout, space, from or body, vs, st, i * 0.1)
+			end
+			return n
+		end
+		local parked = car("Ghost_1", "sedan", x, y, z, nx, nz, 0)
+		t.eq(fires("sewer.crossroads", { { parked }, { parked }, { parked } }), 0, "already there: it is not passing")
+		-- a ghost the view hides parks far under the map (Traffic/Ghost.HIDDEN_Y)
+		local hidden = { id = "Ghost_2", kind = "sedan", x = x, y = -500, z = z }
+		local away = car("Ghost_2", "sedan", x, y, z, nx, nz, 20)
+		t.eq(fires("sewer.crossroads", { { away }, { hidden } }), 0, "hidden")
+		-- the body further along the pipe than C.overheadNear from where the car comes over
+		local far = SewerAmbience.C.overheadNear + 5
+		local farBody = { x = x - nz * far, z = z + nx * far }
+		local over = { { away }, { car("Ghost_2", "sedan", x, y, z, nx, nz, 0) } }
+		t.eq(fires("sewer.crossroads", over), 1, "(the same crossing, heard from near)")
+		t.eq(fires("sewer.crossroads", over, farBody), 0, "too far from the body")
+		-- the same crossing heard from drain 3, and with the body out on the street
+		t.eq(fires("sewer.bowllane", over), 0, "over another pipe")
+		t.eq(fires(nil, over), 0, "outside")
+		local st = SewerAmbience.newOverhead()
+		SewerAmbience.overhead(layout, "sewer.crossroads", body, { away }, st, 0)
+		t.truthy(st.over["Ghost_2"] == false, "seen, not over")
+		SewerAmbience.overhead(layout, nil, nil, { away }, st, 0.1)
+		t.eq(next(st.over), nil, "outside: what was seen is forgotten")
+	end)
+
+	t.test(
+		"overhead in the town: the cars' lanes cross drains 1 and 3, the trolley's track drain 3, none the culvert",
+		function()
+			local svc =
+				TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 3 })
+			local C = SewerAmbience.C
+			-- every lane sampled every stud, both ways: does a vehicle on it come over each pipe (within reach of its line,
+			-- the street over the walkway)?
+			local crosses: { [string]: { [string]: boolean } } = {}
+			for laneId, lane in svc.lanes do
+				if not LaneMath.isVehicleLane(laneId) then
+					continue
+				end
+				for _, dir in { 1, -1 } do
+					local len = LaneMath.length(lane, dir)
+					for s = 0, len, 1 do
+						local p = LaneMath.pointAt(lane, s, dir)
+						for _, pipe in layout.pipes do
+							local st = SewerAmbience.newOverhead()
+							local v = { id = "v", kind = "sedan", x = p.x, y = Height.at(p.x, p.z), z = p.z }
+							-- (seen once away from it, then here: over() is what the cue needs)
+							SewerAmbience.overhead(layout, pipe.space, { x = p.x, z = p.z }, { v }, st, 0)
+							st.over.v = false
+							if #SewerAmbience.overhead(layout, pipe.space, { x = p.x, z = p.z }, { v }, st, 1) > 0 then
+								crosses[pipe.id] = crosses[pipe.id] or {}
+								crosses[pipe.id][laneId] = true
+							end
+						end
+					end
+				end
+			end
+			local function names(id: string): string
+				local out = {}
+				for l in crosses[id] or {} do
+					table.insert(out, l)
+				end
+				table.sort(out)
+				return table.concat(out, ", ")
+			end
+			print(`      drain 1 under: {names("P1")}`)
+			print(`      drain 3 under: {names("P3")}`)
+			t.truthy(crosses.P1 ~= nil, "a car comes over drain 1")
+			t.truthy(crosses.P3 ~= nil and crosses.P3.trolley_track, "the trolley comes over drain 3")
+			t.eq(crosses.P2, nil, "nothing drives over the culvert (under the river)")
+			t.truthy(C.overheadReach > 0 and C.overheadNear >= C.overheadReach)
+		end
+	)
 
 	Isolated.register(t, "tests/isolated/sewer_ambience")
 end

@@ -175,8 +175,8 @@ The storm drains (BRIEF_ADDENDUM D8). Mild: water, echoes and drips. While the s
 | `sewer.riverHum` | a loop in the dry culvert under the river (P2) | 0.5 | Storm Drain Presence 1: a 3' pipe, slowed, wind-like (9119643864) |
 | `sewer.streetMurmur` | a loop within 8 studs of a mouth | 0.25 | City Ambience 1: traffic, an occasional car over a metal plate (9112758242) |
 | `sewer.hiss` | still underground until the idle warning (the small alligator, never seen) | 0.7 | Snake Hiss 1: airy hisses (9119302862) |
-| `sewer.carOverhead` | not fired yet (needs the traffic poses over a pipe) | 0.6 | Metal Plate Impact, Manhole Hit (9116750726) |
-| `sewer.trolleyOverhead` | not fired yet (the trolley over P3) | 0.5 | Electric Trolley 2: a pass by (9114257912) |
+| `sewer.carOverhead` | a town car this client draws (the traffic ghosts) comes over the pipe the squirrel is in: within 5 studs of the pipe's line and 30 of the squirrel, as it arrives (not while one stands there); at most once in 5 s a pipe. The cars cross drain 1 (the north-south main road, the ice cream van's loop) and drain 3 (the boulevard, the patrol beat); nothing drives over the culvert | 0.6 | Metal Plate Impact, Manhole Hit (9116750726) |
+| `sewer.trolleyOverhead` | the same for the trolley (its track crosses drain 3 on the boulevard); at most once in 15 s | 0.5 | Electric Trolley 2: a pass by (9114257912) |
 
 ### Sky lift and the Lookout (`src/shared/Rides/SkyLiftSounds.luau`: ids, volumes, reach)
 The server plays the first three from its posts (`src/server/Rides/SkyLiftService.luau`) and keeps the Lookout's three loops on posts of their own; the client (`src/client/Rides/SkyLiftView.luau`) hangs the cabin's own on each local cabin (heard only round it) and plays them for cabins within 150 studs of the camera; `src/client/Rides/Telescope.luau` clicks on the way out.
