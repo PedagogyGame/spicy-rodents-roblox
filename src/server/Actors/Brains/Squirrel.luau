@@ -147,55 +147,32 @@ function Squirrel.reseat(
 	end
 	local fallback: RouteLike?, fallbackS = nil, 0
 	local asked: { [number]: boolean } = {}
+	local function accept(id: number, _t: number): boolean
+		return not asked[id] and not (enclosed and enclosed(id))
+	end
 	local tries = 0
 	for _, radius in RESEAT_RADII do
-		-- (the nearest sample of each route within the radius)
-		local near: { [number]: { d: number, t: number, x: number, y: number, z: number } } = {}
-		local r2 = radius * radius
-		index:forEachNear(
-			x,
-			y,
-			z,
-			math.ceil(radius / (index.cellSize or 20)),
-			function(id: number, t: number, sx: number, sy: number, sz: number): boolean?
-				local d = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
-				if d <= r2 then
-					local c = near[id]
-					if c == nil or d < c.d then
-						near[id] = { d = d, t = t, x = sx, y = sy, z = sz }
-					end
-				end
-				return nil
+		-- (the nearest sample of a route not asked yet within the radius: the index's own nearest, nearest first)
+		while true do
+			local hit = index:nearest(x, y, z, radius, nil, accept)
+			if hit == nil then
+				break
 			end
-		)
-		local list = {}
-		for id, c in near do
-			if not (enclosed and enclosed(id)) then
-				table.insert(list, { id = id, c = c })
-			end
-		end
-		table.sort(list, function(a, b)
-			return a.c.d < b.c.d
-		end)
-		for _, e in list do
-			local route = routes.byId(e.id)
-			if route == nil or asked[e.id] then
+			local route = routes.byId(hit.routeId)
+			asked[hit.routeId] = true
+			if route == nil then
 				continue
 			end
-			local s = e.c.t * route.length
+			local s = hit.t * route.length
 			if fallback == nil then
 				fallback, fallbackS = route, s
 			end
-			if reach == nil then
+			if reach == nil or reach(x, y, z, hit.x, hit.y, hit.z) then
 				return route, s
-			end
-			if tries >= RESEAT_TRIED then
-				return fallback, fallbackS
 			end
 			tries += 1
-			asked[e.id] = true
-			if reach(x, y, z, e.c.x, e.c.y, e.c.z) then
-				return route, s
+			if tries >= RESEAT_TRIED then
+				return fallback, fallbackS
 			end
 		end
 	end

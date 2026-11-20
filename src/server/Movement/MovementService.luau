@@ -155,6 +155,7 @@ type Squirrel = {
 	base: Gate?, -- the gate this epoch's first packet passed (the held place until a packet is held: invariant E)
 	-- server time of the first doubtful packet accepted since the held place last advanced (nil: none; invariant E)
 	doubtAt: number?,
+	reachAt: number?, -- server time the held place was last asked to reach a clean packet (C.REACH_EVERY)
 	lastX: number,
 	lastY: number,
 	lastZ: number,
@@ -255,6 +256,8 @@ MovementService.C = table.freeze({
 	-- seconds a doubtful packet's doubt may stand with no clean packet reachable from the held place before the body is
 	-- snapped back there (invariant E: "unreached")
 	DOUBT_SNAP = 1,
+	-- seconds: while a doubt stands, the held place is asked to reach a clean packet at most this often (its rays bounded)
+	REACH_EVERY = 0.2,
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
 	-- studs: a root this near a rail's samples (the feet drawn on a big trunk's bark are up to 5.95 off them) is not judged
 	-- for height, nor for walls while the packets have the body on a rail ...
@@ -1485,7 +1488,13 @@ function MovementService.new(deps: Deps): Movement
 				-- after a doubtful one, only on a clean packet reachable from the held place (the doubtful packet may have
 				-- gone through a wall, and every packet since is judged from it)
 				if v.ok and not v.resync and not graced then
-					if sq.doubtAt == nil or self:_reached(actorId, sq, snapshot) then
+					-- (asked at most every C.REACH_EVERY while the doubt stands: its rays bounded)
+					local ask = sq.doubtAt ~= nil
+						and (sq.reachAt == nil or now - (sq.reachAt :: number) >= C.REACH_EVERY)
+					if ask then
+						sq.reachAt = now
+					end
+					if sq.doubtAt == nil or (ask and self:_reached(actorId, sq, snapshot)) then
 						sq.good = snapshot
 						sq.cleanAt = now
 						sq.doubtAt = nil

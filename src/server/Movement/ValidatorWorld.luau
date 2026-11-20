@@ -105,6 +105,10 @@ ValidatorWorld.C = table.freeze({
 	-- Its cost: each leg at most ceil(AROUND_MAX * 0.71 / MAX_CHORD) = 2 chords, 4 corners: at most 16 chords (96 wall
 	-- rays) and C.COVER_WALLS covers per second leg
 	AROUND_MAX = 8,
+	-- ... and the longest line the held place is asked to reach a clean packet by after a doubtful one (studs: aroundFar,
+	-- MoveValidator.reachable; a lag spike's gap round a corner, half a second at a sprint). Asked at most every
+	-- MovementService.C.REACH_EVERY while a doubt stands; a longer line through a wall is no way (snapped back)
+	AROUND_FAR = 16,
 	-- studs: how near a rail a body must get to take it (railReach; Routes/Motion.C.airGrab, 3.4 st)
 	RAIL_GRAB = 3.4,
 	-- floorUnder's bisection: the most rays, and the height it stops at
@@ -323,9 +327,11 @@ end
 -- place). Cost: only for a line already through a wall; at most 8 legs of at most 2 chords
 function ValidatorWorld.around(
 	wall: Ray,
-	down: Ray?
+	down: Ray?,
+	maxLen: number?
 ): (number, number, number, number, number, number?, number?, number?) -> boolean
 	local long = ValidatorWorld.crossesLong(wall, down)
+	local most = maxLen or C.AROUND_MAX
 	return function(
 		x0: number,
 		z0: number,
@@ -336,7 +342,7 @@ function ValidatorWorld.around(
 		rise: number?,
 		endY: number?
 	): boolean
-		if (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > C.AROUND_MAX * C.AROUND_MAX then
+		if (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > most * most then
 			return true -- (too long to tell: weighed as a gap's, never held)
 		end
 		local mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
@@ -515,6 +521,8 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		crosses = if wall then ValidatorWorld.crosses(wall, cover) else nil,
 		crossesLong = if wall then ValidatorWorld.crossesLong(wall, cover) else nil,
 		around = if wall then ValidatorWorld.around(wall, cover) else nil,
+		aroundFar = if wall then ValidatorWorld.around(wall, cover, C.AROUND_FAR) else nil,
+		aroundFarMax = C.AROUND_FAR,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
 		floorNear = if down then ValidatorWorld.floorNear(down) else nil,
 		-- a car's roof within C.CAR_SLACK under the feet (the climb and float flags weigh a third there)
