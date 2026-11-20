@@ -9,7 +9,7 @@
 --   crafted claims    a stream that claims a move in every packet gains no pace: the greedy grab-leap chain along the
 --                     river bridge's parapet (validator_r15rv's) at 20 and 4 packets a second, and a greedy stream over
 --                     open ground, each with and without the claim, against the motor's own.
--- SPICY_TRICK_RUNS=<n> plays n runs of each honest kind (default 2). About a minute.
+-- SPICY_TRICK_RUNS=<n> plays n runs of each honest kind (default 2); SPICY_TRICK_OFF=1 the same with no move. 15 s.
 local process = require("@lune/process")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
@@ -23,6 +23,8 @@ type State = SquirrelMotor.State
 
 local P = SquirrelMotor.params
 local RUNS = tonumber(process.env.SPICY_TRICK_RUNS) or 2
+-- (SPICY_TRICK_OFF=1: the same runs with the button never pressed, the reference a snap is compared with)
+local OFF = process.env.SPICY_TRICK_OFF ~= nil
 local SECONDS = 40
 
 -- (a copy of the validator's state for one actor, its tables shared as they are: a candidate packet tried and undone)
@@ -75,7 +77,7 @@ return function(t)
 		local count = { n = 0 }
 		return function(now: number, s: State, e: { SquirrelMotor.Event }): SquirrelMotor.Input
 			local inp = keys(now, s, e)
-			if AirTrickButton.shows(s :: any) then
+			if not OFF and AirTrickButton.shows(s :: any) then
 				inp.trick = true
 				count.n += 1
 			end
@@ -150,7 +152,7 @@ return function(t)
 				print(
 					`      {RUNS} runs x 2 kinds x {SECONDS} s: {moves} moves pressed, {packets} packets, {snaps} snaps`
 				)
-				t.truthy(moves > 20 * RUNS, "moves were done")
+				t.truthy(OFF or moves > 20 * RUNS, "moves were done")
 				t.eq(snaps, 0, "snaps")
 			end
 		)
