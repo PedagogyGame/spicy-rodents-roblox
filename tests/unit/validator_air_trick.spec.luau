@@ -1,23 +1,27 @@
 --!strict
--- The validator and the air trick (owner D17): the trick swings a flight's heading at the speed it has, so the server
--- needs nothing new for its speed bounds; its only model is the grab search's swing (SquirrelMotor.envelope section 5:
--- the arc widened by v0 x trickTurn x tau^2 / 2 while a move may play). Here:
---   honest            the client's motor, the link and MovementService (tests/lib/LiveRig) with a move every flight (the
---                     button pressed whenever a move is left, roll then wiggle): the S3 driver in town (leaps, pounces,
---                     grabs, transfers) and hopping on open ground steering left and right, on a clean link and through
---                     loss bursts: 0 snaps;
---   crafted claims    a stream that claims a move in every packet gains no pace: the greedy grab-leap chain along the
---                     river bridge's parapet (validator_r15rv's) at 20 and 4 packets a second, and a greedy stream over
---                     open ground, each with and without the claim, against the motor's own.
--- SPICY_TRICK_RUNS=<n> plays n runs of each honest kind (default 2); SPICY_TRICK_OFF=1 the same with no move. 15 s.
+-- The validator and the air trick (owner D17, redone by D18): the re-aim turns and scales a wiggle's flight by what the
+-- packet says it applied (aimYaw, aimReach), each at the motor's rate; the envelope undoes it before judging the move
+-- (SquirrelMotor.envelope 0c), the server's air bound scales by its own reach (MoveValidator._stamina: the motor's
+-- trickReachAt on the server's own footing), a fresh wiggle pays trickCost from the server's meter, and a roll after a
+-- flight the server saw holds the speed for its length. Here:
+--   honest            the client's motor, the link and MovementService (tests/lib/LiveRig) with a trick every flight:
+--                     the wiggle pressed at a random moment mid-jump and the aim swung to and fro (either side, out and
+--                     in), the button held on the way down for the roll as it lands; the S3 driver in town (leaps,
+--                     pounces, grabs, transfers) and hopping on open ground, on a clean link and through loss bursts:
+--                     0 snaps;
+--   crafted claims    a stream that claims a wiggle and its full re-aim out every flight (and a roll every landing) gains
+--                     no pace past an honest player's: the greedy grab-leap chain along the river bridge's parapet
+--                     (validator_r15rv's) at 20 and 4 packets a second, and a greedy stream over open ground, each with
+--                     and without the claims, against the honest trick's own pace there.
+-- SPICY_TRICK_RUNS=<n> plays n runs of each honest kind (default 2); SPICY_TRICK_OFF=1 the same with no trick. 20 s.
 local process = require("@lune/process")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local MoveValidator = require("@server/Movement/MoveValidator")
-local AirTrickButton = require("@client/UI/AirTrickButton")
 local TestWorld = require("@tests/cheat/TestWorld")
 local Rng = require("@tests/cheat/Rng")
 local LiveRig = require("@tests/lib/LiveRig")
+local Units = require("@shared/Config/Units")
 
 type State = SquirrelMotor.State
 
@@ -72,20 +76,47 @@ end
 return function(t)
 	local town = LiveRig.town()
 
-	-- the button pressed whenever a move is left (a roll, then the wiggle as soon as the roll ends)
-	local function tricky(keys: LiveRig.Keys): (LiveRig.Keys, { n: number })
+	-- a trick every flight: the wiggle at a random moment mid-jump, the aim swung to and fro from then (either side, out
+	-- and in), the button held on the way down (the roll as it lands); sometimes the roll pressed on the landing frame
+	local function tricky(keys: LiveRig.Keys, rng: Rng.Rng): (LiveRig.Keys, { n: number })
 		local count = { n = 0 }
+		local airFrom, pressAfter, aimedAt = 0, 0.2, 0
+		local yawTo, reachTo, sweep = 0, 0, 1
+		local wasFoot = true
 		return function(now: number, s: State, e: { SquirrelMotor.Event }): SquirrelMotor.Input
 			local inp = keys(now, s, e)
-			if not OFF and AirTrickButton.shows(s :: any) then
-				inp.trick = true
+			if OFF then
+				return inp
+			end
+			local foot = s.grounded or s.routeId ~= nil
+			if foot then
+				if not wasFoot and s.grounded and rng.next() < 0.3 then
+					inp.trick = true
+				end
+			else
+				if wasFoot then
+					airFrom, pressAfter = now, 0.03 + rng.next() * 0.45
+					yawTo, reachTo, sweep = (rng.next() * 2 - 1) * 0.8, rng.next() * 2 - 1, 2 + rng.next() * 6
+				end
+				if s.trickKind == 0 and now - airFrom >= pressAfter then
+					inp.trick = true
+					aimedAt = now
+				elseif s.trickKind == 2 then
+					local a = now - aimedAt
+					inp.aimYaw = yawTo * math.sin(sweep * a)
+					inp.aimReach = reachTo * math.cos(sweep * a * 0.7)
+					inp.trick = s.vy < 0
+				end
+			end
+			if inp.trick then
 				count.n += 1
 			end
+			wasFoot = foot
 			return inp
 		end,
 			count
 	end
-	-- hopping north on open ground, the keys swung left or right for each flight (the trick steers the landing)
+	-- hopping north on open ground, the keys swung left or right for each flight
 	local function hopper(): LiveRig.Keys
 		local flights, wasGrounded = 0, true
 		return function(_now: number, s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
@@ -125,7 +156,7 @@ return function(t)
 
 	for _, lossy in { false, true } do
 		t.test(
-			`honest with a move every flight, {if lossy
+			`honest with a trick every flight, {if lossy
 				then "loss bursts of 0.3 to 1 s every 2 to 5 s"
 				else "a clean link"}: the town driver and open-ground hops, 0 snaps`,
 			function()
@@ -141,18 +172,16 @@ return function(t)
 							dropAt = bursts(rng, SECONDS + 5, 0.3, 1.0, 2, 5),
 						}
 						else nil
-					local k1, c1 = tricky(town.driven(rng))
+					local k1, c1 = tricky(town.driven(rng), rng)
 					local r1 = play(`town run {run}`, link, town.startAt(rng), k1, seed)
-					local k2, c2 = tricky(hopper())
+					local k2, c2 = tricky(hopper(), rng)
 					local r2 = play(`open-ground hops run {run}`, link, town.openStart(), k2, seed + 50)
 					snaps += r1.snaps + r2.snaps
 					moves += c1.n + c2.n
 					packets += r1.packets + r2.packets
 				end
-				print(
-					`      {RUNS} runs x 2 kinds x {SECONDS} s: {moves} moves pressed, {packets} packets, {snaps} snaps`
-				)
-				t.truthy(OFF or moves > 20 * RUNS, "moves were done")
+				print(`      {RUNS} runs x 2 kinds x {SECONDS} s: {moves} presses, {packets} packets, {snaps} snaps`)
+				t.truthy(OFF or moves > 20 * RUNS, "tricks were done")
 				t.eq(snaps, 0, "snaps")
 			end
 		)
@@ -189,15 +218,24 @@ return function(t)
 		end
 		return feed, try, v
 	end
-	-- (claims a move playing in a packet in the air: a roll with all of its time left, or none)
-	local function claim(c: State, on: boolean)
-		if on and not c.grounded and c.routeId == nil then
-			c.trickKind, c.trickTime = 1, P.trickRoll
-		else
-			c.trickKind, c.trickTime = 0, 0
+	-- (claims the trick on a candidate packet `c` after the baseline `b`: in the air a wiggle, fresh at the flight's start,
+	-- its re-aim out as fast as the motor's rate goes; on the ground a roll at each landing; none on a rail)
+	local function claim(c: State, on: boolean, b: State?, dt: number)
+		c.trickKind, c.trickTime, c.aimYaw, c.aimReach = 0, 0, 0, 0
+		if not on or c.routeId ~= nil then
+			return
+		end
+		local prevKind = if b then b.trickKind else 0
+		if not c.grounded then
+			c.trickKind = 2
+			c.trickTime = if prevKind == 2 and b then math.max(0, b.trickTime - dt) else P.trickWiggle
+			local from = if prevKind == 2 and b then b.aimReach else 0
+			c.aimReach = math.min(1, from + P.trickReachRate * dt)
+		elseif b and (not b.grounded or (prevKind == 1 and b.trickTime > dt)) then
+			c.trickKind = 1
+			c.trickTime = if prevKind == 1 then b.trickTime - dt else P.trickRoll
 		end
 	end
-
 	-- the greedy grab-leap chain along a long rail (validator_r15rv's): every `dt` a packet on the rail's line in the
 	-- air, launching at the next of four speeds up, as far along as the validator takes cleanly with the meter undrained
 	local function chain(tw: any, vworld: any, dt: number, h: number, claimed: boolean): number
@@ -250,7 +288,7 @@ return function(t)
 				local c = SquirrelMotor.new(p.x, p.y + h, p.z)
 				c.vx, c.vz, c.yaw = ux * 42, uz * 42, yaw
 				c.grounded, c.vy, c.clock = false, vys[(k - 1) % #vys + 1], s.clock + dt
-				claim(c, claimed)
+				claim(c, claimed, s, dt)
 				local ok, m = try(c)
 				if ok and m >= math.min(m0, 1) - 1e-4 then
 					best = c
@@ -262,7 +300,7 @@ return function(t)
 				n.vy = s.vy - P.gravity * dt
 				n.y = s.y + (s.vy + n.vy) / 2 * dt
 				n.clock = s.clock + dt
-				claim(n, claimed)
+				claim(n, claimed, s, dt)
 				best = n
 			end
 			feed(best :: State)
@@ -320,7 +358,7 @@ return function(t)
 							c.vy = vy
 							c.y = math.max(0.5, s.y + vy * dt)
 						end
-						claim(c, claimed)
+						claim(c, claimed, s, dt)
 						if try(c) then
 							best = c
 							break
@@ -340,7 +378,7 @@ return function(t)
 							n.vy = 0
 						end
 					end
-					claim(n, claimed)
+					claim(n, claimed, s, dt)
 					best = n
 				end
 				feed(best :: State)
@@ -358,4 +396,57 @@ return function(t)
 		)
 		t.truthy(claimed <= plain + 0.1, `claimed {claimed} st/s against {plain}`)
 	end)
+
+	-- the honest trick's own pace, for the crafted streams above (the motor alone, 60 fps, flat open ground and the parapet)
+	t.test(
+		"the honest trick's pace: hopping with the wiggle out at its best, a roll's carry, the parapet chain",
+		function()
+			local tw = TestWorld.build({ boxes = {} })
+			-- hopping north (W + Shift), Space on landing (or after the roll, `roll`), the wiggle `at` frames into each
+			-- flight with the aim full out (nil: no trick); the pace over `secs` from a full or an empty meter
+			local function hops(at: number?, roll: boolean, secs: number, empty: boolean): number
+				local s = SquirrelMotor.new(Units.st(-560), tw.groundHeight, Units.st(-545))
+				if empty then
+					s.stamina, s.winded = 0, true
+				end
+				local z0 = s.z
+				local f, inAir = 0, 0
+				for _ = 1, math.floor(secs * 60) do
+					local i = SquirrelMotor.idleInput(math.pi)
+					i.fw, i.sprint = 1, true
+					if s.grounded then
+						inAir = 0
+						i.leap = not roll or s.trickKind ~= 1
+						i.trick = roll and s.footAgo <= 0.02
+					else
+						inAir += 1
+						i.trick = at ~= nil and (inAir == at or (roll and s.trickKind == 2 and s.vy < 0))
+						i.aimReach = 1
+					end
+					SquirrelMotor.step(s, i, 1 / 60, tw)
+					f += 1
+				end
+				return (s.z - z0) / secs
+			end
+			local rows = {
+				{ "no trick", nil, false },
+				{ "wiggle out at frame 15", 15, false },
+				{ "wiggle out + roll, then leap", 15, true },
+			}
+			for _, r in rows do
+				print(
+					string.format(
+						"      open ground, %-30s full meter 6 s %.1f st/s, from empty 30 s %.1f st/s",
+						r[1],
+						hops(r[2], r[3], 6, false),
+						hops(r[2], r[3], 30, true)
+					)
+				)
+			end
+			t.truthy(
+				hops(15, false, 6, false) <= hops(nil, false, 6, false) * 1.09,
+				"the trick's hop no more than 9 % on"
+			)
+		end
+	)
 end

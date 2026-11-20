@@ -9,18 +9,20 @@
     "Dogs.Bark"
    ],
    "file": "assets/audio/candidates/dog_bark.ogg",
-   "seconds": 0.78,
+   "seconds": 0.62,
    "channels": 1,
    "sampleRate": 44100,
-   "peakDb": -1.0,
-   "how": "synthesised offline (tools/audio/make_candidates.py dog_bark, seed 3601): two voiced barks, harmonics through three formants, a breathy onset, pitch arc 380->560->300 Hz",
+   "peakDb": -1.5,
+   "truePeakDb": -1.5,
+   "loudnessLufs": -15.1,
+   "how": "synthesised offline (tools/audio/make_candidates.py dog_bark, seed 3601): two barks, each a glottal pulse train (3 % jitter, 12 % shimmer, a moment of period doubling) with pulse-synchronous breath through three time-varying formants (the mouth opening on 'wuh', closing on 'f') and two upper ones for the hiss, a noise burst on each onset, pitch 400->590->320 and 380->550->290 Hz; loudness-normalised",
    "licence": "the game's own: synthesised offline from code in this repository, no recording or third-party audio (CC0-equivalent)",
    "displayName": "SR yard dog bark",
    "description": "Spicy Rodent: a friendly medium dog's woof woof (synthesised offline, tools/audio).",
-   "sha": "c14143330e584a86",
-   "assetId": null,
-   "moderation": null,
-   "approved": false
+   "sha": "376244cc9aefa650",
+   "assetId": "93991496573985",
+   "moderation": "Reviewing",
+   "approved": true
   },
   {
    "slot": "bowling_roll",
@@ -31,15 +33,17 @@
    "seconds": 2.6,
    "channels": 1,
    "sampleRate": 44100,
-   "peakDb": -3.0,
-   "how": "synthesised offline (tools/audio/make_candidates.py bowling_roll, seed 5002): brown noise low-passed with two wooden resonances (85, 140 Hz), a 4-4.6 Hz rotation pulse, faint grit, a closing low-pass and fade as it goes away",
+   "peakDb": -1.4,
+   "truePeakDb": -1.4,
+   "loudnessLufs": -15.1,
+   "how": "synthesised offline (tools/audio/make_candidates.py bowling_roll, seed 5002): noise through seven lane and ball resonances (72-690 Hz), a lumpy 5.2->4.5 Hz once-a-turn pulse, rolling grit (a rain of tiny contacts, 0.5-3.8 kHz) and irregular lane-board ticks, going away: a 3 % doppler-ish pitch drop, a closing low-pass, 9 dB quieter, a 0.7 s fade; loudness-normalised",
    "licence": "the game's own: synthesised offline from code in this repository, no recording or third-party audio (CC0-equivalent)",
    "displayName": "SR bowling ball roll",
    "description": "Spicy Rodent: a bowling ball rumbling down a wooden lane (synthesised offline, tools/audio).",
-   "sha": "e0ff7abd704b4726",
-   "assetId": null,
-   "moderation": null,
-   "approved": false
+   "sha": "9c88bc79f2f272ad",
+   "assetId": "108677793120832",
+   "moderation": "Reviewing",
+   "approved": true
   }
  ]
 }

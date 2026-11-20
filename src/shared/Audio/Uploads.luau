@@ -16,13 +16,13 @@ export type Slot = { id: string, file: string, cues: { string } }
 Uploads.SLOTS = table.freeze({
 	-- the yard dogs' bark: a friendly medium dog's "woof woof", not a growl (owner #36: a custom upload)
 	dog_bark = table.freeze({
-		id = "",
+		id = "93991496573985",
 		file = "assets/audio/candidates/dog_bark.ogg",
 		cues = table.freeze({ "Dogs.Bark" }),
 	}),
 	-- a bowling ball rumbling down the lane, about 2.5 s, fading as it reaches the pins (none in the library)
 	bowling_roll = table.freeze({
-		id = "",
+		id = "108677793120832",
 		file = "assets/audio/candidates/bowling_roll.ogg",
 		cues = table.freeze({ "roll" }),
 	}),
