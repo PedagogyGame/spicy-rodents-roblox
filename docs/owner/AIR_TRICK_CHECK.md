@@ -51,19 +51,21 @@ No text, no glow, no shadow. It disappears as soon as you land.
 
 ## 3. The grab-and-jump cooldown
 
-A leap off a branch or wire can now come at most every **0.08 s**. This stops a key-repeat macro from gaining speed by mashing E and Space together. A person's own rhythm and every normal climb are not affected.
+After a leap off a branch or wire, **E does not grab again in the air for 0.065 s** (just under four frames). So E+Space mashed together by a key-repeat macro can chain no faster than about a person's rhythm. A person's own rhythm and every normal climb are not affected.
 
-We started at 0.25 s as you suggested, but that cut a person's normal chain by a third (41.6 down to 28.1 studs per second) and slowed trunk climbs too. 0.08 s is just under five frames, so a person never runs into it.
+We started at 0.25 s as you suggested, but that also held back a person's normal chain (E+Space about every sixth frame). Longer than four frames also turned some fast rhythms into a pattern the server's climbing checks wrongly flag, so 0.065 s is the value that slows the macro without touching anyone honest.
 
 Measured with W and Shift held, pressing E and Space together every 2, 3 or 6 frames (studs per second):
 
 | Where | Macro every 2 frames: before / now | Every 3: before / now | A person, every 6: before / now |
 |---|---|---|---|
-| River bridge parapet | 47.3 / **29.2** | 35.7 / **32.0** | 41.6 / 41.6 |
-| Avenue cable | 49.9 / **29.3** | 49.9 / **31.2** | 41.6 / 41.6 |
-| Up the tallest trunk | 30.7 / **20.9** | 30.3 / **23.3** | 28.7 / 28.7 |
+| River bridge parapet | 47.3 / **39.4** | 35.7 / **41.6** | 41.6 / 41.6 |
+| Avenue cable | 49.9 / **37.5** | 49.9 / **41.6** | 41.6 / 41.6 |
+| Up the tallest trunk | 30.7 / **29.7** | 30.3 / **28.7** | 28.7 / 28.7 |
 
-So mashing is now slower than a person's rhythm, not faster.
+So mashing now gets about what a person's rhythm gets, no more.
+
+One thing still open: the server's movement checks do not use this cooldown yet. A cheating client (not a macro, a modified game) can still chain at about 47 studs per second along a long rail, as before. Making the server check it is a follow-up for the movement-check work going on now.
 
 ## 4. Sounds and other players
 
@@ -80,7 +82,7 @@ So mashing is now slower than a person's rhythm, not faster.
 5. On a gamepad: **R1** and the right stick. On a phone: tap **TRICK** mid-jump and drag from it.
 6. Run with the meter low and press **G** mid-jump: the meter should drop by a tenth.
 7. With two players: does the other player see your roll and wiggle?
-8. Chain E and Space along a branch or wire at your own pace: it should feel exactly as before.
+8. Chain E and Space along a branch or wire at your own pace: it should feel exactly as before. Mashing them as fast as you can should get you no further.
 
 ## The server checks
 

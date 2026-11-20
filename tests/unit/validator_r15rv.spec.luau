@@ -229,10 +229,16 @@ return function(t)
 				local tw, vworld = flat()
 				local id, t0 = 1075, 0.02 -- (the river bridge's stone parapet, 530 st straight)
 				local place, gone, yaw = alongRoute(tw, id, t0)
+				-- (the motor's chain as the validator models it: with no grab-and-jump cooldown, owner D18's motor rule,
+				-- which the grab search does not read yet; with it the motor's fastest is a person's 41.6 st/s, so a crafted
+				-- chain keeps ~5 st/s over an honest one until the search reads the cooldown)
 				local motor = 0
+				local cd = P.grabLeapCooldown
+				P.grabLeapCooldown = 0
 				for _, every in { 2, 3, 4, 6 } do
 					motor = math.max(motor, motorChain(tw, id, t0, yaw, every, 1, 9, false))
 				end
+				P.grabLeapCooldown = cd
 				local pace, meter, dirty = crafted(tw, vworld, id, case.dt, case.h, 8, place, false, gone, yaw, t0, 1)
 				print(
 					string.format(
@@ -257,9 +263,12 @@ return function(t)
 		local lo, hi = reg:pointAt(r, 0), reg:pointAt(r, 1)
 		local t0 = if lo.y < hi.y then 0.02 else 0.98
 		local motor = 0
+		local cd = P.grabLeapCooldown
+		P.grabLeapCooldown = 0 -- (as the validator models it: no cooldown; see the rail chain above)
 		for _, every in { 2, 3, 4, 6 } do
 			motor = math.max(motor, motorChain(tw, id, t0, 0, every, 0, 2.5, true))
 		end
+		P.grabLeapCooldown = cd
 		-- (the trunk's point at height y)
 		local function at(y: number): any
 			local a, b = 0, 1

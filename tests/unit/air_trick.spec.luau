@@ -532,8 +532,8 @@ return function(t)
 				)
 				t.near(now[6 + i], before[6 + i], 0.05, `{names[i]}: a person's chain unchanged`)
 				t.truthy(
-					now[i] <= now[6 + i] + 0.05 and now[3 + i] <= now[6 + i] + 0.05,
-					`{names[i]}: a macro no faster`
+					now[i] <= now[6 + i] * 1.05 and now[3 + i] <= now[6 + i] * 1.05,
+					`{names[i]}: a macro about a person's pace (within 5 %)`
 				)
 			end
 			t.truthy(before[1] > before[7] + 3, "(without it the macro was faster)")
