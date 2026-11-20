@@ -1518,6 +1518,7 @@ SquirrelMotor.envelopeParams = {
 	forkEnterMaxT = 0.06, -- a fork or sibling hop lands near the bough start (0.018 / 0.03)
 	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
+	grabSimDt = 0.1, -- up to six ticks: a launch in the air is free only off a grab the motor's own step explains
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
@@ -2719,13 +2720,17 @@ function SquirrelMotor.envelope(
 		-- it to the nearest sample over its drawn pose and leaping at the launch's speed); `next` within posSlack of the
 		-- highest any reaches is explained, the earliest last grab of those kept, the height no higher than they reach
 		local frames = math.max(1, math.ceil(dt / P.substep - 1e-6))
+		-- (grasped(): the same search over a gap of up to grabSimDt, six motor frames: validator round 14, the round-13
+		-- review's HIGH 1: a launch in the air is free only off a rail the server itself puts the body on, and for a
+		-- launch the motor's own grab stepped from the last accepted place is that; ten packets a second is how a phone
+		-- at ten frames sends the motor's honest leap-and-regrab climb)
 		local hiddenMemo: boolean? = nil
-		local function hidden(): boolean
+		local function search(): boolean
 			if hiddenMemo ~= nil then
 				return hiddenMemo
 			end
 			hiddenMemo = false
-			if not shortGap then
+			if dt > math.max(E.shortDt, E.grabSimDt) + 1e-6 then
 				return false
 			end
 			local index = world.index :: any
@@ -2817,6 +2822,12 @@ function SquirrelMotor.envelope(
 				judged.y = math.min(judged.y or next.y, bestTop)
 			end
 			return hiddenMemo :: boolean
+		end
+		local function hidden(): boolean
+			return shortGap and search()
+		end
+		local function grasped(): boolean
+			return dt <= E.grabSimDt + 1e-6 and search()
 		end
 		local railPlausible: boolean? = nil
 		local function plausible(): boolean
@@ -2952,10 +2963,13 @@ function SquirrelMotor.envelope(
 			local offGround = landedIn(true)
 			fromGroundOrRail = offGround or railVisit()
 			-- (what the meter pays: a launch off the ground, or a pounce anywhere off a rail, as the motor's doLeap and
-			-- doPounce charge; none for a bounce, nor for one a hidden rail visit explains; validator round 11)
-			if not tramp and (prev.grounded or ((offGround or pounce ~= nil) and not railVisit())) then
+			-- doPounce charge; none for a bounce. Validator round 14, the round-13 review's HIGH 1: a rail launch is free
+			-- only where the server itself puts the body on the rail: in a short gap the motor's own grab stepped from the
+			-- last accepted place (hidden()); a long gap's visit (a rail near the line and over `next`) explains the launch
+			-- but earns nothing: a leap off the ground, charged, its flight no free one)
+			if not tramp and (prev.grounded or not grasped()) then
 				judged.charge = if pounce ~= nil then "pounce" else "leap"
-			elseif not prev.grounded and railVisit() then
+			elseif not prev.grounded and grasped() then
 				judged.railLaunch = true
 			end
 			capUp = if fromGroundOrRail then launchUp else pounceUp
