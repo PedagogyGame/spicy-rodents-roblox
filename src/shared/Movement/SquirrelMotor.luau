@@ -226,6 +226,8 @@ export type State = {
 	-- the carry of the leap off a rail in the air now (1, or chainCarry for one that followed another): what the air
 	-- steers toward scales with it
 	leapScale: number,
+	-- 1 while in the air after leaving a rail (a leap, a drop or a pounce off it), 0 otherwise
+	offRail: number,
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -417,6 +419,7 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		railLeapWait = 0,
 		chainWait = 0,
 		leapScale = 1,
+		offRail = 0,
 	}
 end
 
@@ -443,7 +446,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.trickKind, state.trickTime = 0, 0
 	state.aimYaw, state.aimReach, state.trickReach = 0, 0, 0
 	state.footAgo, state.airDist = if grounded then 10 else 0, 0
-	state.chainWait, state.leapScale = 0, 1
+	state.chainWait, state.leapScale, state.offRail = 0, 1, 0
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -543,6 +546,7 @@ local LATER_SCALARS = {
 	"railLeapWait",
 	"chainWait",
 	"leapScale",
+	"offRail",
 }
 
 function SquirrelMotor.serialize(state: State): Snapshot
@@ -702,8 +706,9 @@ local function enterRoute(
 	state.selectedJunction = nil
 	-- (come onto it from a leap off a rail: the next leap off it within chainRest is a chained one; owner D19)
 	if not wasOnRoute then
-		state.chainWait = if state.railLeap and not state.grounded then P.chainRest else 0
+		state.chainWait = if state.offRail == 1 and not state.grounded then P.chainRest else 0
 	end
+	state.offRail = 0
 	state.vx, state.vy, state.vz = 0, 0, 0
 	state.grounded = false
 	state.committedAirborne = false
@@ -858,6 +863,7 @@ local function doLeap(state: State, world: World, events: { Event })
 		state.airFromRoute = from
 		if from ~= nil then
 			state.railLeapWait = P.grabLeapCooldown
+			state.offRail = 1
 		end
 		state.airX, state.airY, state.airZ = state.x, state.y, state.z
 		push(events, "leap", nil, from)
@@ -881,6 +887,7 @@ local function doDrop(state: State, world: World, events: { Event })
 		clearPendingFork(state)
 		state.routeId = nil
 		state.airFromRoute = nil
+		state.offRail = 1
 		state.vy = P.dropUp
 		state.committedAirborne = true
 		state.cameraCommit = P.cameraCommitDrop
@@ -937,6 +944,7 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	state.vx, state.vy, state.vz = vx, vy, vz
 	state.routeId = nil
 	state.grounded = false
+	state.offRail = if from ~= nil then 1 else 0
 	commitToAir(state, heading)
 	push(events, "pounce", nil, from)
 end
@@ -1366,6 +1374,8 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 	state.railLeapWait = math.max(0, state.railLeapWait - dt)
 	if state.routeId ~= nil then
 		state.chainWait = math.max(0, state.chainWait - dt)
+	elseif state.grounded then
+		state.offRail = 0
 	end
 	state.cameraCommit = math.max(0, state.cameraCommit - dt)
 	if state.routeId == nil and not state.grounded and state.airFromRoute ~= nil then
@@ -2040,6 +2050,8 @@ export type Judged = {
 	grab: number?,
 	grabFrom: { clock: number, x: number, z: number, reach: number }?,
 	grabRoute: number?,
+	-- the grab search explained the move with chained leaps only (owner D19): the most across they carry, the speed kept
+	chainXZ: number?,
 	-- the move was explained only by a wiggle pressed inside the gap (envelope 0c): the meter's trickCost is due
 	trickHidden: boolean?,
 }
@@ -2291,7 +2303,8 @@ local function envelopeCore(
 	dt: number,
 	world: World,
 	boosted: boolean,
-	lastGrab: number?
+	lastGrab: number?,
+	chained: boolean?
 ): ({ Violation }, boolean, number?, Judged)
 	local out: { Violation } = {}
 	local launchUsed = false
@@ -3210,7 +3223,25 @@ local function envelopeCore(
 			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
 			-- its substeps)
 			local leapXZ = math.max(if boosted then P.leapForwardBoost else P.leapForward, steerTo) * C_STEP
-			local vmax = math.max(v0, leapXZ)
+			-- (`prev`'s own flight: a chained leap's steers toward a sprint or v5.4's sprint at chainCarry; owner D19)
+			local arcSteer = if chained
+				then math.max(
+					P.sprint * (if boosted then P.boostMult else 1),
+					SquirrelMotor.V54.sprint * (if boosted then P.boostMult else 1) * P.chainCarry
+				)
+				else steerTo
+			-- (a chained grab-leap, owner D19: the motor's leap off a rail it came onto from another leap off a rail, a
+			-- moment before (every grab in the air from such a flight, so every later grab here, and a first one when
+			-- `prev`'s flight is the server's own rail launch: `chained`): chainCarry across, steered toward a sprint or
+			-- v5.4's sprint at that carry, and chainLift up)
+			local boostM = if boosted then P.boostMult else 1
+			local chainXZ = math.max(
+				(if boosted then P.leapForwardBoost else P.leapForward) * P.chainCarry,
+				P.sprint * boostM,
+				SquirrelMotor.V54.sprint * boostM * P.chainCarry
+			) * C_STEP
+			local chainUp = launchUp * P.chainLift
+			local anyFull = false -- (an explanation with a full leap after a grab: no chained cap kept)
 			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
 			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
 			-- (off a rail, section 4's gap: the motor's leap off it at the start of frame j, from its drawn pose at a
@@ -3270,9 +3301,9 @@ local function envelopeCore(
 						ta, td = ta + ka * h, td + kd * h
 					end
 					local t = f * h
-					local steer = steerTo * (t - th - ta)
+					local steer = arcSteer * (t - th - ta)
 					local lo = v0 * (th + ta) - steer
-					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
+					local hi = math.min(v0 * (th + td) + steer, math.max(v0, arcSteer) * t)
 					local lat = steer
 					local mid = (lo + hi) / 2
 					local x, z = prev.x + ux * mid, prev.z + uz * mid
@@ -3437,6 +3468,10 @@ local function envelopeCore(
 			-- claiming the air trick's swing run 3 % faster). snap3: N's 3-D distance and the drawn offset, for a grab from a
 			-- place whose height is only the highest (a leap off a rail's))
 			local snapAcross, snap3 = 0, 0
+			-- (owner D19, tighter: the leave point's own distance from `prev`, the band's furthest member and its drawn
+			-- offset, less what the arc covers before the grab (vmax per frame); a later grab's snap adds half a sample's
+			-- spacing, the motor's grab of the nearest sample ahead of where its flight has carried it)
+			local leaveFar = 0
 			-- (a trunk's bark the last grab leaves from: its nearest sample across and the drawn pose's offset off it, 0 for
 			-- any other route)
 			local barkX, barkZ, bark = 0, 0, 0
@@ -3594,6 +3629,7 @@ local function envelopeCore(
 				-- well)
 				local spread, lastId, lastOff = 0, -1, 0
 				local across, dr2 = 0, (d + r) ^ 2
+				local far = 0
 				for k = 1, nb do
 					local e = band[k]
 					local id = sId[e]
@@ -3604,14 +3640,13 @@ local function envelopeCore(
 					end
 					local ux, uz = X[e] - X[bi], Z[e] - Z[bi]
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
-					across = math.max(
-						across,
-						math.sqrt(math.max(0, dr2 - (Y[e] - y) ^ 2)) + (if id == topId then m else lastOff)
-					)
+					local off = if id == topId then m else lastOff
+					across = math.max(across, math.sqrt(math.max(0, dr2 - (Y[e] - y) ^ 2)) + off)
+					far = math.max(far, hypot2(X[e] - prev.x, Z[e] - prev.z) + off)
 				end
 				grabbedId, grabbedT = topId, sT[top]
 				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
-				snap3, snapAcross = d + m, across
+				snap3, snapAcross, leaveFar = d + m, across, far
 				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
@@ -3638,13 +3673,15 @@ local function envelopeCore(
 				bark: number,
 				from: { clock: number, x: number, z: number, reach: number },
 				seed: boolean?, -- (a leap off the rail `prev` is on: its next grab is the first)
+				lx: number, -- (the leap in the air now: its rate across, a full leap's or a chained one's)
+				full: boolean, -- (a full leap after some grab of the pattern)
 			}
 			local function finish(s: Pattern)
 				local y, vy, r = s.y, s.vy, s.r
 				for _ = s.f + 1, frames do
 					vy = math.max(vy - g * h, -P.terminalFall)
 					y += vy * h
-					r += leapXZ * h
+					r += s.lx * h
 				end
 				-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own leap
 				-- speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body 4 st under a
@@ -3659,13 +3696,14 @@ local function envelopeCore(
 					next.y <= y + E.posSlack
 					and next.y >= floorY
 					and hypot2(next.x - s.x, next.z - s.z) <= r + E.posSlack
-					and hypot2(next.x - prev.x, next.z - prev.z) <= vmax * dt + s.snap + E.posSlack
+					and hypot2(next.x - prev.x, next.z - prev.z) <= math.max(v0, if s.full then leapXZ else chainXZ) * dt + s.snap + E.posSlack
 					and hypot2(next.x - s.bx, next.z - s.bz) >= s.bark - st(0.4) - E.posSlack
 				then
 					if s.last < bestLast then
 						bestLast, bestFrom, bestRoute = s.last, s.from, s.route
 					end
 					bestTop = math.max(bestTop, y)
+					anyFull = anyFull or s.full
 				end
 			end
 			local function leap(
@@ -3677,15 +3715,20 @@ local function envelopeCore(
 				lowY: number,
 				spread: number,
 				snap: number,
-				from: { clock: number, x: number, z: number, reach: number }
+				from: { clock: number, x: number, z: number, reach: number },
+				chain: boolean,
+				full: boolean
 			): Pattern
+				local up, lx = if chain then chainUp else launchUp, if chain then chainXZ else leapXZ
 				return {
 					f = f + 1,
 					x = gx,
-					y = gy + launchUp * h,
+					y = gy + up * h,
 					z = gz,
-					vy = launchUp,
-					r = spread + leapXZ * h,
+					vy = up,
+					r = spread + lx * h,
+					lx = lx,
+					full = full or not chain,
 					drop = gy - lowY,
 					last = at,
 					route = grabbedId,
@@ -3738,6 +3781,8 @@ local function envelopeCore(
 						bark = 0,
 						from = { clock = prev.clock + (j - 1) * h, x = vis.x, z = vis.z, reach = seedR[j] },
 						seed = true,
+						lx = leapXZ,
+						full = true,
 					})
 				end
 			else
@@ -3761,8 +3806,10 @@ local function envelopeCore(
 								gz,
 								lowY,
 								spread,
-								snapAcross,
-								{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
+								math.min(snapAcross, math.max(0, leaveFar - math.max(v0, chainXZ) * f * h)),
+								{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread },
+								chained == true,
+								false
 							)
 							finish(s)
 							if bestFrom then
@@ -3812,14 +3859,17 @@ local function envelopeCore(
 									gz,
 									lowY,
 									spread,
-									s.snap + (if s.seed then snap3 else d),
-									s.from
+									s.snap + (if s.seed then snap3 else d + E.sampleSpacing / 2),
+									s.from,
+									true,
+									s.full
 								)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
 								if was then
 									was.r, was.drop = math.max(was.r, more.r), math.max(was.drop, more.drop)
 									was.snap = math.max(was.snap, more.snap)
+									was.lx, was.full = math.max(was.lx, more.lx), was.full or more.full
 									finish(was)
 								else
 									same[key] = more
@@ -3830,7 +3880,7 @@ local function envelopeCore(
 						end
 						vy = math.max(vy - g * h, -P.terminalFall)
 						y += vy * h
-						r += leapXZ * h
+						r += s.lx * h
 					end
 					if spent then
 						break
@@ -3845,6 +3895,7 @@ local function envelopeCore(
 				judged.grabFrom = bestFrom
 				judged.grabRoute = bestRoute
 				judged.y = math.min(judged.y or next.y, bestTop)
+				judged.chainXZ = if anyFull then nil else chainXZ
 			end
 			return hiddenMemo :: boolean
 		end
@@ -4220,7 +4271,8 @@ local function envelopeCore(
 			else
 				judged.vy = math.clamp(next.vy, -P.gravity * dt - gEps, math.max(capUp, prev.vy, 0))
 			end
-			judged.xz = capXZ
+			-- (a move the grab search explained with chained leaps only keeps no more across than they carry: owner D19)
+			judged.xz = if judged.chainXZ then math.min(capXZ, judged.chainXZ :: number) else capXZ
 		end
 	end
 	if nextRoute then
@@ -4244,7 +4296,8 @@ function SquirrelMotor.envelope(
 	dt: number,
 	world: World,
 	boosted: boolean,
-	lastGrab: number?
+	lastGrab: number?,
+	chained: boolean?
 ): ({ Violation }, boolean, number?, Judged)
 	local pYaw, pReach = prev.aimYaw or 0, prev.aimReach or 0
 	-- (a re-aim from none: a wiggle pressed in the gap, or a roll in the air the gap's flight came to after its wiggle
@@ -4285,7 +4338,7 @@ function SquirrelMotor.envelope(
 			)
 		gapAim.up = math.abs(up)
 	end
-	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab)
+	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab, chained)
 	gapAim.across, gapAim.up = 0, 0
 	if
 		#out > 0
@@ -4310,7 +4363,7 @@ function SquirrelMotor.envelope(
 			if extra ~= 0 then
 				local p2 = table.clone(prev)
 				p2.vy += extra
-				local o2, u2, po2, j2 = envelopeCore(p2, judgedNext, dt, world, boosted, lastGrab)
+				local o2, u2, po2, j2 = envelopeCore(p2, judgedNext, dt, world, boosted, lastGrab, chained)
 				if #o2 == 0 then
 					out, used, pounce, judged = o2, u2, po2, j2
 					-- (a wiggle the gap hid, `prev` having none: the server's meter pays for it as for one it saw)

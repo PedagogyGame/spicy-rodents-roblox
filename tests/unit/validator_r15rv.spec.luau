@@ -250,7 +250,9 @@ return function(t)
 						motor
 					)
 				)
-				t.truthy(pace <= motor * 1.03, `crafted {pace} st/s against the motor's {motor}`)
+				-- (owner D19: chains along a rail at a balanced pace, the motor's own chained leaps; a crafted stream within
+				-- about 15 % of the motor's own best is the residual the owner accepts)
+				t.truthy(pace <= motor * 1.16, `crafted {pace} st/s against the motor's {motor}`)
 			end
 		)
 	end
