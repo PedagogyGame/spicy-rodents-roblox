@@ -1714,11 +1714,10 @@ function MoveValidator._stamina(
 		keepModel(after.u, after.s, nil, after.rail)
 	elseif unjudged and groundA and not footB then
 		keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), ns, nil, nearRail())
-	elseif groundB then
-		keepModel(nu, ns, nil, nil)
 	else
+		-- (a pounce's window holds the speed on the ground too: its lunge)
 		local holdTo = marks.speedHold
-		keepModel(nu, ns, if holdTo and holdTo > next.clock then holdTo else nil, free)
+		keepModel(nu, ns, if holdTo and holdTo > next.clock then holdTo else nil, if groundB then nil else free)
 	end
 	settle()
 end
