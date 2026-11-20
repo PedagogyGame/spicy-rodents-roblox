@@ -553,8 +553,9 @@ return function(t)
 			for _, e in examples do
 				print(`        {e}`)
 			end
-			-- (one known pre-existing case, both ends off the rails: trunk 1210 at 0.8, a 0.27 st step down a flare)
-			t.truthy(flagged <= 1, `honest drops flagged for a slab ({flagged})`)
+			-- (validator round 11: the one pre-existing case, trunk 1210 at 0.8, on a bough inside its trunk part's box, is
+			-- gone: slab() looks past the rails' own props)
+			t.eq(flagged, 0, `honest drops flagged for a slab ({flagged})`)
 		end
 	)
 

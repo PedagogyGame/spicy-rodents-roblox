@@ -56,6 +56,10 @@
 --     with one end on a rail slab-judged at the off-rail end's column (world.railSlab), a way round a corner or a
 --     building's end up to ValidatorWorld.C.AROUND_GAP explains a gap's wall (a third, never escalated: verdict.cornered),
 --     the sprint meter on the packets' own clocks (a gap drains the least sprint that covers it), gapMax 6.
+--   * Round 11 (2026-11-20, the round-10 review): the sprint meter on the motor's rules (_stamina: a launch off the ground
+--     charged, winded as the motor's, refilled only on the ground or a rail, a gap from the ground charged whatever its
+--     end), railSlab's column up to the rail past the rails' own props, and a ray budget per actor for the ways round a
+--     corner (budgeted).
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
