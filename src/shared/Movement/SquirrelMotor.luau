@@ -3131,7 +3131,10 @@ function SquirrelMotor.envelope(
 				-- height, so N and its neighbours. Validator round 16, the round-15 review's MEDIUM 1: the bisector test
 				-- against N alone took samples 2r along a rail, and a crafted grab-leap chain ran the governor's ceiling.
 				-- (Half a spacing off the place modelled instead of N snapped an honest grab-leap spam on a jittery link
-				-- once more in the tree fuzz.) Another route, or the same one doubled back, keeps the bisector test)
+				-- once more in the tree fuzz.) Another route, or the same one doubled back, keeps the bisector test, a
+				-- micro-stud's rounding over it: where routes meet their samples coincide but for the float sums of their
+				-- curves, and the motor's grab takes any of them (validator round 17, the round-16 review's MEDIUM 1c: N a
+				-- bough's end, the motor the trunk's top at the same point, drawn 1.5 st across)
 				local idN, tN = sId[bi], sT[bi]
 				local routeN = reg:get(idN)
 				local lenN = if routeN then routeN.length else 0
@@ -3153,7 +3156,7 @@ function SquirrelMotor.envelope(
 								if sId[e] == idN and math.abs(sT[e] - tN) * lenN <= chord + spacing then
 									taken = chord * chord <= r * across + pad * chord
 								else
-									taken = d2 - best2 <= twoR * across
+									taken = d2 - best2 <= twoR * across + 1e-6
 								end
 							end
 							if taken then
