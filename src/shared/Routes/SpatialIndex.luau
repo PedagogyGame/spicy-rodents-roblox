@@ -1,7 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Routes.SpatialIndex
 -- 20-stud index over route samples.
--- Interface (BUILD_PLAN §1.4): nearest(pos, maxDist, excl)
+-- Interface (BUILD_PLAN §1.4): nearest(pos, maxDist, excl); also forEachNear, nearestOnRoute, cell
 --
 -- The port of v5.4's `routeSpatial` (routes_movement §1.3): a hash of 8 u (20 st) cells on all three
 -- axes, one entry per arc-length sample with `t = i / (sampleCount - 1)`, 81,613 entries for the
@@ -165,6 +165,12 @@ function SpatialIndex.forEachNear(
 			end
 		end
 	end
+end
+
+-- cell(ix, iy, iz): the cell at those cell coordinates (math.floor(x / cellSize), ...), or nil; its arrays are the index's
+-- own, read only (a caller that gathers a region once, e.g. the movement envelope's grab search, walks them inline)
+function SpatialIndex.cell(self: SpatialIndex, ix: number, iy: number, iz: number): Cell?
+	return self._cells[cellKey(ix, iy, iz)]
 end
 
 -- nearestOnRoute(routeId, x, y, z, maxDist): closest sample of ONE route within maxDist (3x3x3 walk

@@ -1518,7 +1518,20 @@ SquirrelMotor.envelopeParams = {
 	forkEnterMaxT = 0.06, -- a fork or sibling hop lands near the bough start (0.018 / 0.03)
 	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
-	grabSimDt = 0.1, -- up to six ticks: a launch in the air is free only off a grab the motor's own step explains
+	-- seconds: the longest gap the grab search steps (a launch in the air is free only off a grab the motor's own step
+	-- explains): two of the longest packets the client's own send rule makes (a short frame that sends nothing and the
+	-- next, capped, that does), one of them lost (validator round 15, the round-14 review's MEDIUM 2: 0.1 s charged an
+	-- honest grab-leap in a 0.13 s packet; on a lossy, jittery link one lost packet hid as many, and their leapCost ran
+	-- the server's meter empty under a full client one)
+	grabSimDt = 2 * (SquirrelWire.SEND_EVERY + P.frameDtCap),
+	-- the grab search's reach and work for one packet (validator round 15, the round-14 review's MEDIUM 3): the rail
+	-- samples gathered once round the body's own arc, a grab and grabReach further (studs: a later grab's reach), and at
+	-- most grabWork sample visits over the gather and every grab's scan; a pattern past either explains nothing (fail
+	-- safe: "not grasped", charged, never a violation of its own); each further grab tried from the grabBeam patterns
+	-- nearest the end at most)
+	grabReach = st(3.4),
+	grabWork = 2500,
+	grabBeam = 12,
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
@@ -1537,6 +1550,41 @@ SquirrelMotor.envelopeParams = {
 	clickCopy = SquirrelWire.CLICK_COPY,
 }
 local E = SquirrelMotor.envelopeParams
+-- (how far over the motor's own speeds a modelled step may go: its substeps of other lengths, rounding)
+local C_STEP = 1.02
+
+-- the grab search's scratch, reused by every envelope (each runs to its end before another starts): the samples a packet
+-- gathers (id, t, x, y, z, height bin) and the same in order of height, the bins' starts and fills, a grab's band
+local GS = {
+	id = {} :: { number },
+	t = {} :: { number },
+	x = {} :: { number },
+	y = {} :: { number },
+	z = {} :: { number },
+	b = {} :: { number },
+	sid = {} :: { number },
+	st = {} :: { number },
+	sx = {} :: { number },
+	sy = {} :: { number },
+	sz = {} :: { number },
+	start = {} :: { number },
+	fill = {} :: { number },
+	band = {} :: { number },
+}
+
+-- drawnOf(world, route): how far the drawn pose (Motion.visualPose) lies off a route's samples, the most across (at its
+-- start, where a trunk is widest and a bough's clearance off its trunk most) and the lift (a bough's, a wire's: the same
+-- all along), kept per route (the grab search asks it of every sample a grab may take)
+local drawnCache: { [any]: { across: number, lift: number } } = setmetatable({}, { __mode = "k" }) :: any
+local function drawnOf(world: World, r: Registry.Route): { across: number, lift: number }
+	local d = drawnCache[r]
+	if d == nil then
+		local w = Motion.visualPose(world, r, 0, Curve.vec3(0, 0, 0), 1, 0)
+		d = { across = math.sqrt(w.x * w.x + w.z * w.z), lift = math.max(0, w.y) }
+		drawnCache[r] = d
+	end
+	return d :: { across: number, lift: number }
+end
 
 local function hypot2(x: number, z: number): number
 	return math.sqrt(x * x + z * z)
@@ -1645,7 +1693,10 @@ end
 --       trampoline's bounce, which are free. A launch a long gap's rail visit only explains (a rail near) is charged.
 --   railLaunch: the launch is off a rail the server has the body on, as for `charge` (validator round 13: the motor's
 --       railLeap, a free flight; round 14: never a rail merely near; a bounce alone is none).
--- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
+-- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time;
+-- grabFrom: that explanation's first grab, its client clock, the sample's place across and how far the grab's snap
+-- reached from where the body was: the validator's air bound starts there, validator round 15; grabRoute: the route its
+-- last grab took, the one the free flight leaves)
 export type Judged = {
 	vy: number,
 	xz: number,
@@ -1656,6 +1707,8 @@ export type Judged = {
 	charge: string?,
 	railLaunch: boolean?,
 	grab: number?,
+	grabFrom: { clock: number, x: number, z: number, reach: number }?,
+	grabRoute: number?,
 }
 
 -- The motor packet, field by field (validator round 5: the round-4 review's worst hole came from a field nobody checked,
@@ -2261,24 +2314,30 @@ function SquirrelMotor.envelope(
 			-- the honest body left the old rail somewhere it could reach within dt: the gap is measured
 			-- from the closest point of that reachable stretch (sampled), not from the stale position
 			local reachT = railCap * E.railTol * dt / math.max(prevRoute.length, 1e-6)
+			-- (a gap of half the longest judged, a loss burst, can hide a leap off that stretch onto the new rail, as a leap
+			-- along one rail above: across no further than a launch carries in the gap, up no more than the run's climb and
+			-- a launch rises; validator round 10: an honest transfer through a loss burst of half a second was a whole
+			-- flag. A packet or two lost, never: the transfer limits stand there. Validator round 15, the round-14 review's
+			-- LOW a: the run to a point and the leap from it share the gap, the leap only the time the run leaves)
+			local long = dt >= E.maxDt / 2
+			local riseCap = climbThenLaunch(railCap * E.railTol, 1) + E.posSlack
 			local gap = math.huge
-			local fromY = prev.y
+			local leapt = false
 			for k = -4, 4 do
 				local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
 				local q = reg:pointAt(prevRoute, tt)
 				local d = math.sqrt((dest.x - q.x) ^ 2 + (dest.y - q.y) ^ 2 + (dest.z - q.z) ^ 2)
+				local byLeap = long and dest.y - q.y <= riseCap
+				if byLeap then
+					d = math.max(0, d - launchXZ * dt * (1 - math.abs(k) / 4))
+				end
 				if d < gap then
-					gap, fromY = d, q.y
+					gap, leapt = d, byLeap
 				end
 			end
 			local travel = E.posSlack + railCap * E.railTol * dt / 4 -- between the sampled points
-			-- (a gap of half the longest judged, a loss burst, can hide a leap off that stretch onto the new rail, as a leap
-			-- along one rail above: across no further than a launch carries in the gap, up no more than the run's climb and
-			-- a launch rises; validator round 10: an honest transfer through a loss burst of half a second was a whole
-			-- flag. A packet or two lost, never: the transfer limits stand there)
-			if dt >= E.maxDt / 2 and dest.y - fromY <= climbThenLaunch(railCap * E.railTol, 1) + E.posSlack then
-				travel += launchXZ * dt
-			end
+			-- (a hidden intermediate route's reach, below: the leap's whole carry, as before)
+			local hopTravel = travel + (if leapt then launchXZ * dt else 0)
 			local graph = world.graph
 			local relation = graph:relation(prevRoute.id, nextRoute.id)
 			-- a hidden intermediate route B (two transfers inside one long gap) is legal when B passes within
@@ -2307,7 +2366,7 @@ function SquirrelMotor.envelope(
 						for k = -4, 4 do
 							local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
 							local q = reg:pointAt(prevRoute, tt)
-							local hit = world.index:nearestOnRoute(mid, q.x, q.y, q.z, C.explicitGap + travel)
+							local hit = world.index:nearestOnRoute(mid, q.x, q.y, q.z, C.explicitGap + hopTravel)
 							if hit and (best == nil or hit.d < (best :: SpatialIndex.Hit).d) then
 								best = hit
 							end
@@ -2701,6 +2760,11 @@ function SquirrelMotor.envelope(
 		-- length (no time to come down, round a corner and launch again)
 		wallTest(near.x, near.y, near.z, riseInDt, shortGap or (not next.grounded and dt <= 2 * E.shortDt))
 		pounce = pounceAgo(prevRoute)
+		if pounce ~= nil then
+			-- (the motor's pounce off a rail is free, but its flight is the pounce's, no rail leap's: validator round 15,
+			-- the round-14 review's LOW d)
+			judged.railLaunch = nil
+		end
 		judged.vy = if next.grounded then 0 else math.clamp(next.vy, -P.gravity * dt - gEps, launchUp)
 		judged.xz = launchXZ
 	end
@@ -2718,13 +2782,16 @@ function SquirrelMotor.envelope(
 		-- and Space leaps off it in the same frame, at most once per two motor frames (lastGrab: the clock of the last
 		-- one, the validator's; E and Space every second frame is how the honest motor climbs a trunk, 29 st/s). Every
 		-- pattern of grabs the gap's frames allow is stepped as the motor steps (the body on its own arc, a grab snapping
-		-- it to the nearest sample over its drawn pose and leaping at the launch's speed); `next` within posSlack of the
-		-- highest any reaches is explained, the earliest last grab of those kept, the height no higher than they reach
+		-- it to the nearest sample's drawn pose and leaping at the launch's speed); `next` is explained when it is within
+		-- posSlack under the highest a pattern reaches, over a leap off the lowest sample its grab can have taken, and
+		-- across within the leap's flight from the sample (validator round 15, the round-14 review's MEDIUM 4: the grab's
+		-- snap onto the rail is the motor's, no teleport); of those the fewest grabs, the earliest last grab, the highest
 		local frames = math.max(1, math.ceil(dt / P.substep - 1e-6))
-		-- (grasped(): the same search over a gap of up to grabSimDt, six motor frames: validator round 14, the round-13
-		-- review's HIGH 1: a launch in the air is free only off a rail the server itself puts the body on, and for a
-		-- launch the motor's own grab stepped from the last accepted place is that; ten packets a second is how a phone
-		-- at ten frames sends the motor's honest leap-and-regrab climb)
+		-- (grasped(): the same search over a gap of up to grabSimDt: validator round 14, the round-13 review's HIGH 1: a
+		-- launch in the air is free only off a rail the server itself puts the body on, and for a launch the motor's own
+		-- grab stepped from the last accepted place is that; ten packets a second is how a phone at ten frames sends the
+		-- motor's honest leap-and-regrab climb. Round 15, the round-14 review's MEDIUM 3: one gather of the samples the
+		-- grabs can reach, the patterns' grabs scanned over that small list, fewest grabs first, within E.grabWork)
 		local hiddenMemo: boolean? = nil
 		local function search(): boolean
 			if hiddenMemo ~= nil then
@@ -2736,117 +2803,496 @@ function SquirrelMotor.envelope(
 			end
 			local index = world.index :: any
 			local accept = Motion.openOnly(world)
+			local h, g = P.substep, P.gravity
+			-- the body's own arc from `prev`, no grab, frame by frame (entry f + 1: after f frames), and how far across the
+			-- air's steering can have taken it off that arc. The motor's air step per frame either steers the velocity
+			-- toward a heading at moveSpeed (accelAir) or lets it coast (dragAir), or in a pounce's window keeps it: the
+			-- speed it had fades by between the two rates and the steering adds at most its own speed for the rest, never
+			-- past the faster of the two speeds (validator round 15: a reach growing with the speed had and the steering
+			-- both, any way, let a crafted grab-leap chain along a long rail run 44 st/s where the motor's own runs 41)
+			local v0 = hypot2(prev.vx, prev.vz)
+			-- (the air steers toward moveSpeed, a sprint's at most, or v5.4's sprint in a rail leap's flight)
+			local steerTo = math.max(P.sprint * (if boosted then P.boostMult else 1), SquirrelMotor.V54.sprint)
+			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
+			-- its substeps)
+			local leapXZ = math.max(if boosted then P.leapForwardBoost else P.leapForward, steerTo) * C_STEP
+			local vmax = math.max(v0, leapXZ)
+			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
+			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
+			do
+				local ux, uz = if v0 > 1e-6 then prev.vx / v0 else 0, if v0 > 1e-6 then prev.vz / v0 else 0
+				local held = math.max(prev.attackWindow, 0)
+				local fa, fd = 1 - (1 - math.exp(-h * P.accelAir)), math.exp(-h * P.dragAir)
+				local ka, kd = 1, 1 -- (what is left of the speed had, steered every frame or coasting every frame)
+				local ta, td, th = 0, 0, 0 -- (the time it has carried the speed had, each way; the time held)
+				local y, vy = prev.y, prev.vy
+				for f = 1, frames do
+					vy = math.max(vy - g * h, -P.terminalFall)
+					y += vy * h
+					if th + h <= held + 1e-9 then
+						th += h
+					else
+						ka, kd = ka * fa, kd * fd
+						ta, td = ta + ka * h, td + kd * h
+					end
+					local t = f * h
+					local steer = steerTo * (t - th - ta)
+					local lo = v0 * (th + ta) - steer
+					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
+					local lat = steer
+					local mid = (lo + hi) / 2
+					local x, z = prev.x + ux * mid, prev.z + uz * mid
+					local r = math.max((hi - lo) / 2, lat)
+					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
+					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
+					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
+				end
+			end
+			-- the gather, once: every open sample within R1 of the arc's middle (a first grab's whole reach from any point of
+			-- the arc, its band of samples nearest to some place the steering allows included), from the index's cells that
+			-- box it, a cell at a time; within grabReach more (a later grab's) from the cells round those only when a
+			-- second grab is searched. Kept in order of height (a stud a bin), so a grab scans only the heights its nearest
+			-- sample and its band can be at
+			local cx, cy, cz = (lox + hix) / 2, (loy + hiy) / 2, (loz + hiz) / 2
+			local R1 = 0
+			for f = 1, frames + 1 do
+				local d = math.sqrt((ax[f] - cx) ^ 2 + (ay[f] - cy) ^ 2 + (az[f] - cz) ^ 2)
+				R1 = math.max(R1, d + ar[f])
+			end
+			R1 += C.airGrab + E.posSlack
+			local Rg = R1 + 2 * ar[frames + 1] + E.grabReach
+			local held = R1 -- (the radius round the middle the gather holds whole)
+			local yLo = cy - Rg
+			local bins = math.max(1, math.ceil(2 * Rg))
+			local n, work = 0, 0
+			local cs = index.cellSize or 20
+			local cellAt = index.cell
+			-- (an enclosed run is no grab's: Motion.openOnly, by route)
+			local open: { [number]: boolean } = {}
+			local gId, gT, gX, gY, gZ, gB = GS.id, GS.t, GS.x, GS.y, GS.z, GS.b
+			local sId, sT, sX, sY, sZ, start, fill = GS.sid, GS.st, GS.sx, GS.sy, GS.sz, GS.start, GS.fill
+			-- gather(R): the samples within R of the middle, from the cells that meet that ball, into sId, sX, sY, sZ in
+			-- order of height, bin b's (a stud each, up from yLo) from start[b] to start[b + 1] - 1
+			local function cellsFor(R: number): ({ any }, number)
+				local cells, total = {}, 0
+				for i = math.floor((cx - R) / cs), math.floor((cx + R) / cs) do
+					local ex = math.max(0, i * cs - cx, cx - (i + 1) * cs)
+					for j = math.floor((cy - R) / cs), math.floor((cy + R) / cs) do
+						local ey = math.max(0, j * cs - cy, cy - (j + 1) * cs)
+						for k = math.floor((cz - R) / cs), math.floor((cz + R) / cs) do
+							local ez = math.max(0, k * cs - cz, cz - (k + 1) * cs)
+							if ex * ex + ey * ey + ez * ez > R * R then
+								continue
+							end
+							local cell = if cellAt then cellAt(index, i, j, k) else nil
+							if cellAt == nil then
+								-- (an index without cell access: each cell's entries copied by its own walk)
+								local c = { ids = {}, ts = {}, xs = {}, ys = {}, zs = {}, n = 0 }
+								index:forEachNear(
+									(i + 0.5) * cs,
+									(j + 0.5) * cs,
+									(k + 0.5) * cs,
+									0,
+									function(id: number, tt: number, x: number, y: number, z: number): boolean?
+										c.n += 1
+										c.ids[c.n], c.ts[c.n], c.xs[c.n], c.ys[c.n], c.zs[c.n] = id, tt, x, y, z
+										return nil
+									end
+								)
+								cell = c
+							end
+							if cell then
+								table.insert(cells, cell)
+								total += cell.n
+							end
+						end
+					end
+				end
+				return cells, total
+			end
+			local function gather(cells: { any }, R: number)
+				for b = 1, bins do
+					fill[b] = 0
+				end
+				n = 0
+				local mx, my, mz, r2, y0, last = cx, cy, cz, R * R, yLo, bins - 1
+				local lastId, lastOk = -1, false
+				for _, cell in cells do
+					local ids, ts, xs, ys, zs = cell.ids, cell.ts, cell.xs, cell.ys, cell.zs
+					work += cell.n
+					for e = 1, cell.n do
+						local x, y, z = xs[e], ys[e], zs[e]
+						local dx, dy, dz = x - mx, y - my, z - mz
+						if dx * dx + dy * dy + dz * dz <= r2 then
+							local id = ids[e]
+							if id ~= lastId then
+								local ok = open[id]
+								if ok == nil then
+									ok = accept == nil or accept(id, ts[e])
+									open[id] = ok
+								end
+								lastId, lastOk = id, ok :: boolean
+							end
+							if lastOk then
+								n += 1
+								local b = math.floor(y - y0)
+								b = (if b < 0 then 0 elseif b > last then last else b) + 1
+								gId[n], gT[n], gX[n], gY[n], gZ[n], gB[n] = id, ts[e], x, y, z, b
+								fill[b] += 1
+							end
+						end
+					end
+				end
+				start[1] = 1
+				for b = 1, bins do
+					start[b + 1] = start[b] + fill[b]
+					fill[b] = start[b]
+				end
+				for e = 1, n do
+					local b = gB[e]
+					local at = fill[b]
+					fill[b] = at + 1
+					sId[at], sT[at], sX[at], sY[at], sZ[at] = gId[e], gT[e], gX[e], gY[e], gZ[e]
+				end
+				work += n
+			end
+			gather((cellsFor(R1)), R1)
+			local outerDone = false
+			-- (the ring out to Rg, once, when the work allows it: false when it does not)
+			local function gatherOuter(): boolean
+				outerDone = true
+				local cells, total = cellsFor(Rg)
+				if work + total > E.grabWork then
+					return false
+				end
+				gather(cells, Rg)
+				held = Rg
+				return true
+			end
+			local incomplete = false -- (the last grab's band reached past what the gather holds)
+			local over = false -- (the work ran out)
+			local function binOf(y: number): number
+				return math.clamp(math.floor(y - yLo), 0, bins - 1) + 1
+			end
+			-- grab(x, y, z, r): the motor's grab from somewhere within r across of (x, y, z), the height known: the nearest
+			-- sample N, and every sample S that is the nearest to some such place (|S - c|^2 - |N - c|^2 <= 2 r |S - N|
+			-- across, c the place modelled). Returns the highest's drawn pose (where the leap leaves from) across and its
+			-- height, the lowest sample (a leap off it ends no lower: validator round 14), how far the grab's snap took the
+			-- body (N's distance and the drawn pose's offset), and how far across the body may be off that drawn pose (the
+			-- others' spread, their own drawn poses, a trunk's heading in doubt); nil when nothing is within a grab, when
+			-- the gather does not hold all of N's band, or past the work (fail safe)
+			local band = GS.band
+			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
+			local function grab(
+				x: number,
+				y: number,
+				z: number,
+				r: number
+			): (number?, number, number, number, number, number)
+				incomplete = false
+				local X, Y, Z, S = sX, sY, sZ, start
+				local reach = C.airGrab + r + E.posSlack
+				local best2, bi = reach * reach, 0
+				local b0 = binOf(y)
+				local seen = 0
+				-- (nearest: the bins up from the body's, then down, each while it can hold a nearer sample)
+				for b = b0, bins do
+					local dy = yLo + (b - 1) - y
+					if b > b0 and dy * dy >= best2 then
+						break
+					end
+					for e = S[b], S[b + 1] - 1 do
+						local ex, ey, ez = X[e] - x, Y[e] - y, Z[e] - z
+						local d2 = ex * ex + ey * ey + ez * ez
+						if d2 < best2 then
+							best2, bi = d2, e
+						end
+					end
+					seen += S[b + 1] - S[b] + 1
+				end
+				for b = b0 - 1, 1, -1 do
+					local dy = y - (yLo + b)
+					if dy * dy >= best2 then
+						break
+					end
+					for e = S[b], S[b + 1] - 1 do
+						local ex, ey, ez = X[e] - x, Y[e] - y, Z[e] - z
+						local d2 = ex * ex + ey * ey + ez * ez
+						if d2 < best2 then
+							best2, bi = d2, e
+						end
+					end
+					seen += S[b + 1] - S[b] + 1
+				end
+				work += seen
+				if bi == 0 then
+					return nil, 0, 0, 0, 0, 0
+				end
+				local d = math.sqrt(best2)
+				local twoR = 2 * r
+				local w = d + twoR
+				if math.sqrt((x - cx) ^ 2 + (y - cy) ^ 2 + (z - cz) ^ 2) + w > held then
+					incomplete = true
+					return nil, 0, 0, 0, 0, 0
+				end
+				-- (the band, within d + 2r: its highest and lowest, then how far across its members lie off the highest)
+				local nx, nz = X[bi], Z[bi]
+				local top, topY = bi, Y[bi]
+				local lowY = topY
+				local w2 = w * w + 1e-9
+				local nb = 0
+				local bLo, b1 = binOf(y - w), binOf(y + w)
+				if work + S[b1 + 1] - S[bLo] > E.grabWork then
+					-- (past the work: fail safe)
+					over = true
+					return nil, 0, 0, 0, 0, 0
+				end
+				for b = bLo, b1 do
+					for e = S[b], S[b + 1] - 1 do
+						local ex, ey, ez = X[e] - x, Y[e] - y, Z[e] - z
+						local d2 = ex * ex + ey * ey + ez * ez
+						if d2 <= w2 then
+							local ux, uz = X[e] - nx, Z[e] - nz
+							if e == bi or d2 - best2 <= twoR * math.sqrt(ux * ux + uz * uz) then
+								nb += 1
+								band[nb] = e
+								local sy = Y[e]
+								if sy > topY then
+									top, topY = e, sy
+								elseif sy < lowY then
+									lowY = sy
+								end
+							end
+						end
+					end
+				end
+				work += S[b1 + 1] - S[bLo] + nb
+				-- (the leap leaves from the highest's drawn pose: off a trunk toward where the body came from (enterRoute's
+				-- trunk normal), so within r of the place modelled, the farther the less its heading is in doubt; a bough's
+				-- clearance off its trunk is its own)
+				local tx, tz = X[top], Z[top]
+				local topId = sId[top]
+				local grabbed = reg:get(topId)
+				local px, pz, lift, doubt, m = tx, tz, 0, 0, 0
+				if grabbed then
+					local ux, uz = x - tx, z - tz
+					local l = math.sqrt(ux * ux + uz * uz)
+					local drawn = Motion.visualPose(
+						world,
+						grabbed,
+						sT[top],
+						Curve.vec3(tx, topY, tz),
+						if l > 1e-6 then ux / l else 0,
+						if l > 1e-6 then uz / l else 1
+					)
+					px, pz, lift = drawn.x, drawn.z, math.max(0, drawn.y - topY)
+					m = hypot2(px - tx, pz - tz)
+					if grabbed.kind == "trunk" and not grabbed.flags.fixedSurfaceZ then
+						local clear = l - r - st(0.13)
+						doubt = if clear > 1e-6 then math.min(2 * m, m * r / clear) else 2 * m
+					end
+				end
+				-- (the band's others across off the highest; one on another route, its own drawn pose off it as well)
+				local spread, lastId, lastOff = 0, -1, 0
+				for k = 1, nb do
+					local e = band[k]
+					local id = sId[e]
+					if id ~= lastId then
+						local other = reg:get(id)
+						lastId = id
+						lastOff = if id == topId then 0 elseif other then drawnOf(world, other).across + m else m
+					end
+					local ux, uz = X[e] - tx, Z[e] - tz
+					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
+				end
+				grabbedId, grabbedT = topId, sT[top]
+				return px, topY + lift, pz, lowY, d + m, spread + doubt
+			end
+			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
+			-- bound starts)
 			local bestLast, bestTop = math.huge, -math.huge
-			local h = P.substep
-			-- (stepped as the motor steps, frame by frame, each frame with no grab or with one (two motor frames after the
-			-- last, the validator's or this pattern's), the shared start of every pattern stepped once (validator round
-			-- 14: six frames). x, z the body's place to within r studs across; the first grab from `prev` itself is
-			-- exact, a later one may take any sample nearest to some point within r, which lies no higher than the
-			-- nearest sample's distance and r over the body)
-			local function step(
+			local bestFrom: { clock: number, x: number, z: number, reach: number }? = nil
+			local bestRoute: number? = nil
+			-- (a pattern after a grab and the leap's first frame: `f` frames stepped, the body at x, z within r across,
+			-- y its height, vy, `drop` how much lower a leap off the lowest sample of its grab starts, `last` the grab's clock)
+			type Pattern = {
 				f: number,
 				x: number,
 				y: number,
 				z: number,
 				vy: number,
-				vx: number,
-				vz: number,
 				r: number,
-				leapt: boolean,
 				drop: number,
-				last: number?,
-				grabbedLast: boolean
-			)
-				if f >= frames then
-					-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's
-					-- own leap speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body
-					-- 4 st under a bough "grabbed" it every 0.1 s packet)
-					local floorY = y - drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
-					if last ~= nil and next.y <= y + E.posSlack and next.y >= floorY then
-						-- (the earliest last grab of any pattern that explains it, the height kept to the highest)
-						bestLast, bestTop = math.min(bestLast, last), math.max(bestTop, y)
+				last: number,
+				route: number,
+				snap: number,
+				from: { clock: number, x: number, z: number, reach: number },
+			}
+			local function finish(s: Pattern)
+				local y, vy, r = s.y, s.vy, s.r
+				for _ = s.f + 1, frames do
+					vy = math.max(vy - g * h, -P.terminalFall)
+					y += vy * h
+					r += leapXZ * h
+				end
+				-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own leap
+				-- speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body 4 st under a
+				-- bough "grabbed" it every 0.1 s packet; across within its flight from the sample: round 15)
+				local floorY = y - s.drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
+				-- (and from `prev`, across no further than the fastest the air or a leap carries in the gap and the grabs'
+				-- snaps onto their samples: validator round 15)
+				if
+					next.y <= y + E.posSlack
+					and next.y >= floorY
+					and hypot2(next.x - s.x, next.z - s.z) <= r + E.posSlack
+					and hypot2(next.x - prev.x, next.z - prev.z) <= vmax * dt + s.snap + E.posSlack
+				then
+					if s.last < bestLast then
+						bestLast, bestFrom, bestRoute = s.last, s.from, s.route
 					end
-					return
+					bestTop = math.max(bestTop, y)
 				end
-				-- (no grab: the body on its own arc; the air's steering, accelAir, after a leap its push, any way across)
-				local fvy = math.max(vy - P.gravity * h, -P.terminalFall)
-				step(
-					f + 1,
-					x + vx * h,
-					y + fvy * h,
-					z + vz * h,
-					fvy,
-					vx,
-					vz,
-					r + (if leapt then launchXZ * h else P.accelAir * launchXZ * h * h),
-					leapt,
-					drop,
-					last,
-					false
-				)
+			end
+			local function leap(
+				f: number,
+				at: number,
+				gx: number,
+				gy: number,
+				gz: number,
+				lowY: number,
+				spread: number,
+				snap: number,
+				from: { clock: number, x: number, z: number, reach: number }
+			): Pattern
+				return {
+					f = f + 1,
+					x = gx,
+					y = gy + launchUp * h,
+					z = gz,
+					vy = launchUp,
+					r = spread + leapXZ * h,
+					drop = gy - lowY,
+					last = at,
+					route = grabbedId,
+					snap = snap,
+					from = from,
+				}
+			end
+			-- (a grab, and when its band reaches past the first gather the ring round it, gathered once if the work allows;
+			-- fail safe past the work: `spent`)
+			local spent = false
+			local function grabWide(
+				x: number,
+				y: number,
+				z: number,
+				r: number
+			): (number?, number, number, number, number, number)
+				local gx, gy, gz, lowY, d, spread = grab(x, y, z, r)
+				if gx == nil and incomplete and not outerDone then
+					if gatherOuter() then
+						gx, gy, gz, lowY, d, spread = grab(x, y, z, r)
+					else
+						spent = true
+					end
+				end
+				spent = spent or over
+				return gx, gy, gz, lowY, d, spread
+			end
+			-- one grab: from the arc, at any frame two after the last grab the validator knows of, the earliest that explains
+			-- `next` kept
+			local level: { Pattern } = {}
+			for f = 0, frames - 1 do
 				local at = prev.clock + (f + 1) * h
-				if grabbedLast or (lastGrab ~= nil and at - lastGrab < 2 * h - 1e-6) then
-					return
+				if lastGrab == nil or at - lastGrab >= 2 * h - 1e-6 then
+					if work > E.grabWork then
+						spent = true
+						break
+					end
+					local gx, gy, gz, lowY, d, spread = grabWide(ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1])
+					if spent then
+						break
+					end
+					if gx then
+						local s = leap(
+							f,
+							at,
+							gx,
+							gy,
+							gz,
+							lowY,
+							spread,
+							d + ar[f + 1],
+							{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
+						)
+						finish(s)
+						if bestFrom then
+							break
+						end
+						table.insert(level, s)
+					end
 				end
-				-- (a grab: the nearest sample, Space in the same frame)
-				local hit = index:nearest(x, y, z, C.airGrab + r + E.posSlack, nil, accept)
-				if hit == nil then
-					return
+			end
+			-- more grabs, a level at a time while none explains `next` and the work allows (fail safe past it)
+			while bestFrom == nil and #level > 0 and not spent do
+				-- (the patterns nearest `next` first, at most grabBeam of them: a pattern explains `next` only by ending
+				-- near it; the rest are left, fail safe)
+				if #level > E.grabBeam then
+					table.sort(level, function(a: Pattern, b: Pattern): boolean
+						local da = math.sqrt((a.x - next.x) ^ 2 + (a.y - next.y) ^ 2 + (a.z - next.z) ^ 2) - a.r
+						local db = math.sqrt((b.x - next.x) ^ 2 + (b.y - next.y) ^ 2 + (b.z - next.z) ^ 2) - b.r
+						return da < db
+					end)
+					for k = #level, E.grabBeam + 1, -1 do
+						level[k] = nil
+					end
 				end
-				-- (from somewhere within r across of (x, y, z), its height known: a sample S nearer to such a place
-				-- than the nearest one N is when |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the place modelled; the
-				-- highest of them, and the lowest: validator round 14, a leap off a grab ends no lower than one off the
-				-- lowest sample the grab can have taken)
-				local top = hit
-				local lowY = hit.y
-				if r > 0 then
-					local d2 = hit.d * hit.d
-					local band = hit.d + 2 * r
-					index:forEachNear(
-						x,
-						y,
-						z,
-						math.ceil(band / (index.cellSize or 20)),
-						function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
-							if (sy > top.y or sy < lowY) and (accept == nil or accept(id, tt)) then
-								local e2 = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
-								if e2 - d2 <= 2 * r * math.sqrt((sx - hit.x) ^ 2 + (sz - hit.z) ^ 2) then
-									if sy > top.y then
-										top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
-									end
-									lowY = math.min(lowY, sy)
+				local deeper: { Pattern } = {}
+				-- (patterns whose last grab took the same sample on the same frame go on as one, its doubt the most of
+				-- theirs: the same futures, so the patterns grow no faster than the frames and the samples)
+				local same: { [number]: Pattern } = {}
+				for _, s in level do
+					local y, vy, r = s.y, s.vy, s.r
+					for f = s.f, frames - 1 do
+						if f > s.f then
+							if work > E.grabWork then
+								spent = true
+								break
+							end
+							local gx, gy, gz, lowY, d, spread = grabWide(s.x, y, s.z, r)
+							if spent then
+								break
+							end
+							if gx then
+								local more =
+									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d + r, s.from)
+								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
+								local was = same[key]
+								if was then
+									was.r, was.drop = math.max(was.r, more.r), math.max(was.drop, more.drop)
+									was.snap = math.max(was.snap, more.snap)
+									finish(was)
+								else
+									same[key] = more
+									finish(more)
+									table.insert(deeper, more)
 								end
 							end
-							return nil
 						end
-					)
+						vy = math.max(vy - g * h, -P.terminalFall)
+						y += vy * h
+						r += leapXZ * h
+					end
+					if spent then
+						break
+					end
 				end
-				local lift = 0
-				local grabbed = reg:get(top.routeId)
-				if grabbed then
-					local drawn = Motion.visualPose(world, grabbed, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
-					lift = math.max(0, drawn.y - top.y)
-				end
-				local gy = top.y + lift
-				step(
-					f + 1,
-					top.x,
-					gy + launchUp * h,
-					top.z,
-					launchUp,
-					0,
-					0,
-					(if r > 0 then r + hit.d else 0) + launchXZ * h,
-					true,
-					gy - lowY,
-					at,
-					true
-				)
+				level = deeper
 			end
-			step(0, prev.x, prev.y, prev.z, prev.vy, prev.vx, prev.vz, 0, false, 0, nil, false)
-			if bestLast < math.huge then
+			if bestFrom then
 				hiddenMemo = true
 				judged.grab = bestLast
+				judged.grabFrom = bestFrom
+				judged.grabRoute = bestRoute
 				judged.y = math.min(judged.y or next.y, bestTop)
 			end
 			return hiddenMemo :: boolean
@@ -2997,7 +3443,8 @@ function SquirrelMotor.envelope(
 			-- but earns nothing: a leap off the ground, charged, its flight no free one)
 			if not tramp and (prev.grounded or not grasped()) then
 				judged.charge = if pounce ~= nil then "pounce" else "leap"
-			elseif not prev.grounded and grasped() then
+			elseif not prev.grounded and grasped() and pounce == nil then
+				-- (a pounce off the rail is free but no rail leap's flight: validator round 15, the round-14 review's LOW d)
 				judged.railLaunch = true
 			end
 			capUp = if fromGroundOrRail then launchUp else pounceUp
@@ -3065,7 +3512,13 @@ function SquirrelMotor.envelope(
 		local dxz = hypot2(next.x - prev.x, next.z - prev.z)
 		local fastest = math.max(groundCap, if launched then launchXZ else 0, hypot2(prev.vx, prev.vz) * E.speedTol)
 		local allowedXZ = fastest * dt + E.posSlack
-		if dxz > allowedXZ and not (not shortGap and plausible() and dxz <= allowedXZ + C.airGrab) then
+		-- (a launch the grab search explains is across where the motor's grab and leap put it: validator round 15, the
+		-- round-14 review's MEDIUM 4, E+Space beside a rail was a "teleport" by the grab's snap onto it)
+		if
+			dxz > allowedXZ
+			and not (not shortGap and plausible() and dxz <= allowedXZ + C.airGrab)
+			and not (launched and grasped())
+		then
 			add(out, "teleport", math.min(1, dxz / allowedXZ - 1), `moved {dxz} st in {dt} s (allowed {allowedXZ})`)
 		end
 		-- vertical displacement: within what the start and end vertical speeds allow
@@ -3145,8 +3598,9 @@ function SquirrelMotor.envelope(
 				and plausible()
 				and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
 				and (dy <= 0 or railHigh())
-			if not landing and not railVisit and dy > 0 and hidden() then
-				-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden)
+			if not landing and not railVisit and (dy > 0 or launched) and hidden() then
+				-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden; down too, a grab's snap
+				-- onto a lower sample: validator round 15)
 				railVisit = true
 			end
 			if not landing and not railVisit then

@@ -78,6 +78,11 @@
 --     merely near earns nothing, and a gap's hidden time is charged as if no rail were there; (S2) charge first, credit
 --     second: every hidden or claimed launch pays leapCost unless S1 holds, time credited as a flight is never refilled,
 --     one carry per flight. A move with an end on a rail judges its off-rail leg as a move of its own (legOf).
+--   * Round 15 (2026-11-20, the round-14 review): a move with both ends on a rail is the rail's pace only along one route
+--     within its cap; any other leaves A, crosses and grabs B, its leg judged as the one-end move's (legOf). The grab search
+--     reaches the longest honest packet (grabSimDt) at a bounded cost, and a launch it explains starts the air bound at
+--     its first grab (judged.grabFrom). A ledge excuses no leap the body needed to get onto it; a leap onto a rail higher
+--     than a grab from the ground is paid; a pounce off a rail flies as a pounce.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -172,6 +177,9 @@ type Marks = {
 	speedArcAt: number?,
 	speedArcY: number?,
 	speedArcVy: number?,
+	-- (the route a free flight left, when the server had the body on it: a relaunch hidden in an air gap off that same
+	-- route is the motor's free leap chain, validator round 15)
+	speedRoute: number?,
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -425,7 +433,7 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 	end
 	local m = marks :: Marks
 	-- (validator round 13, the round-12 review's HIGH 1: a snap, a move the server made, end a free flight: P2)
-	m.speedRail, m.speedArcAt, m.speedArcY, m.speedArcVy = nil, nil, nil, nil
+	m.speedRail, m.speedArcAt, m.speedArcY, m.speedArcVy, m.speedRoute = nil, nil, nil, nil, nil
 	local key = math.floor(now / CLOCK_BUCKET)
 	local newest = m.offsets[#m.offsets]
 	if newest and newest.server == key then
@@ -687,6 +695,9 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 	local charge: string? = nil -- (a launch the meter pays for: the envelope's judged.charge)
 	local pounceAt: number? = nil
 	local railLaunch: boolean? = nil -- (the launch is off a rail the envelope saw or a visit it explains: judged.railLaunch)
+	-- (the first grab of the motor's own grab and leap that explain the launch: judged.grabFrom)
+	local grabFrom: { clock: number, x: number, z: number, reach: number }? = nil
+	local launchRoute: number? = nil -- (the route a free launch left: prev's, or the grab's)
 	-- what the validator keeps of the packet's speeds (the round-3 review: no later packet is judged by a speed only the
 	-- client claimed): the envelope's Judged, or, for a move it does not judge, the claim held to the motor's own bounds
 	local P = SquirrelMotor.params
@@ -745,6 +756,8 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
 		charge = judged.charge
 		railLaunch = judged.railLaunch
+		grabFrom = if railLaunch then judged.grabFrom else nil
+		launchRoute = if railLaunch then prev.routeId or judged.grabRoute else nil
 		if judged.y then
 			-- (a plain arc: the baseline no higher than the arc, whatever slack the packet took)
 			next.y = judged.y :: number
@@ -802,6 +815,8 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		launched,
 		pounceAt,
 		railLaunch,
+		grabFrom,
+		launchRoute,
 		violations
 	)
 
@@ -1437,6 +1452,8 @@ function MoveValidator._stamina(
 	launched: boolean,
 	pounceAt: number?,
 	railLaunch: boolean?,
+	grabFrom: { clock: number, x: number, z: number, reach: number }?,
+	launchRoute: number?,
 	violations: { Violation }
 )
 	local marks = actor.marks
@@ -1531,13 +1548,15 @@ function MoveValidator._stamina(
 	local sprintLo: number? = walkLo
 	-- (`rail`: the flight is free from here; `arcFrom`: a free launch, its arc dated from this packet (its clock, its height
 	-- and the vertical speed judged); a free flight carried on keeps its launch's)
-	local function keepModel(nu: number?, ns: number?, hold: number?, rail: boolean?, arcFrom: State?)
+	-- (`route`: the rail a fresh free flight left, when the server had the body on it)
+	local function keepModel(nu: number?, ns: number?, hold: number?, rail: boolean?, arcFrom: State?, route: number?)
 		marks.speedU, marks.speedS, marks.speedHold = nu, ns, hold
 		marks.speedRail = if rail then true else nil
 		if not rail then
-			marks.speedArcAt, marks.speedArcY, marks.speedArcVy = nil, nil, nil
+			marks.speedArcAt, marks.speedArcY, marks.speedArcVy, marks.speedRoute = nil, nil, nil, nil
 		elseif arcFrom then
 			marks.speedArcAt, marks.speedArcY, marks.speedArcVy = arcFrom.clock, arcFrom.y, arcFrom.vy
+			marks.speedRoute = route
 		end
 	end
 	-- the launch's speed: the envelope's cap held to the claim (keepXZ), a winded one's no more than a winded leap or pounce;
@@ -1553,7 +1572,8 @@ function MoveValidator._stamina(
 			s,
 			if pounceAt then pounceAt + P.pounceWindow else nil,
 			freeLaunch,
-			if freeLaunch then next else nil
+			if freeLaunch then next else nil,
+			if railLaunch == true then launchRoute else marks.speedRoute
 		)
 	end
 	if exempt then
@@ -1663,11 +1683,13 @@ function MoveValidator._stamina(
 	local function launchAge(): number
 		return math.min(span, math.max(P.substep, (P.leapUp * E.launchTol - next.vy) / P.gravity))
 	end
-	local function hiddenLaunch(): (number, boolean)
+	-- (`along`: the route, when not the one `prev` is on: a relaunch in an air gap off the route the free flight left; no
+	-- run along it then, the flight's own reach judged with the gap)
+	local function hiddenLaunch(along: number?): (number, boolean)
 		local launchUp = P.leapUp * E.launchTol
 		local vy = next.vy
 		local tau = launchAge()
-		local id = prev.routeId
+		local id = along or prev.routeId
 		local route = if id ~= nil then self.world.registry:get(id) else nil
 		if route == nil then
 			return tau, false
@@ -1688,7 +1710,8 @@ function MoveValidator._stamina(
 				minY,
 				maxY,
 				function(sid: number, sx: number, sy: number, sz: number): boolean
-					return sid == id and (sx - prev.x) ^ 2 + (sy - prev.y) ^ 2 + (sz - prev.z) ^ 2 <= run * run
+					return sid == id
+						and (along ~= nil or (sx - prev.x) ^ 2 + (sy - prev.y) ^ 2 + (sz - prev.z) ^ 2 <= run * run)
 				end
 			)
 	end
@@ -1711,15 +1734,17 @@ function MoveValidator._stamina(
 	-- (a gap from the ground ending in the air with no rising speed fell off an edge only where one can be: the height its
 	-- fall from rest starts at no more than a step over where the gap started, or a floor at that height where the body
 	-- left it (back along its velocity by the fall's time; two rays at most). Validator round 14, the round-13 review's LOW: the sign of a
-	-- claimed vertical speed alone skipped a hidden leap, P1)
-	local function fellOff(): boolean
+	-- claimed vertical speed alone skipped a hidden leap, P1. Round 15, the round-14 review's LOW b: a ledge only one the
+	-- body got onto without a leap it did not pay for: `climb` over where it started and a step (from the ground none; off
+	-- a rail, the free leap's rise))
+	local function fellOff(climb: number): boolean
 		local fall = math.max(0, -next.vy) / P.gravity
 		local top = next.y + P.gravity * fall * fall / 2
 		local step = Units.st(1.4) + E.posSlack
 		if top <= prev.y + step then
 			return true
 		end
-		if landable == nil then
+		if landable == nil or top > prev.y + climb + step then
 			return false
 		end
 		-- (the edge where the fall began, and a stud further back along the way it went: the feet leave a little past it)
@@ -1786,8 +1811,13 @@ function MoveValidator._stamina(
 		-- window's for a pounce, else the time a leap's vertical speed (leapUp, winded or not) takes to fall to the one
 		-- judged: a claim at the clamp is a launch at the packet's very end, all of its time before it. Off a rail the
 		-- rail's pace is the rail's own)
+		-- (a launch the envelope's grab search explains: from that grab on, the motor's own grabs and their free leaps; before
+		-- it, the body's own flight to where the grab's snap reached from: validator round 15, the round-14 review's MEDIUM 4)
 		local inAir = math.clamp(
-			if pounceAt then next.clock - pounceAt else (P.leapUp - math.min(next.vy, P.leapUp)) / P.gravity,
+			if grabFrom
+				then next.clock - grabFrom.clock
+				elseif pounceAt then next.clock - pounceAt
+				else (P.leapUp - math.min(next.vy, P.leapUp)) / P.gravity,
 			0,
 			span
 		)
@@ -1812,7 +1842,9 @@ function MoveValidator._stamina(
 			if railLaunch then V54.sprint else nil
 		)
 		if before > 1e-3 and not railA then
-			local onFoot = across - fly * C.STAMINA_STEP - E.posSlack
+			local onFoot = if grabFrom
+				then math.sqrt((grabFrom.x - prev.x) ^ 2 + (grabFrom.z - prev.z) ^ 2) - grabFrom.reach - E.posSlack
+				else across - fly * C.STAMINA_STEP - E.posSlack
 			local function need(air: boolean): number
 				local inAirBefore = if air then before else 0
 				local dW = stepped(inAirBefore, true, 0, 0, before)
@@ -1853,7 +1885,74 @@ function MoveValidator._stamina(
 		local launchUp = P.leapUp * E.launchTol
 		local railT, groundT = span, 0
 		local atRail, cap = false, launchCap
-		if not (railA and railB) then
+		local reg = self.world.registry
+		-- (the free leap off a rail the server had the body on, from its drawn pose at a point of it (its height the drawn
+		-- pose's: a bough's lift) down to height y: its time, at most T, and what it covers steered at v5.4's sprint)
+		local function freeLeap(route: any, hit: any, y: number, T: number): (number, number, number, number, number)
+			local topY = hit.y
+			local off = C.DRAWN_MAX
+			if route then
+				local drawn = Motion.visualPose(self.world, route, hit.t, Curve.vec3(hit.x, hit.y, hit.z), 0, 1)
+				off, topY = math.sqrt((drawn.x - hit.x) ^ 2 + (drawn.z - hit.z) ^ 2), math.max(hit.y, drawn.y)
+			end
+			local disc = launchUp * launchUp + 2 * P.gravity * (topY - y)
+			local tf = math.clamp(if disc >= 0 then (launchUp + math.sqrt(disc)) / P.gravity else 0, 0, T)
+			local dF, uF, sF = SquirrelMotor.speedBound(launchCap, V54.sprint, V54.sprint, false, tf, nil, V54.sprint)
+			return off, tf, dF, uF, sF
+		end
+		if railA and railB then
+			-- (both ends on a rail, validator round 15, the round-14 review's MEDIUM 1: the rail's pace, refilled, only for a
+			-- move along one route within its cap. Any other is judged as the one-end move is: a run along A to the point
+			-- NA of it nearest B (the end's own point on one route: a leap along it), one free leap off A (the server had
+			-- the body on it: S1) and the leg across to NB, B's point nearest NA, less A's drawn offset and a grab onto
+			-- another rail, judged as any off-rail move in the time the runs leave (legOf), then a run along B; refilled
+			-- only for the runs and the ground time neither sprinting nor in a leap's flight)
+			local ra, rb = reg:get(prev.routeId), reg:get(next.routeId)
+			local capA = if ra then SquirrelMotor.routeCap(ra, false) * E.railTol else math.huge
+			local capB = if rb then SquirrelMotor.routeCap(rb, false) * E.railTol else math.huge
+			local along = prev.routeId == next.routeId
+				and ra ~= nil
+				and math.abs(next.railT - prev.railT) * ra.length <= capA * (span + P.substep) + E.posSlack
+			if not along and ra and rb then
+				local a = { x = prev.x, y = prev.y, z = prev.z, t = prev.railT }
+				local b = { x = next.x, y = next.y, z = next.z, t = next.railT }
+				if prev.routeId ~= next.routeId then
+					local index = self.world.index
+					local dist = math.sqrt((next.x - prev.x) ^ 2 + (next.y - prev.y) ^ 2 + (next.z - prev.z) ^ 2)
+					local hitA = index:nearestOnRoute(
+						prev.routeId,
+						next.x,
+						next.y,
+						next.z,
+						math.min(dist + C.ROUTE_NEAR + 1, C.RAIL_REACH_MAX)
+					)
+					if hitA then
+						a = hitA
+					end
+					local back = math.sqrt((next.x - a.x) ^ 2 + (next.y - a.y) ^ 2 + (next.z - a.z) ^ 2)
+					local hitB = index:nearestOnRoute(
+						next.routeId,
+						a.x,
+						a.y,
+						a.z,
+						math.min(back + C.ROUTE_NEAR + 1, C.RAIL_REACH_MAX)
+					)
+					if hitB then
+						b = hitB
+					end
+				end
+				local runA = math.sqrt((a.x - prev.x) ^ 2 + (a.y - prev.y) ^ 2 + (a.z - prev.z) ^ 2)
+				local runB = math.sqrt((next.x - b.x) ^ 2 + (next.y - b.y) ^ 2 + (next.z - b.z) ^ 2)
+				railT = math.min(span, runA / capA + runB / capB)
+				local T = span - railT
+				local off, tf, dF, uF, sF = freeLeap(ra, a, b.y, T)
+				-- (a grab lands at the rail's nearest point: onto another rail it reaches across to NB, along one route it
+				-- adds nothing, the envelope's section 2)
+				local grabTo = if prev.routeId == next.routeId then 0 else Motion.C.airGrab
+				local leg = math.max(0, math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2) - off - grabTo - E.posSlack)
+				sprinted, groundT = legOf(leg, T, tf, dF, uF, sF, leapXZ)
+			end
+		else
 			local o = if railA then next else prev
 			local r = if railA then prev else next
 			local route = self.world.registry:get(r.routeId)
@@ -1888,7 +1987,8 @@ function MoveValidator._stamina(
 					-- fallen off, leapt off the ground: paid, its carry the last of the time)
 					local tau: number
 					tau, atRail = hiddenLaunch()
-					if not atRail and (next.vy > 0 or not fellOff()) then
+					local climb = math.max(0, topY - prev.y) + launchUp * launchUp / (2 * P.gravity)
+					if not atRail and (next.vy > 0 or not fellOff(climb)) then
 						cap = hiddenLeap()
 						leg = math.max(0, leg - cap * tau * C.STAMINA_STEP)
 						T = math.max(0, T - tau)
@@ -1899,7 +1999,19 @@ function MoveValidator._stamina(
 					sprinted, groundT = legOf(leg, T, tf, dF, uF, sF, leapXZ)
 				end
 			elseif groundA then
-				sprinted, groundT = legOf(leg, T, 0, 0, u, s, leapXZ)
+				-- (from the ground onto a rail higher than a grab from where it stood reaches: a leap onto it, paid,
+				-- its carry while it rises there; validator round 15, the round-14 review's LOW c)
+				local over = ny - (o.y + Motion.C.airGrab + E.posSlack)
+				if over > 0 then
+					local leapCap = hiddenLeap()
+					local tUp = if over < launchUp * launchUp / (2 * P.gravity)
+						then (launchUp - math.sqrt(launchUp * launchUp - 2 * P.gravity * over)) / P.gravity
+						else launchUp / P.gravity
+					tUp = math.min(tUp, T)
+					sprinted, groundT = legOf(leg, T, tUp, leapCap * tUp, u, s, leapXZ)
+				else
+					sprinted, groundT = legOf(leg, T, 0, 0, u, s, leapXZ)
+				end
 			else
 				-- (onto a rail from the air: the flight in progress until its arc comes down to the rail's height)
 				local t1 = math.min(fallTo(ny), T)
@@ -1921,7 +2033,7 @@ function MoveValidator._stamina(
 		elseif footB then
 			keepModel(math.min(hxz, launchCap), P.sprint, nil, nil)
 		else
-			keepModel(math.min(hxz, cap), P.sprint, nil, atRail, next)
+			keepModel(math.min(hxz, cap), P.sprint, nil, atRail, next, prev.routeId)
 		end
 		settle()
 		return
@@ -1947,7 +2059,7 @@ function MoveValidator._stamina(
 				next.z,
 				SquirrelMotor.launchCapXZ(false) * E.launchTol * span
 			)
-			if not bed and (next.vy > 0 or not fellOff()) then
+			if not bed and (next.vy > 0 or not fellOff(0)) then
 				leapXZ = hiddenLeap()
 				gapCap = leapXZ
 				leapPaid = true
@@ -2006,7 +2118,19 @@ function MoveValidator._stamina(
 		-- review's LOW a)
 		local gapTired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
 		local leapXZ = (if gapTired then P.leapForwardWinded else P.leapForward) * E.launchTol
-		if tau > 0 then
+		-- (validator round 15: a free flight off a rail the server had the body on, on its arc when the gap began, and a
+		-- relaunch at hand on that same route where `next` is: the motor's free leap chain along it (caught by the rail,
+		-- Space again), free and a rail leap's flight; any other relaunch is a leap off the ground, paid)
+		local chain = false
+		if tau > 0 and free and marks.speedRoute ~= nil then
+			local _, at = hiddenLaunch(marks.speedRoute)
+			chain = at
+		end
+		if chain then
+			local launchCap = SquirrelMotor.launchCapXZ(false) * E.launchTol
+			d3, u3, s3 = SquirrelMotor.speedBound(launchCap, s2, V54.sprint, false, tau, nil, V54.sprint)
+			u3 = math.min(u3, launchCap)
+		elseif tau > 0 then
 			leapXZ = hiddenLeap()
 			d3, u3, s3 = SquirrelMotor.speedBound(leapXZ, s2, P.walk, false, tau)
 			u3 = math.min(u3, leapXZ)
@@ -2030,14 +2154,14 @@ function MoveValidator._stamina(
 		end
 		local ku, ks, kr = u1, s1, free and onArc(next.clock, next.y)
 		if relaunch then
-			ku, ks, kr = math.min(hxz, u3), s3, false
+			ku, ks, kr = math.min(hxz, u3), s3, chain
 		elseif groundB then
 			ku, ks, kr = u2, s2, false
 		end
 		if sprinted > 0 then
 			ku, ks = math.max(ku, P.sprint), P.sprint
 		end
-		after = { u = ku, s = ks, rail = if kr then true else nil, arc = false }
+		after = { u = ku, s = ks, rail = if kr then true else nil, arc = chain }
 	else
 		-- a move judged move by move: on the ground, in the air, or one that lands or walks off an edge
 		if groundA and groundB then
@@ -2091,7 +2215,7 @@ function MoveValidator._stamina(
 	-- ends in the air hid a launch)
 	local _, nu, ns = stepped(airT, airFirst, span - sprinted, span)
 	if after then
-		keepModel(after.u, after.s, nil, after.rail, if after.arc then next else nil)
+		keepModel(after.u, after.s, nil, after.rail, if after.arc then next else nil, marks.speedRoute)
 	elseif unjudged and groundA and not footB then
 		keepModel(math.min(hxz, gapCap), ns, nil, nil)
 	else
