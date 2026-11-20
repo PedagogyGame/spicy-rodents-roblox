@@ -123,12 +123,24 @@ return function(t)
 		t.eq(data.wallet.cents, 10000 + ReceiptLedger.KEEP + 10)
 		t.truthy((ProfileSchema.validate(data)))
 	end)
-	t.test("schema: new player, v0 migration, newer schema refused, corrupt refused", function()
-		local fresh = ProfileSchema.migrate(nil)
-		t.eq((fresh :: any).wallet.cents, 0)
-		local v0 = ProfileSchema.migrate({ cents = 450 })
-		t.eq((v0 :: any).wallet.cents, 450)
-		t.eq((v0 :: any).schema, ProfileSchema.VERSION)
+	t.test("schema: new player, no v0, newer schema refused, corrupt refused", function()
+		-- a new player is the template (ProfileStore: only an absent key); there is no v0 (nothing wrote the store
+		-- before v1), so a record without a numeric schema is refused, never read as a fresh one
+		local fresh = ProfileSchema.template()
+		t.eq(fresh.wallet.cents, 0)
+		t.eq(ProfileSchema.migrate(nil), nil)
+		t.eq(ProfileSchema.migrate({ cents = 450 }), nil)
+		local v1 = ProfileSchema.migrate({
+			schema = 1,
+			wallet = { cents = 450 },
+			receipts = { ids = {}, byId = {} },
+			wardrobe = {},
+			inventory = {},
+			reputation = 0,
+			stats = {},
+		})
+		t.eq((v1 :: any).wallet.cents, 450)
+		t.eq((v1 :: any).schema, ProfileSchema.VERSION)
 		local newer, err = ProfileSchema.migrate({ schema = ProfileSchema.VERSION + 1 })
 		t.eq(newer, nil)
 		t.truthy(err and string.find(err, "newer"))
