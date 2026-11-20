@@ -2737,98 +2737,113 @@ function SquirrelMotor.envelope(
 			local index = world.index :: any
 			local accept = Motion.openOnly(world)
 			local bestLast, bestTop = math.huge, -math.huge
-			local grabs: { boolean } = table.create(frames, false)
-			local function try(k: number)
-				if k >= frames then
-					-- (stepped as the motor steps: x, z the body's place to within r studs across; the first grab from
-					-- `prev` itself is exact, a later one may take any sample nearest to some point within r, which lies
-					-- no higher than the nearest sample's distance and r over the body)
-					local any = false
-					local x, y, z, vy, vx, vz = prev.x, prev.y, prev.z, prev.vy, prev.vx, prev.vz
-					local r = 0
-					local leapt = false
-					local drop = 0
-					local last: number? = nil
-					for f = 0, frames - 1 do
-						if grabs[f + 1] then
-							local hit = index:nearest(x, y, z, C.airGrab + r + E.posSlack, nil, accept)
-							if hit == nil then
-								return
-							end
-							-- (from somewhere within r across of (x, y, z), its height known: a sample S nearer to such a
-							-- place than the nearest one N is when |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the
-							-- place modelled; the highest of them)
-							local top = hit
-							-- (and the lowest of them: validator round 14, a leap off a grab ends no lower than a leap off
-							-- the lowest sample the grab can have taken)
-							local lowY = hit.y
-							if r > 0 then
-								local d2 = hit.d * hit.d
-								local band = hit.d + 2 * r
-								index:forEachNear(
-									x,
-									y,
-									z,
-									math.ceil(band / (index.cellSize or 20)),
-									function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
-										if (sy > top.y or sy < lowY) and (accept == nil or accept(id, tt)) then
-											local e2 = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
-											if e2 - d2 <= 2 * r * math.sqrt((sx - hit.x) ^ 2 + (sz - hit.z) ^ 2) then
-												if sy > top.y then
-													top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
-												end
-												lowY = math.min(lowY, sy)
-											end
-										end
-										return nil
-									end
-								)
-							end
-							local lift = 0
-							local grabbed = reg:get(top.routeId)
-							if grabbed then
-								local drawn =
-									Motion.visualPose(world, grabbed, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
-								lift = math.max(0, drawn.y - top.y)
-							end
-							any = true
-							last = prev.clock + (f + 1) * P.substep
-							x, y, z = top.x, top.y + lift, top.z
-							drop = y - lowY
-							r = if r > 0 then r + hit.d else 0
-							vy, vx, vz = launchUp, 0, 0
-							leapt = true
-							y += vy * P.substep
-							r += launchXZ * P.substep
-						else
-							vy = math.max(vy - P.gravity * P.substep, -P.terminalFall)
-							x, y, z = x + vx * P.substep, y + vy * P.substep, z + vz * P.substep
-							-- (the air's steering, accelAir; after a leap its push, any way across)
-							r += if leapt then launchXZ * P.substep else P.accelAir * launchXZ * P.substep * P.substep
-						end
-					end
-					-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own
-					-- leap speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body 4 st
-					-- under a bough "grabbed" it every 0.1 s packet)
+			local h = P.substep
+			-- (stepped as the motor steps, frame by frame, each frame with no grab or with one (two motor frames after the
+			-- last, the validator's or this pattern's), the shared start of every pattern stepped once (validator round
+			-- 14: six frames). x, z the body's place to within r studs across; the first grab from `prev` itself is
+			-- exact, a later one may take any sample nearest to some point within r, which lies no higher than the
+			-- nearest sample's distance and r over the body)
+			local function step(
+				f: number,
+				x: number,
+				y: number,
+				z: number,
+				vy: number,
+				vx: number,
+				vz: number,
+				r: number,
+				leapt: boolean,
+				drop: number,
+				last: number?,
+				grabbedLast: boolean
+			)
+				if f >= frames then
+					-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's
+					-- own leap speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body
+					-- 4 st under a bough "grabbed" it every 0.1 s packet)
 					local floorY = y - drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
-					if any and next.y <= y + E.posSlack and next.y >= floorY then
+					if last ~= nil and next.y <= y + E.posSlack and next.y >= floorY then
 						-- (the earliest last grab of any pattern that explains it, the height kept to the highest)
-						bestLast, bestTop = math.min(bestLast, last :: number), math.max(bestTop, y)
+						bestLast, bestTop = math.min(bestLast, last), math.max(bestTop, y)
 					end
 					return
 				end
-				-- (no grab at frame k, or one: two motor frames after the last, the validator's or this pattern's)
-				grabs[k + 1] = false
-				try(k + 1)
-				local at = prev.clock + (k + 1) * P.substep
-				local free = (lastGrab == nil or at - lastGrab >= 2 * P.substep - 1e-6) and (k == 0 or not grabs[k])
-				if free then
-					grabs[k + 1] = true
-					try(k + 1)
-					grabs[k + 1] = false
+				-- (no grab: the body on its own arc; the air's steering, accelAir, after a leap its push, any way across)
+				local fvy = math.max(vy - P.gravity * h, -P.terminalFall)
+				step(
+					f + 1,
+					x + vx * h,
+					y + fvy * h,
+					z + vz * h,
+					fvy,
+					vx,
+					vz,
+					r + (if leapt then launchXZ * h else P.accelAir * launchXZ * h * h),
+					leapt,
+					drop,
+					last,
+					false
+				)
+				local at = prev.clock + (f + 1) * h
+				if grabbedLast or (lastGrab ~= nil and at - lastGrab < 2 * h - 1e-6) then
+					return
 				end
+				-- (a grab: the nearest sample, Space in the same frame)
+				local hit = index:nearest(x, y, z, C.airGrab + r + E.posSlack, nil, accept)
+				if hit == nil then
+					return
+				end
+				-- (from somewhere within r across of (x, y, z), its height known: a sample S nearer to such a place
+				-- than the nearest one N is when |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the place modelled; the
+				-- highest of them, and the lowest: validator round 14, a leap off a grab ends no lower than one off the
+				-- lowest sample the grab can have taken)
+				local top = hit
+				local lowY = hit.y
+				if r > 0 then
+					local d2 = hit.d * hit.d
+					local band = hit.d + 2 * r
+					index:forEachNear(
+						x,
+						y,
+						z,
+						math.ceil(band / (index.cellSize or 20)),
+						function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
+							if (sy > top.y or sy < lowY) and (accept == nil or accept(id, tt)) then
+								local e2 = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
+								if e2 - d2 <= 2 * r * math.sqrt((sx - hit.x) ^ 2 + (sz - hit.z) ^ 2) then
+									if sy > top.y then
+										top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+									end
+									lowY = math.min(lowY, sy)
+								end
+							end
+							return nil
+						end
+					)
+				end
+				local lift = 0
+				local grabbed = reg:get(top.routeId)
+				if grabbed then
+					local drawn = Motion.visualPose(world, grabbed, top.t, Curve.vec3(top.x, top.y, top.z), 0, 1)
+					lift = math.max(0, drawn.y - top.y)
+				end
+				local gy = top.y + lift
+				step(
+					f + 1,
+					top.x,
+					gy + launchUp * h,
+					top.z,
+					launchUp,
+					0,
+					0,
+					(if r > 0 then r + hit.d else 0) + launchXZ * h,
+					true,
+					gy - lowY,
+					at,
+					true
+				)
 			end
-			try(0)
+			step(0, prev.x, prev.y, prev.z, prev.vy, prev.vx, prev.vz, 0, false, 0, nil, false)
 			if bestLast < math.huge then
 				hiddenMemo = true
 				judged.grab = bestLast
