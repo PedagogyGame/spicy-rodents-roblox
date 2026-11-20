@@ -1519,15 +1519,19 @@ SquirrelMotor.envelopeParams = {
 	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (between two pounces, on the ground or in the air)
 	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
 	-- seconds: the longest gap the grab search steps (a launch in the air is free only off a grab the motor's own step
-	-- explains): the longest packet the client's own send rule makes, a short frame that sends nothing and the next, capped,
-	-- that does (validator round 15, the round-14 review's MEDIUM 2: 0.1 s charged an honest grab-leap in a 0.13 s packet)
-	grabSimDt = SquirrelWire.SEND_EVERY + P.frameDtCap,
+	-- explains): two of the longest packets the client's own send rule makes (a short frame that sends nothing and the
+	-- next, capped, that does), one of them lost (validator round 15, the round-14 review's MEDIUM 2: 0.1 s charged an
+	-- honest grab-leap in a 0.13 s packet; on a lossy, jittery link one lost packet hid as many, and their leapCost ran
+	-- the server's meter empty under a full client one)
+	grabSimDt = 2 * (SquirrelWire.SEND_EVERY + P.frameDtCap),
 	-- the grab search's reach and work for one packet (validator round 15, the round-14 review's MEDIUM 3): the rail
 	-- samples gathered once round the body's own arc, a grab and grabReach further (studs: a later grab's reach), and at
 	-- most grabWork sample visits over the gather and every grab's scan; a pattern past either explains nothing (fail
-	-- safe: "not grasped", charged, never a violation of its own)
+	-- safe: "not grasped", charged, never a violation of its own); each further grab tried from the grabBeam patterns
+	-- nearest the end at most)
 	grabReach = st(3.4),
-	grabWork = 3500,
+	grabWork = 2500,
+	grabBeam = 12,
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
@@ -2950,7 +2954,7 @@ function SquirrelMotor.envelope(
 			-- others' spread, their own drawn poses, a trunk's heading in doubt); nil when nothing is within a grab, when
 			-- the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
-			local grabbedId = 0 -- (the route of the last grab's highest sample)
+			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
 			local function grab(
 				x: number,
 				y: number,
@@ -3073,7 +3077,7 @@ function SquirrelMotor.envelope(
 					local ux, uz = X[e] - tx, Z[e] - tz
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
 				end
-				grabbedId = topId
+				grabbedId, grabbedT = topId, sT[top]
 				return px, topY + lift, pz, lowY, d + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
@@ -3195,7 +3199,22 @@ function SquirrelMotor.envelope(
 			end
 			-- more grabs, a level at a time while none explains `next` and the work allows (fail safe past it)
 			while bestFrom == nil and #level > 0 and not spent do
+				-- (the patterns nearest `next` first, at most grabBeam of them: a pattern explains `next` only by ending
+				-- near it; the rest are left, fail safe)
+				if #level > E.grabBeam then
+					table.sort(level, function(a: Pattern, b: Pattern): boolean
+						local da = math.sqrt((a.x - next.x) ^ 2 + (a.y - next.y) ^ 2 + (a.z - next.z) ^ 2) - a.r
+						local db = math.sqrt((b.x - next.x) ^ 2 + (b.y - next.y) ^ 2 + (b.z - next.z) ^ 2) - b.r
+						return da < db
+					end)
+					for k = #level, E.grabBeam + 1, -1 do
+						level[k] = nil
+					end
+				end
 				local deeper: { Pattern } = {}
+				-- (patterns whose last grab took the same sample on the same frame go on as one, its doubt the most of
+				-- theirs: the same futures, so the patterns grow no faster than the frames and the samples)
+				local same: { [number]: Pattern } = {}
 				for _, s in level do
 					local y, vy, r = s.y, s.vy, s.r
 					for f = s.f, frames - 1 do
@@ -3210,8 +3229,16 @@ function SquirrelMotor.envelope(
 							end
 							if gx then
 								local more = leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.from)
-								finish(more)
-								table.insert(deeper, more)
+								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
+								local was = same[key]
+								if was then
+									was.r, was.drop = math.max(was.r, more.r), math.max(was.drop, more.drop)
+									finish(was)
+								else
+									same[key] = more
+									finish(more)
+									table.insert(deeper, more)
+								end
 							end
 						end
 						vy = math.max(vy - g * h, -P.terminalFall)

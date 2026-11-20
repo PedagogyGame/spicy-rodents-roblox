@@ -3,7 +3,8 @@
 -- server itself has the body on the rail, and every launch charged first. The mechanics those cases do not reach:
 --   grab search       the motor's own E+Space climb at ten packets a second: each launch's grab is the motor's own step
 --                     from the last accepted place (grasped, six frames): free, nothing charged; at four packets a second
---                     the visit is only near: charged leapCost, its flight never a free one
+--                     mostly the same (round 15: the search reaches grabSimDt, two of the longest honest packets, within
+--                     its work); at two a second the visit is only near: charged leapCost, its flight never a free one
 --                     a body 4 st under a bough "grabbing" it every 0.1 s: no grab (a leap off a grab ends no lower than
 --                     one off the lowest sample it can take): charged
 --   ground to a bough a gap from the ground ending in a fresh flight beside a bough: a leap off the ground, charged, not free
@@ -82,54 +83,61 @@ return function(t)
 		return clock
 	end
 
-	t.test("grab search: the motor's climb at ten packets a second is free; at four, near only, charged", function()
-		for _, rate in { 10, 4 } do
-			local tw, v, feed = rig()
-			local tall: any = nil
-			for _, r in tw.registry:all() do
-				if r.kind == "trunk" and (tall == nil or r.length > tall.length) then
-					tall = r
-				end
-			end
-			local p = tw.registry:pointAt(tall, 0.05)
-			local s = SquirrelMotor.new(p.x, p.y, p.z)
-			s.routeId, s.railT, s.grounded, s.clock = tall.id, 0.05, false, 0
-			s.tireless = true
-			feed(SquirrelMotor.clone(s))
-			local m = v._marks.a
-			local codes, launches, freeOnes = {}, 0, 0
-			local every = math.floor(60 / rate + 0.5)
-			for f = 1, 120 do
-				local i = SquirrelMotor.idleInput(0)
-				i.grab, i.leap = f % 4 == 0, f % 4 == 0
-				SquirrelMotor.step(s, i, 1 / 60, tw)
-				if f % every == 0 then
-					local r = feed(SquirrelMotor.clone(s))
-					for _, x in r.violations do
-						table.insert(codes, x.code)
-					end
-					if r.launched then
-						launches += 1
-						freeOnes += if m.speedRail then 1 else 0
+	t.test(
+		"grab search: the motor's climb at ten packets a second is free, at four mostly; at two, near only, charged",
+		function()
+			for _, rate in { 10, 4, 2 } do
+				local tw, v, feed = rig()
+				local tall: any = nil
+				for _, r in tw.registry:all() do
+					if r.kind == "trunk" and (tall == nil or r.length > tall.length) then
+						tall = r
 					end
 				end
-			end
-			print(
-				`      {rate}/s: {launches} launches, {freeOnes} free, meter {string.format("%.2f", m.stamina)}, [{table.concat(
-					codes,
-					","
-				)}]`
-			)
-			t.eq(#codes, 0, `the motor's own climb at {rate}/s is clean`)
-			if rate == 10 then
-				t.eq(freeOnes, launches, "every launch a grab the motor's step explains: free")
-				t.truthy(m.stamina >= 1 - 1e-6, "nothing charged")
-			else
-				t.eq(freeOnes, 1, "only the launch off the trunk the server saw is free")
-				t.truthy(m.stamina < 1 - P.leapCost * (launches - 2), "the visits near only are charged")
+				local p = tw.registry:pointAt(tall, 0.05)
+				local s = SquirrelMotor.new(p.x, p.y, p.z)
+				s.routeId, s.railT, s.grounded, s.clock = tall.id, 0.05, false, 0
+				s.tireless = true
+				feed(SquirrelMotor.clone(s))
+				local m = v._marks.a
+				local codes, launches, freeOnes = {}, 0, 0
+				local every = math.floor(60 / rate + 0.5)
+				for f = 1, 120 do
+					local i = SquirrelMotor.idleInput(0)
+					i.grab, i.leap = f % 4 == 0, f % 4 == 0
+					SquirrelMotor.step(s, i, 1 / 60, tw)
+					if f % every == 0 then
+						local r = feed(SquirrelMotor.clone(s))
+						for _, x in r.violations do
+							table.insert(codes, x.code)
+						end
+						if r.launched then
+							launches += 1
+							freeOnes += if m.speedRail then 1 else 0
+						end
+					end
+				end
+				print(
+					`      {rate}/s: {launches} launches, {freeOnes} free, meter {string.format("%.2f", m.stamina)}, [{table.concat(
+						codes,
+						","
+					)}]`
+				)
+				t.eq(#codes, 0, `the motor's own climb at {rate}/s is clean`)
+				if rate == 10 then
+					t.eq(freeOnes, launches, "every launch a grab the motor's step explains: free")
+					t.truthy(m.stamina >= 1 - 1e-6, "nothing charged")
+				elseif rate == 4 then
+					-- (packets of 0.25 s, inside the search: three or four grabs each, E+Space fifteen times a second, no
+					-- person's rate; a pattern that deep is at times past the search's work, and charged, never a violation)
+					t.truthy(freeOnes > launches / 2, "the motor's grabs explain most launches: free")
+				else
+					t.eq(freeOnes, 1, "only the launch off the trunk the server saw is free")
+					t.truthy(m.stamina < 1 - P.leapCost * (launches - 2), "the visits near only are charged")
+				end
 			end
 		end
-	end)
+	)
 
 	t.test(
 		"grab search: a body 4 st under a bough relaunching every 0.1 s grabbed nothing: charged, not free",
