@@ -58,7 +58,9 @@
 --   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
 --   the town's people looking up at a squirrel overhead; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
---   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start),
+--   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
+--   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
+--   saved between servers (D16 #25; section 6e),
 --   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
@@ -111,6 +113,9 @@ local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
 local CornerStore = require("../Items/CornerStore")
+local PlayerSaves = require("../Persistence/PlayerSaves")
+local Wardrobe = require("../Cosmetics/Wardrobe")
+local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
@@ -2142,6 +2147,113 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the lounge failed to open: {errLo}`)
 	end
 
+	-- 6e. Clothing carries over between servers (owner D16 #25): Persistence/PlayerSaves holds one session-locked
+	-- profile per player in the DataStore PlayerSaves.STORE (loaded on join, saved a few seconds after a change and
+	-- every 30 s, within a server-wide write budget, released on leave and at shutdown), Cosmetics/Wardrobe writes only the clothing into it (what is owned and
+	-- what is worn) and puts it on the player's body, Cosmetics/GiftShop sells the alley shirt. Money and every
+	-- other item stay on this server. A DataStore failure never blocks play and never takes back a purchase
+	-- (PlayerSaves: retry, a notice). The player attributes Clothes (what is worn) and ClothesSaved (the save's state)
+	-- are for the Studio check (docs/owner/CLOTHING_SAVE_CHECK.md).
+	local saves: any, wardrobe: any, giftShop: any = nil, nil, nil
+	local clothesConns: { RBXScriptConnection } = {}
+	local clothesRunning = true
+	local okClothes, errClothes = pcall(function()
+		local store: any = nil
+		local okDs, ds = pcall(function(): any
+			return game:GetService("DataStoreService"):GetDataStore(PlayerSaves.STORE)
+		end)
+		if okDs then
+			store = ds
+		else
+			warn(`[SpicyRodents] no DataStore, clothing is not saved on this server: {ds}`)
+		end
+		saves = PlayerSaves.new({
+			store = store,
+			-- (each Studio session its own id: two Studio sessions never take each other's lock for their own)
+			jobId = if game.JobId ~= ""
+				then game.JobId
+				else `studio-{game:GetService("HttpService"):GenerateGUID(false)}`,
+			now = os.time,
+			sleep = function(seconds: number)
+				task.wait(seconds)
+			end,
+			spawn = function(fn: () -> ())
+				task.spawn(fn)
+			end,
+			tell = function(player: any, words: string)
+				fire(player, { kind = "notice", text = words })
+			end,
+			loaded = function(player: any, profileData: any): boolean
+				return wardrobe ~= nil and wardrobe:loaded(player, profileData)
+			end,
+			pending = function(player: any): boolean
+				return wardrobe ~= nil and wardrobe:pending(player)
+			end,
+			changed = function(player: any, state: string)
+				setAttr(player, "ClothesSaved", state)
+			end,
+		})
+		wardrobe = Wardrobe.new({
+			saves = saves,
+			bodyOf = function(player: any): (any?, string?)
+				local a = possession:actorOf(player)
+				return if a and a.body then a.body else nil, if a then a.species else nil
+			end,
+			players = function(): { any }
+				return Players:GetPlayers()
+			end,
+			setAttr = setAttr,
+		})
+		giftShop = GiftShop.start({
+			attractions = workspace:FindFirstChild("Attractions"),
+			wallet = wallet,
+			wardrobe = wardrobe,
+			possession = possession,
+			tell = function(player: any, words: string)
+				fire(player, { kind = "notice", text = words })
+			end,
+		})
+		if o.players ~= false then
+			for _, player in Players:GetPlayers() do
+				saves:join(player)
+			end
+			table.insert(
+				clothesConns,
+				Players.PlayerAdded:Connect(function(player: Player)
+					wardrobe:join(player)
+					saves:join(player)
+				end)
+			)
+			table.insert(
+				clothesConns,
+				Players.PlayerRemoving:Connect(function(player: Player)
+					wardrobe:leave(player)
+					saves:leave(player)
+				end)
+			)
+			game:BindToClose(function()
+				saves:closeAll()
+			end)
+		end
+		if o.heartbeat ~= false then
+			task.spawn(function()
+				while clothesRunning do
+					task.wait(1)
+					local okStep, errStep = pcall(function()
+						wardrobe:sweep()
+						saves:step(os.time())
+					end)
+					if not okStep then
+						warn(`[SpicyRodents] clothing step failed: {errStep}`)
+					end
+				end
+			end)
+		end
+	end)
+	if not okClothes then
+		warn(`[SpicyRodents] clothing saving failed to start: {errClothes}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -2211,6 +2323,9 @@ function Game.start(opts: Opts?): any
 			if dogs and o.heartbeat == false then
 				dogs.step(dt)
 			end
+			if wardrobe and o.heartbeat == false then
+				wardrobe:sweep()
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
@@ -2226,6 +2341,7 @@ function Game.start(opts: Opts?): any
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
+		clothes = { saves = saves, wardrobe = wardrobe, giftShop = giftShop },
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -2260,6 +2376,13 @@ function Game.start(opts: Opts?): any
 			end
 			if dogs then
 				dogs.stop()
+			end
+			clothesRunning = false
+			for _, c in clothesConns do
+				c:Disconnect()
+			end
+			if giftShop then
+				giftShop.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

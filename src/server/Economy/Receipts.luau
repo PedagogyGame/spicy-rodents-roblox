@@ -8,6 +8,9 @@
 -- the redelivery idempotent: a receipt already in the profile is never credited again, and one
 -- credited in memory but not yet saved is only saved, not re-credited.
 -- The engine edge maps the string to Enum.ProductPurchaseDecision; this module stays pure.
+-- WIRING IT LIVE: the profile it credits must be the one Persistence/PlayerSaves already holds for the player
+-- (the live server's only session lock on key p_<userId>), never one loaded through its own ProfileStore or
+-- Persistence/Profiles: a second lock on the same key from the same server would lock the two out of each other.
 -- Interface: new(deps) -> Handler; handler:process(receiptInfo) -> Decision; handler.stats
 
 local Import = require("../Import")
