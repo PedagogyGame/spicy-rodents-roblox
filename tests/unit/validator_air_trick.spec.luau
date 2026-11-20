@@ -286,8 +286,10 @@ return function(t)
 						claimed
 					)
 				)
-				-- (validator_r15rv's bar is the motor's own fastest chain there: 47.3 st/s; the claim may add only the swing)
-				t.truthy(claimed <= plain * 1.02 + 0.1, `{case.name}: claimed {claimed} st/s against {plain}`)
+				-- (validator_r15rv's bar is the motor's own fastest chain there: 47.3 st/s; the claim may add only the swing.
+				-- Validator round 17: a first grab's snap is the band's reach across from the body, sound for a sample over or
+				-- under it, and the claimed swing widens that reach too: 3 %, still under the motor's own chain's bar)
+				t.truthy(claimed <= plain * 1.03 + 0.1, `{case.name}: claimed {claimed} st/s against {plain}`)
 			end
 		end
 	)

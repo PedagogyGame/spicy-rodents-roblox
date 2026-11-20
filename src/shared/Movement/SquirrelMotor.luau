@@ -3153,10 +3153,14 @@ function SquirrelMotor.envelope(
 			-- within a grab, when the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
 			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
-			-- (the last grab's snap bounded by N's 3-D distance and the drawn offset: the motor takes any sample of the band,
-			-- and one nearer in 3-D than N can lie further across; a first grab's bound, validator round 17, the round-16
-			-- review's MEDIUM 1b)
-			local snap3 = 0
+			-- (the last grab's snap across, a first grab's bound: the motor takes any sample S of the band, nearest to where
+			-- the body is, within r across of the place modelled and at its height (the arc's own), so no further from it
+			-- than N is (d + r): across, sqrt((d + r)^2 - (S's height off the body's)^2), and S's drawn offset. Not N's
+			-- distance across (one nearer in 3-D can lie further across: validator round 17, the round-16 review's MEDIUM 1b),
+			-- nor N's 3-D distance (a grab from over a rail is mostly down, and that drop let a crafted chain along a rail
+			-- claiming the air trick's swing run 3 % faster). snap3: N's 3-D distance and the drawn offset, for a grab from a
+			-- place whose height is only the highest (a leap off a rail's))
+			local snapAcross, snap3 = 0, 0
 			-- (a trunk's bark the last grab leaves from: its nearest sample across and the drawn pose's offset off it, 0 for
 			-- any other route)
 			local barkX, barkZ, bark = 0, 0, 0
@@ -3313,6 +3317,7 @@ function SquirrelMotor.envelope(
 				-- (the band's others across off N; one on another route than the highest's, its own drawn pose off it as
 				-- well)
 				local spread, lastId, lastOff = 0, -1, 0
+				local across, dr2 = 0, (d + r) ^ 2
 				for k = 1, nb do
 					local e = band[k]
 					local id = sId[e]
@@ -3323,10 +3328,14 @@ function SquirrelMotor.envelope(
 					end
 					local ux, uz = X[e] - X[bi], Z[e] - Z[bi]
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
+					across = math.max(
+						across,
+						math.sqrt(math.max(0, dr2 - (Y[e] - y) ^ 2)) + (if id == topId then m else lastOff)
+					)
 				end
 				grabbedId, grabbedT = topId, sT[top]
 				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
-				snap3 = d + m
+				snap3, snapAcross = d + m, across
 				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
@@ -3476,7 +3485,7 @@ function SquirrelMotor.envelope(
 								gz,
 								lowY,
 								spread,
-								snap3 + ar[f + 1],
+								snapAcross,
 								{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
 							)
 							finish(s)
