@@ -3145,6 +3145,10 @@ local function envelopeCore(
 			local index = world.index :: any
 			local accept = Motion.openOnly(world)
 			local h, g = P.substep, P.gravity
+			-- (the motor's grab-and-jump cooldown after a seed's leap off the rail, owner D18: its first grab no sooner than
+			-- grabLeapCooldown after the leap, in whole steps rounded down (a frame's own length is the client's); not yet
+			-- between the air's grab-leaps, where it snapped honest climbs on uneven frames)
+			local seedWait = math.max(1, math.floor(P.grabLeapCooldown / h + 1e-6))
 			-- the body's own arc from `prev`, no grab, frame by frame (entry f + 1: after f frames), and how far across the
 			-- air's steering can have taken it off that arc. The motor's air step per frame either steers the velocity
 			-- toward a heading at moveSpeed (accelAir) or lets it coast (dragAir), or in a pounce's window keeps it: the
@@ -3745,7 +3749,7 @@ local function envelopeCore(
 				for _, s in level do
 					local y, vy, r = s.y, s.vy, s.r
 					for f = s.f, frames - 1 do
-						if f > s.f then
+						if f > s.f and (not s.seed or f >= s.f + seedWait) then
 							if work > E.grabWork then
 								spent = true
 								break
