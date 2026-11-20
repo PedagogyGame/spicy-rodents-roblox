@@ -1479,8 +1479,16 @@ function MoveValidator._stamina(
 		return math.clamp(t, 0, span)
 	end
 	-- (the move as air then ground (`airFirst`) or ground then air, `airT` of it in the air, moveSpeed's goal the sprint
-	-- from `from` to `to` seconds into it and the walk the rest: the distance the speed step covers and the speed it keeps)
-	local function stepped(airT: number, airFirst: boolean, from: number, to: number): (number, number, number)
+	-- from `from` to `to` seconds into it and the walk the rest: the distance the speed step covers and the speed it keeps.
+	-- `total`: the time stepped, when not the whole move's: a launch packet's time before its launch)
+	local function stepped(
+		airT: number,
+		airFirst: boolean,
+		from: number,
+		to: number,
+		total: number?
+	): (number, number, number)
+		local T = total or span
 		local d, nu, ns = 0, u, s
 		local at = 0
 		local function piece(grounded: boolean, t: number, sprint: boolean)
@@ -1509,9 +1517,9 @@ function MoveValidator._stamina(
 		end
 		if airFirst then
 			part(false, airT)
-			part(true, span - airT)
+			part(true, T - airT)
 		else
-			part(true, span - airT)
+			part(true, T - airT)
 			part(false, airT)
 		end
 		return d, nu, ns
@@ -1519,16 +1527,18 @@ function MoveValidator._stamina(
 	-- (the least sprint the motor covers `across` with: the sprint first, where it carries furthest inside the move, past
 	-- the walk-steered step by C.STAMINA_STEP, with `credit` studs more. Past even the whole move's sprint (a speed the
 	-- motor's step cannot reach from the speed kept: a sprint claimed at once from a walk) the rest is sprint too, at the
-	-- sprint's own pace over the walk: never free)
-	local function least(airT: number, airFirst: boolean, credit: number): number
+	-- sprint's own pace over the walk: never free. `total` and `dist`: a part of the move, its time and the distance it
+	-- must cover)
+	local function least(airT: number, airFirst: boolean, credit: number, total: number?, dist: number?): number
+		local T, D = total or span, dist or across
 		local function covers(t: number): boolean
-			return (stepped(airT, airFirst, 0, t)) * C.STAMINA_STEP + credit >= across
+			return (stepped(airT, airFirst, 0, t, T)) * C.STAMINA_STEP + credit >= D
 		end
-		if not covers(span) then
-			local dS = stepped(airT, airFirst, 0, span)
-			return span + math.max(0, across - dS * C.STAMINA_STEP - credit) / math.max(P.sprint - P.walk, 1e-3)
+		if not covers(T) then
+			local dS = stepped(airT, airFirst, 0, T, T)
+			return T + math.max(0, D - dS * C.STAMINA_STEP - credit) / math.max(P.sprint - P.walk, 1e-3)
 		end
-		local lo, hi = 0, span
+		local lo, hi = 0, T
 		for _ = 1, 12 do
 			local mid = (lo + hi) / 2
 			if covers(mid) then
@@ -1556,12 +1566,42 @@ function MoveValidator._stamina(
 	-- (the speed kept after the move, when a branch sets it: u, s, hold, rail)
 	local after: { u: number, s: number, rail: boolean? }? = nil
 	if launched then
-		-- (the launch's own packet: the moments on the ground before it refill; the flight starts at the launch's speed)
+		-- (the launch's own packet, validator round 13, the round-12 review's MEDIUM: the time before the launch is a move of
+		-- its own, judged as any other: the least sprint past the walk-steered step for the distance the launch's flight, at
+		-- its cap for the whole of its time, does not cover; on the ground, or from the air the ground or the air, whichever
+		-- needs less (a landing the packet may hide). Only the ground time not sprinting refills. The launch's time: the
+		-- window's for a pounce, else the time a leap's vertical speed (leapUp, winded or not) takes to fall to the one
+		-- judged: a claim at the clamp is a launch at the packet's very end, all of its time before it. Off a rail the
+		-- rail's pace is the rail's own)
+		local inAir = math.clamp(
+			if pounceAt then next.clock - pounceAt else (P.leapUp - math.min(next.vy, P.leapUp)) / P.gravity,
+			0,
+			span
+		)
+		local before = span - inAir
+		if before > 1e-3 and not railA then
+			local flyCap = if tired
+				then (if charge == "pounce" then P.walk else P.leapForwardWinded) * E.launchTol
+				else SquirrelMotor.launchCapXZ(false) * E.launchTol
+			local onFoot = across - flyCap * inAir - E.posSlack
+			local function need(air: boolean): number
+				local airT = if air then before else 0
+				local dW = stepped(airT, true, 0, 0, before)
+				local credit = math.max(0, P.walk * before * tol - dW * C.STAMINA_STEP)
+				if onFoot <= dW * C.STAMINA_STEP + credit then
+					return 0
+				end
+				return least(airT, true, credit, before, onFoot)
+			end
+			sprinted = need(not groundA)
+			if not groundA and sprinted > 0 then
+				sprinted = math.min(sprinted, need(false))
+			end
+			spend(sprinted / P.sprintSeconds)
+			onCredit(sprinted, `{across} st in {span} s with a launch {inAir} s before its end: faster than a walk before it for longer than the sprint meter lasts`)
+		end
 		if footA then
-			local inAir = if pounceAt
-				then next.clock - pounceAt
-				else (P.leapUp - math.min(next.vy, P.leapUp)) / P.gravity
-			refill = if groundB then span else math.clamp(span - inAir, 0, span)
+			refill = math.max(0, before - sprinted)
 		end
 		marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
 		launchModel()
