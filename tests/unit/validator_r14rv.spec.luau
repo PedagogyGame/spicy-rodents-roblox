@@ -160,7 +160,7 @@ return function(t)
 		local nxt = SquirrelMotor.new(hit.x + 5, hit.y + 2, hit.z + 2)
 		nxt.grounded, nxt.vy, nxt.vx, nxt.clock = false, 20, 30, 10.1
 		local visits = 0
-		local fen, nea = index.forEachNear, index.nearest
+		local fen, nea, cel = index.forEachNear, index.nearest, index.cell
 		index.forEachNear = function(self: any, x: number, y: number, z: number, rc: number, fn: any)
 			return fen(self, x, y, z, rc, function(...): boolean?
 				visits += 1
@@ -176,10 +176,18 @@ return function(t)
 			end)
 			return nea(self, x, y, z, md, ex, acc)
 		end
+		-- (validator round 15: the grab search walks a cell's entries itself, SpatialIndex.cell: each counted)
+		index.cell = function(self: any, ix: number, iy: number, iz: number): any
+			local c = cel(self, ix, iy, iz)
+			if c then
+				visits += c.n
+			end
+			return c
+		end
 		local t0 = os.clock()
 		local _f, _l, _p, judged = SquirrelMotor.envelope(prev, nxt, 0.1, vworld, false, nil)
 		local ms = (os.clock() - t0) * 1000
-		index.forEachNear, index.nearest = fen, nea
+		index.forEachNear, index.nearest, index.cell = fen, nea, cel
 		print(
 			`      densest neighbourhood {best} samples at ({math.floor(at[1])}, {math.floor(at[2])}, {math.floor(at[3])}): {visits} entries visited, {string.format(
 				"%.3f",

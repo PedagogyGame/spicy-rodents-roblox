@@ -10,7 +10,8 @@
 --   off the rail      a gap from a bough to open ground: a free leap off it carries what it carries, the rest of the way is
 --                     a ground move (drained past a walk)
 --   off an edge       a gap from the ground ending in the air past its apex: no leap where a ledge it could have walked off
---                     stands at the height its fall started (fellOff); over open ground the leap is paid (validator_r13rv)
+--                     stands at the height its fall started (fellOff) and it stood on it; from under it (round 15) or over
+--                     open ground the leap is paid (validator_r13rv)
 --   flight time       a ground gap read as a leap refills none of the leap's flight
 --   ray clock         budgeted()'s refill clock never goes back
 -- About 3 s: `lune run tests/run.luau validator_r14`.
@@ -214,12 +215,14 @@ return function(t)
 	end)
 
 	t.test(
-		"off an edge: a fall past a ledge it could have walked off pays no leap; over open ground it does",
+		"off an edge: a fall past a ledge it walked off pays no leap; from under the ledge or over open ground it does",
 		function()
-			for _, ledge in { true, false } do
+			-- (validator round 15, the round-14 review's LOW b: a ledge explains no leap to a body that stood more than a
+			-- step under it: getting onto it took a leap)
+			for _, case in { { ledge = true, y = 7 }, { ledge = true, y = 0 }, { ledge = false, y = 0 } } do
 				local lx = 600
-				local _, v, feed = rig(if ledge then lx else nil)
-				local clock = stand(feed, lx - 5, 0, -1000, 0)
+				local _, v, feed = rig(if case.ledge then lx else nil)
+				local clock = stand(feed, lx - 5, case.y, -1000, 0)
 				local m = v._marks.a
 				local before = m.stamina
 				-- (0.55 s on: 3 st past the ledge's edge, falling at 7.5 st/s, its fall begun at the ledge's height)
@@ -228,11 +231,14 @@ return function(t)
 				local s = SquirrelMotor.new(lx + 3, 7 - 0.5 * P.gravity * fall * fall, -1000)
 				s.grounded, s.vx, s.vy, s.clock = false, 3 / fall, vy, clock + 0.55
 				feed(s)
-				print(`      ledge {ledge}: meter {before} -> {m.stamina}`)
-				if ledge then
-					t.truthy(m.stamina >= before - 1e-6, "off the ledge: no leap charged")
+				print(`      ledge {case.ledge}, standing at y {case.y}: meter {before} -> {m.stamina}`)
+				if case.ledge and case.y == 7 then
+					t.truthy(m.stamina >= before - 1e-6, "off the ledge it stood on: no leap charged")
 				else
-					t.truthy(m.stamina <= before - P.leapCost + 1e-6, "over open ground: the leap is paid")
+					t.truthy(
+						m.stamina <= before - P.leapCost + 1e-6,
+						"under the ledge or over open ground: the leap is paid"
+					)
 				end
 			end
 		end
