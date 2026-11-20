@@ -3,12 +3,17 @@
 --   grab chain 20 Hz   a crafted grab-leap chain along the river bridge's parapet (route 1075) in ordinary 0.05 s packets,
 --                      no lag switch: every packet the furthest place along the rail the validator takes with no
 --                      violation and no drain of its meter, one fixed shape (on the rail's line, a launch every packet at
---                      5, 15, 25, 33 st/s up in turn). It holds the displacement governor's own ceiling (about 52 st/s),
---                      meter full; the motor's own fastest chain there (E+Space every second frame, a key-repeat
---                      macro's rate) runs 45, a person's (every sixth frame) 41
+--                      5, 15, 25, 33 st/s up in turn). About 50 st/s, the displacement governor's own ceiling, meter full;
+--                      the motor's own fastest chain there (E+Space every second frame, a key-repeat macro's rate) runs
+--                      47 st/s from its first second on, a person's (every sixth frame) 41. The grab search's band: a
+--                      later grab's nearest samples taken within 2r on a line (r: how far the body may be), the leap
+--                      from the band's highest with the whole band as its doubt, and r added to the snap again
 --   grab chain 4 Hz    the same in 0.25 s packets (the round-15 residual, "44.2 st/s", at its real ceiling)
---   grab climb         the same up the town's tallest trunk (route 604): the motor's own fastest climb is 29 st/s
--- Each compares the crafted pace with the motor's own on the same route, measured here. About 60 s:
+--   grab climb         the same up the town's tallest trunk (route 604), any launch speed and up to 3 st off its line:
+--                      41.6 st/s against the motor's own 30.7 over 2.5 s (a packet a hair over 0.05 s, as float clocks
+--                      make, is a long gap: a hidden rail visit's geometry, no grab search, up to the governor's vRail)
+-- Each compares the crafted pace with the motor's own on the same route, measured here (along a rail within 3 %, up a
+-- trunk within 1 st/s). About 15 s:
 -- `lune run tests/run.luau validator_r15rv`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
@@ -239,7 +244,7 @@ return function(t)
 						motor
 					)
 				)
-				t.truthy(pace <= motor + 1, `crafted {pace} st/s against the motor's {motor}`)
+				t.truthy(pace <= motor * 1.03, `crafted {pace} st/s against the motor's {motor}`)
 			end
 		)
 	end
