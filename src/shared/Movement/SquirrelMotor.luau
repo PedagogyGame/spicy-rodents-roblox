@@ -883,11 +883,9 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	state.cooldown = P.pounceCooldown
 	state.attack = P.pounceAttack
 	state.attackWindow = P.pounceWindow
-	-- (a pounce is aimed: the move's pose ends, a roll's carry with it; a re-aim waits out the window)
-	state.trickTime = 0
-	if state.trickKind == 1 then
-		state.trickKind = 0
-	end
+	-- (a pounce is aimed: it ends the move, its re-aim and a roll's carry; a new flight of its own)
+	state.trickKind, state.trickTime = 0, 0
+	state.aimYaw, state.aimReach, state.trickReach = 0, 0, 0
 	if not mouth then
 		launchFromVisibleRoute(state, world)
 	end
@@ -1155,6 +1153,20 @@ function SquirrelMotor.reaim(state: State, wantYaw: number?, wantReach: number?,
 		state.vy += SquirrelMotor.aimDown(ne) - SquirrelMotor.aimDown(state.aimReach)
 	end
 	state.aimYaw, state.aimReach = ny, ne
+end
+
+-- SquirrelMotor.freshMove(prev, next, kind): `next` claims a move of `kind` pressed after `prev` (a new one, not the one
+-- `prev` had playing): its press, dated by its time left, later than `prev`'s (a move's time runs down with the clock, so
+-- the same move has no more left than `prev`'s less the gap). Pure; the envelope and the validator's meter use it.
+function SquirrelMotor.freshMove(prev: State, next: State, kind: number): boolean
+	local nt = next.trickTime or 0
+	if next.trickKind ~= kind or nt <= 0 then
+		return false
+	end
+	if prev.trickKind ~= kind then
+		return true
+	end
+	return nt > (prev.trickTime or 0) - (next.clock - prev.clock) + 1e-4
 end
 
 -- SquirrelMotor.unaim(s, toYaw, toReach): a copy of `s` with its velocity as a re-aim at (toYaw, toReach) would have
@@ -2216,6 +2228,10 @@ end
 -- Returns the violations; whether a launch (leap, pounce, a step off a rail) was needed to explain the move; how long
 -- before `next` the motor's pounce launched when the move holds one (a pounce-shaped launch the window dates; nil
 -- otherwise); and what it judged of `next` (Judged).
+-- (the re-aim the envelope in progress undid (0c): the most it moves the body across a second for each second of speed
+-- had, and up or down, st/s; read by the grab search's arc. Set by envelope round envelopeCore, 0 otherwise)
+local gapAim = { across = 0, up = 0 }
+
 local function envelopeCore(
 	prev: State,
 	next: State,
@@ -2440,8 +2456,18 @@ local function envelopeCore(
 			local hx, hz = math.sin(next.yaw), math.cos(next.yaw)
 			local mx, mz = next.x - prev.x, next.z - prev.z
 			local m = hypot2(mx, mz)
+			-- (the body is a box, not a point: a wall's corner it presses can lie off the centre line, so the lines either
+			-- side at its half-width count too; found by the air trick's honest runs, 2026-11-20: a winded pounce into a
+			-- house's corner, the centre line passing 0.2 st clear of it)
+			local half = P.fitHalves[1]
 			local function wallAt(dx: number, dz: number, r: number): boolean
-				return crosses(next.x, next.z, next.x + dx * r, next.z + dz * r, next.y, next.y, 0)
+				for _, side in { 0, half, -half } do
+					local ox, oz = next.x - dz * side, next.z + dx * side
+					if crosses(ox, oz, ox + dx * r, oz + dz * r, next.y, next.y, 0) then
+						return true
+					end
+				end
+				return false
 			end
 			local met
 			if m < E.wallMoved then
@@ -3109,11 +3135,10 @@ local function envelopeCore(
 			-- past the faster of the two speeds (validator round 15: a reach growing with the speed had and the steering
 			-- both, any way, let a crafted grab-leap chain along a long rail run 44 st/s where the motor's own runs 41)
 			local v0 = hypot2(prev.vx, prev.vz)
-			-- (the air trick's re-aim, owner D18: in a wiggle's flight the motor turns the velocity at up to trickYawRate
-			-- (trickAimYaw at most) and scales its speed by up to 1 + trickOutPeak (reaim). In the gap when `prev` or `next`
-			-- is in a wiggle's flight: the speed had, turned by at most trickYawRate x tau and scaled, lies no further than
-			-- v0 x tau x (min(trickYawRate x tau / 2, trickAimYaw) + trickOutPeak) from where it would be)
-			local trickFor = if prev.trickKind == 2 or next.trickKind == 2 then math.huge else 0
+			-- (the air trick's re-aim, owner D18: the gap's own re-aim (0c: the claimed change, held to the motor's rates)
+			-- turns the speed had by at most its turn and scales it by at most its scale, and pushes it down or up by at most
+			-- its vertical speed's change: no further than v0 x tau x aimAcross + aimUp x tau from where it would be)
+			local aimAcross, aimUp = gapAim.across, gapAim.up
 			-- (the air steers toward moveSpeed, a sprint's at most, or v5.4's sprint in a rail leap's flight)
 			local steerTo = math.max(P.sprint * (if boosted then P.boostMult else 1), SquirrelMotor.V54.sprint)
 			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
@@ -3142,12 +3167,10 @@ local function envelopeCore(
 					local steer = steerTo * (t - th - ta)
 					local lo = v0 * (th + ta) - steer
 					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
-					local tau = math.min(t, trickFor)
 					local lat = steer
 					local mid = (lo + hi) / 2
 					local x, z = prev.x + ux * mid, prev.z + uz * mid
-					local r = math.max((hi - lo) / 2, lat)
-						+ v0 * tau * (math.min(P.trickYawRate * tau / 2, P.trickAimYaw) + P.trickOutPeak)
+					local r = math.max((hi - lo) / 2, lat) + (v0 * aimAcross + aimUp) * t
 					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
 					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
 					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
@@ -4030,14 +4053,15 @@ function SquirrelMotor.envelope(
 	lastGrab: number?
 ): ({ Violation }, boolean, number?, Judged)
 	local pYaw, pReach = prev.aimYaw or 0, prev.aimReach or 0
-	local fresh = next.trickKind == 2 and (prev.trickKind ~= 2 or (next.trickTime or 0) > (prev.trickTime or 0) + 1e-6)
-	if fresh then
+	if SquirrelMotor.freshMove(prev, next, 2) then
 		pYaw, pReach = 0, 0
 	end
 	local nYaw, nReach = next.aimYaw or 0, next.aimReach or 0
 	local trick: { Violation } = {}
 	local judgedNext = next
-	if nYaw ~= pYaw or nReach ~= pReach then
+	-- (on its footing, or with no move, a body has no re-aim (fieldCheck): the flight ended in the gap)
+	local inFlight = not next.grounded and next.routeId == nil and next.trickKind ~= 0
+	if inFlight and (nYaw ~= pYaw or nReach ~= pReach) then
 		if prev.trickKind ~= 2 and next.trickKind ~= 2 then
 			add(trick, "trick", 1, "a re-aim with no wiggle")
 		end
@@ -4048,16 +4072,32 @@ function SquirrelMotor.envelope(
 		then
 			add(trick, "trick", 1, `re-aimed {nYaw - pYaw} rad and {nReach - pReach} in {dt} s`)
 		end
-		if not next.grounded and next.routeId == nil and next.trickKind ~= 0 then
-			judgedNext = SquirrelMotor.unaim(next, pYaw, pReach)
-		end
+		judgedNext = SquirrelMotor.unaim(next, pYaw, pReach)
+		-- (the height: the re-aim's vertical speed may have changed anywhere in the gap, so the body lies up to its change
+		-- x dt off the unaimed arc, that way only: the part of `next`'s height off the arc that way is taken off)
+		local up = judgedNext.vy - next.vy -- (what was undone: the re-aim gave next.vy - judgedNext.vy)
+		local give = -up * dt
+		local arcY = prev.y + (prev.vy + judgedNext.vy) / 2 * dt
+		local off = math.clamp(next.y - arcY, math.min(0, give), math.max(0, give))
+		judgedNext.y = next.y - off
+		gapAim.across = math.abs(nYaw - pYaw)
+			+ math.max(
+				0,
+				SquirrelMotor.aimScale(nReach, P.trickOutPeak) / SquirrelMotor.aimScale(pReach, P.trickOutPeak) - 1
+			)
+		gapAim.up = math.abs(up)
 	end
 	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab)
+	gapAim.across, gapAim.up = 0, 0
 	for _, v in trick do
 		table.insert(out, v)
 	end
-	if judgedNext ~= next and not next.grounded and next.routeId == nil then
+	if judgedNext ~= next then
 		judged.vy += next.vy - judgedNext.vy
+		local y = judged.y
+		if y then
+			judged.y = y + (next.y - judgedNext.y)
+		end
 		if nReach > pReach then
 			judged.xz *= SquirrelMotor.aimScale(nReach, P.trickOutPeak) / SquirrelMotor.aimScale(pReach, P.trickOutPeak)
 		end
