@@ -345,7 +345,7 @@ SquirrelMotor.params = {
 	-- (st/s along the parapet 1075 / the avenue cable 660 / up trunk 604; Space held, E+Space every 6 / 3 / 2 frames):
 	--   before       Space 41.4 / 41.4 / -   E+Space 41.6 / 41.6 / 28.7, 41.6 / 41.6 / 28.7, 39.4 / 37.5 / 29.7
 	--   chained      Space 29.7 / 29.8 / -   E+Space 28.0 / 28.2 / 25.0, 28.0 / 28.2 / 25.0, 28.0 / 25.0 / 27.0
-	-- (movement_rail_pace asserts the bands: along a rail 25-32, up a trunk 24-28, a macro about a person's)
+	-- (movement_rail_pace asserts the bands: along a rail 24-32, up a trunk 24-28, a macro about a person's)
 	chainCarry = 0.69,
 	chainLift = 0.88,
 	chainRest = 0.25,

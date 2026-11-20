@@ -88,17 +88,20 @@ After a leap off a branch or wire, **E does not grab again in the air for 0.065 
 
 We started at 0.25 s as you suggested, but that also held back a person's normal chain (E+Space about every sixth frame). Longer than four frames also turned some fast rhythms into a pattern the server's climbing checks wrongly flag, so 0.065 s is the value that slows the macro without touching anyone honest.
 
-Measured with W and Shift held, pressing E and Space together every 2, 3 or 6 frames (studs per second):
+Measured with W and Shift held, pressing E and Space together every 2, 3 or 6 frames (studs per second). The last
+number in each cell is with your D19 change (chained leaps carry less, see `RAIL_PACE_CHECK.md`):
 
-| Where | Macro every 2 frames: before / now | Every 3: before / now | A person, every 6: before / now |
+| Where | Macro every 2 frames: before / cooldown / D19 | Every 3 | A person, every 6 |
 |---|---|---|---|
-| River bridge parapet | 47.3 / **39.4** | 35.7 / **41.6** | 41.6 / 41.6 |
-| Avenue cable | 49.9 / **37.5** | 49.9 / **41.6** | 41.6 / 41.6 |
-| Up the tallest trunk | 30.7 / **29.7** | 30.3 / **28.7** | 28.7 / 28.7 |
+| River bridge parapet | 47.3 / 39.4 / **28.0** | 35.7 / 41.6 / **28.0** | 41.6 / 41.6 / **28.0** |
+| Avenue cable | 49.9 / 37.5 / **25.0** | 49.9 / 41.6 / **28.2** | 41.6 / 41.6 / **28.2** |
+| Up the tallest trunk | 30.7 / 29.7 / **27.0** | 30.3 / 28.7 / **25.0** | 28.7 / 28.7 / **25.0** |
 
-So mashing now gets about what a person's rhythm gets, no more.
+So mashing gets about what a person's rhythm gets, no more (up a trunk a fast rhythm is 2 studs per second quicker;
+both are inside the climb's band).
 
-One thing still open: the server's movement checks do not use this cooldown yet. A cheating client (not a macro, a modified game) can still chain at about 47 studs per second along a long rail, as before. Making the server check it is a follow-up for the movement-check work going on now.
+The server now checks chained leaps too (see `RAIL_PACE_CHECK.md`): a modified game sending a crafted chain along a long
+rail gets about 35-38 studs per second, against the game's own 28-33.
 
 ## 4. Sounds and other players
 
