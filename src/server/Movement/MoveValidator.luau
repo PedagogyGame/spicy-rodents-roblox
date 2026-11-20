@@ -1503,13 +1503,16 @@ function MoveValidator._stamina(
 		return d, nu, ns
 	end
 	-- (the least sprint the motor covers `across` with: the sprint first, where it carries furthest inside the move, past
-	-- the walk-steered step by C.STAMINA_STEP, with `credit` studs more; the whole move when even that falls short)
+	-- the walk-steered step by C.STAMINA_STEP, with `credit` studs more. Past even the whole move's sprint (a speed the
+	-- motor's step cannot reach from the speed kept: a sprint claimed at once from a walk) the rest is sprint too, at the
+	-- sprint's own pace over the walk: never free)
 	local function least(airT: number, airFirst: boolean, credit: number): number
 		local function covers(t: number): boolean
 			return (stepped(airT, airFirst, 0, t)) * C.STAMINA_STEP + credit >= across
 		end
 		if not covers(span) then
-			return span
+			local dS = stepped(airT, airFirst, 0, span)
+			return span + math.max(0, across - dS * C.STAMINA_STEP - credit) / math.max(P.sprint - P.walk, 1e-3)
 		end
 		local lo, hi = 0, span
 		for _ = 1, 12 do
