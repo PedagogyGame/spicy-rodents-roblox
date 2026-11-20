@@ -1995,6 +1995,8 @@ export type Judged = {
 	grab: number?,
 	grabFrom: { clock: number, x: number, z: number, reach: number }?,
 	grabRoute: number?,
+	-- the move was explained only by a wiggle pressed inside the gap (envelope 0c): the meter's trickCost is due
+	trickHidden: boolean?,
 }
 
 -- The motor packet, field by field (validator round 5: the round-4 review's worst hole came from a field nobody checked,
@@ -4059,7 +4061,11 @@ function SquirrelMotor.envelope(
 	lastGrab: number?
 ): ({ Violation }, boolean, number?, Judged)
 	local pYaw, pReach = prev.aimYaw or 0, prev.aimReach or 0
-	if SquirrelMotor.freshMove(prev, next, 2) then
+	-- (a re-aim from none: a wiggle pressed in the gap, or a roll in the air the gap's flight came to after its wiggle
+	-- (a roll `prev` was not in the middle of a wiggle's flight for: a new flight, `prev` having rolled or done nothing))
+	local fromNone = SquirrelMotor.freshMove(prev, next, 2)
+		or (SquirrelMotor.freshMove(prev, next, 1) and prev.trickKind ~= 2)
+	if fromNone then
 		pYaw, pReach = 0, 0
 	end
 	local nYaw, nReach = next.aimYaw or 0, next.aimReach or 0
@@ -4068,7 +4074,7 @@ function SquirrelMotor.envelope(
 	-- (on its footing, or with no move, a body has no re-aim (fieldCheck): the flight ended in the gap)
 	local inFlight = not next.grounded and next.routeId == nil and next.trickKind ~= 0
 	if inFlight and (nYaw ~= pYaw or nReach ~= pReach) then
-		if prev.trickKind ~= 2 and next.trickKind ~= 2 then
+		if prev.trickKind ~= 2 and next.trickKind ~= 2 and not fromNone then
 			add(trick, "trick", 1, "a re-aim with no wiggle")
 		end
 		local span = math.max(dt, 0) + P.substep
@@ -4095,6 +4101,39 @@ function SquirrelMotor.envelope(
 	end
 	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab)
 	gapAim.across, gapAim.up = 0, 0
+	if
+		#out > 0
+		and not inFlight
+		and prev.trickKind ~= 1
+		and not prev.grounded
+		and prev.routeId == nil
+		and prev.attackWindow <= 0
+	then
+		-- (the flight `prev` was in ended in the gap (a landing, a rail, a pounce, or a new flight after a hidden
+		-- landing), and a wiggle's re-aim may have run in it: `prev`'s own, or one pressed in the gap (once a flight: none
+		-- yet at `prev`), down to full in or back to none, so the arc from `prev` came down sooner or later than the
+		-- server's. The move is judged from `prev` with its vertical speed given that push, each way, and the first a
+		-- clean judgement takes stands; found by the honest lossy runs: a wiggle, a pull-in, a landing and a leap hidden
+		-- in a 0.4 s loss. Costs an envelope or two, only on a packet that already has a violation)
+		-- (no more than the re-aim's own rate brings in the gap: trickDown x trickReachRate x dt at most)
+		local r = math.min(pReach, 0)
+		local most = P.trickDown * math.min(1, P.trickReachRate * dt)
+		local down = math.max(SquirrelMotor.aimDown(-1) - SquirrelMotor.aimDown(r), -most)
+		local up = math.min(-SquirrelMotor.aimDown(r), most)
+		for _, push in { down, up } do
+			if push ~= 0 then
+				local p2 = table.clone(prev)
+				p2.vy += push
+				local o2, u2, po2, j2 = envelopeCore(p2, judgedNext, dt, world, boosted, lastGrab)
+				if #o2 == 0 then
+					out, used, pounce, judged = o2, u2, po2, j2
+					-- (a wiggle the gap hid, `prev` having none: the server's meter pays for it as for one it saw)
+					judged.trickHidden = prev.trickKind == 0
+					break
+				end
+			end
+		end
+	end
 	for _, v in trick do
 		table.insert(out, v)
 	end

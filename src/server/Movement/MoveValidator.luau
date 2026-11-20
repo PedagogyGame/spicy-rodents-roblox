@@ -187,6 +187,7 @@ type Marks = {
 	rollArmed: boolean?,
 	footClock: number?,
 	trickReach: number?,
+	trickHidden: boolean?, -- (this packet's move needed a wiggle the gap hid: SquirrelMotor.Judged.trickHidden)
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -762,6 +763,7 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		end
 		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
 		charge = judged.charge
+		actor.marks.trickHidden = judged.trickHidden
 		railLaunch = judged.railLaunch
 		grabFrom = if railLaunch then judged.grabFrom else nil
 		launchRoute = if railLaunch then prev.routeId or judged.grabRoute else nil
@@ -1550,6 +1552,13 @@ function MoveValidator._stamina(
 			-- (a launch in the gap, off the ground, a rail or a grab the envelope explained: a new flight, begun after `prev`)
 			marks.trickArmed = true
 			marks.footClock = math.max(marks.footClock or -math.huge, prev.clock)
+		end
+		if marks.trickHidden then
+			-- (a wiggle the gap hid, which the envelope needed: paid as one seen; that flight's reach is none)
+			marks.trickHidden = nil
+			if marks.stamina > 0 then
+				spend(math.min(P.trickCost, marks.stamina))
+			end
 		end
 		if freshWiggle then
 			if marks.stamina > 0 then
