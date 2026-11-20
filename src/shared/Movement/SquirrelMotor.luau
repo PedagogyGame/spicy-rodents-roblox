@@ -2747,6 +2747,7 @@ function SquirrelMotor.envelope(
 					local x, y, z, vy, vx, vz = prev.x, prev.y, prev.z, prev.vy, prev.vx, prev.vz
 					local r = 0
 					local leapt = false
+					local drop = 0
 					local last: number? = nil
 					for f = 0, frames - 1 do
 						if grabs[f + 1] then
@@ -2758,6 +2759,9 @@ function SquirrelMotor.envelope(
 							-- place than the nearest one N is when |S - c|^2 - |N - c|^2 <= 2 r |S - N| across, c the
 							-- place modelled; the highest of them)
 							local top = hit
+							-- (and the lowest of them: validator round 14, a leap off a grab ends no lower than a leap off
+							-- the lowest sample the grab can have taken)
+							local lowY = hit.y
 							if r > 0 then
 								local d2 = hit.d * hit.d
 								local band = hit.d + 2 * r
@@ -2767,10 +2771,13 @@ function SquirrelMotor.envelope(
 									z,
 									math.ceil(band / (index.cellSize or 20)),
 									function(id: number, tt: number, sx: number, sy: number, sz: number): boolean?
-										if sy > top.y and (accept == nil or accept(id, tt)) then
+										if (sy > top.y or sy < lowY) and (accept == nil or accept(id, tt)) then
 											local e2 = (sx - x) ^ 2 + (sy - y) ^ 2 + (sz - z) ^ 2
 											if e2 - d2 <= 2 * r * math.sqrt((sx - hit.x) ^ 2 + (sz - hit.z) ^ 2) then
-												top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+												if sy > top.y then
+													top = { routeId = id, t = tt, d = 0, x = sx, y = sy, z = sz }
+												end
+												lowY = math.min(lowY, sy)
 											end
 										end
 										return nil
@@ -2787,6 +2794,7 @@ function SquirrelMotor.envelope(
 							any = true
 							last = prev.clock + (f + 1) * P.substep
 							x, y, z = top.x, top.y + lift, top.z
+							drop = y - lowY
 							r = if r > 0 then r + hit.d else 0
 							vy, vx, vz = launchUp, 0, 0
 							leapt = true
@@ -2799,7 +2807,11 @@ function SquirrelMotor.envelope(
 							r += if leapt then launchXZ * P.substep else P.accelAir * launchXZ * P.substep * P.substep
 						end
 					end
-					if any and next.y <= y + E.posSlack then
+					-- (a grab's leap: `next` no lower than one off the lowest sample it can have taken, at the motor's own
+					-- leap speed, a stud and the slack under: validator round 14, the round-13 review's HIGH 1, a body 4 st
+					-- under a bough "grabbed" it every 0.1 s packet)
+					local floorY = y - drop - (launchUp - P.leapUp) * dt - st(0.4) - E.posSlack
+					if any and next.y <= y + E.posSlack and next.y >= floorY then
 						-- (the earliest last grab of any pattern that explains it, the height kept to the highest)
 						bestLast, bestTop = math.min(bestLast, last :: number), math.max(bestTop, y)
 					end

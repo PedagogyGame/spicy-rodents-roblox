@@ -4,6 +4,8 @@
 --   grab search       the motor's own E+Space climb at ten packets a second: each launch's grab is the motor's own step
 --                     from the last accepted place (grasped, six frames): free, nothing charged; at four packets a second
 --                     the visit is only near: charged leapCost, its flight never a free one
+--                     a body 4 st under a bough "grabbing" it every 0.1 s: no grab (a leap off a grab ends no lower than
+--                     one off the lowest sample it can take): charged
 --   ground to a bough a gap from the ground ending in a fresh flight beside a bough: a leap off the ground, charged, not free
 --   off the rail      a gap from a bough to open ground: a free leap off it carries what it carries, the rest of the way is
 --                     a ground move (drained past a walk)
@@ -128,6 +130,47 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"grab search: a body 4 st under a bough relaunching every 0.1 s grabbed nothing: charged, not free",
+		function()
+			local _, v, feed = rig()
+			local id, tt, pt = bough(v.world, 0, -200)
+			local clock = 0
+			for _ = 1, 10 do
+				clock += 0.05
+				local s = SquirrelMotor.new(pt.x, pt.y, pt.z)
+				s.routeId, s.railT, s.grounded, s.clock = id, tt, false, clock
+				feed(s)
+			end
+			local m = v._marks.a
+			local x, dir, charged, launches = pt.x, 1, 0, 0
+			for k = 1, 20 do
+				if math.abs(x - pt.x) > 3 then
+					dir = -dir
+				end
+				-- (a relaunch: 1.5 st over the ground, rising at 10 st/s; then a plain arc)
+				x += dir * 4.2
+				clock += 0.1
+				local before = m.stamina
+				local s = SquirrelMotor.new(x, 1.5, pt.z)
+				s.grounded, s.vx, s.vy, s.clock = false, dir * 42, 10, clock
+				local r = feed(s)
+				if r.launched and k > 1 then
+					launches += 1
+					-- (charged: the meter down by a leap, or held at its floor once there)
+					local paid = m.stamina < before - 1e-6 or m.stamina <= -0.5 + 1e-6
+					charged += if paid and not m.speedRail then 1 else 0
+				end
+				x += dir * 4.2
+				clock += 0.1
+				local a = SquirrelMotor.new(x, 1.5 + 0.25, pt.z)
+				a.grounded, a.vx, a.vy, a.clock = false, dir * 37.9, 10 - P.gravity * 0.1, clock
+				feed(a)
+			end
+			print(`      {launches} relaunches, {charged} charged and not free`)
+			t.truthy(launches > 0 and charged == launches, "every relaunch under the bough is a charged leap")
+		end
+	)
 	t.test(
 		"ground to a bough: a gap from the ground ending in a fresh flight beside a bough is a charged leap",
 		function()
