@@ -894,7 +894,7 @@ end
 -- (world.slab; `standY`: the height it last stood at, for a long slanting fall), neither end by a trampoline's bed. Both
 -- ends off the rails: world.slab. One end on a rail (validator round 10, the round-9 review's MEDIUM: such a move was
 -- never judged, so a drop off a bridge over a house with its packets held back landed in the sealed storey under it):
--- world.railSlab at the off-rail end's column, from just over its feet to C.RAIL_CLEAR under the rail. Both on rails:
+-- world.railSlab at the off-rail end's column, from just over its feet up to the rail. Both on rails:
 -- the rails' own (the envelope's transfers).
 function MoveValidator.throughSlab(
 	world: World,

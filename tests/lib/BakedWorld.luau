@@ -726,7 +726,8 @@ end
 
 -- validatorRays(world) -> (wall, down, cover): ValidatorWorld.engineRays over the baked parts, so a spec judges with
 -- what the server sees. Each ray meets the colliding parts in the squirrel's group (squirrelSolid) and passes the ones
--- ValidatorWorld.stops says it looks past (a tree's bough cylinders, for the wall and the cover), at most four hits in
+-- ValidatorWorld.stops says it looks past (a tree's bough cylinders, for the wall and the cover; the rails' props too for
+-- the cover ray's "rail" rule, its 7th argument, as the engine's), at most four hits in
 -- all, as the engine's loop; `down` and `cover` also meet the terrain (World/Height under the carves), the river's
 -- water, and the town's ground plates (Shared/World/GroundPlate: non-colliding parts of Town.Lots / Town.Roads, the
 -- first part of a path; four hits, as the engine's plate ray). The terrain and the water are met by vertical rays only
@@ -773,8 +774,9 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 		end
 		return false
 	end
-	local function solidRay(kind: string): ValidatorWorld.Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+	local function solidRay(own: string): ValidatorWorld.Ray
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
+			local kind = rule or own
 			return walk(ox, oy, oz, dx, dy, dz, colliding, function(p: Part): boolean
 				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
 				return ValidatorWorld.stops(kind, p.name, parentName)
@@ -802,8 +804,10 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or ground(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-		return solidCover(ox, oy, oz, dx, dy, dz) or ground(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz, kind)
+			or ground(ox, oy, oz, dx, dy, dz)
+			or plate(ox, oy, oz, dx, dy, dz)
 	end
 	return wall, down, cover
 end

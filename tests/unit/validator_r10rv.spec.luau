@@ -37,8 +37,9 @@ type State = SquirrelMotor.State
 return function(t)
 	-- rail slab aslant ---------------------------------------------------------------------------------------------------
 	local town: any, bw: any, bvworld: any
-	-- (the aslant drops the first case found unjudged: the end-to-end case plays them through MovementService)
-	local unjudged: { any } = {}
+	-- (every aslant drop the first case tried: the end-to-end case plays them all through MovementService; validator
+	-- round 11: it played only the unjudged ones, and found none to play once all were judged)
+	local aslant: { any } = {}
 	local function baked(): boolean
 		if town then
 			return true
@@ -111,6 +112,7 @@ return function(t)
 							local tau = math.sqrt(2 * (p.y - fy) / SquirrelMotor.params.gravity)
 							if open and aside / tau <= SquirrelMotor.params.leapForward then
 								total += 1
+								table.insert(aslant, { d = d, x1 = x1, z1 = z1, fy = fy, tau = tau })
 								local v = MoveValidator.new(bvworld)
 								local on = SquirrelMotor.new(p.x, p.y, p.z)
 								on.routeId, on.railT, on.grounded, on.clock = d.r.id, d.t, false, 1
@@ -131,7 +133,6 @@ return function(t)
 									if reached then
 										held += 1
 									end
-									table.insert(unjudged, { d = d, x1 = x1, z1 = z1, fy = fy, tau = tau })
 									if #missed < 8 then
 										local codes = {}
 										for _, x in r.violations do
@@ -169,7 +170,7 @@ return function(t)
 	)
 
 	t.test(
-		"rail slab aslant, end to end: on the rail, the packets held back, the first one on the storey's floor under the ceiling, then standing there: the held place never inside (needs build/Town.rbxm)",
+		"rail slab aslant, end to end: every one of them on the rail, the packets held back, the first one on the storey's floor under the ceiling, then standing there: the held place never inside (needs build/Town.rbxm)",
 		function()
 			if not baked() then
 				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
@@ -177,7 +178,7 @@ return function(t)
 			end
 			local held, total = 0, 0
 			local where: { [string]: number } = {}
-			for _, u in unjudged do
+			for _, u in aslant do
 				local d = u.d
 				local p = d.p
 				total += 1
@@ -234,8 +235,8 @@ return function(t)
 			for k, v in where do
 				print(`      {k}: held inside the storey under it after {v} drops`)
 			end
-			print(`      {held} of {total} unjudged aslant drops held inside the storey, no snap`)
-			t.truthy(total > 0, "the first case found unjudged drops to play (run both)")
+			print(`      {held} of {total} aslant drops held inside the storey, no snap`)
+			t.truthy(total > 0, "the first case found aslant drops to play (run both)")
 			t.eq(held, 0, "an aslant drop off a rail through a ceiling never puts the held place inside")
 		end
 	)

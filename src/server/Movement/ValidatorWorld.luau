@@ -60,7 +60,9 @@ local GroundPlate = Import.shared("World/GroundPlate") :: typeof(require("../../
 
 local ValidatorWorld = {}
 
-export type Ray = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number) -> boolean
+-- (`kind`: the stop rule the ray runs by instead of its own, for the cover ray: "rail", railSlab's column; a ray over no
+-- parts ignores it)
+export type Ray = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?) -> boolean
 
 ValidatorWorld.C = table.freeze({
 	-- the body's core height over the feet (ClientWorld.STEP + PROBE_RADIUS: the narrow probe's centre)
@@ -131,9 +133,10 @@ ValidatorWorld.C = table.freeze({
 	AROUND_RAYS = 360,
 	-- studs: how near a rail a body must get to take it (railReach; Routes/Motion.C.airGrab, 3.4 st)
 	RAIL_GRAB = 3.4,
-	-- studs under a rail's centreline a move with one end on the rail is slab-judged from (railSlab; validator round 10:
-	-- a bridge's deck, a wire's or a branch's own parts, are the rail's)
-	RAIL_CLEAR = 0.5,
+	-- the props the rails are made of (railSlab's stop rule, "rail": validator round 11): a part whose parent's name starts
+	-- with one of these is a rail's own (a tree's trunk and boughs, a pole, a wire's mast, a pipe, a fence's rails and
+	-- panels: solid columns and bars, nothing to hide in), never a slab a move off a rail went through
+	RAIL_PROPS = table.freeze({ "Tree_", "Pole_", "Wire_", "Pipe_", "Fence_" }),
 	-- floorUnder's bisection: the most rays, and the height it stops at
 	FLOOR_RAYS = 14,
 	FLOOR_STEP = 0.05,
@@ -147,10 +150,18 @@ end
 
 -- stops(kind, name, parentName): does a ray of `kind` stop at a colliding part (in the squirrel's collision group) of
 -- this name under a parent of this name? "floor": every one (the client's ground stands on a bough's cylinder); "wall"
--- and "cover": not a tree's bough cylinders (no wall for the client's motor; a bough over a wall is no roof).
+-- and "cover": not a tree's bough cylinders (no wall for the client's motor; a bough over a wall is no roof); "rail"
+-- (railSlab's column, validator round 11): not the props the rails are made of either (C.RAIL_PROPS).
 function ValidatorWorld.stops(kind: string, name: string, parentName: string): boolean
 	if kind == "floor" then
 		return true
+	end
+	if kind == "rail" then
+		for _, prefix in C.RAIL_PROPS do
+			if string.sub(parentName, 1, #prefix) == prefix then
+				return false
+			end
+		end
 	end
 	return not ValidatorWorld.isBough(name, parentName)
 end
@@ -605,25 +616,25 @@ end
 -- centreline) and the other off it (o: feet) go through a floor, a roof or a ceiling? (Validator round 10, the round-9
 -- review's MEDIUM: slab() skipped any move with a rail end, so a drop (Q) off a bridge or a branch over a house, the
 -- packets held back until the first one off the rail was under the ceiling, was never judged, and every packet after it
--- was judged from inside.) Only for an off-rail end lower than the rail: the off-rail end's column, from C.SLAB_ON over
--- its feet up to C.RAIL_CLEAR under the rail (the rail's own deck or parts), and no higher than the move's drop over its
--- last C.SLAB_REACH studs across over C.RAY_ABOVE (an honest body that came in beside an overhang's edge, as slab() has
--- it); one ray down and one up (a slab either one starts inside the other meets). Nothing in the river's water.
--- The same for a body that went onto a rail from below (the column it rose from). Cost: two rays, for such moves only
+-- was judged from inside.) Only for an off-rail end lower than the rail: the off-rail end's whole column, from C.SLAB_ON
+-- over its feet up to the rail's own height, one ray down and one up (a slab either one starts inside the other meets),
+-- by the stop rule "rail": past the rails' own props (a tree's trunk and boughs, poles, masts, pipes, fences: C.RAIL_PROPS)
+-- and nothing else. Validator round 11 (the round-10 review's MEDIUM): the column stopped a fixed 0.5 st under the
+-- rail, which is under the plate of a pitched roof a bridge lies 0 to 0.5 st inside (a drop straight into the attic), and
+-- its top was lowered by the move's slant (an aslant drop 5 to 12 st aside into a sealed storey met no ceiling); neither
+-- now. Nothing in the river's water. The same for a body that went onto a rail from below (the column it rose from).
+-- Cost: two rays, for such moves only
 function ValidatorWorld.railSlab(ray: Ray): (number, number, number, number, number, number) -> boolean
-	return function(ox: number, oy: number, oz: number, rx: number, ry: number, rz: number): boolean
+	return function(ox: number, oy: number, oz: number, _rx: number, ry: number, _rz: number): boolean
 		if Height.insideRiverWater(ox, oz) then
 			return false
 		end
-		local drop = ry - oy
-		local across = math.sqrt((rx - ox) ^ 2 + (rz - oz) ^ 2)
-		local part = if across <= C.SLAB_REACH then drop else drop * C.SLAB_REACH / across
-		local top = math.min(ry - C.RAIL_CLEAR, oy + C.RAY_ABOVE + part)
+		local top = ry
 		local bottom = oy + C.SLAB_ON
 		if top <= bottom then
 			return false
 		end
-		return ray(ox, top, oz, 0, bottom - top, 0) or ray(ox, bottom, oz, 0, top - bottom, 0)
+		return ray(ox, top, oz, 0, bottom - top, 0, "rail") or ray(ox, bottom, oz, 0, top - bottom, 0, "rail")
 	end
 end
 
@@ -638,11 +649,11 @@ export type Options = { wall: Ray?, down: Ray?, cover: Ray?, cars: Cars? }
 function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars, cover: Ray?): (Ray, Ray, Ray)
 	local walls, floors = cars.walls, cars.floors
 	local function over(set: any, ray: Ray?): Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
 			if set.n > 0 and Solid.ray(set, ox, oy, oz, dx, dy, dz) then
 				return true
 			end
-			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz)
+			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz, kind)
 		end
 	end
 	return over(walls, wall), over(floors, down), over(floors, cover or down)
@@ -692,7 +703,8 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 	}
 end
 
--- engineRays(exclude): the three rays on the live server. `wall`: colliding parts in the squirrel's group, past the
+-- engineRays(exclude): the three rays on the live server (each takes a stop rule in place of its own as a 7th argument:
+-- the cover ray's "rail" for railSlab). `wall`: colliding parts in the squirrel's group, past the
 -- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: colliding parts
 -- in the squirrel's group, the bough cylinders included, the terrain, the water, the vehicles and the town's ground
 -- plates (Shared/World/GroundPlate) counted as floor. `cover`: `down` past the bough cylinders (stops: one rule each).
@@ -718,8 +730,9 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	end
 	local floorParams = params(floorList)
 	floorParams.IgnoreWater = false
-	local function cast(p: RaycastParams, kind: string): Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+	local function cast(p: RaycastParams, own: string): Ray
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
+			local kind = rule or own
 			local origin = Vector3.new(ox, oy, oz)
 			local left = Vector3.new(dx, dy, dz)
 			for _ = 1, 4 do
@@ -793,8 +806,8 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-		return solidCover(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz, kind) or plate(ox, oy, oz, dx, dy, dz)
 	end
 	return cast(wallParams, "wall"), down, cover
 end

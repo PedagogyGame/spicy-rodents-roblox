@@ -464,8 +464,16 @@ function Game.start(opts: Opts?): any
 		down = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 			return engineRays().down(ox, oy, oz, dx, dy, dz)
 		end,
-		cover = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-			return engineRays().cover(ox, oy, oz, dx, dy, dz)
+		cover = function(
+			ox: number,
+			oy: number,
+			oz: number,
+			dx: number,
+			dy: number,
+			dz: number,
+			kind: string?
+		): boolean
+			return engineRays().cover(ox, oy, oz, dx, dy, dz, kind)
 		end,
 	})
 	local net: any? = nil
