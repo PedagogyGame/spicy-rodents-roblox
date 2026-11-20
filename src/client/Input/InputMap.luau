@@ -31,6 +31,7 @@ export type Frame = {
 	grab: boolean,
 	choose: number,
 	pounce: boolean,
+	trick: boolean, -- the squirrel's air trick (owner D17): G, gamepad R1; the touch button is UI/AirTrickButton's
 	jump: boolean,
 	interact: boolean, -- enter / exit a vehicle
 	toggleView: boolean, -- first-person toggle (V)
@@ -58,6 +59,9 @@ InputMap.BINDINGS = table.freeze({
 	chooseLeft = { "A", "Left", "DPadLeft" },
 	chooseRight = { "D", "Right", "DPadRight" },
 	pounce = { "MouseButton1", "ButtonR2" },
+	-- the air trick (owner D17): G and R1 are bound by no other on-foot verb (G is paintball's scoreboard and R1 the
+	-- telescope's and pool's, each only inside its own game or ride)
+	trick = { "G", "ButtonR1" },
 	interact = { "E", "ButtonY" },
 	kick = { "F", "ButtonX" },
 	toggleView = { "V", "ButtonR3" },
@@ -78,9 +82,9 @@ function InputMap.HINTS(role: string): string
 	if role == "human" then
 		return "WASD move · Shift run · Space jump · F kick · E get in a vehicle · V first person"
 	elseif role == "rodent" then
-		return "WASD run · Shift sprint · Space leap · Click pounce · F feint · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
+		return "WASD run · Shift sprint · Space leap · G in the air: roll, again: wiggle · Click pounce · F feint · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
 	elseif role == "squirrel" then
-		return "WASD run · Shift sprint · Space leap · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
+		return "WASD run · Shift sprint · Space leap · G in the air: roll, again: wiggle · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
 	elseif role == "quadruped" then
 		return "WASD move · Shift run · Space jump"
 	elseif role == "vehicle" then
@@ -311,6 +315,7 @@ function InputMap.start(): Sampler
 				grab = edges.grab == true,
 				choose = (if edges.chooseRight then 1 else 0) - (if edges.chooseLeft then 1 else 0),
 				pounce = edges.pounce == true,
+				trick = edges.trick == true,
 				jump = edges.jump == true,
 				interact = edges.interact == true,
 				toggleView = edges.toggleView == true,

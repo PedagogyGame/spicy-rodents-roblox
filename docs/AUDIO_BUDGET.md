@@ -219,5 +219,13 @@ The library's human voices are few; the two vocal picks are the riskiest in this
 |---|---|---|
 | `Nuts.Pick` | the player's own squirrel picks a nut up (heard by that player only; volume 0.35, played a little higher) | Wood Drop, Impacts On Concrete, Small Pieces: a small wooden tick and bounce (9120863989). It replaces the stand-in, the store's flashlight click (9114481274). |
 
+### The air trick (`src/shared/Movement/AirTrick.luau` `SOUNDS`; played by `src/client/Animation/AnimationDriver.luau`)
+Owner D17: one sound per move, played once at the squirrel by every client that sees it (within 120 studs), a little higher than recorded. Both are ids the game already uses elsewhere; nothing uploaded.
+
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `AirTrick.Roll` | a squirrel's barrel roll in the air | Cloth Whooshes Soft 1: a soft whoosh going past (9113842150) |
+| `AirTrick.Wiggle` | a squirrel's twitch-and-wiggle in the air | Swish, Paddle Swish, Soft (9119702970) |
+
 ## To hear first in Studio
 All of the above were chosen without being heard. The ones most likely to need a swap: the duel's two voices; `Items.SodaFizz` (a gulp, not a can opening); `sewer.footEcho` and `sewer.rung` at their volumes; `SkyLift.CableHum` (a building's lift motor, not a rope); and the two upload candidates.

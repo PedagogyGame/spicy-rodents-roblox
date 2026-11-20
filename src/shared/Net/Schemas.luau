@@ -51,7 +51,7 @@ Schemas.MotorState = BufferCodec.layout({
 	{ name = "vz", kind = "f32" },
 })
 
--- 167 bytes: Movement/SquirrelWire.
+-- 172 bytes: Movement/SquirrelWire.
 Schemas.SquirrelState = SquirrelWire.LAYOUT
 
 -- 13 bytes per vehicle (§1.6 VehiclePoses): yaw and speed pre-quantised to bytes by the sender.

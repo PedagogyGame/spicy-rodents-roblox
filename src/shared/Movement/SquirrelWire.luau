@@ -4,8 +4,9 @@
 -- Server/Movement/MoveValidator judges (SquirrelMotor.serialize's snapshot), a sequence number, and the motor epoch
 -- the server last handed this player (Possession.Granted's `motorEpoch`, then each "Correction"). The server drops a
 -- packet from an older epoch: it was sent before a teleport, a snap-back or a hand-off reached the client.
--- 167 bytes: positions, the rail parameter and the clock as f64 (the on-rail check is 0.125 studs and the clock only
--- grows), velocities and timers as f32, the four optional ids as i32 (-1 none), the flags as one byte, and the rodent's
+-- 172 bytes: positions, the rail parameter and the clock as f64 (the on-rail check is 0.125 studs and the clock only
+-- grows), velocities and timers as f32, the four optional ids as i32 (-1 none), the flags as one byte, the air trick
+-- (owner D17: trickKind as a byte, 0 to 2, and trickTime as f32; SquirrelMotor's state), and the rodent's
 -- last click (validator round 5: a click's reliable remote resent after a loss arrived too late to tie its pounce): its
 -- number (clickSeq, u8: 0 none, then 1 to 255 round) and how long before this packet's clock it was made (clickAgo,
 -- f32 seconds), repeated in every packet for CLICK_COPY seconds after the click (Controllers/MotorLink.click). The server
@@ -57,6 +58,8 @@ local fields: { BufferCodec.Field } = {
 	{ name = "railDir", kind = "i8" },
 	{ name = "clickSeq", kind = "u8" },
 	{ name = "clickAgo", kind = "f32" },
+	{ name = "trickKind", kind = "u8" },
+	{ name = "trickTime", kind = "f32" },
 }
 for _, k in F64 do
 	table.insert(fields, { name = k, kind = "f64" })
@@ -93,6 +96,9 @@ function SquirrelWire.encode(seq: number, epoch: number, snapshot: { [string]: n
 	local click = snapshot.clickSeq
 	rec.clickSeq = if type(click) == "number" then click else 0
 	rec.clickAgo = if type(click) == "number" and click ~= 0 then snapshot.clickAgo :: number else 0
+	local trick = snapshot.trickKind
+	rec.trickKind = if type(trick) == "number" then trick else 0
+	rec.trickTime = if type(snapshot.trickTime) == "number" then snapshot.trickTime :: number else 0
 	for _, k in F64 do
 		rec[k] = snapshot[k] :: number
 	end
@@ -121,6 +127,8 @@ function SquirrelWire.fromRecord(rec: { [string]: number }): (number, number, { 
 	s.railDir = if (rec.railDir or 1) < 0 then -1 else 1
 	s.clickSeq = rec.clickSeq or 0
 	s.clickAgo = rec.clickAgo or 0
+	s.trickKind = rec.trickKind or 0
+	s.trickTime = rec.trickTime or 0
 	for _, k in F64 do
 		s[k] = rec[k] or 0
 	end

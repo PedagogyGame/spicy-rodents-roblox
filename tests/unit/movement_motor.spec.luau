@@ -257,15 +257,19 @@ return function(t)
 		t.near(speedOf(a), P.sprint, 0.05)
 	end)
 
-	-- Review 2026-11-10: chained pounces held 28 st/s for ever and hops 24 st/s for half a minute.
+	-- Review 2026-11-10: chained pounces held 28 st/s for ever and hops 24 st/s for half a minute. Owner D17
+	-- (2026-11-20): hopping on an empty meter keeps a slight edge over the walk, short of hopping with meter. Measured on
+	-- open ground at the south edge, running north (inside the world clamp for the whole minute: from (300, 300) the
+	-- clamp stopped the body after 19 s and every pace here read 0).
 	t.test("hopping and pounce-chaining are no way round the sprint meter", function()
 		local P = SquirrelMotor.params
-		local function average(press: string, every: number): (number, number)
-			local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+		local function average(press: string, every: number, window: number?): (number, number)
+			local s = SquirrelMotor.new(Units.st(-560), world.groundHeight, Units.st(-545))
 			local inp = input(math.pi)
 			inp.fw = 1
-			local nextAt, late0, firstWinded = 0, 0, math.huge
-			for i = 1, 60 * 60 do
+			local nextAt, late0, firstWinded = 0, s.z, math.huge
+			local frames = if window then window * 60 else 60 * 60
+			for i = 1, frames do
 				local now = i / 60
 				local anyInp = inp :: any
 				anyInp[press] = false
@@ -279,22 +283,30 @@ return function(t)
 						firstWinded = math.min(firstWinded, now)
 					end
 				end
-				if i == 30 * 60 then
+				if not window and i == 30 * 60 then
 					late0 = s.z
 				end
 			end
-			return (s.z - late0) / 30, firstWinded
+			return (s.z - late0) / (if window then window else 30), firstWinded
 		end
+		local walk = average("leap", -1) -- (never pressed)
+		t.near(walk, P.walk, 0.2, "walking north the whole minute")
 		local hop, hopWinded = average("leap", 0)
+		local full = average("leap", 0, 6)
+		print(`      walk {walk}, hop on landing: winded {hop}, the first 6 s on a full meter {full} st/s`)
 		t.truthy(hopWinded < 10, `hopping empties the meter in {hopWinded} s`)
-		t.truthy(hop <= P.walk * 1.03, `winded hopping averages {hop} st/s (walk {P.walk})`)
+		t.truthy(
+			hop >= walk * 1.05 and hop <= walk * 1.2,
+			`winded hopping averages {hop} st/s: a slight edge (walk {walk})`
+		)
+		t.truthy(full >= hop * 1.1, `hopping with meter ({full} st/s) stays well over winded hopping ({hop})`)
 		for _, every in { 0.7, 0.72, 1.0 } do
 			local pounce, pounceWinded = average("pounce", every)
 			t.truthy(pounceWinded < 10, `pouncing every {every} s empties the meter in {pounceWinded} s`)
 			t.truthy(pounce <= P.walk * 1.06, `pouncing every {every} s averages {pounce} st/s (walk {P.walk})`)
 		end
 		-- the first pounce of a fresh squirrel is a full lunge
-		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+		local s = SquirrelMotor.new(Units.st(-560), world.groundHeight, Units.st(-545))
 		local inp = input(math.pi)
 		inp.pounce = true
 		SquirrelMotor.step(s, inp, 1 / 60, world)
