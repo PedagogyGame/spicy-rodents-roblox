@@ -23,6 +23,7 @@ node tools/cloud/cloud.mjs save_place build/test.rbxl --place ci [--legacy] [--o
 node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/boot_smoke.luau --version <v> [--place ci] [--out build/r.json]
 node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/boot_smoke.luau --version 1 --inject ci.project.json --inject-exclude generated
 node tools/cloud/cloud.mjs upload_asset path/to.png --type Image --name "name" [--description ...]
+node tools/cloud/cloud.mjs upload_asset assets/audio/candidates/x.ogg --type Audio --name "name" --i-am-within-audio-budget
 node tools/cloud/cloud.mjs harvest_ids [--place art_inbox] [--run --version <v>]      # W0 stub
 node tools/cloud/cloud.mjs publish build/owner.rbxl --place main --i-really-mean-it   # never in CI
 node tools/cloud/cloud.mjs operation operations/<id> [--wait]
@@ -43,6 +44,26 @@ Exit codes: 0 pass, 1 failure (HTTP error, task FAILED, or the task's JSON has `
   `versionType=Saved` with `--legacy`). Only `publish` can publish, and only with the flag.
 - Every engine-test task is **pinned to a version** (`/versions/{v}`); `--version` is mandatory.
 - Task scripts over 1 MiB are refused locally (the live API limit), so no task create is wasted.
+
+### Audio uploads (the lead only; docs/AUDIO_BUDGET.md)
+
+Audio spends the owner's monthly cap (100; this game works within 40, at most 50 when genuinely
+needed, and keeps at least 50 for his other games: BRIEF_ADDENDUM B3). So `--type Audio`:
+
+- needs `--i-am-within-audio-budget` (exit 3 without it): check the tally in `docs/AUDIO_BUDGET.md`
+  first, and upload only a take that has been heard and approved;
+- takes only an Ogg Vorbis file (`.ogg`, sent as `audio/ogg`, assetType `Audio`), as
+  `tools/audio/make_candidates.py` writes them;
+- logs `audio-attempt sha <16 hex> <file>` to `assets.log` **before** the request (a failed or
+  cut-off upload still counts) and the usual result line after it; `lib/audioBudget.mjs` counts the
+  attempts over a rolling 30 days and refuses (exit 3) at 40 unless `--beyond-working-budget`, always
+  at 50, and a file whose sha was already uploaded unless `--reupload`. The log is this machine's
+  backstop; the doc's tally is the authority.
+
+Put the file first (`upload_asset <file> --type Audio ...`): a bare flag right before a positional
+argument would take it as its value. Then record the id:
+`python3 -I tools/audio/publish.py --record <slot>=<assetId> --moderation <state> --approve`, and add
+the upload to the tally.
 
 ### Shared lock and token buckets
 
@@ -120,5 +141,7 @@ Expected per the plan: save + task in well under 2 minutes (the task alone is ~3
 - `lib/config.mjs`: IDs, forbidden IDs, buckets, state dir. `lib/lock.mjs`: lock, buckets, task
   registry, logs. `lib/http.mjs`: fetch with retries (429/5xx), multipart helper, error hints.
   `lib/openCloud.mjs`: the API calls. `lib/inject.mjs`: project tree -> task bootstrap.
+  `lib/audioBudget.mjs`: the audio upload rule (pure; reads the assets log).
 - `tasks/*.luau`: task scripts (`ping.luau`, `boot_smoke.luau`); formatted and linted with the rest.
-- Logs of every save/task/upload append to `saves.log`, `tasks.log`, `assets.log` in the state dir.
+- Logs of every save/task/upload append to `saves.log`, `tasks.log`, `assets.log` in the state dir
+  (audio attempts too: `lib/audioBudget.mjs` reads them back).

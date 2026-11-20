@@ -12,22 +12,24 @@ Every id below was picked by its library title, description and length; **none h
 ## Uploads
 | Month | Uploaded | Notes |
 |---|---|---|
-| 2026-11 | 0 so far; **2 planned** | `dog_bark` and `bowling_roll` below. Nothing else needs an upload. |
+| 2026-11 | 0 so far; **2 planned on 20 November** | `dog_bark` and `bowling_roll` below (redone on 20 November, D18), by the lead with `tools/cloud` `upload_asset --type Audio`. Nothing else needs an upload. After them: 2 of the 40 working budget used, 38 left; the owner keeps at least 50 of his 100. |
 
 The upload slots (`src/shared/Audio/Uploads.luau`: the game reads the id from there; empty until uploaded, and the cue is silent until then):
 
 | Slot | Cue | Candidate | Length | How it was made | Licence |
 |---|---|---|---|---|---|
-| `dog_bark` | `Dogs.Bark` (the yard dogs; owner #36: a custom bark) | `assets/audio/candidates/dog_bark.ogg` | 0.78 s | synthesised offline: two short voiced barks, harmonics through three open-mouth formants (650, 1250, 2600 Hz), a breath at each onset, pitch 380 -> 560 -> 300 Hz; friendly, no growl | the game's own (made from code here; no recording or third-party audio) |
-| `bowling_roll` | `roll` (bowling: the ball down the lane) | `assets/audio/candidates/bowling_roll.ogg` | 2.6 s | synthesised offline: low brown noise with the lane's wooden resonances (85, 140 Hz), the ball's turn as a 4-4.6 Hz pulse, faint surface grit, duller and quieter as it goes, faded | the game's own |
+| `dog_bark` | `Dogs.Bark` (the yard dogs; owner #36: a custom bark) | `assets/audio/candidates/dog_bark.ogg` | 0.62 s (barks 0.21 and 0.25 s) | synthesised offline: two barks, each a glottal pulse train (jitter, shimmer, a moment of period doubling for the rasp) with breath noise through a dog's moving formants (the mouth opening on "wuh", closing on "f"), a noisy burst on each onset, pitch about 500 -> 580 -> 350 Hz; friendly, no growl | the game's own (made from code here; no recording or third-party audio) |
+| `bowling_roll` | `roll` (bowling: the ball down the lane) | `assets/audio/candidates/bowling_roll.ogg` | 2.6 s | synthesised offline: noise through the lane's and the ball's resonances (72-690 Hz), the ball's turn as a lumpy 5 Hz pulse, rolling grit and irregular lane-board ticks, going away (a slight pitch drop, duller, 9 dB quieter, a smooth fade) | the game's own |
+
+Both are mono 44.1 kHz Ogg Vorbis at -15 LUFS integrated (ITU-R BS.1770), true peak at most -1.5 dBTP, as the manifest records. The first takes (until 20 November) were redone for D18 ("redo the sounds if they need it"): the bark measured as a clean harmonic tone (harmonics-to-noise about 12 dB, a 30 ms attack, nothing above 2 kHz but the harmonics), which reads as an electronic "wah"; the roll had 99 % of its energy under 250 Hz (27 % under 60 Hz), which a phone speaker barely plays; both were 3-4 dB quieter than -15 LUFS.
 
 Why these two: the licensed library has no dog bark short enough (only 50-70 s farm ambiences with barking in them) and no ball rolling down a lane (only billiards, basketballs and carts); the owner asked for the bark as an upload.
 
 The lead's steps:
 1. `python3 -I tools/audio/make_candidates.py --preview build/audio` remakes both from fixed seeds (numpy, scipy, ffmpeg) and writes WAVs and spectrograms to listen to and look at.
 2. Listen. To change one, edit its recipe in `make_candidates.py` and remake it.
-3. `python3 -I tools/audio/publish.py --skip-upload` checks the candidates (mono Vorbis, short, the length the manifest says, a slot in `Uploads.luau` for each).
-4. Upload by hand (Creator Hub; `tools/cloud` deliberately does not upload audio), then `python3 -I tools/audio/publish.py --record dog_bark=<assetId> --moderation Approved --approve`, which writes the id into the manifest and `Uploads.luau`. Add the upload to the tally above.
+3. `python3 -I tools/audio/publish.py --skip-upload` checks the candidates (mono Vorbis, short, the length, sha, loudness and true peak the manifest says, -16 to -14 LUFS and at most -1 dBTP, a slot in `Uploads.luau` for each) and prints the exact upload commands.
+4. Upload: `node tools/cloud/cloud.mjs upload_asset assets/audio/candidates/<slot>.ogg --type Audio --name "<displayName>" --description "<description>" --i-am-within-audio-budget` (the flag says the tally above was checked; `tools/cloud/lib/audioBudget.mjs` also counts this machine's logged audio uploads over 30 days and refuses at 40 unless `--beyond-working-budget`, always at 50, and refuses the same file twice). Then `python3 -I tools/audio/publish.py --record <slot>=<assetId> --moderation <state> --approve`, which writes the id into the manifest and `Uploads.luau`. Add the upload to the tally above.
 
 ## Every cue and its sound
 

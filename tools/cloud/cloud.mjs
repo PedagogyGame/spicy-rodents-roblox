@@ -45,8 +45,9 @@ function help() {
                                    create a Luau Execution task pinned to /versions/<v>, poll, print logs,
                                    parse the JSON result; exit 1 on failure. Scripts are capped at 1 MiB by the API;
                                    --inject rebuilds the code tree in the task, --inject-exclude leaves $path dirs out
-  upload_asset <file> --type Image|Model|Animation --name <n> [--description <d>] [--creator-user id|--creator-group id]
-                                   Assets API create with operation polling (creator = universe owner)
+  upload_asset <file> --type Image|Model|Animation|Audio --name <n> [--description <d>] [--creator-user id|--creator-group id]
+                                   Assets API create with operation polling (creator = universe owner); Audio (.ogg)
+                                   needs --i-am-within-audio-budget and is counted against docs/AUDIO_BUDGET.md
   harvest_ids [--place art_inbox] --version <v>   stub (W0): reads asset IDs from a place version
   publish <file.rbxl> --place main --i-really-mean-it      publish a version (refuses without the flag)
   operation <operations/id>        poll an Assets API operation
