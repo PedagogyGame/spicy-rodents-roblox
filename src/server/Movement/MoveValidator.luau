@@ -65,6 +65,12 @@
 --     landing's carry and a flight coasting from its launch drain nothing, the rest the least sprint the motor covers it
 --     with; gaps from the air pay their flight's carry and any launch they hid; a flight past the sprint-steered step is a
 --     "speed" violation; the rail rule's slab columns look past up to ValidatorWorld.C.RAIL_HOPS props, then fail closed.
+--   * Round 13 (2026-11-20, the round-12 review), two rules for the meter and the speed kept: (P1) no allowance is sized or
+--     skipped from a claim the server has not checked (a hidden relaunch is at least a substep old and charged; where a
+--     fact is unknown, the honest-favourable bound, never a free one); (P2) a free flight is earned only by a rail launch
+--     the server knows of (the envelope's judged.railLaunch, a packet on a rail, a rail at hand where a hidden launch
+--     ends) and ends when its arc must have come down. A charge that takes the meter to its floor winds it before any
+--     refill; a launch packet's time before its launch is judged as a move of its own.
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -1352,7 +1358,8 @@ end
 --   * The speed kept. The most horizontal speed and moveSpeed the body can have, stepped with the walk as moveSpeed's goal
 --     where the move needed no sprint and with the sprint where it did; a launch sets it to the launch's speed (the
 --     envelope's cap, a winded one's no more than leapForwardWinded; a pounce's held for pounceWindow), a free launch
---     (off a rail, a trampoline's bed) steers at v5.4's speeds as the motor's railLeap does.
+--     (off a rail the server knows of; a bounce keeps a free flight free) steers at v5.4's speeds as the motor's railLeap
+--     does, until its arc from the launch must have come down (validator round 13: onArc).
 --   * Drain: what the walk-steered step does not cover. On the ground a move longer than C.STAMINA_WALK times both a walk
 --     and the walk-steered step from the speed kept (a landing's carry, a sprint slowing to a walk at speedSmooth: the
 --     motor drains none of it) drains all its time, as the motor's sprint does (a full meter is sprintSeconds). In the
@@ -1370,8 +1377,9 @@ end
 --   * A pounce's lunge runs on along the ground, unsteered, for the motor's pounceWindow: paid with pounceCost, so the
 --     ground packets inside it no faster than the lunge drain nothing (a winded pounce's lunge is a walk: not exempt).
 --   * Refill, at the motor's rate (sprintRefill), for the time on the ground or a rail not sprinting: a move whose ends are
---     both there, and the ground part of one that lands or launches (validator round 12); never in the air ("or a hop
---     would pay for itself"). A ride, a stall or a respawn refill by the server's own time on the first packet after.
+--     both there, and the ground part of one that lands or launches (validator round 12; a launch packet's ground part is
+--     judged as a ground move first, validator round 13); never in the air ("or a hop would pay for itself"). A charge or
+--     a sprint that takes the meter to its floor winds it there, before any refill (validator round 13). A ride, a stall or a respawn refill by the server's own time on the first packet after.
 --   * The time a move stands for is the packets' own clocks (validator round 10): the client clock's gap, never more than
 --     the clock check lets it stand for (dtEff).
 --   * A gap too long to judge move by move (`unjudged`) pays the least the motor could have covered its distance with,
@@ -1505,13 +1513,14 @@ function MoveValidator._stamina(
 	end
 	-- the launch's speed: the envelope's cap held to the claim (keepXZ), a winded one's no more than a winded leap or pounce;
 	-- free off a rail the envelope saw, and a trampoline's bounce keeps a free flight free (the motor's railLeap is kept)
-	local function launchModel()
+	-- (`most`: the most its flight can have kept by the packet's end, when the packet dates the launch)
+	local function launchModel(most: number?)
 		local cap = if tired
 			then (if charge == "pounce" then P.walk else P.leapForwardWinded) * E.launchTol
 			else math.huge
 		local freeLaunch = not footB and (railLaunch == true or (charge == nil and free))
 		keepModel(
-			math.min(hxz, cap),
+			math.min(hxz, cap, most or math.huge),
 			s,
 			if pounceAt then pounceAt + P.pounceWindow else nil,
 			freeLaunch,
@@ -1653,9 +1662,6 @@ function MoveValidator._stamina(
 		local tiredBefore = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
 		if tiredBefore or (marks.stamina < P.leapCost and hxz <= windedXZ) then
 			marks.stamina -= math.clamp(marks.stamina, 0, P.leapCost)
-			if marks.stamina <= 1e-6 then
-				marks.winded = true
-			end
 			return windedXZ
 		end
 		spend(P.leapCost)
@@ -1686,11 +1692,27 @@ function MoveValidator._stamina(
 			span
 		)
 		local before = span - inAir
+		-- (the launch's flight over its time: from its cap (a winded one's; a bounce's or a rail leap's no less than the
+		-- speed judged at the end), steered toward the sprint at accelAir as the motor's flight is, a pounce's window held,
+		-- a rail leap's toward v5.4's sprint: what it covers, and the most it keeps; validator round 13, a 0.49 s launch
+		-- packet credited at its cap throughout and kept at it after carried 29.7 st/s)
+		local flyCap = if tired
+			then (if charge == "pounce" then P.walk else P.leapForwardWinded) * E.launchTol
+			else SquirrelMotor.launchCapXZ(false) * E.launchTol
+		if charge == nil then
+			flyCap = math.max(flyCap, hxz)
+		end
+		local fly, uFly = SquirrelMotor.speedBound(
+			flyCap,
+			P.sprint,
+			P.sprint,
+			false,
+			inAir,
+			if pounceAt then P.pounceWindow else nil,
+			if railLaunch then V54.sprint else nil
+		)
 		if before > 1e-3 and not railA then
-			local flyCap = if tired
-				then (if charge == "pounce" then P.walk else P.leapForwardWinded) * E.launchTol
-				else SquirrelMotor.launchCapXZ(false) * E.launchTol
-			local onFoot = across - flyCap * inAir - E.posSlack
+			local onFoot = across - fly * C.STAMINA_STEP - E.posSlack
 			local function need(air: boolean): number
 				local inAirBefore = if air then before else 0
 				local dW = stepped(inAirBefore, true, 0, 0, before)
@@ -1714,7 +1736,7 @@ function MoveValidator._stamina(
 			refill = math.max(0, before - sprinted)
 		end
 		marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
-		launchModel()
+		launchModel(uFly)
 		settle()
 		return
 	elseif railA or railB then
