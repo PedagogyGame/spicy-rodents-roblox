@@ -180,6 +180,14 @@ type Marks = {
 	-- (the route a free flight left, when the server had the body on it: a relaunch hidden in an air gap off that same
 	-- route is the motor's free leap chain, validator round 15)
 	speedRoute: number?,
+	-- the air trick (owner D18; _stamina): a flight began since the last wiggle charged (the server saw the body on the
+	-- ground or a rail, or a gap long enough to hide a landing), and since the last roll's carry (the server saw it in the
+	-- air); the client clock of the last packet on its footing; the flight's reach out (SquirrelMotor.trickReachAt)
+	trickArmed: boolean?,
+	rollArmed: boolean?,
+	footClock: number?,
+	trickReach: number?,
+	trickHidden: boolean?, -- (this packet's move needed a wiggle the gap hid: SquirrelMotor.Judged.trickHidden)
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -755,6 +763,7 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 		end
 		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
 		charge = judged.charge
+		actor.marks.trickHidden = judged.trickHidden
 		railLaunch = judged.railLaunch
 		grabFrom = if railLaunch then judged.grabFrom else nil
 		launchRoute = if railLaunch then prev.routeId or judged.grabRoute else nil
@@ -1524,8 +1533,63 @@ function MoveValidator._stamina(
 			})
 		end
 	end
+	-- the air trick (owner D18), by the server's own footing (a flight: from a packet on the ground or a rail, or a gap
+	-- long enough to hide a landing, to the next). A fresh wiggle claimed pays trickCost from a meter with any left, the
+	-- client's own word on its meter aside; the first of a flight earns a reach out, the motor's rule on the server's
+	-- numbers (trickReachAt: its time in the air no less than since the last footing seen; no landing known, so the
+	-- timing's bound alone), the next of the same flight none. While a wiggle's re-aim is live the horizontal speed bound
+	-- scales as the re-aim's reach changed, at that reach (the motor's aimScale; it telescopes, so a re-aim to and fro
+	-- buys nothing). A fresh roll after a flight the server saw holds the speed (neither steered nor dragged) for the
+	-- roll's length from its press, dated within the packet: the motor's carry along the ground
+	local trickScale, trickOut = 1, 1
+	if not exempt then
+		local freshWiggle = SquirrelMotor.freshMove(prev, next, 2)
+		local freshRoll = SquirrelMotor.freshMove(prev, next, 1)
+		if unjudged then
+			marks.trickArmed, marks.rollArmed = true, true
+		end
+		if launched or grabFrom then
+			-- (a launch in the gap, off the ground, a rail or a grab the envelope explained: a new flight, begun after `prev`)
+			marks.trickArmed = true
+			marks.footClock = math.max(marks.footClock or -math.huge, prev.clock)
+		end
+		if marks.trickHidden then
+			-- (a wiggle the gap hid, which the envelope needed: paid as one seen; that flight's reach is none)
+			marks.trickHidden = nil
+			if marks.stamina > 0 then
+				spend(math.min(P.trickCost, marks.stamina))
+			end
+		end
+		if freshWiggle then
+			if marks.stamina > 0 then
+				spend(math.min(P.trickCost, marks.stamina)) -- (the motor empties a meter, no further)
+			end
+			marks.trickReach = if marks.trickArmed
+				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0, 0)
+				else 0
+			marks.trickArmed = nil
+		end
+		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind ~= 0) then
+			local R = marks.trickReach or 0
+			local from = if freshWiggle then 0 else prev.aimReach or 0
+			trickScale = SquirrelMotor.aimScale(next.aimReach or 0, R) / SquirrelMotor.aimScale(from, R)
+			trickOut = SquirrelMotor.aimScale(math.max(next.aimReach or 0, from), R)
+		end
+		if freshRoll and marks.rollArmed then
+			local at = math.clamp(next.clock - (P.trickRoll - next.trickTime), prev.clock, next.clock)
+			marks.speedHold = math.max(marks.speedHold or -math.huge, at + P.trickRoll)
+			marks.rollArmed = nil
+		end
+		if next.routeId ~= nil or next.grounded then
+			marks.trickArmed = true
+			marks.footClock = next.clock
+		else
+			marks.rollArmed = true
+		end
+	end
 	-- the speed kept (unknown: the most an honest body has there: a sprint on the ground, a launch's in the air)
-	local u = marks.speedU or (if footA then P.sprint else SquirrelMotor.launchCapXZ(false) * E.launchTol)
+	local u = (marks.speedU or (if footA then P.sprint else SquirrelMotor.launchCapXZ(false) * E.launchTol))
+		* trickScale
 	local s = marks.speedS or P.sprint
 	local holdLeft = math.max(0, (marks.speedHold or -math.huge) - prev.clock)
 	-- (a free flight, validator round 13, the round-12 review's HIGH 1: earned only by a launch off a rail the server
@@ -1546,6 +1610,11 @@ function MoveValidator._stamina(
 	-- motor's railLeap)
 	local walkLo: number? = if free then V54.sprint else nil
 	local sprintLo: number? = walkLo
+	if trickOut > 1 then
+		-- (a wiggle's re-aim out: the motor's air steers toward its speed scaled as the speed was, a sprint's at most)
+		local lo = math.max(walkLo or 0, P.sprint) * trickOut
+		walkLo, sprintLo = lo, lo
+	end
 	-- (`rail`: the flight is free from here; `arcFrom`: a free launch, its arc dated from this packet (its clock, its height
 	-- and the vertical speed judged); a free flight carried on keeps its launch's)
 	-- (`route`: the rail a fresh free flight left, when the server had the body on it)

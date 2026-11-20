@@ -669,6 +669,19 @@ function AnimationDriver.trickOf(kin: KinematicPose.Pose?, kind: any, at: any, n
 	return AirTrick.playing(kind, at, now)
 end
 
+-- The twitch's aim and seed for a body (pure): its own motor's when the controller holds it, else the server's
+-- attributes (AirTrickAim, a Vector2 of the turn over its most and the reach; AirTrickSeed). (aimYaw, aimReach, seed)
+function AnimationDriver.trickAim(kin: KinematicPose.Pose?, aim: any, seed: any): (number, number, number)
+	if kin then
+		return kin.trickAimYaw or 0, kin.trickAimReach or 0, kin.trickSeed or 0
+	end
+	local yaw, reach = 0, 0
+	if typeof(aim) == "Vector2" then
+		yaw, reach = aim.X * AirTrick.MAX_YAW, aim.Y
+	end
+	return yaw, reach, if type(seed) == "number" then seed else 0
+end
+
 -- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the
 -- speed the animation is told, heroClip's mode, the kinematic controller's pose when the body is held
 -- (else the pose arrives in the server's steps), the server's clock, and whether it is too far from the
@@ -1332,7 +1345,12 @@ function AnimationDriver.start(opts: Opts): Driver
 				end)
 			end
 		end
-		return AirTrick.pose(kind, elapsed)
+		local aimYaw, aimReach, seed = AnimationDriver.trickAim(
+			KinematicPose.get(e.body),
+			e.body:GetAttribute(AirTrick.ATTR.aim),
+			e.body:GetAttribute(AirTrick.ATTR.seed)
+		)
+		return AirTrick.pose(kind, elapsed, aimYaw, aimReach, seed)
 	end
 
 	-- the procedural gait writes Motor6D.Transform in Stepped (before the joints are solved)
