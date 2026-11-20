@@ -54,9 +54,9 @@ type Bucket = typeof(KiteFlight.bucket())
 
 local ItemWorld = {}
 
--- cue name -> sound asset id, "rbxassetid://<n>": empty until the lead picks a sound from Roblox's licensed
--- library (no uploads; docs/AUDIO_BUDGET.md "Corner store"). Every cue of ItemRules.CUES and
--- ItemRules.RADIO_PLAYLIST has a row (tests/unit/corner_store_items.spec.luau).
+-- cue name -> sound asset id, "rbxassetid://<n>", all from Roblox's licensed library (no uploads;
+-- docs/AUDIO_BUDGET.md "Corner store"). Every cue of ItemRules.CUES and ItemRules.RADIO_PLAYLIST has a row
+-- (tests/unit/corner_store_items.spec.luau) and none is empty (tests/unit/audio_cues.spec.luau).
 local SOUNDS: { [string]: string } = {
 	["Items.WaterGun"] = "rbxassetid://9125995935", -- Squirt Bottle (ProSoundEffects)
 	["Items.Harmonica"] = "rbxassetid://1846183142", -- Harmonica Stings D (APM)
@@ -66,7 +66,7 @@ local SOUNDS: { [string]: string } = {
 	["Items.CameraClick"] = "rbxassetid://9113678227", -- Camera Shutter 1 (ProSoundEffects)
 	["Items.TapeRip"] = "rbxassetid://9114886755", -- Denim Or Canvas Tears 8 (ProSoundEffects)
 	["Items.Whoopee"] = "rbxassetid://9114372701", -- Airy deflate 13 (ProSoundEffects)
-	["Items.SodaFizz"] = "",
+	["Items.SodaFizz"] = "rbxassetid://9114171849", -- Drinking Cu Gulping 1: from a soda can (ProSoundEffects)
 	["Items.Wrapper"] = "rbxassetid://9117409740", -- Crunchy Cellophane 6 (ProSoundEffects)
 	["Items.PaperRustle"] = "rbxassetid://9118835414", -- Open And Turn Pages 2 (ProSoundEffects)
 	["Items.ChairUnfold"] = "rbxassetid://9114514975", -- Folding Chairs 18 (ProSoundEffects)
@@ -74,7 +74,7 @@ local SOUNDS: { [string]: string } = {
 	["Items.UmbrellaOpen"] = "rbxassetid://9114884567", -- Heavy Cloth Flap 6 (ProSoundEffects)
 	["Items.Throw"] = "rbxassetid://9120742716", -- Whoosh Thick Quick 2 (ProSoundEffects)
 	["Items.Chalk"] = "rbxassetid://9113781594", -- Chalkboard 9 (ProSoundEffects)
-	["Items.Scatter"] = "",
+	["Items.Scatter"] = "rbxassetid://9117274542", -- Pebbles On Wood 14: a handful dropped lightly (ProSoundEffects)
 	["Items.Crunch"] = "rbxassetid://9113734636", -- Celery Break 6 (ProSoundEffects)
 	["Items.KiteWind"] = "rbxassetid://9114461211", -- Flag Flap 3 (ProSoundEffects)
 	["Radio.Oldies1"] = "rbxassetid://1837066444", -- Sunny Side Up (Alan Hawkshaw), 70's Easy FM

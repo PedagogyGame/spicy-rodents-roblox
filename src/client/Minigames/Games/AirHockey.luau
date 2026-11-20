@@ -191,10 +191,10 @@ local entry: ClientGame.ClientGame = {
 		["air_hockey.strike"] = "rbxassetid://9116202343", -- Knock Slap Plastic 15; a mallet meets the puck (volume: how hard)
 		["air_hockey.rail"] = "rbxassetid://9116201137", -- Knock Slap Plastic 1; the puck off a rail
 		["air_hockey.post"] = "rbxassetid://9116741491", -- Metal Lid Small 2; the puck off a goal post
-		["air_hockey.serve"] = "", -- the puck is let go (every serve: the countdown running out, or a press)
+		["air_hockey.serve"] = "rbxassetid://9113418957", -- Bellows 19 (a soft puff of air); the puck is let go
 		["air_hockey.goal_for"] = "rbxassetid://1840076509", -- Through the Roof (sting); you scored
 		["air_hockey.goal_against"] = "rbxassetid://1839996306", -- Feet Do Not Fail Me (sting a); they scored
-		["air_hockey.goal"] = "", -- a goal at a table you are watching
+		["air_hockey.goal"] = "rbxassetid://9126097643", -- Tennis Ball Can Drop Into Plastic Container; a goal you watch
 		["air_hockey.win"] = "rbxassetid://1839982934", -- J Funk (sting); the match is yours
 		["air_hockey.lose"] = "rbxassetid://1837719710", -- Muck and Brass (sting); the match is theirs
 	},

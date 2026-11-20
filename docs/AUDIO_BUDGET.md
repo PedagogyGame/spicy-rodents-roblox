@@ -1,185 +1,223 @@
 # Audio budget
 
-Roblox has no runtime sound synthesis: every sound is a library asset or an upload, and uploads are limited to 40 to 50 a month (BRIEF_ADDENDUM B3; HANDOFF §3 rule 6). This file keeps the tally and the list of sounds that are waiting.
+Roblox has no runtime sound synthesis: every sound is a library asset or an upload, and uploads are limited (BRIEF_ADDENDUM B3: this game works within 40 a month, at most 50, and keeps at least 50 of the owner's 100 for his other games; HANDOFF §3 rule 6). The owner's rule since D16 (#36, #50): **no cue is left silent**; the most fitting reasonable sound for each, with uploads only where the licensed library has nothing, and a custom upload for the dog's bark.
+
+Where the sounds come from, in order:
+1. **Roblox's licensed library**: ProSoundEffects (creator 7462895450) for effects and APMOfficial (creator 7462718749) for music and stings, found through the Creator Store's read-only toolbox search.
+2. **Roblox's own sounds** (creator Roblox): its pinball set ("Audio/Roblox_Pinball_..."), its interface set, its player footsteps, and the classic sounds every client ships (`rbxasset://sounds/...`).
+3. **The game's own uploads**, made offline (never at run time) where nothing above fits. Each is a candidate under `assets/audio/candidates/` until the lead has heard it, approved it and uploaded it.
+
+Every id below was picked by its library title, description and length; **none has been heard in the game yet**. Each is one line to swap in the table named. `tests/unit/audio_cues.spec.luau` fails if any cue in the game has no sound (other than an upload slot waiting for the lead), if an id chosen is missing from this file, or if the uploads planned exceed 12.
 
 ## Uploads
 | Month | Uploaded | Notes |
 |---|---|---|
-| 2026-11 | not tallied here yet | Bowling (branch `feat/bowling-complete`) uploaded nothing. Whoever uploads audio next starts the count on this row. |
+| 2026-11 | 0 so far; **2 planned** | `dog_bark` and `bowling_roll` below. Nothing else needs an upload. |
 
-## Cues waiting for a sound
-These already fire at the right moments in the game and are silent. Fill the asset id in the named table and the sound plays.
+The upload slots (`src/shared/Audio/Uploads.luau`: the game reads the id from there; empty until uploaded, and the cue is silent until then):
 
-### Bowling (`src/client/Minigames/MinigameSounds.luau`, table `CUES`)
-| Cue | When it fires | Wanted |
+| Slot | Cue | Candidate | Length | How it was made | Licence |
+|---|---|---|---|---|---|
+| `dog_bark` | `Dogs.Bark` (the yard dogs; owner #36: a custom bark) | `assets/audio/candidates/dog_bark.ogg` | 0.78 s | synthesised offline: two short voiced barks, harmonics through three open-mouth formants (650, 1250, 2600 Hz), a breath at each onset, pitch 380 -> 560 -> 300 Hz; friendly, no growl | the game's own (made from code here; no recording or third-party audio) |
+| `bowling_roll` | `roll` (bowling: the ball down the lane) | `assets/audio/candidates/bowling_roll.ogg` | 2.6 s | synthesised offline: low brown noise with the lane's wooden resonances (85, 140 Hz), the ball's turn as a 4-4.6 Hz pulse, faint surface grit, duller and quieter as it goes, faded | the game's own |
+
+Why these two: the licensed library has no dog bark short enough (only 50-70 s farm ambiences with barking in them) and no ball rolling down a lane (only billiards, basketballs and carts); the owner asked for the bark as an upload.
+
+The lead's steps:
+1. `python3 -I tools/audio/make_candidates.py --preview build/audio` remakes both from fixed seeds (numpy, scipy, ffmpeg) and writes WAVs and spectrograms to listen to and look at.
+2. Listen. To change one, edit its recipe in `make_candidates.py` and remake it.
+3. `python3 -I tools/audio/publish.py --skip-upload` checks the candidates (mono Vorbis, short, the length the manifest says, a slot in `Uploads.luau` for each).
+4. Upload by hand (Creator Hub; `tools/cloud` deliberately does not upload audio), then `python3 -I tools/audio/publish.py --record dog_bark=<assetId> --moderation Approved --approve`, which writes the id into the manifest and `Uploads.luau`. Add the upload to the tally above.
+
+## Every cue and its sound
+
+### Corner store (`src/server/Items/ItemWorld.luau` `SOUNDS`; the till in `src/server/Items/CornerStore.luau`)
+Each cue is a Sound named after it, played at the person using the item (or at the cushion).
+
+| Cue | When it fires | Sound (id) |
 |---|---|---|
-| `release` | the ball leaves the hand | a soft thud on wood |
-| `roll` | just after the release, volume from the power | a ball rumbling down a lane, about 2 s, should stop at the pins or the pit |
-| `gutter` | the ball drops into the channel | a hollow clunk and a duller rumble |
-| `pin` | each clatter of pins (pins hit within 0.04 s count as one) | one to three pins knocking; played several times in a strike |
-| `pit` | the ball drops off the back of the deck | a thump on carpet |
-| `strike` | the STRIKE banner | a short bright sting |
-| `spare` | the SPARE banner | a shorter, smaller sting |
-| `sweep` | not fired yet (the pinsetter is drawn by the server) | a machine clank and whirr, about 2.5 s |
+| `CornerStore.Till` | a sale at the till | Cash Register 2 (9113728049) |
+| `Items.WaterGun` | a squirt | Squirt Bottle (9125995935) |
+| `Items.Harmonica` | the harmonica is played | Harmonica Stings D, APM (1846183142) |
+| `Items.BikeHorn` | the bike horn | Horn Blow Long Bursts 7 (9114822511) |
+| `Items.AirHorn` | the air horn (it also startles anyone within 12 studs) | Diesel Truck Air Horn 1 (9114075665) |
+| `Items.Bubbles` | blowing bubbles | Small Bubbles Float Up Pop 5 (9112872239) |
+| `Items.CameraClick` | a disposable-camera shot | Camera Shutter 1 (9113678227) |
+| `Items.TapeRip` | a strip of duct tape | Denim Or Canvas Tears 8 (9114886755) |
+| `Items.Whoopee` | someone steps on the whoopee cushion | Airy Deflate 13 (9114372701) |
+| `Items.SodaFizz` | a soda is had | Drinking Cu Gulping 1: drinking from a soda can (9114171849). The library has no can opening; this is the nearest. |
+| `Items.Wrapper` | the ice cream bar | Crunchy Cellophane 6 (9117409740) |
+| `Items.PaperRustle` | the newspaper is read | Open And Turn Pages 2 (9118835414) |
+| `Items.ChairUnfold` | the lawn chair is set down | Folding Chairs 18 (9114514975) |
+| `Items.Click` | the flashlight on or off | Flashlight Switch 13 (9114481274) |
+| `Items.UmbrellaOpen` | the umbrella opens or closes | Heavy Cloth Flap 6 (9114884567) |
+| `Items.Throw` | a frisbee or a football thrown | Whoosh Thick Quick 2 (9120742716) |
+| `Items.Chalk` | chalk writing | Chalkboard 9 (9113781594) |
+| `Items.Scatter` | peanuts or bird seed put down | Pebbles On Wood 14: a handful dropped lightly (9117274542) |
+| `Items.Crunch` | a dog treat given | Celery Break 6 (9113734636) |
+| `Items.KiteWind` | the kite goes up | Flag Flap 3 (9114461211) |
 
-Eight sounds if each is uploaded; fewer if library sounds fit.
+The radio's playlist (the same table; APM, chosen 18 November): `Radio.Oldies1` Sunny Side Up, Alan Hawkshaw (1837066444); `Radio.Oldies2` Songbird, Brian Bennett (1837066718); `Radio.SoftRock` Out Of Sight, David Hamer (1847299654); `Radio.Country` Way Out West, Richard Warren Gilks (1840347412); `Radio.Jazz` Coffee Break, Manfred Paulsen (1845444990); `Radio.Weather` A Million Stars, a 15-second sting (9042143607).
 
-### Air hockey (`src/client/Minigames/Games/AirHockey.luau`, table `sounds`)
-| Cue | When it fires | Wanted |
+### THE GILDED ACORN, the 1940s lounge
+The jazz (`src/shared/Attractions/LoungeClassic.luau` `JAZZ`, APM, heard inside only): `Lounge.Jazz1` Charleston Time, Harry Gold (104391003816309); `Lounge.Jazz2` Strolling Along, Paul Lenart (1847365925); `Lounge.Jazz3` White Gardenia, Harry Gold (112961391906009); `Lounge.Jazz4` Dixie Doodle, Harry Gold (112031221369583).
+
+The effects (`src/server/Attractions/LoungeService.luau` `SOUND_IDS`):
+| Cue | When it fires | Sound (id) |
 |---|---|---|
-| `air_hockey.strike` | a mallet meets the puck, when the contact is seen; volume from how hard | a sharp plastic clack |
-| `air_hockey.rail` | the puck comes off a side or end rail; volume from how hard | a shorter, duller knock |
-| `air_hockey.post` | the puck comes off a goal post | a small metal tick |
-| `air_hockey.serve` | each time the puck is let go (the countdown running out, or a press) | a soft puff of air |
-| `air_hockey.goal_for` | you scored | the puck dropping into the goal, then a short bright sting |
-| `air_hockey.goal_against` | they scored | the same drop, then a lower sting |
-| `air_hockey.goal` | a goal at a table you are watching | the drop alone |
-| `air_hockey.win` | the match is yours | a short win sting |
-| `air_hockey.lose` | the match is theirs | a short falling sting |
+| `Lounge.GuardSwat` | a guard knocks out a squirrel at the door | Cloth Whooshes Soft 1 (9113842150) |
+| `Lounge.Door` | the door's prompt, in or out | Half Glass Door 1 (9114745537) |
+| `Lounge.CounterBell` | a drink is ordered at the bar | Desk Bell Counter Service (9125485591) |
+| `Lounge.Pour` | the drink is handed over | Pour Tea From Pot Into Cup 3 (9117865590) |
 
-Nine sounds if each is uploaded. The owner's own game makes these as tones in code (`docs/reference/air_hockey/`); the strike, rail and post could be one recording at three pitches.
-
-### Sewers (`src/client/World/SewerAmbience.luau`, table `CUES`)
-The storm drains (BRIEF_ADDENDUM D8). Mild: water, echoes and drips, nothing dirty. While the squirrel is inside, the client also sets `SoundService.AmbientReverb` to `SewerPipe` and puts it back on the way out, so most of these can be dry library sounds.
-| Cue | When it fires | Wanted |
+### Bowling (`src/client/Minigames/Games/Bowling.luau` `sounds`; the cue points in `Shared/Minigames/Bowling/RollScript.cues`)
+| Cue | When it fires | Sound (id) |
 |---|---|---|
-| `sewer.grateIn` | the squirrel goes down a grate or quay cover | a light iron rattle and a soft drop |
-| `sewer.grateOut` | it comes up out of one (or the body changes while inside) | the same rattle, shorter |
-| `sewer.rung` | every stud climbed or descended in a shaft | a small claw tick on iron |
-| `sewer.footEcho` | every 2.75 studs run along a passage | a soft patter with a short echo |
-| `sewer.drip` | at random every 2 to 6 s while inside, at the nearest drip point | one clear water drip |
-| `sewer.trickle` | a loop while inside a brick drain (P1, P3) | running water in a narrow channel |
-| `sewer.riverHum` | a loop while inside the dry culvert under the river (P2) | a low, muffled rush from above |
-| `sewer.streetMurmur` | a loop while within 8 studs (level) of a mouth, from below | muffled traffic and voices through a grate |
-| `sewer.hiss` | the squirrel has stood still underground until the idle warning (D34; v5.4's small alligator), with the line "A low hiss and a ripple in the sewer water…" | a low hiss and a small splash, never seen |
-| `sewer.carOverhead` | not fired yet (needs the traffic poses over a pipe) | a car passing over a manhole lid, a dull double thump |
-| `sewer.trolleyOverhead` | not fired yet (as above, the trolley over P3) | a heavier rumble and a rail clack |
+| `release` | the ball leaves the hand | Wood Beam Impact Resonant Clunk (9126236431) |
+| `roll` | just after the release, volume from the power | **upload slot `bowling_roll`** (silent until uploaded) |
+| `gutter` | the ball drops into the channel | Punch Wood Box 2: a hollow wooden knock (9117973595) |
+| `pin` | each clatter of pins | Wood Down Shaft Clanking 5 (9120840234) |
+| `pit` | the ball drops off the back of the deck | Body Pat Muted 1 (9113531800) |
+| `strike` | the STRIKE banner | Through the Roof, APM sting (1840076509) |
+| `spare` | the SPARE banner | The Little Things, APM hit (1848287311) |
+| `sweep` | the pinsetter's bar comes down (now fired: the throw's end + `RollScript.SWEEP_AT`, which is the server's SETTLE + PAUSE; played after the playback lets go) | Pump Cycle Machine: mechanical clunks, an air burst, 2.9 s (9125792061) |
 
-Eleven sounds if each is uploaded. The loops (trickle, riverHum, streetMurmur) and the drip are the ones that make the place; the rest could share two or three recordings.
-
-### Sky lift and the Lookout (branch `feat/skylift`; nothing uploaded, nothing synthesised)
-The server makes these as Sound instances with empty ids (`src/server/Rides/SkyLiftService.luau`, table `CUES`):
-| Cue | When it fires | Wanted |
+### Air hockey (`src/client/Minigames/Games/AirHockey.luau` `sounds`)
+| Cue | When it fires | Sound (id) |
 |---|---|---|
-| `SkyLift.StationBell` | on each gate post, when a cabin's doors open there | a single soft station chime |
-| `SkyLift.CounterBell` | on the Lookout's counter, when a lunch is served | a small service bell |
-| `SkyLift.TelescopeClick` | on the telescope, when someone looks through it | a coin-viewer click |
+| `air_hockey.strike` | a mallet meets the puck (volume: how hard) | Knock Slap Plastic 15 (9116202343) |
+| `air_hockey.rail` | the puck off a rail | Knock Slap Plastic 1 (9116201137) |
+| `air_hockey.post` | the puck off a goal post | Metal Lid Small 2 (9116741491) |
+| `air_hockey.serve` | each time the puck is let go | Bellows 19: a soft puff of air (9113418957) |
+| `air_hockey.goal_for` | you scored | Through the Roof, APM sting (1840076509) |
+| `air_hockey.goal_against` | they scored | Feet Do Not Fail Me, APM sting (1839996306) |
+| `air_hockey.goal` | a goal at a table you are watching | Tennis Ball Can Drop Into Plastic Container: a puck-sized drop into plastic (9126097643) |
+| `air_hockey.win` | the match is yours | J Funk, APM sting (1839982934) |
+| `air_hockey.lose` | the match is theirs | Muck and Brass, APM sting (1837719710) |
 
-Named but not placed yet (no Sound instance exists; the natural trigger is given):
-| Cue | Trigger | Wanted |
+### Paintball (`src/client/Minigames/Games/Paintball.luau` `sounds`; volumes in `Shared/Minigames/Paintball/Tuning`)
+| Cue | When it plays | Sound |
 |---|---|---|
-| `SkyLift.CableHum` | looped in the rider's cabin (Client/Rides/SkyLiftView) | a low steady hum of rope and wheels |
-| `SkyLift.DoorsOpen` / `SkyLift.DoorsClose` | `SkyLift.doorFrac` rising from 0 / falling to 0 | a pneumatic slide, about 1 s |
-| `SkyLift.TowerClunk` | a cabin's grip passing a tower's sheaves | a soft double clunk |
-| `SkyLift.WindAtHeight` | looped, louder the higher the cabin | wind round a cabin |
-| `Telescope.Click` | Client/Rides/Telescope in and out | the same click as the server's |
-| `Lookout.Fireplace`, `Lookout.DiningRoom`, `Lookout.TerraceWind` | looped at the fire, in the dining room, on the terrace | crackle; low murmur and cutlery; wind |
+| `paintball.fire`, `paintball.fire_far` | a ball leaves (yours; another's, placed) | `rbxasset://sounds/paintball.wav` (the classic Paintball Gun gear's pop, ships with every client) |
+| `paintball.splat` | a ball bursts | `rbxasset://sounds/splat.wav` |
+| `paintball.tag` | the server says YOU tagged someone | `rbxasset://sounds/electronicpingshort.wav` |
+| `paintball.tagged` | you were tagged out | Thwack Sharp 1 (9120032247) |
+| `paintball.reload` | a reload starts | Plastic Rattle (9125746771) |
+| `paintball.dry` | a press on an empty marker | `rbxasset://sounds/clickfast.wav` |
+| `paintball.step` | each stride: loud sprinting, soft walking, silent crouched | Roblox's own PlayerStep_Dirt_03, a single player footstep (129087653644939). The licensed library has no single human footstep. |
+| `paintball.ready` | the reload is done | `rbxasset://sounds/button.wav` |
+| `paintball.go` | the match is live | `rbxasset://sounds/electronicpingshort.wav` |
+| `paintball.back` | back from being tagged out | `rbxasset://sounds/action_get_up.mp3` |
+| `paintball.over` | full time | Referee Whistle 2 (9118113825) |
 
-### THE GILDED ACORN, the 1940s lounge (branch `feat/lounge-classic`; nothing uploaded, nothing synthesised)
-The jazz is stock, licensed music from Roblox's own library (B3: library first; no upload). The client plays it inside only (`src/client/World/LoungeMusic.luau`), from the playlist `src/shared/Attractions/LoungeClassic.luau` `JAZZ`; every id is empty, so it is silent until the lead fills them in:
-| Cue | Wanted (from the library) |
-|---|---|
-| `Lounge.Jazz1` | 1920s hot jazz, small band, instrumental |
-| `Lounge.Jazz2` | stride piano, solo, 1920s |
-| `Lounge.Jazz3` | slow jazz ballad, clarinet or muted trumpet, 1920s |
-| `Lounge.Jazz4` | swing, light and bright, instrumental |
+The `rbxasset://sounds/...` ones are the client's own files; check in Studio that each loads (a missing one is silent and the Output says so).
 
-The server makes these as Sound instances with empty ids (`src/server/Attractions/LoungeService.luau`, table `CUES`):
-| Cue | When it fires | Wanted |
+### Pool and bumper pool (`src/client/Minigames/Pool/Sounds.luau`: one set, `pool.<cue>` and `bumper_pool.<cue>`)
+| Cue | When it fires | Sound (id) |
 |---|---|---|
-| `Lounge.GuardSwat` | a guard knocks out a squirrel at the door | a quick whoosh and a soft thump (no hit or cry) |
-| `Lounge.Door` | the door's prompt, in or out | a heavy wooden door opening and closing |
-| `Lounge.CounterBell` | a drink is ordered at the bar | a small service bell |
-| `Lounge.Pour` | the drink is handed over | a pour into a china cup |
+| `chalk` | a turn begins: the cue is chalked | Coral Scrape: small pieces rubbed together, thin, gritty (9125460155) |
+| `strike` | the tip meets the ball (volume by power) | Billiards Ball Hits Rolls With Cue Stick 3 (9113441098) |
+| `click` | ball on ball | Billiard Balls Ball Hits Rolls 13 (9113440232) |
+| `crack` | the break (eight-ball) | Billiards Break Rack Up Ball Hits 6 (9113441694) |
+| `cushion` | a ball off a cushion | Billiards Ball Bounces Off Of Bumpers 8 (9113440925) |
+| `jaw` | a ball rattling in a pocket's jaws (eight-ball) | Billiards Shoot Balls Into Pockets 2 (9113442163) |
+| `post` | a ball off a rubber bumper (bumper pool) | Billiards Ball Bounces Off Of Bumpers 7 (9113440927) |
+| `rim` | a ball lipping out or skipping a cup | Billiards Balls Rolling On Table 3: soft plunky hits (9113441345) |
+| `drop` | a ball dropping into a pocket or cup | Billiards Shoot Balls Into Pockets 1 (9113442190) |
+| `home` | a potted ball arriving in the tray | Roblox Pinball Rolling Metal Tracks Loop 01 (16480554578) |
 
-No uploads: all eight can come from the library.
+### Pinball (`src/client/Minigames/Pinball/Cabinet.luau` `IDS`; the same on the three machines, `pinball.<variant>.<cue>`)
+All from Roblox's own pinball set (Audio/Roblox_Pinball_...):
 
-**The jazz, chosen 18 November** (licensed music from Roblox's verified partner APM, found through the Creator Store search; picked by title, album, genre and length, not yet heard in the game): `Lounge.Jazz1` Charleston Time, Harry Gold (104391003816309, 1:58); `Lounge.Jazz2` Strolling Along, Paul Lenart, Harlem Stride Piano (1847365925, 2:37); `Lounge.Jazz3` White Gardenia, Harry Gold (112961391906009, 2:39); `Lounge.Jazz4` Dixie Doodle, Harry Gold (112031221369583, 2:33). Any of them is one line to swap in `src/shared/Attractions/LoungeClassic.luau`. The four cues above are still empty.
-
-### Paintball (`src/client/Minigames/Games/Paintball.luau`, table `sounds`)
-Every cue below is timed and placed already. Until the owner chooses the set, eleven of them play a PLACEHOLDER that ships with every Roblox client (`rbxasset://sounds/...`, nothing uploaded, no licence needed), so the fire, the hits and the dry click can be judged at the playtest; `paintball.step` is empty (no single footstep ships with the client: the body's own stock footsteps are heard meanwhile). A placeholder that does not exist in the client is silent and the Output says it failed to load. Volumes are in `src/client/Minigames/Paintball/Tuning.luau`. Another player's cues are played from where they happened and dulled by each floor between (`World.luau`).
-
-| Cue | When it plays | Volume | Placeholder now | Wanted |
-|---|---|---|---|---|
-| `paintball.fire` | your ball leaves | `volFire` 0.7 | `paintball.wav` (the classic Paintball Gun gear's pop) | a toy "thup": a light pneumatic pop, not a gunshot |
-| `paintball.fire_far` | another player's or a bot's ball leaves, from where they stand | `volFireFar` 0.6 | `paintball.wav` | the same pop, duller and further off |
-| `paintball.splat` | a ball bursts on a wall, a floor or a body (yours at once on your screen, others' where they land) | `volSplat` 0.45 | `splat.wav` | a wet splat |
-| `paintball.tag` | the server says YOU tagged someone | `volTag` 0.9 | `electronicpingshort.wav` | a bright two-note ding, unmistakable |
-| `paintball.tagged` | you were tagged out | `volTagged` 1.0 | `uuhhh.mp3` | a loud low thwack (the loudest thing in the game) |
-| `paintball.reload` | your reload starts (R, or by itself after the fifth ball); another's, placed | `volReload` 0.5, `volReloadFar` 0.35 | `switch.wav` | a plastic hopper rattle, about a second and a half |
-| `paintball.dry` | a press on an empty or reloading marker (at most one per `drySecs`) | `volDry` 0.5 | `clickfast.wav` | a dry click |
-| `paintball.step` | each stride: loud sprinting, soft walking, silent crouched; others' placed | `stepLoud` 0.6, `stepQuiet` 0.22 | none | soft footsteps on a hard floor |
-| `paintball.ready` | the reload is done: the magazine is full | `volReady` 0.45 | `button.wav` | a short click-clack |
-| `paintball.go` | the briefing is over, the match is live | `volGo` 0.8 | `electronicpingshort.wav` | a horn |
-| `paintball.back` | you are back from being tagged out | `volBack` 0.6 | `action_get_up.mp3` | a short rising chime |
-| `paintball.over` | full time | `volGo` 0.8 | `victory.wav` | a whistle |
-
-Twelve sounds if each is uploaded; the fire and the far fire, and the reload and the ready, could be one recording each at two volumes.
-
-### Corner store (`src/server/Items/ItemWorld.luau`, table `SOUNDS`; branch `feat/corner-store`; nothing uploaded)
-Every cue is a Sound named after it, played at the person using the item (or at the cushion). All of these should be found in Roblox's licensed sound library: no uploads. Fill `"rbxassetid://<n>"` in `SOUNDS`.
-
-| Cue | When it fires | Wanted |
-|---|---|---|
-| `CornerStore.Till` | a sale at the till (`src/server/Items/CornerStore.luau`, table `SOUNDS`) | a cash register's drawer and bell |
-| `Items.WaterGun` | a squirt | a short water squirt |
-| `Items.Harmonica` | the harmonica is played | a two-second harmonica phrase |
-| `Items.BikeHorn` | the bike horn | a rubber-bulb honk |
-| `Items.AirHorn` | the air horn (it also startles people and squirrels within 12 studs) | a loud air-horn blast, about a second |
-| `Items.Bubbles` | blowing bubbles | a soft blow and pops |
-| `Items.CameraClick` | a disposable-camera shot | a shutter click and film wind |
-| `Items.TapeRip` | a strip of duct tape | tape ripping off a roll |
-| `Items.Whoopee` | someone steps on the whoopee cushion | a whoopee cushion (mild: it is a toy) |
-| `Items.SodaFizz` | a soda or an ice cream bar is had | a can opening and fizz |
-| `Items.Wrapper` | (named for the ice cream bar; the soda's fizz plays for both today) | a wrapper crinkle |
-| `Items.PaperRustle` | the newspaper is read | paper rustle |
-| `Items.ChairUnfold` | the lawn chair is set down | an aluminium chair unfolding |
-| `Items.Click` | the flashlight on or off | a small switch click |
-| `Items.UmbrellaOpen` | the umbrella opens or closes | an umbrella whoosh |
-| `Items.Throw` | a frisbee or a football thrown | a soft whoosh |
-| `Items.Chalk` | chalk writing | chalk on pavement |
-| `Items.Scatter` | peanuts or bird seed put down | seeds scattered |
-| `Items.Crunch` | a dog treat given | a crunch |
-| `Items.KiteWind` | the kite goes up | wind and a flapping kite |
-
-The radio's playlist (the same table): `Radio.Oldies1`, `Radio.Oldies2`, `Radio.SoftRock`, `Radio.Country`, `Radio.Jazz`, `Radio.Weather` (a short town weather jingle). Six stock-library music tracks, one after another while the radio is on; any licensed library tracks with a small-town 1970s feel will do.
-
-**The radio, chosen 18 November** (the same licensed library, not yet heard in the game): `Radio.Oldies1` Sunny Side Up, Alan Hawkshaw, 70's Easy FM (1837066444); `Radio.Oldies2` Songbird, Brian Bennett, 70's Easy FM (1837066718); `Radio.SoftRock` Out Of Sight, David Hamer, AOR of the 70s (1847299654); `Radio.Country` Way Out West, Richard Warren Gilks (1840347412); `Radio.Jazz` Coffee Break, Manfred Paulsen (1845444990); `Radio.Weather` A Million Stars, a 15-second sting from Vintage Radio: 1970s (9042143607). One line each in `src/server/Items/ItemWorld.luau`.
-
-Twenty effects and six tracks; all from the library, so none counts against the month's uploads. The six tracks are filled; the twenty effects are still empty.
-
-### The yard dogs (`src/server/Wildlife/YardHazards.luau`, table `SOUNDS`; nothing uploaded)
-| Cue | When it fires | Wanted |
-|---|---|---|
-| `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | a friendly medium dog's "woof woof", not a growl |
-
-## Sound effects chosen 18 November (licensed library, nothing uploaded)
-Picked from Roblox's Creator Store by name and length, only from Roblox's verified licensed partners (ProSoundEffects for effects, APMOfficial for stings); not yet heard in the game. Each is one line to swap, in the table named.
-
-| Where | Cue | Library sound (id) |
-|---|---|---|
-| Store (`Server/Items/CornerStore`) | `CornerStore.Till` | Cash Register 2 (9113728049) |
-| Store items (`Server/Items/ItemWorld` `SOUNDS`) | water gun, harmonica, bike horn, air horn, bubbles, camera, tape, whoopee cushion, wrapper, newspaper, lawn chair, flashlight click, umbrella, throw, chalk, crunch, kite wind | see the comments beside each id in the table |
-| Lounge (`Server/Attractions/LoungeService` `SOUND_IDS`) | guard swat, door, pour, counter bell | Cloth Whoosh (9113842150), Half Glass Door (9114745537), Pour Tea Into Cup (9117865590), Desk Bell (9125485591) |
-| Bowling (`Client/Minigames/Games/Bowling`) | release, pin, pit, strike, spare | Wood Beam Clunk, Wood Shaft Clanking, Body Pat Muted, Through the Roof (sting), The Little Things (hit) |
-| Air hockey (`Client/Minigames/Games/AirHockey`) | strike, rail, post, goal for, goal against, win, lose | Knock Slap Plastic 15 and 1, Metal Lid Small, four short APM stings |
-| Paintball (`Client/Minigames/Games/Paintball`) | tagged, reload, over | Thwack Sharp (replaces the groan placeholder), Plastic Rattle, Referee Whistle; the other nine keep their built-in placeholders |
-
-**Left silent, no fitting licensed sound found:** the soda's fizz and the seeds' scatter (store), bowling's roll, gutter and pinsetter sweep, air hockey's serve and the goal drop for watchers, paintball's footstep.
-
-### The duel (`src/server/Combat/CombatService.luau`, table `SOUNDS`; branch `feat/combat-duel`; nothing uploaded)
-Every cue is a Sound named after it, played at the body (Boot/Game). All should come from Roblox's licensed sound library: no uploads. Fill `"rbxassetid://<n>"` in `SOUNDS`. Mild: no crunch, no pain sounds.
-
-| Cue | When it fires | Wanted |
-|---|---|---|
-| `Duel.Windup` | the rodent's pounce wind-up, or a feint (at the rodent) | a short hiss |
-| `Duel.Strike` | a person's kick, swing or baton comes down (at the person) | a whoosh |
-| `Duel.Blow` | the blow lands on the rodent (at the rodent) | a soft thump and a squeak |
-| `Duel.Batted` | a bite batted away (at the person) | a slap and a yelp |
-| `Duel.Squareup` | someone squares up to the rodent (a vigilante, or the scene turning on it; at the person) | a short grunt, "Hey!" |
-| `Duel.Shout` | someone on the scene of a bite backs off (at the person) | a short shout, no words needed |
-
-### Nuts (`src/client/UI/NutMeter.luau`, `PICK_SOUND`; branch `feat/nuts`; nothing uploaded)
-| Cue | When it fires | Now | Wanted |
+| Cue | Sound (id) | Cue | Sound (id) |
 |---|---|---|---|
-| `Nuts.Pick` | the player's own squirrel picks a nut up (heard by that player only, quiet) | a stand-in: Flashlight Switch 13 (ProSoundEffects, 9114481274, the store's click), played a little higher | a small wooden tap or a nut rolled in a paw; a library pick replaces the stand-in in one line |
+| `flip_up` | Flipper Up 01 (16480564862) | `flip_down` | Flipper Down 01 (16480567211) |
+| `flipper_hit` | Bumper Weighted Click 01 (16480567946) | `wall` | Bumper Soft Click 02 (16480568611) |
+| `post` | Bumper Soft Click 01 (16480568821) | `bumper` | Bumper Full 01 (16480574637) |
+| `sling` | Bumper Mecanical Air 02 (16480569302) | `standup` | Bumper Weighted Click 03 (16480567747) |
+| `drop` | Modern Machine Mechanics 01 (16480555593) | `rollover` | Tiny Button Press 01 (16480550292) |
+| `spin` | Small Button Press 05 (16480553171) | `saucer` | Giant Button Press 01 (16480560857) |
+| `eject` | Bumper Mecanical Air 03 (16480569639) | `ramp_in` | Ball Plastic Slide 01 (16480576404) |
+| `ramp_out` | Ball Plastic Slide 04 (16480576087) | `balls_click` | Small Metal Click 01 (16480551554) |
+| `drain` | Modern Machine Mechanics 03 (16480555243) | `plunge` | Joystick Buzz Release 01 (16480558943) |
+| `save` | 8Bit Riser 01 (16480578169) | `bonus_tick` | 8Bit Blip 01 (16480580213) |
+| `tilt_warn` | Giant Button Press 02 (16480560696) | `tilt` | Modern Machine Mechanics 02 (16480555445) |
+| `ball_start` | Startup Mechanical 01 (16480551414) | `ball_end` | Big Metal Tally 02 (16480575731) |
+| `extra_ball` | 8Bit Riser 02 (16480578036) | `game_over` | Endgame Tally 01 (16480567382) |
+| `say` | 8Bit Blip 05 (16480579431) | `nudge` | Joystick Slam 01 (16480557599) |
+| `search` | Gameplay Actions 01 (16480563821) | `reset_drops` | Startup Mechanical 02 (16480551277) |
+| `jingle` | 8Bit Riser 04 (16480577565) | `gate` | Tiny Button Press 02 (16480550090) |
+| `reel` | Big Metal Tally 03 (16480575322) | | |
+
+### Whack-a-mole (`src/client/Minigames/WhackAMole/Cabinet.luau` `IDS`)
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `whack_a_mole.pop` | a mole comes up | Pop Airy 16 (9117834439) |
+| `whack_a_mole.swing` | the mallet swings | Swish, Paddle Swish, Soft (9119702970) |
+| `whack_a_mole.bonk` | a hit | Comic Boinks 2 (9113854411) |
+| `whack_a_mole.thud` | a miss on the deck | Punch Wood Box 1 (9117973587) |
+| `whack_a_mole.count` | each second of the count-in | Roblox Pinball 8Bit Blip 02 (16480580064) |
+| `whack_a_mole.go` | GO | Roblox Pinball 8Bit Riser 01 (16480578169) |
+| `whack_a_mole.hurry` | each of the last five seconds | Roblox Pinball 8Bit Blip 09 (16480578434) |
+| `whack_a_mole.over` | TIME | Roblox UI Tonal Stinger (15675043410) |
+
+### Sewers (`src/client/World/SewerAmbience.luau` `CUES` and `VOLUME`; the server's hiss in `src/server/World/SewerService.luau`)
+The storm drains (BRIEF_ADDENDUM D8). Mild: water, echoes and drips. While the squirrel is inside, the client sets `SoundService.AmbientReverb` to `SewerPipe`, so the sounds themselves are dry; the per-stride and per-stud cues play quietly.
+
+| Cue | When it fires | Volume | Sound (id) |
+|---|---|---|---|
+| `sewer.grateIn` | the squirrel goes down a grate or quay cover | 0.6 | Cast Iron Fireplace Grate: drop on its side and shift (9125426401) |
+| `sewer.grateOut` | it comes up out of one | 0.5 | the same, shorter (9125426396) |
+| `sewer.rung` | every stud climbed or descended in a shaft | 0.2 | Metal Rungs 1: a ladder climb (9116801858) |
+| `sewer.footEcho` | every 2.75 studs run along a passage | 0.25 | Spider Footsteps 4: soft fast taps, a small patter (9119455498) |
+| `sewer.drip` | at random every 2 to 6 s inside | 0.5 | Water Drip: a distant single drop, reverberant (9126176614) |
+| `sewer.trickle` | a loop in a brick drain (P1, P3) | 0.35 | River Water 1: an aqueduct inside a tunnel (9118187543) |
+| `sewer.riverHum` | a loop in the dry culvert under the river (P2) | 0.5 | Storm Drain Presence 1: a 3' pipe, slowed, wind-like (9119643864) |
+| `sewer.streetMurmur` | a loop within 8 studs of a mouth | 0.25 | City Ambience 1: traffic, an occasional car over a metal plate (9112758242) |
+| `sewer.hiss` | still underground until the idle warning (the small alligator, never seen) | 0.7 | Snake Hiss 1: airy hisses (9119302862) |
+| `sewer.carOverhead` | not fired yet (needs the traffic poses over a pipe) | 0.6 | Metal Plate Impact, Manhole Hit (9116750726) |
+| `sewer.trolleyOverhead` | not fired yet (the trolley over P3) | 0.5 | Electric Trolley 2: a pass by (9114257912) |
+
+### Sky lift and the Lookout (`src/shared/Rides/SkyLiftSounds.luau`: ids, volumes, reach)
+The server plays the first three from its posts (`src/server/Rides/SkyLiftService.luau`) and keeps the Lookout's three loops on posts of their own; the client (`src/client/Rides/SkyLiftView.luau`) hangs the cabin's own on each local cabin (heard only round it) and plays them for cabins within 150 studs of the camera; `src/client/Rides/Telescope.luau` clicks on the way out.
+
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `SkyLift.StationBell` | on each gate post, when a cabin's doors open there | Amtrak Superliner 1: a call-to-conductor chime (9113118168) |
+| `SkyLift.CounterBell` | on the Lookout's counter, when a lunch is served | Desk Bell Counter Service (9125485591) |
+| `SkyLift.TelescopeClick` | on the telescope, when someone looks through it | Airstream Door Latch 5: a lever click and snap (9113076465) |
+| `Telescope.Click` | the looker's own screen, on the way out | the same (9113076465) |
+| `SkyLift.CableHum` | looped on every cabin | Elevator Room 2: motors running, a steady hum (9112777363) |
+| `SkyLift.DoorsOpen` / `SkyLift.DoorsClose` | a cabin's `doorFrac` leaving 0 / back to 0 | Air Chuff Hydraulic Pneumatic Air Burst 2 / 4 (9113059828 / 9113059926) |
+| `SkyLift.TowerClunk` | a cabin's grip reaching a tower (within `TOWER_NEAR` of its centre in plan) | Pulley Rotating Movement 3: wheels turning, soft clicks (9117951840) |
+| `SkyLift.WindAtHeight` | looped on every cabin, louder the higher it is over the slope (none under 15 studs, full at 120) | Barstow Wind 3: light, blustery, a low howl (9113287001) |
+| `Lookout.Fireplace` | looped at the fire | Fireplace, constant burning flame (9112780193) |
+| `Lookout.DiningRoom` | looped in the dining room | Dining Jesuits 1: plates, cutlery, a murmur (9112769536) |
+| `Lookout.TerraceWind` | looped on the terrace | Desert Wind: whistley, light gusts (9114057104) |
+
+### The duel (`src/server/Combat/CombatService.luau` `SOUNDS`)
+Mild: no crunch, no pain sounds. Played at the body.
+
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `Duel.Windup` | the rodent's pounce wind-up, or a feint | Creature Vocal, Spider Hiss Exhale 1: a short hiss (9113990336) |
+| `Duel.Strike` | a person's kick, swing or baton comes down | Whoosh Heavy Punches 3: arm swings (9120729007) |
+| `Duel.Blow` | the blow lands on the rodent | Squeaky Toy 2: a toy hit and squeak (9119536562) |
+| `Duel.Batted` | a bite batted away | Baseball Fist Slap Into Glove (9125376871) |
+| `Duel.Squareup` | someone squares up to the rodent | Video Game Effects 18: a fight yell (9120416894) |
+| `Duel.Shout` | someone on the scene of a bite backs off | Male Vocal Gasps Exclamations 3 (9116457156) |
+
+The library's human voices are few; the two vocal picks are the riskiest in this file (a word, or a pained sound, would have to go). If either does not fit when heard, the next candidates are the other takes of the same sets (Video Game Effects 1-27, 9120415730 to 9120417879; Male Vocal Gasps Exclamations 1-5).
+
+### The yard dogs (`src/server/Wildlife/YardHazards.luau` `SOUNDS`)
+| Cue | When it fires | Sound |
+|---|---|---|
+| `Dogs.Bark` | a yard dog barks at a squirrel in its yard (at most every 8 seconds a dog) | **upload slot `dog_bark`** (the game's own; silent until uploaded) |
+
+### Nuts (`src/client/UI/NutMeter.luau` `PICK_SOUND`)
+| Cue | When it fires | Sound (id) |
+|---|---|---|
+| `Nuts.Pick` | the player's own squirrel picks a nut up (heard by that player only; volume 0.35, played a little higher) | Wood Drop, Impacts On Concrete, Small Pieces: a small wooden tick and bounce (9120863989). It replaces the stand-in, the store's flashlight click (9114481274). |
+
+## To hear first in Studio
+All of the above were chosen without being heard. The ones most likely to need a swap: the duel's two voices; `Items.SodaFizz` (a gulp, not a can opening); `sewer.footEcho` and `sewer.rung` at their volumes; `SkyLift.CableHum` (a building's lift motor, not a rope); and the two upload candidates.

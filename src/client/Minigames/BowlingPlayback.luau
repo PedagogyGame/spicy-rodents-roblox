@@ -12,7 +12,8 @@
 -- arrived before this lets go, and then the server's pinsetter takes over. If a lane has not streamed in, or the script is damaged, nothing is played and the
 -- server's copy is what shows: a throw can never break on a client.
 -- Pins that fall into the pit are hidden with LocalTransparencyModifier (never replicated, reset when the
--- throw ends: by then the server has hidden them itself).
+-- throw ends: by then the server has hidden them itself). Cues still to come when the throw lets go (the
+-- pinsetter's sweep) are played at their time all the same, unless the lane plays or stops another throw first.
 -- Interface: play(place, lane, script, onCue?) -> bool (script already checked by RollScript.check);
 --   stop(lane, place?, mask?) (cut a throw short; with a mask, show that rack standing and the ball on its
 --   rack); now(lane) -> seconds into the throw being played, or nil; playing(lane) -> bool; TAIL; clock
@@ -44,6 +45,7 @@ type Entry = {
 }
 
 local active: { [number]: Entry } = {}
+local gone: { [number]: Entry } = {} -- lane -> the throw that let go with cues still due (later)
 local bound = false
 
 local function laneModel(lane: number): Instance?
@@ -116,6 +118,24 @@ local function finish(e: Entry)
 	end
 end
 
+-- the cues of a throw that has let go but are not due yet (the sweep): each at its own time, dropped if the lane
+-- has started (or stopped) another throw by then
+local function later(lane: number, e: Entry, t: number)
+	local onCue = e.onCue
+	if onCue == nil then
+		return
+	end
+	for i = e.cueAt, #e.cues do
+		local cue = e.cues[i]
+		task.delay(math.max(0, cue[1] - t), function()
+			if active[lane] == nil and gone[lane] == e then
+				pcall(onCue, cue[2], cue[3])
+			end
+		end)
+	end
+	gone[lane] = e
+end
+
 local function step()
 	local now = BowlingPlayback.clock()
 	for lane, e in active do
@@ -138,6 +158,7 @@ local function step()
 		if t >= tEnd + BowlingPlayback.TAIL then
 			finish(e)
 			active[lane] = nil
+			later(lane, e, t)
 		end
 	end
 	if next(active) == nil and bound then
@@ -154,6 +175,7 @@ function BowlingPlayback.play(
 	onCue: ((name: string, volume: number) -> ())?
 ): boolean
 	local old = active[lane]
+	gone[lane] = nil
 	if old then
 		finish(old)
 		active[lane] = nil
@@ -188,6 +210,7 @@ end
 -- shown as the server now has it: those pins standing on their spots, the ball on its rack.
 function BowlingPlayback.stop(lane: number, place: any?, mask: { boolean }?)
 	local e = active[lane]
+	gone[lane] = nil
 	if e then
 		finish(e)
 		active[lane] = nil

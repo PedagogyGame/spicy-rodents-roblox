@@ -122,9 +122,8 @@ local Game: ClientGame.ClientGame = {
 		["paintball.tagged"] = "rbxassetid://9120032247", -- Thwack Sharp 1 (library); you were tagged
 		["paintball.reload"] = "rbxassetid://9125746771", -- Plastic Rattle (library); the rattle
 		["paintball.dry"] = "rbxasset://sounds/clickfast.wav", -- a click with nothing to fire
-		-- (no single footstep ships with the client: the stock ones are loops. The body's own stock footsteps are
-		-- heard meanwhile; the owner's set brings the loud sprint and the silent crouch)
-		["paintball.step"] = "", -- footsteps (running loud, crouching silent)
+		-- (Roblox's own single player step, PlayerStep_Dirt_03: soft on any floor; running loud, crouching silent)
+		["paintball.step"] = "rbxassetid://129087653644939", -- one footstep a stride
 		["paintball.ready"] = "rbxasset://sounds/button.wav", -- the reload is done: the magazine is full again
 		["paintball.go"] = "rbxasset://sounds/electronicpingshort.wav", -- the briefing is over: the match is live
 		["paintball.back"] = "rbxasset://sounds/action_get_up.mp3", -- you are back from being tagged out

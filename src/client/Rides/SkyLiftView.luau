@@ -41,6 +41,7 @@
 
 local Import = require("../Import")
 local SkyLift = Import.shared("Rides/SkyLift") :: typeof(require("../../shared/Rides/SkyLift"))
+local SkyLiftSounds = Import.shared("Rides/SkyLiftSounds") :: typeof(require("../../shared/Rides/SkyLiftSounds"))
 local TownLights = require("../Render/TownLights")
 
 local SkyLiftView = {}
@@ -61,6 +62,12 @@ SkyLiftView.RIDERS_PERIOD = 0.1 -- seconds between looks for bodies with a Ride 
 SkyLiftView.LIGHTS_PERIOD = 0.5 -- seconds between looks at the lamp level
 SkyLiftView.SCAN_PERIOD = 1 -- seconds between looks for the template and for streamed-in wheels
 SkyLiftView.WAIT_WARN = 30 -- seconds without a CabinTemplate before the console is told
+-- a cabin's sounds (Shared/Rides/SkyLiftSounds) are played only within this of the camera: its doors, the clunk at
+-- a tower; its hum and its wind loop on it, quiet past their reach, the wind's level set every WIND_PERIOD
+SkyLiftView.SOUND_RANGE = 150
+SkyLiftView.WIND_PERIOD = 0.5
+SkyLiftView.CABIN_LOOPS = { "SkyLift.CableHum", "SkyLift.WindAtHeight" }
+SkyLiftView.CABIN_CUES = { "SkyLift.DoorsOpen", "SkyLift.DoorsClose", "SkyLift.TowerClunk" }
 
 export type Opts = { now: (() -> number)?, bind: boolean? }
 
@@ -74,6 +81,7 @@ type Cabin = {
 	light: any?,
 	lamp: any?,
 	lightMaterial: any,
+	sounds: { [string]: any }, -- cue -> its Sound on the cabin (SkyLiftSounds)
 }
 type Spinner = { part: any, base: any, rate: number } -- rate: signed radians per second of the clock
 type State = {
@@ -88,6 +96,7 @@ type State = {
 	farAcc: number,
 	ridersAcc: number,
 	lightsAcc: number,
+	windAcc: number,
 	riders: { any },
 	night: boolean?, -- nil until the day cycle has said (no StreetLamps: the baked look stands)
 	wheels: { [any]: { Spinner } }, -- streamed-in model -> its spinning parts
@@ -223,6 +232,16 @@ local function template(): any
 	return f4 and f4:FindFirstChild("CabinTemplate")
 end
 
+local function sound(parent: any, name: string): any
+	local snd = Instance.new("Sound")
+	snd.Name = name
+	snd.SoundId = SkyLiftSounds.CUES[name] or ""
+	snd.Volume = SkyLiftSounds.VOLUME[name] or 0.5
+	snd.RollOffMaxDistance = SkyLiftSounds.REACH[name] or 40
+	snd.Parent = parent
+	return snd
+end
+
 -- Six clones of the template, each part's pose kept relative to the template's origin.
 local function makeCabins(s: State, tpl: any)
 	local origin = tpl.PrimaryPart or tpl:FindFirstChild("Origin")
@@ -248,6 +267,7 @@ local function makeCabins(s: State, tpl: any)
 			light = nil,
 			lamp = nil,
 			lightMaterial = nil,
+			sounds = {},
 		}
 		-- the door leaves: index 1 fore, 2 aft
 		local leafOf: { [any]: number } = {}
@@ -298,6 +318,24 @@ local function makeCabins(s: State, tpl: any)
 			for _, d in if p then p:GetDescendants() else {} do
 				if d.Name == "Number" and d:IsA("TextLabel") then
 					d.Text = tostring(i)
+				end
+			end
+		end
+		-- its sounds, on the part the cabin hangs from (moved with it)
+		local at = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true)
+		if at then
+			for _, name in SkyLiftView.CABIN_LOOPS do
+				local snd = sound(at, name)
+				snd.Looped = true
+				snd.Volume = if name == "SkyLift.WindAtHeight" then 0 else snd.Volume
+				snd:Play()
+			end
+			for _, name in SkyLiftView.CABIN_CUES do
+				sound(at, name)
+			end
+			for _, d in at:GetChildren() do
+				if d:IsA("Sound") then
+					cab.sounds[d.Name] = d
 				end
 			end
 		end
@@ -511,6 +549,31 @@ function SkyLiftView.frame(dt: number)
 	if n > 0 then
 		workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
 	end
+	-- the cabins' sounds near the camera: the doors, the towers; the wind's level by height now and then
+	if before ~= nil and camPos then
+		s.windAcc += dt
+		local windDue = s.windAcc >= SkyLiftView.WIND_PERIOD
+		if windDue then
+			s.windAcc = 0
+		end
+		local near2 = SkyLiftView.SOUND_RANGE * SkyLiftView.SOUND_RANGE
+		for i, cab in s.cabins do
+			local x, y, z = SkyLift.cabin(i, t)
+			if (x - camPos.X) ^ 2 + (y - camPos.Y) ^ 2 + (z - camPos.Z) ^ 2 > near2 then
+				continue
+			end
+			for _, name in SkyLiftSounds.events(i, before :: number, t) do
+				local snd = cab.sounds[name]
+				if snd then
+					snd:Play()
+				end
+			end
+			local wind = cab.sounds["SkyLift.WindAtHeight"]
+			if windDue and wind then
+				wind.Volume = SkyLiftSounds.windVolume(SkyLiftSounds.heightOver(x, y, z))
+			end
+		end
+	end
 	-- the riders, on the same clock
 	for _, body in s.riders do
 		local c, k = SkyLiftView.parseRide(body:GetAttribute("Ride"))
@@ -538,6 +601,7 @@ function SkyLiftView.start(opts: Opts?): () -> ()
 		farAcc = SkyLiftView.FAR_PERIOD,
 		ridersAcc = SkyLiftView.RIDERS_PERIOD,
 		lightsAcc = SkyLiftView.LIGHTS_PERIOD,
+		windAcc = SkyLiftView.WIND_PERIOD,
 		riders = {},
 		night = nil,
 		wheels = {},

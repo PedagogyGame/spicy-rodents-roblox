@@ -1,0 +1,45 @@
+{
+ "$schema": "audio/candidates v1",
+ "src": "tools/audio/make_candidates.py (made offline); tools/audio/publish.py (the lead's upload record)",
+ "uploadsPlanned": 2,
+ "candidates": [
+  {
+   "slot": "dog_bark",
+   "cues": [
+    "Dogs.Bark"
+   ],
+   "file": "assets/audio/candidates/dog_bark.ogg",
+   "seconds": 0.78,
+   "channels": 1,
+   "sampleRate": 44100,
+   "peakDb": -1.0,
+   "how": "synthesised offline (tools/audio/make_candidates.py dog_bark, seed 3601): two voiced barks, harmonics through three formants, a breathy onset, pitch arc 380->560->300 Hz",
+   "licence": "the game's own: synthesised offline from code in this repository, no recording or third-party audio (CC0-equivalent)",
+   "displayName": "SR yard dog bark",
+   "description": "Spicy Rodent: a friendly medium dog's woof woof (synthesised offline, tools/audio).",
+   "sha": "c14143330e584a86",
+   "assetId": null,
+   "moderation": null,
+   "approved": false
+  },
+  {
+   "slot": "bowling_roll",
+   "cues": [
+    "roll"
+   ],
+   "file": "assets/audio/candidates/bowling_roll.ogg",
+   "seconds": 2.6,
+   "channels": 1,
+   "sampleRate": 44100,
+   "peakDb": -3.0,
+   "how": "synthesised offline (tools/audio/make_candidates.py bowling_roll, seed 5002): brown noise low-passed with two wooden resonances (85, 140 Hz), a 4-4.6 Hz rotation pulse, faint grit, a closing low-pass and fade as it goes away",
+   "licence": "the game's own: synthesised offline from code in this repository, no recording or third-party audio (CC0-equivalent)",
+   "displayName": "SR bowling ball roll",
+   "description": "Spicy Rodent: a bowling ball rumbling down a wooden lane (synthesised offline, tools/audio).",
+   "sha": "e0ff7abd704b4726",
+   "assetId": null,
+   "moderation": null,
+   "approved": false
+  }
+ ]
+}

@@ -154,15 +154,21 @@ CombatService.REBALANCE_SECS = 1
 CombatService.REMOTE_RATE = 10
 CombatService.REMOTE_BURST = 4
 CombatService.REPLY_EVERY = 0.5
--- The duel's sounds, by cue name, played at the body (Boot/Game: a Sound named after the cue). The ids are to be
--- chosen from Roblox's licensed library (docs/AUDIO_BUDGET.md); an empty id is silent.
+-- The duel's sounds, by cue name, played at the body (Boot/Game: a Sound named after the cue): Roblox's licensed
+-- library (ProSoundEffects; docs/AUDIO_BUDGET.md), mild (no crunch, no pain), picked by name and length.
 CombatService.SOUNDS = table.freeze({
-	["Duel.Windup"] = "", -- the rodent gathers itself to pounce (or feints): a short hiss
-	["Duel.Strike"] = "", -- a person's kick or swing comes down: a whoosh
-	["Duel.Blow"] = "", -- the blow lands on the rodent: a soft thump and a squeak (no crunch)
-	["Duel.Batted"] = "", -- a bite batted away: a slap and a yelp
-	["Duel.Squareup"] = "", -- someone squares up to the rodent (a vigilante, or the scene turning on it): a grunt ("Hey!")
-	["Duel.Shout"] = "", -- someone on the scene backs off shouting ("Get away!"): a short shout, no words needed
+	-- the rodent gathers itself to pounce (or feints): a short hiss (Creature Vocal, Spider Hiss Exhale 1)
+	["Duel.Windup"] = "rbxassetid://9113990336",
+	-- a person's kick or swing comes down: a whoosh (Whoosh Heavy Punches 3: arm swings)
+	["Duel.Strike"] = "rbxassetid://9120729007",
+	-- the blow lands on the rodent: a soft thump and a squeak, no crunch (Squeaky Toy 2: a toy hit and squeak)
+	["Duel.Blow"] = "rbxassetid://9119536562",
+	-- a bite batted away: a slap (Baseball Fist Slap Into Glove)
+	["Duel.Batted"] = "rbxassetid://9125376871",
+	-- someone squares up to the rodent (a vigilante, or the scene turning on it): a fight yell (Video Game Effects 18)
+	["Duel.Squareup"] = "rbxassetid://9120416894",
+	-- someone on the scene backs off: a short exclamation (Male Vocal Gasps Exclamations 3)
+	["Duel.Shout"] = "rbxassetid://9116457156",
 }) :: { [string]: string }
 
 export type Service = typeof(setmetatable(
