@@ -727,13 +727,14 @@ end
 -- validatorRays(world) -> (wall, down, cover): ValidatorWorld.engineRays over the baked parts, so a spec judges with
 -- what the server sees. Each ray meets the colliding parts in the squirrel's group (squirrelSolid) and passes the ones
 -- ValidatorWorld.stops says it looks past (a tree's bough cylinders, for the wall and the cover; the rails' props too for
--- the cover ray's "rail" rule, its 7th argument, as the engine's), at most four hits in
--- all, as the engine's loop; `down` and `cover` also meet the terrain (World/Height under the carves), the river's
+-- the cover ray's "rail" rule, its 7th argument, as the engine's), at most ValidatorWorld.C.HOPS hits in all
+-- (C.RAIL_HOPS by the "rail" rule, which then fails closed), as the engine's loop; `down` and `cover` also meet the
+-- terrain (World/Height under the carves), the river's
 -- water, and the town's ground plates (Shared/World/GroundPlate: non-colliding parts of Town.Lots / Town.Roads, the
 -- first part of a path; four hits, as the engine's plate ray). The terrain and the water are met by vertical rays only
 -- (every down ray ValidatorWorld casts is vertical).
 function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorWorld.Ray, ValidatorWorld.Ray)
-	local HOPS = 4
+	local C = ValidatorWorld.C
 	local function colliding(p: Part): boolean
 		return p.squirrelSolid
 	end
@@ -744,7 +745,8 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 	local function inPlateFolder(p: Part): boolean
 		return inFolders[string.match(p.path, "^([^%.]+)") or ""] == true
 	end
-	-- (the parts along the segment in order, `filter`ed, at most HOPS; `stop` decides at each)
+	-- (the parts along the segment in order, `filter`ed, at most `hops` (C.HOPS); `stop` decides at each; hops spent with
+	-- the segment not seen to its end: `closed`, as the engine's "rail" ray fails closed)
 	local function walk(
 		ox: number,
 		oy: number,
@@ -753,10 +755,12 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 		dy: number,
 		dz: number,
 		filter: Filter,
-		stop: (p: Part) -> boolean
+		stop: (p: Part) -> boolean,
+		hops: number?,
+		closed: boolean?
 	): boolean
 		local from = 0
-		for _ = 1, HOPS do
+		for _ = 1, hops or C.HOPS do
 			local sx, sy, sz = ox + dx * from, oy + dy * from, oz + dz * from
 			local left = 1 - from
 			if left <= 1e-6 then
@@ -772,7 +776,7 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
 			from += tt * left + (if len > 0 then 0.02 / len else 1)
 		end
-		return false
+		return closed == true and from < 1 - 1e-6
 	end
 	local function solidRay(own: string): ValidatorWorld.Ray
 		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
@@ -780,7 +784,7 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 			return walk(ox, oy, oz, dx, dy, dz, colliding, function(p: Part): boolean
 				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
 				return ValidatorWorld.stops(kind, p.name, parentName)
-			end)
+			end, if kind == "rail" then C.RAIL_HOPS else C.HOPS, kind == "rail")
 		end
 	end
 	local function plate(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean

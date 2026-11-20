@@ -15,7 +15,15 @@
 --                      second leap's flight (a landing and a leap hidden), that flight seen to the ground, on open ground
 --                      with no rail within reach: snapped (the round-11 meter charged the leap seen and took the hidden one
 --                      as free: 27.4 st/s for good, 0 snaps)
--- About 8 s: `lune run tests/run.luau validator_r12`.
+--   many props        every rail sample of the baked town over a slab within 40 st that the rail rule's column reaches
+--                      only past four or more of the rails' props (a trunk, a wire, boughs: the engine's ray gave up after
+--                      four and failed open: 82 such samples, 20 of them unmet in the round-11 review's count): met
+--                      (ValidatorWorld.C.RAIL_HOPS, then failing closed; needs build/Town.rbxm)
+-- About 12 s: `lune run tests/run.luau validator_r12`.
+local fs = require("@lune/fs")
+local Data = require("@shared/Data")
+local Height = require("@shared/World/Height")
+local BakedWorld = require("@tests/lib/BakedWorld")
 local Tunables = require("@shared/Config/Tunables")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SquirrelWire = require("@shared/Movement/SquirrelWire")
@@ -356,6 +364,62 @@ return function(t)
 				)}]`
 			)
 			t.truthy(#snaps > 0, "leaps hidden in gaps from the air, back to back, are snapped")
+		end
+	)
+
+	t.test(
+		"many props: every rail sample over a slab within 40 st that the column reaches only past four or more of the rails' props: met by the rail rule (needs build/Town.rbxm)",
+		function()
+			if not fs.isFile("build/Town.rbxm") then
+				print("      (no build/Town.rbxm: bake first)")
+				return
+			end
+			Height.configure(Data.default():module("TerrainExtensions"))
+			local town: any = BakedWorld.load("build/Town.rbxm")
+			local bw = town:motorWorld(Data.default())
+			local _, _, cover = BakedWorld.validatorRays(town)
+			local function parentOf(p: any): string
+				return string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
+			end
+			local function real(p: any): boolean
+				return p.squirrelSolid and ValidatorWorld.stops("rail", p.name, parentOf(p))
+			end
+			local function prop(p: any): boolean
+				return p.squirrelSolid and not ValidatorWorld.stops("rail", p.name, parentOf(p))
+			end
+			local deep, met = 0, 0
+			for _, r in bw.registry:all() do
+				local n = math.clamp(math.floor((r.length or 50) / 2), 2, 400)
+				for k = 0, n do
+					local p = bw.registry:pointAt(r, k / n)
+					local tt, part = town.raycast(p.x, p.y, p.z, 0, -40, 0, real)
+					if tt and part then
+						local hitY = p.y - 40 * tt
+						-- (the props the column passes before the slab)
+						local props, from = 0, p.y
+						while props < 64 do
+							local t2 = town.raycast(p.x, from, p.z, 0, hitY - from, 0, prop)
+							if not t2 then
+								break
+							end
+							props += 1
+							from += (hitY - from) * t2 - 0.05
+							if from <= hitY then
+								break
+							end
+						end
+						if props >= 4 then
+							deep += 1
+							if cover(p.x, p.y, p.z, 0, -(p.y - hitY + 0.3), 0, "rail") then
+								met += 1
+							end
+						end
+					end
+				end
+			end
+			print(`      {deep} rail samples over a slab only past 4 or more props: {met} met`)
+			t.truthy(deep >= 10, "such columns found")
+			t.eq(met, deep, "every one met")
 		end
 	)
 end
