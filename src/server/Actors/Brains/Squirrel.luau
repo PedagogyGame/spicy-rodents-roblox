@@ -24,12 +24,8 @@ export type RouteLike = {
 }
 
 export type Params = {
-	routes: {
-		routes: { RouteLike },
-		byId: (id: number) -> RouteLike?,
-		index: any?, -- (Shared/Routes/SpatialIndex over the routes: reseat's nearest-first search)
-		enclosed: ((id: number) -> boolean)?, -- (an enclosed run: reseat never puts the body in one)
-	},
+	-- (AI/RouteAdapter's also carries `index` and `enclosed`: reseat's nearest-first search, never an enclosed run)
+	routes: { routes: { RouteLike }, byId: (id: number) -> RouteLike? },
 	startRoute: number?,
 	rng: () -> number,
 	-- the server's own rays: nothing (no wall, no floor, roof or ceiling) between two places (reseat; nil: not asked)
@@ -296,7 +292,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	-- (let go by a player: on the rail nearest where the server held the body, never the old route point)
 	local x, y, z = snapshot.x, snapshot.y, snapshot.z
 	if type(x) == "number" and type(y) == "number" and type(z) == "number" then
-		local near, ns = Squirrel.reseat(self.params.routes, x, y, z, self.params.reach)
+		local near, ns = Squirrel.reseat(self.params.routes :: any, x, y, z, self.params.reach)
 		if near then
 			route, s = near, ns
 		end
