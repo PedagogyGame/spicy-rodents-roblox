@@ -4095,6 +4095,25 @@ function SquirrelMotor.envelope(
 	end
 	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab)
 	gapAim.across, gapAim.up = 0, 0
+	if #out > 0 and not inFlight and prev.trickKind == 2 and not prev.grounded and prev.routeId == nil then
+		-- (the flight `prev` was re-aiming ended in the gap (a landing, a rail, a pounce, or a new flight after a hidden
+		-- landing): its re-aim may have gone on to the end of it, down to full in or back to none, so the arc from `prev`
+		-- came down sooner or later than the server's. The move is judged from `prev` with its vertical speed given that
+		-- push, each way, and the first a clean judgement takes stands; found by the honest lossy runs, a landing and a
+		-- leap hidden in a 0.5 s loss after a pull-in)
+		local r = math.min(pReach, 0)
+		for _, push in { SquirrelMotor.aimDown(-1) - SquirrelMotor.aimDown(r), -SquirrelMotor.aimDown(r) } do
+			if push ~= 0 then
+				local p2 = table.clone(prev)
+				p2.vy += push
+				local o2, u2, po2, j2 = envelopeCore(p2, judgedNext, dt, world, boosted, lastGrab)
+				if #o2 == 0 then
+					out, used, pounce, judged = o2, u2, po2, j2
+					break
+				end
+			end
+		end
+	end
 	for _, v in trick do
 		table.insert(out, v)
 	end
