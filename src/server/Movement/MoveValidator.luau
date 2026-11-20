@@ -1539,7 +1539,7 @@ function MoveValidator._stamina(
 	-- scales as the re-aim's reach changed, at that reach (the motor's aimScale; it telescopes, so a re-aim to and fro
 	-- buys nothing). A fresh roll after a flight the server saw holds the speed (neither steered nor dragged) for the
 	-- roll's length from its press, dated within the packet: the motor's carry along the ground
-	local trickScale = 1
+	local trickScale, trickOut = 1, 1
 	if not exempt then
 		local freshWiggle = next.trickKind == 2 and (prev.trickKind ~= 2 or next.trickTime > prev.trickTime + 1e-6)
 		local freshRoll = next.trickKind == 1 and (prev.trickKind ~= 1 or next.trickTime > prev.trickTime + 1e-6)
@@ -1551,14 +1551,15 @@ function MoveValidator._stamina(
 				spend(P.trickCost)
 			end
 			marks.trickReach = if marks.trickArmed
-				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0)
+				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0, 0)
 				else 0
 			marks.trickArmed = nil
 		end
-		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind == 2) then
+		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind ~= 0) then
 			local R = marks.trickReach or 0
 			local from = if freshWiggle then 0 else prev.aimReach or 0
 			trickScale = SquirrelMotor.aimScale(next.aimReach or 0, R) / SquirrelMotor.aimScale(from, R)
+			trickOut = SquirrelMotor.aimScale(math.max(next.aimReach or 0, from), R)
 		end
 		if freshRoll and marks.rollArmed then
 			local at = math.clamp(next.clock - (P.trickRoll - next.trickTime), prev.clock, next.clock)
@@ -1595,6 +1596,11 @@ function MoveValidator._stamina(
 	-- motor's railLeap)
 	local walkLo: number? = if free then V54.sprint else nil
 	local sprintLo: number? = walkLo
+	if trickOut > 1 then
+		-- (a wiggle's re-aim out: the motor's air steers toward its speed scaled as the speed was, a sprint's at most)
+		local lo = math.max(walkLo or 0, P.sprint) * trickOut
+		walkLo, sprintLo = lo, lo
+	end
 	-- (`rail`: the flight is free from here; `arcFrom`: a free launch, its arc dated from this packet (its clock, its height
 	-- and the vertical speed judged); a free flight carried on keeps its launch's)
 	-- (`route`: the rail a fresh free flight left, when the server had the body on it)

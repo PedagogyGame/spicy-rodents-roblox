@@ -31,9 +31,14 @@
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
 -- The water gun's stun (body attribute StunnedUntil, server time; Items/ItemWorld): no input reaches the motor.
--- The air trick (owner D17): G, gamepad R1, or on a touch screen UI/AirTrickButton (shown only in the air with a move
--- left) goes to the motor as `trick`; the move and its time left go to the animation layer (KinematicPose trick,
--- trickLeft: Shared/Movement/AirTrick poses it).
+-- The air trick (owner D17, redone D18): G, gamepad R1, or on a touch screen UI/AirTrickButton (shown in the air while
+-- a press can do something) goes to the motor as `trick`; the move and its time left go to the animation layer
+-- (KinematicPose trick, trickLeft: Shared/Movement/AirTrick poses it). After a mid-jump press (the motor's "trick"
+-- event, "wiggle") the re-aim is live until the landing: the camera's turn since the press is the aim (aimOf: its yaw
+-- either side, its look up = further out, down = nearer in, full at AIM_PITCH). The mouse IS the look on foot
+-- (Camera/CameraRig) and the right stick too, so the camera follows the aimed heading and nothing swings it besides;
+-- on a touch screen a drag from the button is the aim instead (AirTrickButton.aimOf). UI/AimMarker shows where the
+-- flight comes down while the aim is live (this player only).
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -48,7 +53,8 @@
 --   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
 --   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
---   string (pure); launch(events, vy) -> action?, airSeconds? (pure); stunned(untilTime, now) -> boolean (pure)
+--   string (pure); launch(events, vy) -> action?, airSeconds? (pure); stunned(untilTime, now) -> boolean (pure);
+--   aimOf(yaw0, pitch0, yaw, pitch) -> (aimYaw, aimReach) (pure); AIM_PITCH
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -65,10 +71,21 @@ local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
 local AirTrickButton = require("../UI/AirTrickButton")
+local AimMarker = require("../UI/AimMarker")
 
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 
 local Squirrel = {}
+
+-- radians of camera pitch for the whole re-aim out (looking up) or in (looking down)
+Squirrel.AIM_PITCH = math.rad(15)
+
+-- The re-aim the camera asks for, from its yaw and pitch at the wiggle's press to now: the turn either side (wrapped;
+-- the motor holds it to trickAimYaw) and the look up or down as -1 in .. 1 out.
+function Squirrel.aimOf(yaw0: number, pitch0: number, yaw: number, pitch: number): (number, number)
+	local turn = (yaw - yaw0 + math.pi) % (2 * math.pi) - math.pi
+	return turn, math.clamp((pitch - pitch0) / Squirrel.AIM_PITCH, -1, 1)
+end
 
 -- The rodent's wind-up: a press starts it (tell: send it to the duel) when the motor is ready; the pounce goes to the
 -- motor `secs` later; presses during a wind-up are ignored.
@@ -315,6 +332,12 @@ function Squirrel.start(
 	if game:GetService("UserInputService").TouchEnabled then
 		trickButton = AirTrickButton.start()
 	end
+	-- the re-aim: the camera at the wiggle's press (nil: no aim live), and its marker
+	local aimFrom: { yaw: number, pitch: number }? = nil
+	local marker = AimMarker.start()
+	local function cameraPitch(): number
+		return math.asin(math.clamp(workspace.CurrentCamera.CFrame.LookVector.Y, -1, 1))
+	end
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
 		if not railLive and state.routeId == nil then
@@ -371,7 +394,21 @@ function Squirrel.start(
 			choose = if state.routeId then f.choose else 0,
 			pounce = f.pounce,
 			trick = f.trick or (trickButton ~= nil and trickButton.consume()),
+			aimYaw = nil :: number?,
+			aimReach = nil :: number?,
 		}
+		local from = aimFrom
+		if from and state.trickKind == 2 and not state.grounded then
+			local dx: number?, dy: number? = nil, nil
+			if trickButton then
+				dx, dy = trickButton.drag()
+			end
+			if dx and dy then
+				mi.aimYaw, mi.aimReach = AirTrickButton.aimOf(dx, dy, SquirrelMotor.params.trickAimYaw)
+			else
+				mi.aimYaw, mi.aimReach = Squirrel.aimOf(from.yaw, from.pitch, f.cameraYaw, cameraPitch())
+			end
+		end
 		if spicy then
 			local now, pend, tell = Squirrel.windup(pounceAt, state.clock, f.pounce, windupSecs, state.cooldown <= 0)
 			pounceAt = pend
@@ -401,7 +438,24 @@ function Squirrel.start(
 		local _, events = SquirrelMotor.step(state, mi, dt, motorWorld :: any)
 		for _, e in events do
 			metrics.lastEvent = e.kind
+			if e.kind == "trick" and e.reason == "wiggle" then
+				aimFrom = { yaw = f.cameraYaw, pitch = cameraPitch() }
+			end
 		end
+		local aiming = aimFrom ~= nil and state.trickKind == 2 and not state.grounded and state.routeId == nil
+		if not aiming then
+			aimFrom = nil
+		end
+		-- (the marker: where the flight comes down, while the aim is live)
+		local mx, my, mz = nil, nil, nil
+		if aiming then
+			local land = SquirrelMotor.landingIn(state.x, state.y, state.z, state.vx, state.vy, state.vz, motorWorld :: any)
+			if land < 5 then
+				mx, mz = state.x + state.vx * land, state.z + state.vz * land
+				my = world.groundAt(mx :: number, mz :: number, state.y)
+			end
+		end
+		marker.set(mx, my, mz, dt)
 		if state.routeId == nil then
 			local rx, ry, rz = Recovery.riverFall(state.x, state.y, state.z)
 			if rx and ry and rz then
@@ -472,6 +526,7 @@ function Squirrel.start(
 		if trickButton then
 			trickButton.stop()
 		end
+		marker.stop()
 	end
 end
 
