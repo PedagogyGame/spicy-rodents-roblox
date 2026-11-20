@@ -1532,6 +1532,10 @@ SquirrelMotor.envelopeParams = {
 	grabReach = st(3.4),
 	grabWork = 2500,
 	grabBeam = 12,
+	-- studs: how far past r along a rail the samples a grab may take lie from its nearest one: the route's own sample
+	-- spacing (length / (sampleCount - 1), at most a third of an HTML unit, 0.83 st: Curve.sampleSteps) and posSlack;
+	-- this when the route is not in the registry (validator round 16, the round-15 review's MEDIUM 1)
+	bandPad = st(0.45) + st(0.05),
 	groundVy = 0.5, -- studs/s: a body on the ground off the rails has no vertical speed (the motor's is exactly 0)
 	-- studs: how far over the floor the server's rays find the client may stand (its ground plates are up to 0.3 over
 	-- the colliding surface): a landing hidden in a gap ends no higher than this over the floor it came down on
@@ -2975,12 +2979,15 @@ function SquirrelMotor.envelope(
 				return math.clamp(math.floor(y - yLo), 0, bins - 1) + 1
 			end
 			-- grab(x, y, z, r): the motor's grab from somewhere within r across of (x, y, z), the height known: the nearest
-			-- sample N, and every sample S that is the nearest to some such place (|S - c|^2 - |N - c|^2 <= 2 r |S - N|
-			-- across, c the place modelled). Returns the highest's drawn pose (where the leap leaves from) across and its
-			-- height, the lowest sample (a leap off it ends no lower: validator round 14), how far the grab's snap took the
-			-- body (N's distance and the drawn pose's offset), and how far across the body may be off that drawn pose (the
-			-- others' spread, their own drawn poses, a trunk's heading in doubt); nil when nothing is within a grab, when
-			-- the gather does not hold all of N's band, or past the work (fail safe)
+			-- sample N, and every sample S that is the nearest to some such place (the band: along N's own stretch of
+			-- route within r across and a sample's spacing; any other within the bisector test |S - c|^2 - |N - c|^2 <= 2 r |S - N|
+			-- across, c the place modelled). Returns where the leap leaves from across (N, the highest's drawn offset)
+			-- and its height (the highest's drawn pose), the lowest sample (a leap off it ends no lower: validator round
+			-- 14), how far across the grab's snap took the body (N's distance across and the drawn pose's offset), and
+			-- how far across the body may be off where the leap leaves (the band's spread off N, their own drawn poses, a
+			-- trunk's heading in doubt; validator round 16, the round-15 review's MEDIUM 1: from the band's highest with
+			-- the whole band as its doubt, a later grab carried the body half a band forward a grab); nil when nothing is
+			-- within a grab, when the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
 			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
 			local function grab(
@@ -3035,7 +3042,7 @@ function SquirrelMotor.envelope(
 					incomplete = true
 					return nil, 0, 0, 0, 0, 0
 				end
-				-- (the band, within d + 2r: its highest and lowest, then how far across its members lie off the highest)
+				-- (the band, within d + 2r: its highest and lowest, then how far across its members lie off N)
 				local nx, nz = X[bi], Z[bi]
 				local top, topY = bi, Y[bi]
 				local lowY = topY
@@ -3047,13 +3054,38 @@ function SquirrelMotor.envelope(
 					over = true
 					return nil, 0, 0, 0, 0, 0
 				end
+				-- (a sample of N's own route along the same stretch, its arc no longer than the chord between them and a
+				-- sample's spacing: the places within r across of the one modelled take only the samples within r of N
+				-- across and a sample's spacing and posSlack (`pad`) along it, as their nearest, the samples between
+				-- nearer than any further; up a trunk a place across takes the same height, so only N's neighbours. Validator round
+				-- 16, the round-15 review's MEDIUM 1: the bisector test against N alone took samples 2r along a rail, and
+				-- a crafted grab-leap chain ran the governor's ceiling. Another route, or the same one doubled back, keeps
+				-- the bisector test)
+				local idN, tN = sId[bi], sT[bi]
+				local routeN = reg:get(idN)
+				local lenN = if routeN then routeN.length else 0
+				local pad = if routeN then lenN / math.max(1, routeN.sampleCount - 1) + E.posSlack else E.bandPad
+				local nyN = Y[bi]
 				for b = bLo, b1 do
 					for e = S[b], S[b + 1] - 1 do
 						local ex, ey, ez = X[e] - x, Y[e] - y, Z[e] - z
 						local d2 = ex * ex + ey * ey + ez * ez
 						if d2 <= w2 then
-							local ux, uz = X[e] - nx, Z[e] - nz
-							if e == bi or d2 - best2 <= twoR * math.sqrt(ux * ux + uz * uz) then
+							local ux, uz, uy = X[e] - nx, Z[e] - nz, Y[e] - nyN
+							local across = math.sqrt(ux * ux + uz * uz)
+							local taken
+							if e == bi then
+								taken = true
+							else
+								local chord2 = ux * ux + uz * uz + uy * uy
+								local chord = math.sqrt(chord2)
+								if sId[e] == idN and math.abs(sT[e] - tN) * lenN <= chord + pad then
+									taken = chord2 <= r * across + pad * chord
+								else
+									taken = d2 - best2 <= twoR * across
+								end
+							end
+							if taken then
 								nb += 1
 								band[nb] = e
 								local sy = Y[e]
@@ -3092,7 +3124,8 @@ function SquirrelMotor.envelope(
 						doubt = if clear > 1e-6 then math.min(2 * m, m * r / clear) else 2 * m
 					end
 				end
-				-- (the band's others across off the highest; one on another route, its own drawn pose off it as well)
+				-- (the band's others across off N; one on another route than the highest's, its own drawn pose off it as
+				-- well)
 				local spread, lastId, lastOff = 0, -1, 0
 				for k = 1, nb do
 					local e = band[k]
@@ -3102,11 +3135,12 @@ function SquirrelMotor.envelope(
 						lastId = id
 						lastOff = if id == topId then 0 elseif other then drawnOf(world, other).across + m else m
 					end
-					local ux, uz = X[e] - tx, Z[e] - tz
+					local ux, uz = X[e] - X[bi], Z[e] - Z[bi]
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
 				end
 				grabbedId, grabbedT = topId, sT[top]
-				return px, topY + lift, pz, lowY, d + m, spread + doubt
+				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
+				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
 			-- bound starts)
@@ -3264,7 +3298,7 @@ function SquirrelMotor.envelope(
 							end
 							if gx then
 								local more =
-									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d + r, s.from)
+									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d, s.from)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
 								if was then
