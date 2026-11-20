@@ -585,7 +585,7 @@ function LookoutHill.rails(): { { number } }
 	local hw = LookoutHill.TRAIL_WIDTH / 2
 	local out: { { number } } = {}
 	for _, p in LookoutHill.trailPieces() do
-		local sides = {}
+		local sides: { number } = {}
 		if p.grade > LookoutHill.RAIL_GRADE then
 			sides = { -1, 1 }
 		elseif p.drop > LookoutHill.DROP_RAIL then
