@@ -111,6 +111,17 @@ return function(t)
 				t.truthy(c.channels == 1 and c.seconds > 0 and c.seconds <= 7, `{slot}: mono, short`)
 				t.truthy(type(c.licence) == "string" and #c.licence > 0, `{slot}: its licence is recorded`)
 				t.truthy(type(c.how) == "string" and #c.how > 0, `{slot}: how it was made is recorded`)
+				-- level with the game's other short sounds, never clipping (tools/audio/make_candidates.py measures
+				-- the encoded file; tools/audio/publish.py measures it again before an upload)
+				t.truthy(
+					type(c.loudnessLufs) == "number" and c.loudnessLufs >= -16 and c.loudnessLufs <= -14,
+					`{slot}: {c.loudnessLufs} LUFS (want -16 to -14)`
+				)
+				t.truthy(
+					type(c.truePeakDb) == "number" and c.truePeakDb <= -1,
+					`{slot}: true peak {c.truePeakDb} dBTP (want at most -1)`
+				)
+				t.truthy(c.sampleRate == 44100, `{slot}: 44.1 kHz`)
 				t.eq(#c.cues, #s.cues)
 				-- an id in the game is the id in the manifest (tools/audio/publish.py --record writes both)
 				t.eq(s.id, c.assetId or "", `{slot}: the game's id is the manifest's`)
