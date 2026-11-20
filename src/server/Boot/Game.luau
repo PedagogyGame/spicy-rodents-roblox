@@ -748,23 +748,16 @@ function Game.start(opts: Opts?): any
 	end
 	-- the hollow trees and the fallen log (Foraging/HollowService): their insides built (World/HollowShell), the cover,
 	-- the nut meter and the claim shown on each tree; a failure leaves the routes running and nobody hidden in them
-	-- where the server holds a player's squirrel (the validator's invariant D: never the root its client moves): the
-	-- feet of its last accepted motor packet, only while that packet was clean; nil before one (a body still pinned)
-	-- or after a flagged one. What the nuts read: a pick-up (Foraging/ForageService) and a deposit (HollowService)
+	-- where the server holds a player's squirrel (the validator's invariants D and E: never the root its client moves,
+	-- never a doubtful packet): MovementService.heldPlace in its strict mode (`current`): the held place only while it is
+	-- also the newest accepted packet; nil before one (a body still pinned) or while a doubt stands. What the nuts read:
+	-- a pick-up (Foraging/ForageService) and a deposit (HollowService)
 	local function heldPlace(id: number): (number?, number?, number?)
 		local actor = rt.byTownId[id]
 		if actor == nil then
 			return nil, nil, nil
 		end
-		local snap, at, _, cleanAt = movement:motorOf(actor.id)
-		if snap == nil or at == nil or cleanAt == nil or cleanAt < at then
-			return nil, nil, nil
-		end
-		local x, y, z = snap.x, snap.y, snap.z
-		if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then
-			return nil, nil, nil
-		end
-		return x, y, z
+		return movement:heldPlace(actor.id, true)
 	end
 	-- a claim is the player's (by UserId), not the body's; the computer's bodies claim as themselves
 	local function claimKey(id: number): string

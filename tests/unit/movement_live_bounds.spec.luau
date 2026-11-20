@@ -234,6 +234,11 @@ return function(t)
 		-- C.COVER_WALLS of them (C.COVER_RAYS + 1 down rays and three wall rays each; one of them was always counted)
 		local C = ValidatorWorld.C
 		local most = C.MAX_CHORDS * 6 + 12 + (C.COVER_WALLS - 1) * (C.COVER_RAYS + 4)
+		-- (validator round 9: a line of at most C.AROUND_MAX through a wall is asked for a way round a corner,
+		-- ValidatorWorld.around: 4 corners, two legs of at most 2 chords each, the first leg asked for no cover)
+		local chords = math.ceil(C.AROUND_MAX / C.MAX_CHORD)
+		local perChord = 6 + C.COVER_RAYS + 1 + 3
+		most = math.max(most, 12 + chords * perChord + 4 * (chords * 6 + chords * perChord))
 		t.truthy(worstRays <= most, `rays per call bounded ({worstRays} of {most})`)
 		-- (Lune's time; generous for a loaded machine: the bound is what matters, before this fix 60 s cost 1,200 ms)
 		t.truthy(worstMs < 8, `the worst call {worstName} took {worstMs} ms`)

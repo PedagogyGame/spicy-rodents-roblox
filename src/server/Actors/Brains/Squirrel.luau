@@ -24,9 +24,12 @@ export type RouteLike = {
 }
 
 export type Params = {
+	-- (AI/RouteAdapter's also carries `index` and `enclosed`: reseat's nearest-first search, never an enclosed run)
 	routes: { routes: { RouteLike }, byId: (id: number) -> RouteLike? },
 	startRoute: number?,
 	rng: () -> number,
+	-- the server's own rays: nothing (no wall, no floor, roof or ceiling) between two places (reseat; nil: not asked)
+	reach: ((x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean)?,
 }
 
 type Brain = Common.Brain & {
@@ -102,17 +105,74 @@ local function nearest3(route: RouteLike, x: number, y: number, z: number): (num
 	return bestS, bestD
 end
 
--- Squirrel.reseat(routes, x, y, z) -> (route, s)?: the rail nearest to where a player let the body go (validator round
--- 8: a release puts a plain squirrel back where the server held it, not on the route point it was taken from)
-function Squirrel.reseat(routes: { RouteLike }, x: number, y: number, z: number): (RouteLike?, number)
-	local best, bestS, bestD = nil, 0, math.huge
-	for _, r in routes do
-		local s, d = nearest3(r, x, y, z)
-		if d < bestD then
-			best, bestS, bestD = r, s, d
+-- Squirrel.reseat(routes, x, y, z, reach?) -> (route, s)?: the rail a player let the body go nearest (validator round 8:
+-- a release puts a plain squirrel back where the server held it, not on the route point it was taken from). Round 9 (the
+-- round-8 review's LOW): only a rail the body could have gone to from there: never an enclosed run (a storm drain under
+-- the street, a hollow: entered only at a mouth), and with `reach` (the server's rays) nothing between, nearest first;
+-- by the routes' spatial index (routes.index) within RESEAT_RADII, widened only when nothing is found; a scan of
+-- every route only with no index. With nothing reachable near, the nearest open rail found (no recall to where the
+-- body was taken)
+local RESEAT_RADII = { 8, 24, 64 } -- studs
+local RESEAT_TRIED = 4 -- candidates asked of `reach` in all (one route each, nearest first: its cost bounded)
+function Squirrel.reseat(
+	routes: {
+		routes: { RouteLike },
+		index: any?,
+		enclosed: ((id: number) -> boolean)?,
+		byId: (id: number) -> RouteLike?,
+	},
+	x: number,
+	y: number,
+	z: number,
+	reach: ((x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean)?
+): (RouteLike?, number)
+	local enclosed = routes.enclosed
+	local index = routes.index
+	if index == nil then
+		local best, bestS, bestD = nil, 0, math.huge
+		for _, r in routes.routes do
+			if enclosed and enclosed(r.id) then
+				continue
+			end
+			local s, d = nearest3(r, x, y, z)
+			if d < bestD then
+				best, bestS, bestD = r, s, d
+			end
+		end
+		return best, bestS
+	end
+	local fallback: RouteLike?, fallbackS = nil, 0
+	local asked: { [number]: boolean } = {}
+	local function accept(id: number, _t: number): boolean
+		return not asked[id] and not (enclosed and enclosed(id))
+	end
+	local tries = 0
+	for _, radius in RESEAT_RADII do
+		-- (the nearest sample of a route not asked yet within the radius: the index's own nearest, nearest first)
+		while true do
+			local hit = index:nearest(x, y, z, radius, nil, accept)
+			if hit == nil then
+				break
+			end
+			local route = routes.byId(hit.routeId)
+			asked[hit.routeId] = true
+			if route == nil then
+				continue
+			end
+			local s = hit.t * route.length
+			if fallback == nil then
+				fallback, fallbackS = route, s
+			end
+			if reach == nil or reach(x, y, z, hit.x, hit.y, hit.z) then
+				return route, s
+			end
+			tries += 1
+			if tries >= RESEAT_TRIED then
+				return fallback, fallbackS
+			end
 		end
 	end
-	return best, bestS
+	return fallback, fallbackS
 end
 
 local function railSpeed(route: RouteLike, sprint: boolean): number
@@ -232,7 +292,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	-- (let go by a player: on the rail nearest where the server held the body, never the old route point)
 	local x, y, z = snapshot.x, snapshot.y, snapshot.z
 	if type(x) == "number" and type(y) == "number" and type(z) == "number" then
-		local near, ns = Squirrel.reseat(self.params.routes.routes, x, y, z)
+		local near, ns = Squirrel.reseat(self.params.routes :: any, x, y, z, self.params.reach)
 		if near then
 			route, s = near, ns
 		end

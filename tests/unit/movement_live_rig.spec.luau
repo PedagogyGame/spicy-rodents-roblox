@@ -383,8 +383,11 @@ return function(t)
 			opts = { world = noWalls },
 		})
 	end
+	-- (validator round 9, the round-8 review's HIGH: the stream grace let a swap walk through walls for 3 s. Possession
+	-- streams around the body before it hands it over, so a house within MovementService.C.STREAMED of the hand-off is on
+	-- the client: a wall there is snapped at once; the snaps in the old grace window are not counted toward a hold)
 	t.test(
-		"a wall alone in the first seconds after a hand-off is logged, not snapped (the town may still stream in)",
+		"a wall in the first seconds after a hand-off, within the streamed radius: snapped, never through, never held",
 		function()
 			local b = boxes[1]
 			local rig = LiveRig.new({
@@ -403,10 +406,11 @@ return function(t)
 			)
 			rig:run(2.5)
 			local r = rig:result()
+			local p = rig:place()
 			print(`      {LiveRig.describe("in through a wall straight after a hand-off", r)}`)
-			t.eq(r.snaps, 0, "snaps")
-			local entered = r.client and r.client.x > b.minX
-			t.truthy(entered, "the body went in")
+			t.truthy(r.snaps >= 1, "snapped")
+			t.eq(r.holds, 0, "never held for it (the old grace window)")
+			t.truthy(p ~= nil and p.x <= b.minX, "the held place never inside")
 		end
 	)
 

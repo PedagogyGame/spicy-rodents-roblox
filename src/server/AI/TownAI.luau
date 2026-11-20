@@ -37,7 +37,7 @@
 -- mouth) before the AI takes it. Removing one cover leaves the others; with none nothing changes.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
 --   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
---   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?);
+--   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?); setReach(world, fn);
 --   listen(world, fn) -> unlisten; addCover(world, cover) -> remove; covered(world, id) -> space?
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
@@ -119,6 +119,8 @@ export type World = {
 	covers: { Cover }, -- what hides squirrels (addCover), in the order added
 	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
 	way: any, -- World/WalkWay.Way: the town's way on foot (every walk that is not a lane or a round goes by it)
+	-- the server's rays for a squirrel's re-seat on release (setReach; nil: not asked)
+	reach: ((x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean)?,
 }
 
 local TownAI = {}
@@ -559,7 +561,19 @@ function TownAI.build(opts: Opts): World
 		local r = candidates[(i * 97) % #candidates + 1]
 		local p = r.points[1]
 		local actor = add("squirrel", "normal", "Squirrel", sqDef.hipHeight, p[1], p[3])
-		register(actor, SquirrelBrain.new(actor, { routes = routes :: any, rng = rng, startRoute = r.id }))
+		register(
+			actor,
+			SquirrelBrain.new(actor, {
+				routes = routes :: any,
+				rng = rng,
+				startRoute = r.id,
+				-- (a release's re-seat: only a rail the body could get onto from where it was let go; setReach)
+				reach = function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean
+					local f = world.reach
+					return f == nil or f(x0, y0, z0, x1, y1, z1)
+				end,
+			})
+		)
 	end
 	do
 		local hide = HIDES[1]
@@ -593,6 +607,15 @@ function TownAI.build(opts: Opts): World
 		return {}
 	end)
 	return world
+end
+
+-- setReach(world, fn): the server's own rays for a squirrel's re-seat on release (Movement/MovementService.railReach:
+-- a rail the body could get onto from where it was let go, never a drain under the street nor a roof over a ceiling)
+function TownAI.setReach(
+	world: World,
+	fn: (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean
+)
+	world.reach = fn
 end
 
 function TownAI.setFocus(world: World, fn: () -> { BrainScheduler.Focus })

@@ -77,7 +77,7 @@ return function(t)
 			-- the server's floorNear: ValidatorWorld.floor at FLOOR_NEAR over the live floor ray, by the server's own rule
 			-- (BakedWorld.validatorRays: colliders, the bough cylinders included, terrain, water, plates)
 			local _, down = BakedWorld.validatorRays(town)
-			local serverFloorNear = ValidatorWorld.floor(down, ValidatorWorld.C.FLOOR_NEAR)
+			local serverFloorNear = ValidatorWorld.floorNear(down)
 			local plates, samples, worst, worstAt, overBefore = 0, 0, -math.huge, "", 0
 			local missed: { string } = {}
 			local byFolder: { [string]: number } = {}
@@ -181,8 +181,8 @@ return function(t)
 							end)
 							== nil
 				end
-				local nearNow = ValidatorWorld.floor(down, ValidatorWorld.C.FLOOR_NEAR)
-				local nearBefore = ValidatorWorld.floor(before, ValidatorWorld.C.FLOOR_NEAR)
+				local nearNow = ValidatorWorld.floorNear(down)
+				local nearBefore = ValidatorWorld.floorNear(before)
 				local n, now, bef = 0, 0, 0
 				for _, p in w.parts do
 					if not p.squirrelSolid then

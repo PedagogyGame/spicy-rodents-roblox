@@ -265,6 +265,12 @@ function Squirrel.start(
 	local state = SquirrelMotor.new(pos.X, ground, pos.Z)
 	state.yaw = (snap.yaw or 0) + math.pi
 	state.vx, state.vz = snap.vx or 0, snap.vz or 0
+	-- the sprint meter as the server has it (the grant's: the body's last driver left it so; the server's validator holds
+	-- this driver to the same meter, Movement/MoveValidator.meterOf)
+	if type(payload.stamina) == "number" and payload.stamina == payload.stamina then
+		state.stamina = math.clamp(payload.stamina, 0, 1)
+		state.winded = payload.winded == true
+	end
 	local b = snap.brain
 	if railLive and b and b.routeId and b.routeId ~= 0 then
 		local route = motorWorld.registry:get(b.routeId)

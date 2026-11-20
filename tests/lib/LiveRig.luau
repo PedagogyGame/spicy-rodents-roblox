@@ -441,6 +441,12 @@ function LiveRig.new(opts: Options): Rig
 		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "possess")
 		local epoch = movement:epochOf(actorKey())
 		local s = SquirrelMotor.clone(state)
+		-- (the grant's sprint meter, as Client/Controllers/Squirrel starts the motor from it: MovementService.meterOf)
+		-- (a test's own lower meter is kept: a body never driven grants a full one)
+		local meter, winded = movement:meterOf(actorKey(), rig.t)
+		if meter < s.stamina then
+			s.stamina, s.winded = meter, winded
+		end
 		local load = opts.loadSeconds or 0
 		reliable(function()
 			if load <= 0 then

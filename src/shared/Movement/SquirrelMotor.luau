@@ -91,6 +91,18 @@ export type World = Motion.World & {
 		rise: number?,
 		endY: number?
 	) -> boolean)?,
+	-- optional, for validators: a long line through a wall has a way round a corner, two legs via a corner one of which
+	-- is clear (Server/Movement/ValidatorWorld.around); none is a wall, not a corner rounded unseen
+	around: ((
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		y: number,
+		yHigh: number?,
+		rise: number?,
+		endY: number?
+	) -> boolean)?,
 	-- optional floor test for validators: is there something to stand on under feet at (x, y, z)?
 	floorBelow: ((x: number, y: number, z: number) -> boolean)?,
 	-- optional, for validators: is there ground within `depth` under feet at (x, y, z)? (else groundAt is asked)
@@ -2095,8 +2107,8 @@ function SquirrelMotor.envelope(
 	-- over the higher end by `rise` at most (a leap over a fence is no wall), and only as high as `next` is open above
 	-- (ValidatorWorld.crosses: no leap into a house under its roof). A line longer than the short test judges
 	-- (the world's maxChord) is judged chord by chord (crossesLong): a crossing is a wall when the move was `straight`
-	-- (a flight inside a short gap rounds no corner), else weighed by the validator as a gap's (judged.longWall: one may
-	-- be a corner rounded unseen)
+	-- (a flight inside a short gap rounds no corner) or no way round a corner is clear (world.around), else weighed by
+	-- the validator as a gap's (judged.longWall: a corner rounded unseen)
 	local function wallTest(fx: number, fy: number, fz: number, rise: number, straight: boolean)
 		local crosses = world.crosses
 		if crosses == nil then
@@ -2114,7 +2126,10 @@ function SquirrelMotor.envelope(
 			and hypot2(next.x - fx, next.z - fz) > chord
 			and long(fx, fz, next.x, next.z, lo, hi, rise, next.y)
 		then
-			if straight then
+			-- (validator round 9, the round-8 review's MEDIUM: a long line through a wall was always weighed a third and
+			-- kept; now only when a corner rounded unseen explains it, ValidatorWorld.around: else a whole flag)
+			local round = world.around
+			if straight or (round ~= nil and not round(fx, fz, next.x, next.z, lo, hi, rise, next.y)) then
 				add(out, "wall", 1, "move crosses a wall collider")
 			else
 				judged.longWall = true
