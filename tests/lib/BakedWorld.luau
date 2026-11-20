@@ -757,10 +757,18 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 		filter: Filter,
 		stop: (p: Part) -> boolean,
 		hops: number?,
-		closed: boolean?
+		closed: boolean?,
+		pool: { left: number }?
 	): boolean
 		local from = 0
-		for _ = 1, hops or C.HOPS do
+		for i = 1, hops or C.HOPS do
+			if i > C.HOPS and pool then
+				-- (a hop past C.HOPS from the actor's ray budget, as the engine's; spent, the column fails closed)
+				if pool.left <= 0 then
+					return closed == true
+				end
+				pool.left -= 1
+			end
 			local sx, sy, sz = ox + dx * from, oy + dy * from, oz + dz * from
 			local left = 1 - from
 			if left <= 1e-6 then
@@ -779,12 +787,21 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 		return closed == true and from < 1 - 1e-6
 	end
 	local function solidRay(own: string): ValidatorWorld.Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
+		return function(
+			ox: number,
+			oy: number,
+			oz: number,
+			dx: number,
+			dy: number,
+			dz: number,
+			rule: string?,
+			pool: { left: number }?
+		): boolean
 			local kind = rule or own
 			return walk(ox, oy, oz, dx, dy, dz, colliding, function(p: Part): boolean
 				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
 				return ValidatorWorld.stops(kind, p.name, parentName)
-			end, if kind == "rail" then C.RAIL_HOPS else C.HOPS, kind == "rail")
+			end, if kind == "rail" then C.RAIL_HOPS else C.HOPS, kind == "rail", pool)
 		end
 	end
 	local function plate(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
@@ -808,8 +825,17 @@ function BakedWorld.validatorRays(world: World): (ValidatorWorld.Ray, ValidatorW
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or ground(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
-		return solidCover(ox, oy, oz, dx, dy, dz, kind)
+	local function cover(
+		ox: number,
+		oy: number,
+		oz: number,
+		dx: number,
+		dy: number,
+		dz: number,
+		kind: string?,
+		pool: { left: number }?
+	): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz, kind, pool)
 			or ground(ox, oy, oz, dx, dy, dz)
 			or plate(ox, oy, oz, dx, dy, dz)
 	end

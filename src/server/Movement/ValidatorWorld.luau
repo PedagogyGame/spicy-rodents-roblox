@@ -61,8 +61,18 @@ local GroundPlate = Import.shared("World/GroundPlate") :: typeof(require("../../
 local ValidatorWorld = {}
 
 -- (`kind`: the stop rule the ray runs by instead of its own, for the cover ray: "rail", railSlab's column; a ray over no
--- parts ignores it)
-export type Ray = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?) -> boolean
+-- parts ignores it. `pool`: the rays the actor being judged has left (MoveValidator.budgeted): each part a "rail" ray
+-- looks past beyond C.HOPS takes one, and an empty pool fails the column closed; validator round 13)
+export type Ray = (
+	ox: number,
+	oy: number,
+	oz: number,
+	dx: number,
+	dy: number,
+	dz: number,
+	kind: string?,
+	pool: { left: number }?
+) -> boolean
 
 ValidatorWorld.C = table.freeze({
 	-- the body's core height over the feet (ClientWorld.STEP + PROBE_RADIUS: the narrow probe's centre)
@@ -145,8 +155,9 @@ ValidatorWorld.C = table.freeze({
 	-- by the stop rule "rail" (slab's and railSlab's columns: validator round 12, the round-11 review's LOW: past a
 	-- trunk, a wire and the boughs, a column down a crown met a slab only past four or more, and the ray failed open)
 	-- RAIL_HOPS, then fails closed: a column it could not see the whole of is judged to meet a slab. Every rail sample's
-	-- whole column to the ground in the baked town is seen within 24 (31,000 samples); the cost bound is two such
-	-- columns a move with a rail end
+	-- whole column to the ground in the baked town is seen within 24 (31,000 samples). Each hop past HOPS is a ray from the
+	-- actor's own budget (AROUND_BUDGET a second, shared with its ways round: validator round 13, the round-12 review's
+	-- LOW c), and a spent budget fails the column closed
 	HOPS = 4,
 	RAIL_HOPS = 32,
 	-- floorUnder's bisection: the most rays, and the height it stops at
@@ -710,8 +721,23 @@ end
 function ValidatorWorld.build(rail: any, opts: Options?): any
 	local o: Options = opts or {}
 	local wall, down, cover = o.wall, o.down, o.cover or o.down
-	local slabRay = cover -- (before the cars: a car is drawn behind the server's box)
 	local pool = { left = math.huge }
+	-- (before the cars: a car is drawn behind the server's box; a "rail" column's hops past C.HOPS from the actor's pool)
+	local slabRay: Ray? = nil
+	if cover then
+		local raw = cover :: Ray
+		slabRay = function(
+			ox: number,
+			oy: number,
+			oz: number,
+			dx: number,
+			dy: number,
+			dz: number,
+			kind: string?
+		): boolean
+			return raw(ox, oy, oz, dx, dy, dz, kind, if kind == "rail" then pool else nil)
+		end
+	end
 	if o.cars then
 		wall, down, cover = ValidatorWorld.withCars(wall, down, o.cars, cover)
 	end
@@ -781,11 +807,27 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	local floorParams = params(floorList)
 	floorParams.IgnoreWater = false
 	local function cast(p: RaycastParams, own: string): Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
+		return function(
+			ox: number,
+			oy: number,
+			oz: number,
+			dx: number,
+			dy: number,
+			dz: number,
+			rule: string?,
+			pool: { left: number }?
+		): boolean
 			local kind = rule or own
 			local origin = Vector3.new(ox, oy, oz)
 			local left = Vector3.new(dx, dy, dz)
-			for _ = 1, if kind == "rail" then C.RAIL_HOPS else C.HOPS do
+			for i = 1, if kind == "rail" then C.RAIL_HOPS else C.HOPS do
+				if i > C.HOPS and pool then
+					-- (a hop past HOPS: from the actor's ray budget; spent, the column fails closed)
+					if pool.left <= 0 then
+						return true
+					end
+					pool.left -= 1
+				end
 				local hit = workspace:Raycast(origin, left, p)
 				if hit == nil then
 					return false
@@ -857,8 +899,17 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
-		return solidCover(ox, oy, oz, dx, dy, dz, kind) or plate(ox, oy, oz, dx, dy, dz)
+	local function cover(
+		ox: number,
+		oy: number,
+		oz: number,
+		dx: number,
+		dy: number,
+		dz: number,
+		kind: string?,
+		pool: { left: number }?
+	): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz, kind, pool) or plate(ox, oy, oz, dx, dy, dz)
 	end
 	return cast(wallParams, "wall"), down, cover
 end

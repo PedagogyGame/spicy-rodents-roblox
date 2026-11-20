@@ -471,9 +471,10 @@ function Game.start(opts: Opts?): any
 			dx: number,
 			dy: number,
 			dz: number,
-			kind: string?
+			kind: string?,
+			pool: { left: number }?
 		): boolean
-			return engineRays().cover(ox, oy, oz, dx, dy, dz, kind)
+			return engineRays().cover(ox, oy, oz, dx, dy, dz, kind, pool)
 		end,
 	})
 	local net: any? = nil

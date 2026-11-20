@@ -1641,6 +1641,8 @@ end
 --   charge: a launch the motor's sprint meter pays for (validator round 11, the round-10 review's HIGH): "leap" (leapCost)
 --       or "pounce" (pounceCost) off the ground, or a pounce in the air; nil for none, or one off a rail (seen, or a visit
 --       the gap may hide) or a trampoline's bounce, which are free.
+--   railLaunch: the launch is off a rail, seen or a visit the gap may hide (validator round 13: the motor's railLeap, a
+--       free flight; a bounce alone is none).
 -- (grab: the client clock of the last hidden grab a short gap's move was explained by: envelope's lastGrab next time)
 export type Judged = {
 	vy: number,
@@ -1650,6 +1652,7 @@ export type Judged = {
 	longWall: boolean,
 	cornered: boolean?,
 	charge: string?,
+	railLaunch: boolean?,
 	grab: number?,
 }
 
@@ -2471,6 +2474,7 @@ function SquirrelMotor.envelope(
 	-- only onto another rail: on the same one it lands at the nearest point)
 	if prevRoute and not nextRoute then
 		launchUsed = true
+		judged.railLaunch = true
 		local railCap = SquirrelMotor.routeCap(prevRoute, boosted)
 		local prevSpec = prevRoute.enclosure
 		local points: { Vec3 } = {}
@@ -2951,6 +2955,8 @@ function SquirrelMotor.envelope(
 			-- doPounce charge; none for a bounce, nor for one a hidden rail visit explains; validator round 11)
 			if not tramp and (prev.grounded or ((offGround or pounce ~= nil) and not railVisit())) then
 				judged.charge = if pounce ~= nil then "pounce" else "leap"
+			elseif not prev.grounded and railVisit() then
+				judged.railLaunch = true
 			end
 			capUp = if fromGroundOrRail then launchUp else pounceUp
 			capXZ = if fromGroundOrRail then launchXZ else pounceXZ
