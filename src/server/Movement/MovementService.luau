@@ -507,11 +507,21 @@ function MovementService.new(deps: Deps): Movement
 
 	-- anchorOf(sq): a place the server itself holds for the body, to judge a packet the validator has no baseline for
 	-- (validator round 6, invariant A): where it keeps a pinned body, else the root it last saw this epoch, else the last
-	-- packet it accepted; nil when it knows none (never an uninitialised 0, 0, 0: the round-5 review)
+	-- packet it accepted; nil when it knows none (never an uninitialised 0, 0, 0: the round-5 review). Invariant E (round
+	-- 9): the held place (the last clean packet, or the gate this epoch's first packet passed) before the root or a
+	-- packet that may have been doubtful
 	local function anchorOf(sq: Squirrel): Gate?
 		local pin = sq.pinAt
 		if sq.pinned and pin then
 			return { x = pin.x, y = pin.y, z = pin.z, at = pin.at }
+		end
+		local good = sq.good
+		if good then
+			return { x = good.x :: number, y = good.y :: number, z = good.z :: number, at = sq.cleanAt or 0 }
+		end
+		local base = sq.base
+		if base then
+			return { x = base.x, y = base.y, z = base.z, at = base.at }
 		end
 		if sq.rootX then
 			return { x = sq.rootX :: number, y = sq.rootY, z = sq.rootZ, at = sq.rootAt }
