@@ -61,7 +61,11 @@
 --   playback speed (pure);
 --   heroTracks(tracks, current, want, track, loop, rate, startAt?) -> clip now playing; HERO. The
 --   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
---   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   heroLayers(rig, t, seed, live?, trick?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   The air trick (owner D17; Shared/Movement/AirTrick): a squirrel's barrel roll and wiggle, from its own motor for the
+--   held body (KinematicPose trick, trickLeft) and from the server's AirTrick / AirTrickAt attributes for every other;
+--   trickOf(kin?, kind, at, now) -> (kind, elapsed)? (pure). On a hero rig it is one more layer (heroLayers' `trick`);
+--   on a part-built puppet the roll and the shimmy go on its Root joint. Each move's sound plays once at the body.
 --   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
 --   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
 --   seated(seatPart, ride) -> boolean (pure); medPose(med, footDrop) -> { clip, drop, flat } (pure);
@@ -75,6 +79,7 @@ local Creep = require("./Creep")
 local Liveliness = require("./Liveliness")
 local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
+local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
@@ -147,6 +152,7 @@ type Entry = {
 	windStop: number?, -- os.clock() when the wind-up's crouch is let go
 	pickSeen: number?, -- the body's PickAt attribute as last seen (a nut picked up)
 	pickStop: number?, -- os.clock() when the pick-up's dip is let go
+	trickSeen: number?, -- the air trick: the start (server time) of the last move whose sound was played
 	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
 	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
 	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
@@ -616,9 +622,14 @@ function AnimationDriver.heroLayers(
 	rig: string,
 	t: number,
 	seed: number,
-	live: Liveliness.State?
+	live: Liveliness.State?,
+	trick: { [string]: { number } }?
 ): { [string]: { number } }
 	local out: { [string]: { number } } = {}
+	if trick then
+		-- (the air trick's offsets, on top of the rest)
+		return AirTrick.onto(AnimationDriver.heroLayers(rig, t, seed, live), trick)
+	end
 	if rig ~= "rodent" then
 		return if live then Liveliness.onto(out, live.pose) else out
 	end
@@ -647,6 +658,15 @@ function AnimationDriver.heroLayers(
 		out.Neck = { 0, 0, 3 * pose.spine }
 	end
 	return if live then Liveliness.onto(out, live.pose) else out
+end
+
+-- The air trick a body is doing at server time `now` (pure): from its own motor when the controller holds it (`kin`:
+-- KinematicPose), else from the server's attributes (AirTrick `kind`, AirTrickAt `at`). (kind, elapsed) or nil.
+function AnimationDriver.trickOf(kin: KinematicPose.Pose?, kind: any, at: any, now: number): (number?, number?)
+	if kin then
+		return AirTrick.own(kin.trick, kin.trickLeft)
+	end
+	return AirTrick.playing(kind, at, now)
 end
 
 -- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the
@@ -1284,6 +1304,37 @@ function AnimationDriver.start(opts: Opts): Driver
 		end
 	end
 
+	-- the air trick a body is doing this frame (its pose, or nil), and its sound once a move (near the camera only)
+	local function trickFrame(e: Entry, now: number, far: boolean): { [string]: { number } }?
+		local kind, elapsed = AnimationDriver.trickOf(
+			KinematicPose.get(e.body),
+			e.body:GetAttribute(AirTrick.ATTR.kind),
+			e.body:GetAttribute(AirTrick.ATTR.at),
+			now
+		)
+		if kind == nil or elapsed == nil or far then
+			return nil
+		end
+		local began = now - elapsed
+		if e.trickSeen == nil or math.abs(e.trickSeen - began) > 0.1 then
+			e.trickSeen = began
+			local id = AirTrick.SOUNDS[AirTrick.CUE[kind] or ""]
+			if id and elapsed < 0.35 then -- (a move seen late, past a round trip, plays silent)
+				local sound = Instance.new("Sound")
+				sound.Name = AirTrick.CUE[kind]
+				sound.SoundId = id
+				sound.Volume = AirTrick.VOLUME
+				sound.PlaybackSpeed = AirTrick.SPEED[kind] or 1
+				sound.Parent = e.root
+				sound:Play()
+				sound.Ended:Once(function()
+					sound:Destroy()
+				end)
+			end
+		end
+		return AirTrick.pose(kind, elapsed)
+	end
+
 	-- the procedural gait writes Motor6D.Transform in Stepped (before the joints are solved)
 	local clock = 0
 	local function gaitStep(_t: number, dt: number)
@@ -1312,7 +1363,8 @@ function AnimationDriver.start(opts: Opts): Driver
 				local far = camera ~= nil and (cf.Position - camera.CFrame.Position).Magnitude > Liveliness.RANGE
 				local sample = AnimationDriver.liveSample(cf, e.speed, e.mode, KinematicPose.get(e.body), now, far)
 				local live = if Liveliness.frame(creep.live, sample, dt) then creep.live else nil
-				for name, r in AnimationDriver.heroLayers(creep.rig, now, creep.seed, live) do
+				local trickPose = trickFrame(e, now, far)
+				for name, r in AnimationDriver.heroLayers(creep.rig, now, creep.seed, live, trickPose) do
 					layer(name, CFrame.new(r[4] or 0, r[5] or 0, r[6] or 0) * CFrame.Angles(r[1], r[2], r[3]))
 				end
 			end
@@ -1334,6 +1386,12 @@ function AnimationDriver.start(opts: Opts): Driver
 				e.phase = Gait.advance(e.phase, e.speed, dt, p)
 			end
 			local pose = Gait.pose(e.phase, e.speed, clock, p, e.tailN, if kin then kin.climb else 0)
+			local camera = workspace.CurrentCamera
+			local trickPoseP = trickFrame(
+				e,
+				workspace:GetServerTimeNow(),
+				camera ~= nil and (e.root.Position - camera.CFrame.Position).Magnitude > AirTrick.RANGE
+			)
 			for _, j in e.joints do
 				local cf = CFrame.identity
 				local leg = if j.leg then pose.legs[j.leg] else nil
@@ -1350,6 +1408,10 @@ function AnimationDriver.start(opts: Opts): Driver
 					cf = CFrame.Angles(pose.head, 0, 0)
 				elseif j.kind == "Root" then
 					cf = CFrame.new(0, pose.bob, 0) * CFrame.Angles(pose.rock, 0, 0)
+					local tr = if trickPoseP then trickPoseP.Root else nil
+					if tr then
+						cf = cf * CFrame.new(tr[4] or 0, tr[5] or 0, tr[6] or 0) * CFrame.Angles(tr[1], tr[2], tr[3])
+					end
 				end
 				j.motor.Transform = cf
 			end

@@ -21,6 +21,10 @@ export type Pose = {
 	-- expects it to stay up
 	action: string?,
 	airSeconds: number?,
+	-- the air trick (owner D17; Shared/Movement/AirTrick): the motor's move this flight (0 none, 1 roll, 2 wiggle) and
+	-- the seconds of it left (0: none playing)
+	trick: number?,
+	trickLeft: number?,
 }
 
 local KinematicPose = {}

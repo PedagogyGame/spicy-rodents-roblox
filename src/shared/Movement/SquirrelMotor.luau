@@ -16,7 +16,12 @@
 --           auto-take, end-of-route auto switch, transfer easing (routeBridge), body yaw along the
 --           tangent; W/S only
 --   AIR     ballistic while attackWindow > 0; landing clears committedAirborne
--- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click).
+-- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click), trick (G).
+-- AIR TRICK (owner D17): one button, only in the air (off the ground and off any rail, no pounce's window): the first
+-- press in a flight is a barrel roll (trickRoll s), the second a twitch-and-wiggle (trickWiggle s), further presses do
+-- nothing until the body lands or takes a rail; while a move plays the keys swing the flight's heading toward them at
+-- up to trickTurn rad/s on top of the air's own steering, its speed exactly kept: no speed, no height (trickKind: the
+-- last move of this flight, 0 none; trickTime: seconds of it left). Winded or not. Movement/AirTrick draws it.
 -- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
 -- moving into it (walking, falling, leaping or pouncing: the flight's swept path counts and going in ends the
 -- attack), eased like a transfer (a hatch mouth, a storm drain's grate, takes only E from a body standing at it, never
@@ -127,6 +132,7 @@ export type Input = {
 	grab: boolean, -- E pressed this frame
 	choose: number, -- A/D pressed this frame: -1 / 0 / +1
 	pounce: boolean, -- left click this frame
+	trick: boolean?, -- the air trick's button pressed this frame (G, gamepad R1, the touch button in the air)
 }
 
 export type Bridge = {
@@ -184,6 +190,10 @@ export type State = {
 	airX: number?,
 	airY: number?,
 	airZ: number?,
+	-- the air trick: the last move of this flight (0 none, 1 the barrel roll, 2 the twitch-and-wiggle) and the seconds
+	-- of it left (0: none playing); both 0 on the ground and on a rail
+	trickKind: number,
+	trickTime: number,
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -205,15 +215,20 @@ SquirrelMotor.params = {
 	-- sprint bursts: a full meter is sprintSeconds of sprinting; it refills in sprintRefill seconds of
 	-- not sprinting, on the ground or on a rail (never in the air, or a hop would pay for itself); once
 	-- empty ("winded") sprint is off until sprintRecover of the meter is back. A leap from the ground
-	-- costs leapCost and a pounce from the ground pounceCost; winded, neither carries faster than a
-	-- walk, so hopping or pounce-chaining is never a way round the meter (review 2026-11-10: chained
-	-- pounces held 28 st/s for ever, hops 24 st/s for half a minute). Off a rail both are free and full.
+	-- costs leapCost and a pounce from the ground pounceCost; winded, a pounce lunges no faster than a
+	-- walk and a leap carries leapForwardWinded, so pounce-chaining is never a way round the meter and
+	-- hopping is only a little one (review 2026-11-10: chained pounces held 28 st/s for ever, hops 24
+	-- st/s for half a minute). Off a rail both are free and full.
 	sprintSeconds = 4,
 	sprintRefill = 9,
 	sprintRecover = 0.35,
 	leapCost = 0.12,
 	pounceCost = 0.25,
-	leapForwardWinded = st(7.2),
+	-- owner D17 (2026-11-20, "slight advantage even if there is empty meter, but not the same"): a winded
+	-- leap carries 27.5 st/s (it was a walk's 18), so hopping on an empty meter keeps 6-14 % over the walk
+	-- (hop on landing 20.5 st/s against the walk's 17.9) and stays under hopping with meter (24.1 at the
+	-- same cadence); the air still steers it toward the walk, so the carry fades as before
+	leapForwardWinded = st(11),
 	stalk = st(1.65),
 	boostMult = 1.6,
 	treeTravelMult = 0.6,
@@ -259,6 +274,11 @@ SquirrelMotor.params = {
 	cameraCommitLaunch = 0.52,
 	cameraCommitDrop = 0.32,
 	cameraCommitLand = 0.35,
+	-- the air trick (owner D17, 2026-11-20): how long each move plays (s) and how fast it swings the flight's heading
+	-- toward the keys (rad/s: about 115 degrees over a roll, the speed kept)
+	trickRoll = 0.45,
+	trickWiggle = 0.5,
+	trickTurn = 4.5,
 	-- transfer heading hold (§10)
 	freeLookAfterTransfer = 0.65,
 	-- wall sweep (§8.3)
@@ -319,6 +339,8 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		alive = true,
 		stamina = 1,
 		winded = false,
+		trickKind = 0,
+		trickTime = 0,
 	}
 end
 
@@ -342,6 +364,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.attackWindow = 0
 	state.railLeap = false
 	state.airFromRoute = nil
+	state.trickKind, state.trickTime = 0, 0
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -357,6 +380,7 @@ function SquirrelMotor.idleInput(cameraYaw: number?): Input
 		grab = false,
 		choose = 0,
 		pounce = false,
+		trick = false,
 	}
 end
 
@@ -426,6 +450,8 @@ local SCALARS = {
 }
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
+-- (numbers a snapshot from before the air trick lacks: 0 when absent; the wire always carries them)
+local LATER_SCALARS = { "trickKind", "trickTime" }
 
 function SquirrelMotor.serialize(state: State): Snapshot
 	local s: Snapshot = {}
@@ -439,6 +465,9 @@ function SquirrelMotor.serialize(state: State): Snapshot
 	for _, k in OPTIONAL_IDS do
 		local v = anyState[k]
 		s[k] = if v == nil then -1 else v
+	end
+	for _, k in LATER_SCALARS do
+		s[k] = anyState[k] or 0
 	end
 	local b = state.bridge
 	s.bridgeActive = b ~= nil
@@ -472,6 +501,10 @@ function SquirrelMotor.deserialize(s: Snapshot): State
 			error(`SquirrelMotor.deserialize: {k} missing`)
 		end
 		state[k] = if v < 0 then nil else v
+	end
+	for _, k in LATER_SCALARS do
+		local v = s[k]
+		state[k] = if type(v) == "number" then v else 0
 	end
 	if s.bridgeActive == true then
 		state.bridge = {
@@ -788,6 +821,7 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	state.cooldown = P.pounceCooldown
 	state.attack = P.pounceAttack
 	state.attackWindow = P.pounceWindow
+	state.trickTime = 0 -- (a pounce is aimed: no trick steers it)
 	if not mouth then
 		launchFromVisibleRoute(state, world)
 	end
@@ -983,6 +1017,33 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			push(events, "hint", nil, nil, "nothingNear")
 		end
 	end
+end
+
+-- The air trick's button: a move while the body is in the air (not on the ground, a rail or a transfer, nor in a
+-- pounce's window), none playing and fewer than two this flight: the first a barrel roll, the second a wiggle.
+local function doTrick(state: State, events: { Event })
+	if state.grounded or state.routeId ~= nil or state.bridge ~= nil or state.attackWindow > 0 then
+		return
+	end
+	if state.trickTime > 0 or state.trickKind >= 2 then
+		return
+	end
+	state.trickKind += 1
+	state.trickTime = if state.trickKind == 1 then P.trickRoll else P.trickWiggle
+	push(events, "trick", nil, nil, if state.trickKind == 1 then "roll" else "wiggle")
+end
+
+-- SquirrelMotor.trickSteer(vx, vz, dx, dz, dt): the air trick's swing of a flight's heading toward the keys' (dx, dz),
+-- at most P.trickTurn * dt radians, the speed exactly kept (pure; the validator bounds the swing by the same rate).
+function SquirrelMotor.trickSteer(vx: number, vz: number, dx: number, dz: number, dt: number): (number, number)
+	local speed = math.sqrt(vx * vx + vz * vz)
+	if speed < 1e-6 or (dx == 0 and dz == 0) then
+		return vx, vz
+	end
+	local from = math.atan2(vx, vz)
+	local diff = (math.atan2(dx, dz) - from + math.pi) % (2 * math.pi) - math.pi
+	local turn = math.clamp(diff, -P.trickTurn * dt, P.trickTurn * dt)
+	return math.sin(from + turn) * speed, math.cos(from + turn) * speed
 end
 
 -- Substep ----------------------------------------------------------------------------------------------
@@ -1358,6 +1419,10 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			end
 			state.vx += (dx * steer - state.vx) * a
 			state.vz += (dz * steer - state.vz) * a
+			if state.trickTime > 0 and not state.grounded then
+				-- (the air trick: the heading swings toward the keys faster, at the speed the flight has)
+				state.vx, state.vz = SquirrelMotor.trickSteer(state.vx, state.vz, dx, dz, dt)
+			end
 			state.yaw = Motion.turnToward(
 				state.yaw,
 				math.atan2(dx, dz),
@@ -1424,6 +1489,12 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 	end
 
 	state.routeFreeLook = math.max(0, state.routeFreeLook - dt)
+	-- the air trick: the move plays on in the air; a landing or a rail ends the flight, and with it the moves
+	if state.grounded or state.routeId ~= nil then
+		state.trickKind, state.trickTime = 0, 0
+	else
+		state.trickTime = math.max(0, state.trickTime - dt)
+	end
 	local clamp = world.clamp
 	if clamp then
 		state.x = math.clamp(state.x, clamp.minX, clamp.maxX)
@@ -1437,7 +1508,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 end
 
 -- step(state, input, dt, world) -> state, events. One frame: edge actions in the key-handler order
--- (A/D, E, Q, Space, click), then updatePlayer substeps of <= 1/60 s (dt capped at 0.08 s).
+-- (A/D, E, Q, Space, click, the trick), then updatePlayer substeps of <= 1/60 s (dt capped at 0.08 s).
 function SquirrelMotor.step(state: State, input: Input, dt: number, world: World): (State, { Event })
 	local events: { Event } = {}
 	if not state.alive then
@@ -1457,6 +1528,9 @@ function SquirrelMotor.step(state: State, input: Input, dt: number, world: World
 	end
 	if input.pounce then
 		doPounce(state, world, input, events)
+	end
+	if input.trick then
+		doTrick(state, events)
 	end
 	local frameDt = math.min(dt, P.frameDtCap)
 	local steps = math.clamp(math.ceil(frameDt / P.substep - 1e-9), 1, P.maxSubsteps)
@@ -1770,6 +1844,8 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	bDuration = "Motion.bridgeDuration of the transfer's own length (fieldCheck)",
 	clickSeq = "0 (none) or 1..255, a click counted once, the newer only (MovementService.clickNew)",
 	clickAgo = "[0, SquirrelWire.CLICK_COPY], 0 with no click (fieldCheck); the click dated as the remote's (clickAt)",
+	trickKind = "enum 0, 1 or 2; 0 on the ground and on a rail (fieldCheck); worth no speed: it widens only the grab search's swing of the heading (envelope 5)",
+	trickTime = "[0, the move's own length] (trickRoll, trickWiggle), 0 with no move (fieldCheck); the swing's time (envelope 5)",
 })
 
 -- poseAgreement(world, r, railT, x, y, z, b, out): a packet on rail `r` is where its rail parameter says (validator
@@ -1913,6 +1989,18 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 			add(out, "railPose", 1, `transfer easing {s.bDuration} s for {gap} st`)
 		end
 		-- (its easing in [0, bDuration] and the body on it: poseAgreement below)
+	end
+	-- the air trick: a move, its time within its length, and only in the air (the motor ends both on a landing or a rail)
+	-- (a snapshot from before the trick has neither field: none, deserialize's reading; the wire always carries both)
+	local tk = s.trickKind
+	local old = tk == nil and s.trickTime == nil
+	if not old and tk ~= 0 and tk ~= 1 and tk ~= 2 then
+		add(out, "field", 1, `trickKind {tk}`)
+	elseif not old then
+		range("trickTime", 0, if tk == 1 then P.trickRoll elseif tk == 2 then P.trickWiggle else 0)
+		if tk ~= 0 and (s.grounded == true or (type(rid) == "number" and rid ~= -1)) then
+			add(out, "field", 1, `trickKind {tk} on the ground or a rail`)
+		end
 	end
 	local seq = s.clickSeq
 	if seq ~= nil then
@@ -2828,6 +2916,17 @@ function SquirrelMotor.envelope(
 			-- past the faster of the two speeds (validator round 15: a reach growing with the speed had and the steering
 			-- both, any way, let a crafted grab-leap chain along a long rail run 44 st/s where the motor's own runs 41)
 			local v0 = hypot2(prev.vx, prev.vz)
+			-- (the air trick, owner D17: while a move plays the motor swings the heading toward the keys at up to
+			-- P.trickTurn rad/s, the speed kept (trickSteer). A move plays in the gap when one was playing at `prev`, or
+			-- `next` claims a later one of the same flight; for at most `trickFor` of it (the whole gap, unless `prev`'s
+			-- was its last move). The speed had, turned by at most trickTurn x tau, lies no further than v0 x trickTurn x
+			-- tau^2 / 2 from where it would be unturned: that much more across, no more speed)
+			local trickFor = 0
+			if prev.trickTime > 0 or next.trickKind > prev.trickKind then
+				trickFor = if prev.trickKind >= 2 and next.trickKind <= prev.trickKind
+					then prev.trickTime
+					else math.huge
+			end
 			-- (the air steers toward moveSpeed, a sprint's at most, or v5.4's sprint in a rail leap's flight)
 			local steerTo = math.max(P.sprint * (if boosted then P.boostMult else 1), SquirrelMotor.V54.sprint)
 			-- (a grab's leap across: the motor's own leap off a rail, steered toward v5.4's sprint at most, a hair over for
@@ -2896,10 +2995,11 @@ function SquirrelMotor.envelope(
 					local steer = steerTo * (t - th - ta)
 					local lo = v0 * (th + ta) - steer
 					local hi = math.min(v0 * (th + td) + steer, math.max(v0, steerTo) * t)
+					local tau = math.min(t, trickFor)
 					local lat = steer
 					local mid = (lo + hi) / 2
 					local x, z = prev.x + ux * mid, prev.z + uz * mid
-					local r = math.max((hi - lo) / 2, lat)
+					local r = math.max((hi - lo) / 2, lat) + v0 * P.trickTurn * tau * tau / 2
 					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = x, y, z, r
 					lox, loy, loz = math.min(lox, x), math.min(loy, y), math.min(loz, z)
 					hix, hiy, hiz = math.max(hix, x), math.max(hiy, y), math.max(hiz, z)
