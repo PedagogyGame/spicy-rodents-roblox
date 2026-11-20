@@ -33,7 +33,18 @@ AirTrick.WIGGLE = 2
 AirTrick.ATTR = table.freeze({
 	kind = "AirTrick",
 	at = "AirTrickAt",
+	-- the twitch's aim, as the server last accepted it (aimAttr: a Vector2 of the turn over its most and the reach, in
+	-- twentieths), and its seed (seedOf)
+	aim = "AirTrickAim",
+	seed = "AirTrickSeed",
 })
+
+-- aimAttr(aimYaw, aimReach) -> (x, y): the aim as the body attribute carries it (sideways -1..1, reach -1..1, each in
+-- twentieths: a write only when it moves that far)
+function AirTrick.aimAttr(aimYaw: number, aimReach: number): (number, number)
+	local x = math.clamp(aimYaw / SquirrelMotor.params.trickAimYaw, -1, 1)
+	return math.floor(x * 20 + 0.5) / 20, math.floor(math.clamp(aimReach, -1, 1) * 20 + 0.5) / 20
+end
 
 -- one sound per move, heard at the body (ProSoundEffects, licensed; chosen by title, not heard yet)
 AirTrick.SOUNDS = table.freeze({
@@ -76,34 +87,317 @@ local function ease(p: number): number
 	return p * p * (3 - 2 * p)
 end
 
--- pose(kind, elapsed): the joint offsets of move `kind` `elapsed` seconds in; {} outside it.
-function AirTrick.pose(kind: number, elapsed: number): { [string]: { number } }
+-- THE TWITCH (owner D18, 2026-11-20: "a quick spin, twist, summersault, 360 plus weird strange bizarre body-twists, a
+-- variety ... based on the final aim and direction"; "all sorts of variations and combinations"; "keep side to side
+-- wiggle as well as primary, and add the others in, for other situations, or angles"; "make which one occurs, partially
+-- random"). A twitch is built from MOVES: the side-to-side WIGGLE (the primary), and spin (a flat 360 / 720 turn),
+-- flip (a forward somersault), tuck (a back tuck), corkscrew (a roll and a turn at once), cartwheel (a sideways turn),
+-- pretzel (head and hips counter-twisting), starfish (a snap open and shut) and whip (a double tail helix). Each move has
+-- a WEIGHT set by the aim (weights below: the wiggle's grows as the aim gets small; a hard push sideways weights the
+-- spin, out the flip, in the tuck, out-and-sideways the corkscrew, in-and-sideways the cartwheel), and the twitch's SEED
+-- (seedOf: from the client clock the button was pressed at, which the motor's packet dates, so every client draws the
+-- same) draws the moves from those weights (a Gumbel draw: a weighted random pick, so the same aim gives different
+-- moves on different jumps). The draw is soft (a softmax over the drawn scores at TEMPERATURE), so as the aim moves
+-- during the twitch the pose blends toward the move the new aim draws instead of popping. On top, the seed sometimes
+-- (FLOURISH) lays a second odd move over the first, later in the twitch: combinations. The seed also sets the turn
+-- count (360 or 720) and when the turn starts. The whole-body turn is one rotation about the blended axis of the turning
+-- moves, of a whole number of turns at the end (the turning share is rounded over the last quarter), so the body ends
+-- upright and facing its heading; every other offset is zero at both ends and held to LIMIT.
+
+AirTrick.MOVES =
+	table.freeze({ "wiggle", "spin", "flip", "tuck", "corkscrew", "cartwheel", "pretzel", "starfish", "whip" })
+AirTrick.TEMPERATURE = 0.25
+AirTrick.MAX_YAW = SquirrelMotor.params.trickAimYaw -- (the aim attribute's sideways is over this)
+AirTrick.FLOURISH = 0.4 -- the share of twitches with a second, odd move laid over the first
+AirTrick.DOUBLE = 0.3 -- the share of turning twitches that turn twice
+
+-- seedOf(pressClock): the twitch's seed (an integer 0..1023) from the client clock its button was pressed at (eighths of
+-- a second): the client reads its own clock, the server dates the press from the packet (clock less the wiggle's time
+-- run) and writes the seed on the body for every other client.
+function AirTrick.seedOf(pressClock: number): number
+	return math.floor(pressClock * 8) % 1024
+end
+
+-- pressOf(clock, trickTime): the client clock a wiggle with trickTime left at `clock` was pressed at
+function AirTrick.pressOf(clock: number, trickTime: number): number
+	return clock - (SquirrelMotor.params.trickWiggle - trickTime)
+end
+
+-- (0 < u < 1 from a seed and a salt: an integer hash, the same everywhere)
+local function hash(seed: number, salt: number): number
+	local h = bit32.bxor((seed * 73856093) % 4294967296, (salt * 19349663 + 83492791) % 4294967296)
+	h = (h * 1103515245 + 12345) % 2147483648
+	h = bit32.bxor(h, bit32.rshift(h, 13))
+	h = (h * 1103515245 + 12345) % 2147483648
+	return (h + 0.5) / 2147483648
+end
+
+-- weights(sideways, reach): each move's weight for an aim (sideways -1..1: the aim's turn over its most; reach -1 in ..
+-- 1 out). Pure.
+function AirTrick.weights(sideways: number, reach: number): { [string]: number }
+	local s = math.min(math.abs(sideways), 1)
+	local o, i = math.clamp(reach, 0, 1), math.clamp(-reach, 0, 1)
+	local mag = math.min(1, math.sqrt(s * s + reach * reach))
+	local small = (1 - mag) ^ 2
+	return {
+		wiggle = 1.6 + 6 * small,
+		spin = 4 * s * s * math.max(0, 1 - o - i) + 0.06,
+		flip = 4 * o * o * (1 - s) + 0.06,
+		tuck = 4 * i * i * (1 - s) + 0.06,
+		corkscrew = 5 * s * o + 0.06,
+		cartwheel = 5 * s * i + 0.06,
+		pretzel = 0.25 + 0.5 * small,
+		starfish = 0.2 + 0.3 * mag,
+		whip = 0.2 + 0.4 * s,
+	}
+end
+
+-- blend(sideways, reach, seed): each move's share of the twitch (they sum to 1): the seed's weighted draw, softened.
+function AirTrick.blend(sideways: number, reach: number, seed: number): { [string]: number }
+	local w = AirTrick.weights(sideways, reach)
+	local score: { [string]: number } = {}
+	local top = -math.huge
+	for k, name in AirTrick.MOVES do
+		local g = -math.log(-math.log(hash(seed, k)))
+		local sc = (math.log(w[name]) + g) / AirTrick.TEMPERATURE
+		score[name] = sc
+		top = math.max(top, sc)
+	end
+	local sum = 0
+	for name, sc in score do
+		score[name] = math.exp(sc - top)
+		sum += score[name]
+	end
+	for name in score do
+		score[name] /= sum
+	end
+	return score
+end
+
+-- the move a twitch mostly is (the largest share), for the specs and the owner's sheet
+function AirTrick.drawn(sideways: number, reach: number, seed: number): string
+	local b = AirTrick.blend(sideways, reach, seed)
+	local best, at = "wiggle", -1
+	for _, name in AirTrick.MOVES do
+		if b[name] > at then
+			best, at = name, b[name]
+		end
+	end
+	return best
+end
+
+-- (the rig's Euler offsets {rx, ry, rz} for CFrame.Angles(rx, ry, rz) = Rx Ry Rz of a turn of `angle` about unit (x, y, z))
+local function eulerOf(x: number, y: number, z: number, angle: number): (number, number, number)
+	local c, s = math.cos(angle), math.sin(angle)
+	local t = 1 - c
+	local r01 = t * x * y - s * z
+	local r02 = t * x * z + s * y
+	local r00 = t * x * x + c
+	local r12 = t * y * z - s * x
+	local r22 = t * z * z + c
+	return math.atan2(-r12, r22), math.asin(math.clamp(r02, -1, 1)), math.atan2(-r01, r00)
+end
+
+local function addTo(out: { [string]: { number } }, bone: string, rx: number, ry: number, rz: number)
+	local o = out[bone]
+	if o == nil then
+		out[bone] = { rx, ry, rz }
+	else
+		o[1] += rx
+		o[2] += ry
+		o[3] += rz
+	end
+end
+
+-- one move's offsets on the body (not its whole-body turn) at p (0..1), amplitude a, side sg (+1 / -1)
+local function body(out: { [string]: { number } }, name: string, p: number, a: number, sg: number)
+	if a < 1e-4 then
+		return
+	end
+	local hump = math.sin(math.pi * math.clamp(p, 0, 1))
+	local h = a * hump
+	if name == "wiggle" then
+		local w = math.sin(2 * math.pi * K.waves * p)
+		local r = out.Root or { 0, 0, 0, 0, 0, 0 }
+		r[2] = (r[2] or 0) - K.counter * h * w
+		r[4] = (r[4] or 0) + K.shift * h * w
+		r[5], r[6] = r[5] or 0, r[6] or 0
+		r[1], r[3] = r[1] or 0, r[3] or 0
+		out.Root = r
+		addTo(out, "Hips", 0, K.hips * h * w, K.hipsRoll * h * w)
+		for i = 1, K.tailBones do
+			addTo(out, `Tail{i}`, 0, K.tail * h * math.sin(2 * math.pi * K.waves * p - i * K.tailLag), 0)
+		end
+		local flick = math.sin(2 * math.pi * 2 * p)
+		addTo(out, "Head", 0, 0, K.twitch * h * flick)
+		addTo(out, "EarL", 0, 0, K.ear * h * math.max(0, flick))
+		addTo(out, "EarR", 0, 0, -K.ear * h * math.max(0, -flick))
+	elseif name == "spin" then
+		-- (the tail flung out by the turn, the ears laid back)
+		for i = 1, K.tailBones do
+			addTo(out, `Tail{i}`, 0, -sg * 0.2 * h, 0)
+		end
+		addTo(out, "EarL", 0, 0, 0.3 * h)
+		addTo(out, "EarR", 0, 0, -0.3 * h)
+		addTo(out, "Spine2", 0, sg * 0.15 * h, 0)
+	elseif name == "flip" then
+		-- (tucked tight over the somersault)
+		addTo(out, "Spine1", -0.35 * h, 0, 0)
+		addTo(out, "Spine2", -0.35 * h, 0, 0)
+		addTo(out, "Head", -0.3 * h, 0, 0)
+		for i = 1, K.tailBones do
+			addTo(out, `Tail{i}`, 0.18 * h, 0, 0)
+		end
+	elseif name == "tuck" then
+		-- (the back arched over the back tuck, the hips drawn in)
+		addTo(out, "Spine1", 0.3 * h, 0, 0)
+		addTo(out, "Spine2", 0.3 * h, 0, 0)
+		addTo(out, "Head", 0.25 * h, 0, 0)
+		addTo(out, "Hips", -0.3 * h, 0, 0)
+	elseif name == "corkscrew" then
+		-- (the body wrung: the spine twisted one way at the chest, the other at the hips, the tail in a helix)
+		addTo(out, "Spine1", 0, sg * 0.3 * h, 0)
+		addTo(out, "Spine2", 0, -sg * 0.3 * h, 0)
+		for i = 1, K.tailBones do
+			local ph = 2 * math.pi * 2 * p - i * 0.7
+			addTo(out, `Tail{i}`, 0.15 * h * math.cos(ph), 0.15 * h * math.sin(ph), 0)
+		end
+	elseif name == "cartwheel" then
+		-- (spread wide across the turn: back bent sideways, tail fanned, ears out)
+		addTo(out, "Spine1", 0, 0, sg * 0.25 * h)
+		addTo(out, "Spine2", 0, 0, sg * 0.25 * h)
+		for i = 1, K.tailBones do
+			addTo(out, `Tail{i}`, 0, 0, -sg * 0.12 * h)
+		end
+		addTo(out, "EarL", 0, 0, 0.35 * h)
+		addTo(out, "EarR", 0, 0, -0.35 * h)
+	elseif name == "pretzel" then
+		-- (head and hips counter-twisting, twice)
+		local w = math.sin(2 * math.pi * 2 * p)
+		addTo(out, "Head", 0, 0.45 * h * w, 0)
+		addTo(out, "Neck", 0, 0.2 * h * w, 0)
+		addTo(out, "Hips", 0, -0.45 * h * w, 0)
+		addTo(out, "Spine1", 0, -0.2 * h * w, 0.1 * h * w)
+		addTo(out, "Spine2", 0, 0.2 * h * w, -0.1 * h * w)
+	elseif name == "starfish" then
+		-- (a snap open and shut: back arched, head up, tail fanned flat, ears out, at the twitch's middle)
+		local q = math.clamp((p - 0.2) / 0.5, 0, 1)
+		local snap = a * math.sin(math.pi * q) ^ 2
+		addTo(out, "Spine1", 0.3 * snap, 0, 0)
+		addTo(out, "Spine2", 0.3 * snap, 0, 0)
+		addTo(out, "Head", 0.25 * snap, 0, 0)
+		for i = 1, K.tailBones do
+			addTo(out, `Tail{i}`, -0.15 * snap, 0, 0)
+		end
+		addTo(out, "EarL", 0, 0, 0.45 * snap)
+		addTo(out, "EarR", 0, 0, -0.45 * snap)
+	elseif name == "whip" then
+		-- (the tail cracked round in a double helix, the hips answering)
+		for i = 1, K.tailBones do
+			local ph = 2 * math.pi * 4 * p - i * 0.8
+			addTo(out, `Tail{i}`, 0.3 * h * math.cos(ph), 0.3 * h * math.sin(ph), 0)
+		end
+		addTo(out, "Hips", 0, -0.12 * h * math.sin(2 * math.pi * 4 * p), 0)
+	end
+end
+
+-- the turning moves' axes (rig: +X right, +Y up, -Z ahead; a flip turns head over heels forward), side sg
+local function axisOf(name: string, sg: number): (number, number, number)
+	if name == "spin" then
+		return 0, sg, 0
+	elseif name == "flip" then
+		return -1, 0, 0
+	elseif name == "tuck" then
+		return 1, 0, 0
+	elseif name == "corkscrew" then
+		return 0, sg * 0.7071, 0.7071 * sg
+	elseif name == "cartwheel" then
+		return 0.3, 0, sg * 0.954
+	end
+	return 0, 0, 0
+end
+
+-- twitch(p, sideways, reach, seed): the twitch's offsets at p (0..1) for an aim and a seed (pure).
+function AirTrick.twitch(p: number, sideways: number, reach: number, seed: number): { [string]: { number } }
+	local out: { [string]: { number } } = {}
+	if p <= 0 or p >= 1 then
+		return out
+	end
+	-- (the side, eased through the middle: an aim that swings across turns the other way through none, never a flip)
+	local sg = math.clamp(sideways / 0.2, -1, 1)
+	local b = AirTrick.blend(sideways, reach, seed)
+	local mag = math.min(1, math.sqrt(sideways * sideways + reach * reach))
+	local vigour = 0.6 + 0.4 * mag
+	-- the whole-body turn: about the turning moves' blended axis, their share of a whole number of turns
+	local ax, ay, az = 0, 0, 0
+	for _, name in AirTrick.MOVES do
+		local x, y, z = axisOf(name, sg)
+		if x ~= 0 or y ~= 0 or z ~= 0 then
+			ax += b[name] * x
+			ay += b[name] * y
+			az += b[name] * z
+		end
+	end
+	local len = math.sqrt(ax * ax + ay * ay + az * az)
+	local turns = if hash(seed, 41) < AirTrick.DOUBLE then 2 else 1
+	local start = 0.04 + 0.12 * hash(seed, 43)
+	local q = math.clamp((p - start) / (0.86 - start), 0, 1)
+	local settle = ease((p - 0.75) / 0.25)
+	-- (the turning share as the blended axis measures it: two sides of a turn cancel through the middle)
+	local whole = len + (math.floor(len + 0.5) - len) * settle
+	local angle = 2 * math.pi * turns * ease(q) * whole
+	if len > 1e-6 and math.abs(angle) > 1e-9 then
+		local rx, ry, rz = eulerOf(ax / len, ay / len, az / len, angle)
+		out.Root = { rx, ry, rz, 0, 0, 0 }
+	end
+	for _, name in AirTrick.MOVES do
+		body(out, name, p, b[name] * vigour, sg)
+	end
+	-- a flourish: a second, odd move over the first, later in the twitch
+	if hash(seed, 47) < AirTrick.FLOURISH then
+		local extra = ({ "pretzel", "starfish", "whip", "wiggle" })[1 + math.floor(hash(seed, 53) * 4) % 4]
+		local from = 0.25 + 0.2 * hash(seed, 59)
+		body(out, extra, (p - from) / (1 - from), 0.7 * vigour, -sg)
+	end
+	-- bounds: every bone but the Root's turn held to LIMIT
+	local L = AirTrick.LIMIT
+	for bone, r in out do
+		if bone ~= "Root" then
+			for k = 1, 3 do
+				r[k] = math.clamp(r[k], -L.swing, L.swing)
+			end
+		else
+			r[4] = math.clamp(r[4] or 0, -L.shift, L.shift)
+		end
+	end
+	return out
+end
+
+-- pose(kind, elapsed, aimYaw?, aimReach?, seed?): the joint offsets of move `kind` `elapsed` seconds in ({} outside
+-- it): the barrel roll, or the twitch for the aim (radians, -1..1; none: no aim) and the twitch's seed (seedOf; 0).
+function AirTrick.pose(
+	kind: number,
+	elapsed: number,
+	aimYaw: number?,
+	aimReach: number?,
+	seed: number?
+): { [string]: { number } }
 	local out: { [string]: { number } } = {}
 	local d = AirTrick.duration(kind)
 	if d <= 0 or elapsed <= 0 or elapsed >= d then
 		return out
 	end
 	local p = elapsed / d
+	if kind ~= AirTrick.ROLL then
+		local side = math.clamp((aimYaw or 0) / SquirrelMotor.params.trickAimYaw, -1, 1)
+		return AirTrick.twitch(p, side, math.clamp(aimReach or 0, -1, 1), seed or 0)
+	end
 	local hump = math.sin(math.pi * p) -- 0 at both ends, 1 in the middle
-	if kind == AirTrick.ROLL then
-		out.Root = { 0, 0, AirTrick.LIMIT.roll * ease(p) }
-		out.Spine1 = { -K.curl * hump, 0, 0 }
-		out.Spine2 = { -K.curl * hump, 0, 0 }
-		for i = 1, K.tailBones do
-			out[`Tail{i}`] = { K.wrap * hump, 0, 0 }
-		end
-	else
-		local w = math.sin(2 * math.pi * K.waves * p)
-		local a = hump
-		out.Root = { 0, -K.counter * a * w, 0, K.shift * a * w, 0, 0 }
-		out.Hips = { 0, K.hips * a * w, K.hipsRoll * a * w }
-		for i = 1, K.tailBones do
-			out[`Tail{i}`] = { 0, K.tail * a * math.sin(2 * math.pi * K.waves * p - i * K.tailLag), 0 }
-		end
-		local flick = math.sin(2 * math.pi * 2 * p)
-		out.Head = { 0, 0, K.twitch * a * flick }
-		out.EarL = { 0, 0, K.ear * a * math.max(0, flick) }
-		out.EarR = { 0, 0, -K.ear * a * math.max(0, -flick) }
+	out.Root = { 0, 0, AirTrick.LIMIT.roll * ease(p) }
+	out.Spine1 = { -K.curl * hump, 0, 0 }
+	out.Spine2 = { -K.curl * hump, 0, 0 }
+	for i = 1, K.tailBones do
+		out[`Tail{i}`] = { K.wrap * hump, 0, 0 }
 	end
 	return out
 end
