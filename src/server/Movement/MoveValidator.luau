@@ -1420,10 +1420,10 @@ function MoveValidator._stamina(
 	local holdLeft = math.max(0, (marks.speedHold or -math.huge) - prev.clock)
 	local free = marks.speedRail == true
 	local V54 = SquirrelMotor.V54
-	-- (a free launch's flight steers toward v5.4's speeds, the sprint's while the key drains the meter: the motor's
-	-- railLeap)
-	local walkLo: number? = if free then V54.walk else nil
-	local sprintLo: number? = if free then V54.sprint else nil
+	-- (a free launch's flight steers toward v5.4's speeds, the sprint's with the key held whatever the meter says: the
+	-- motor's railLeap)
+	local walkLo: number? = if free then V54.sprint else nil
+	local sprintLo: number? = walkLo
 	local function keepModel(nu: number?, ns: number?, hold: number?, rail: boolean?)
 		marks.speedU, marks.speedS, marks.speedHold, marks.speedRail = nu, ns, hold, rail
 	end
@@ -1464,31 +1464,63 @@ function MoveValidator._stamina(
 		local t = if disc >= 0 then (vy + math.sqrt(disc)) / P.gravity else math.max(vy, 0) / P.gravity
 		return math.clamp(t, 0, span)
 	end
-	-- (the move as air then ground (`airFirst`) or ground then air, `airT` of it in the air: the walk-steered step's
-	-- distance and the speed it keeps, or the sprint-steered one's)
-	local function stepped(airT: number, airFirst: boolean, sprint: boolean): (number, number, number)
-		local goal = if sprint then P.sprint else P.walk
-		local lo = if sprint then sprintLo else walkLo
-		local groundT = span - airT
+	-- (the move as air then ground (`airFirst`) or ground then air, `airT` of it in the air, moveSpeed's goal the sprint
+	-- from `from` to `to` seconds into it and the walk the rest: the distance the speed step covers and the speed it keeps)
+	local function stepped(airT: number, airFirst: boolean, from: number, to: number): (number, number, number)
 		local d, nu, ns = 0, u, s
-		local hold = holdLeft
-		local function part(grounded: boolean, t: number)
+		local at = 0
+		local function piece(grounded: boolean, t: number, sprint: boolean)
 			if t <= 1e-6 then
 				return
 			end
 			local dd: number
-			dd, nu, ns = SquirrelMotor.speedBound(nu, ns, goal, grounded, t, hold, if grounded then nil else lo)
-			hold = math.max(0, hold - t)
+			dd, nu, ns = SquirrelMotor.speedBound(
+				nu,
+				ns,
+				if sprint then P.sprint else P.walk,
+				grounded,
+				t,
+				math.max(0, holdLeft - at),
+				if grounded then nil elseif sprint then sprintLo else walkLo
+			)
+			at += t
 			d += dd
+		end
+		local function part(grounded: boolean, t: number)
+			local p0, p1 = at, at + math.max(t, 0)
+			local a, b = math.clamp(from, p0, p1), math.clamp(to, p0, p1)
+			piece(grounded, a - p0, false)
+			piece(grounded, b - a, true)
+			piece(grounded, p1 - b, false)
 		end
 		if airFirst then
 			part(false, airT)
-			part(true, groundT)
+			part(true, span - airT)
 		else
-			part(true, groundT)
+			part(true, span - airT)
 			part(false, airT)
 		end
 		return d, nu, ns
+	end
+	-- (the least sprint the motor covers `across` with: the sprint first, where it carries furthest inside the move, past
+	-- the walk-steered step by C.STAMINA_STEP, with `credit` studs more; the whole move when even that falls short)
+	local function least(airT: number, airFirst: boolean, credit: number): number
+		local function covers(t: number): boolean
+			return (stepped(airT, airFirst, 0, t)) * C.STAMINA_STEP + credit >= across
+		end
+		if not covers(span) then
+			return span
+		end
+		local lo, hi = 0, span
+		for _ = 1, 12 do
+			local mid = (lo + hi) / 2
+			if covers(mid) then
+				hi = mid
+			else
+				lo = mid
+			end
+		end
+		return hi
 	end
 	-- (a rail within a grab and a leap's reach over the move's time of either end: a gap may hide the motor's free leaps
 	-- off it)
@@ -1536,7 +1568,7 @@ function MoveValidator._stamina(
 		-- step does not, or a leap paid with leapCost whose carry, at most a leap's flight at the leap's speed over a walk,
 		-- covers part of it)
 		airT, airFirst = 0, true
-		local dW = stepped(0, true, false)
+		local dW = stepped(0, true, 0, 0)
 		local over = across - math.max(P.walk * span, dW) * tol
 		if over > 0 then
 			if span <= C.STAMINA_BURST then
@@ -1633,25 +1665,23 @@ function MoveValidator._stamina(
 		end
 		-- (a walk, or the walk-steered step: the motor's own, so only C.STAMINA_STEP over it; a sprint slowing to a walk
 		-- at speedSmooth, a landing's carry, a flight coasting from its launch drain nothing)
-		local dW = stepped(airT, airFirst, false)
-		local over = across - math.max(P.walk * span * tol, dW * C.STAMINA_STEP)
-		if over > 0 then
-			if airT <= 0 then
-				-- (a pounce's lunge runs on along the ground for its window, unsteered: paid with pounceCost, not the
-				-- sprint)
-				local pounced = actor.lastPounce
-				local lunge = pounced ~= nil
-					and not marks.tiredLunge
-					and prev.clock >= pounced - 1e-3
-					and next.clock <= pounced + P.pounceWindow + 1e-3
-					and across <= P.pounceSpeedFast * E.speedTol * span + E.posSlack
-				sprinted = if lunge then 0 else span
-			else
-				sprinted = math.min(over / rate, span)
+		local dW = stepped(airT, airFirst, 0, 0)
+		local credit = math.max(0, P.walk * span * tol - dW * C.STAMINA_STEP)
+		if across > dW * C.STAMINA_STEP + credit then
+			-- (a pounce's lunge runs on along the ground for its window, unsteered: paid with pounceCost, not the sprint)
+			local pounced = actor.lastPounce
+			local lunge = airT <= 0
+				and pounced ~= nil
+				and not marks.tiredLunge
+				and prev.clock >= pounced - 1e-3
+				and next.clock <= pounced + P.pounceWindow + 1e-3
+				and across <= P.pounceSpeedFast * E.speedTol * span + E.posSlack
+			sprinted = if lunge then 0 else least(airT, airFirst, credit)
+			if airT >= span then
 				-- (past what the sprint-steered step covers: a flight faster than the motor's from its launch)
-				local dS = stepped(airT, airFirst, true)
+				local dS = stepped(airT, airFirst, 0, span)
 				local most = dS * E.speedTol + E.posSlack
-				if airT >= span and across > most then
+				if across > most then
 					table.insert(violations, {
 						code = "speed",
 						severity = math.min(1, across / most - 1),
@@ -1670,8 +1700,9 @@ function MoveValidator._stamina(
 			else "faster than a walk on the ground for longer than the sprint meter lasts"
 	)
 	marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
-	-- (the speed kept: stepped as the move was judged; a gap from the ground that ends in the air hid a launch)
-	local _, nu, ns = stepped(airT, airFirst, sprinted > 0)
+	-- (the speed kept: stepped as the move was judged, its sprint last, where it leaves the most; a gap from the ground that
+	-- ends in the air hid a launch)
+	local _, nu, ns = stepped(airT, airFirst, span - sprinted, span)
 	if after then
 		keepModel(after[1], after[2], after[3], after[4])
 	elseif unjudged and groundA and not footB then
