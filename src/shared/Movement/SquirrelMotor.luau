@@ -1147,7 +1147,8 @@ function SquirrelMotor.reaim(state: State, wantYaw: number?, wantReach: number?,
 		state.vx, state.vz = state.vx * c + state.vz * s, state.vz * c - state.vx * s
 	end
 	if ne ~= state.aimReach then
-		local k = SquirrelMotor.aimScale(ne, state.trickReach) / SquirrelMotor.aimScale(state.aimReach, state.trickReach)
+		local k = SquirrelMotor.aimScale(ne, state.trickReach)
+			/ SquirrelMotor.aimScale(state.aimReach, state.trickReach)
 		state.vx *= k
 		state.vz *= k
 		state.vy += SquirrelMotor.aimDown(ne) - SquirrelMotor.aimDown(state.aimReach)

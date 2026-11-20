@@ -449,7 +449,8 @@ function Squirrel.start(
 		-- (the marker: where the flight comes down, while the aim is live)
 		local mx, my, mz = nil, nil, nil
 		if aiming then
-			local land = SquirrelMotor.landingIn(state.x, state.y, state.z, state.vx, state.vy, state.vz, motorWorld :: any)
+			local land =
+				SquirrelMotor.landingIn(state.x, state.y, state.z, state.vx, state.vy, state.vz, motorWorld :: any)
 			if land < 5 then
 				mx, mz = state.x + state.vx * land, state.z + state.vz * land
 				my = world.groundAt(mx :: number, mz :: number, state.y)

@@ -241,7 +241,11 @@ return function(t)
 		local most, bestAt = 0, 0
 		for _, o in { { fw = 1, sprint = true }, { fw = 1 }, {} } do
 			local d0 = flight(nil, 0, o)
-			local line = string.format("      keys %-14s plain %.1f st:", if o.sprint then "W + Shift" elseif o.fw then "W" else "none", d0)
+			local line = string.format(
+				"      keys %-14s plain %.1f st:",
+				if o.sprint then "W + Shift" elseif o.fw then "W" else "none",
+				d0
+			)
 			for _, at in { 3, 9, 15, 21, 26, 32, 38, 44 } do
 				local dO, dI = flight(at, 1, o), flight(at, -1, o)
 				local out = dO / d0 - 1
@@ -264,7 +268,12 @@ return function(t)
 		t.truthy(bestAt >= 9 and bestAt <= 32, "best near the apex, not at the takeoff or the landing")
 		t.near(SquirrelMotor.trickReachAt(0, 0, 10), 0, 1e-12, "nothing at the takeoff")
 		t.truthy(SquirrelMotor.trickReachAt(10, 1000, 1) <= P.trickOutPeak, "never past the peak")
-		t.near(SquirrelMotor.trickReachAt(1, 1, 1), P.trickOut * 2, 1e-12, "9 % of the whole carry: half of it left, twice that")
+		t.near(
+			SquirrelMotor.trickReachAt(1, 1, 1),
+			P.trickOut * 2,
+			1e-12,
+			"9 % of the whole carry: half of it left, twice that"
+		)
 		-- in from a higher fall comes in further: a body moving across at 30 st/s from rest high over the ground
 		local function fall(height: number, reach: number): number
 			local s = fresh()
@@ -292,55 +301,58 @@ return function(t)
 		t.truthy(h1 / h0 - 1 <= -0.15 and l1 / l0 - 1 <= -0.15, "15 % or more")
 	end)
 
-	t.test("the packet: the trick and the aim on the wire, bounded by fieldCheck, a snapshot without them reads none", function()
-		local s = fresh()
-		step(s, { fw = 1, leap = true })
-		for _ = 1, 10 do
-			step(s, { fw = 1 })
-		end
-		step(s, { fw = 1, trick = true })
-		for _ = 1, 6 do
-			step(s, { fw = 1, aimYaw = 0.3, aimReach = 0.5 })
-		end
-		local snap = SquirrelMotor.serialize(s)
-		local _, _, back = SquirrelWire.decode(SquirrelWire.encode(1, 1, snap))
-		t.eq(back.trickKind, 2)
-		t.near(back.trickTime :: number, s.trickTime, 1e-6)
-		t.near(back.aimYaw :: number, s.aimYaw, 1e-6)
-		t.near(back.aimReach :: number, s.aimReach, 1e-6)
-		t.eq(#SquirrelMotor.fieldCheck(back, world), 0, "an honest packet")
-		for _, k in { "trickKind", "trickTime", "aimYaw", "aimReach" } do
-			t.truthy(SquirrelMotor.FIELD_BOUNDS[k] ~= nil, k)
-		end
-		local function bad(edit: { [string]: any }): boolean
-			local c = table.clone(back)
-			for k, v in edit do
-				c[k] = v
+	t.test(
+		"the packet: the trick and the aim on the wire, bounded by fieldCheck, a snapshot without them reads none",
+		function()
+			local s = fresh()
+			step(s, { fw = 1, leap = true })
+			for _ = 1, 10 do
+				step(s, { fw = 1 })
 			end
-			return #SquirrelMotor.fieldCheck(c, world) > 0
+			step(s, { fw = 1, trick = true })
+			for _ = 1, 6 do
+				step(s, { fw = 1, aimYaw = 0.3, aimReach = 0.5 })
+			end
+			local snap = SquirrelMotor.serialize(s)
+			local _, _, back = SquirrelWire.decode(SquirrelWire.encode(1, 1, snap))
+			t.eq(back.trickKind, 2)
+			t.near(back.trickTime :: number, s.trickTime, 1e-6)
+			t.near(back.aimYaw :: number, s.aimYaw, 1e-6)
+			t.near(back.aimReach :: number, s.aimReach, 1e-6)
+			t.eq(#SquirrelMotor.fieldCheck(back, world), 0, "an honest packet")
+			for _, k in { "trickKind", "trickTime", "aimYaw", "aimReach" } do
+				t.truthy(SquirrelMotor.FIELD_BOUNDS[k] ~= nil, k)
+			end
+			local function bad(edit: { [string]: any }): boolean
+				local c = table.clone(back)
+				for k, v in edit do
+					c[k] = v
+				end
+				return #SquirrelMotor.fieldCheck(c, world) > 0
+			end
+			t.truthy(bad({ trickKind = 3 }), "no third move")
+			t.truthy(bad({ trickKind = 1.5 }), "a whole move")
+			t.truthy(bad({ trickKind = 1, trickTime = P.trickRoll + 0.01 }), "a roll no longer than a roll")
+			t.truthy(bad({ trickTime = P.trickWiggle + 0.01 }), "a wiggle no longer than a wiggle")
+			t.truthy(bad({ trickKind = 0, trickTime = 0.1, aimYaw = 0, aimReach = 0 }), "no time without a move")
+			t.truthy(bad({ grounded = true, vy = 0, aimYaw = 0, aimReach = 0 }), "no wiggle on the ground")
+			t.truthy(bad({ aimYaw = P.trickAimYaw + 0.01 }), "no more than 30 degrees")
+			t.truthy(bad({ aimReach = 1.01 }), "no more than full out")
+			t.truthy(bad({ trickKind = 0, trickTime = 0 }), "no re-aim with no move")
+			t.truthy(bad({ grounded = true, vy = 0, trickKind = 1, trickTime = 0.2 }), "no re-aim on the ground")
+			t.falsy(
+				bad({ grounded = true, vy = 0, trickKind = 1, trickTime = 0.2, aimYaw = 0, aimReach = 0 }),
+				"a roll on the ground"
+			)
+			t.truthy(bad({ routeId = 220, railT = 0, trickKind = 1, trickTime = 0.2, aimYaw = 0, aimReach = 0 }))
+			local old = table.clone(snap)
+			old.trickKind, old.trickTime, old.aimYaw, old.aimReach = nil, nil, nil, nil
+			local st = SquirrelMotor.deserialize(old)
+			t.eq(st.trickKind, 0)
+			t.eq(st.aimYaw, 0)
+			t.eq(#SquirrelMotor.fieldCheck(old, world), 0, "a snapshot from before the trick")
 		end
-		t.truthy(bad({ trickKind = 3 }), "no third move")
-		t.truthy(bad({ trickKind = 1.5 }), "a whole move")
-		t.truthy(bad({ trickKind = 1, trickTime = P.trickRoll + 0.01 }), "a roll no longer than a roll")
-		t.truthy(bad({ trickTime = P.trickWiggle + 0.01 }), "a wiggle no longer than a wiggle")
-		t.truthy(bad({ trickKind = 0, trickTime = 0.1, aimYaw = 0, aimReach = 0 }), "no time without a move")
-		t.truthy(bad({ grounded = true, vy = 0, aimYaw = 0, aimReach = 0 }), "no wiggle on the ground")
-		t.truthy(bad({ aimYaw = P.trickAimYaw + 0.01 }), "no more than 30 degrees")
-		t.truthy(bad({ aimReach = 1.01 }), "no more than full out")
-		t.truthy(bad({ trickKind = 0, trickTime = 0 }), "no re-aim with no move")
-		t.truthy(bad({ grounded = true, vy = 0, trickKind = 1, trickTime = 0.2 }), "no re-aim on the ground")
-		t.falsy(
-			bad({ grounded = true, vy = 0, trickKind = 1, trickTime = 0.2, aimYaw = 0, aimReach = 0 }),
-			"a roll on the ground"
-		)
-		t.truthy(bad({ routeId = 220, railT = 0, trickKind = 1, trickTime = 0.2, aimYaw = 0, aimReach = 0 }))
-		local old = table.clone(snap)
-		old.trickKind, old.trickTime, old.aimYaw, old.aimReach = nil, nil, nil, nil
-		local st = SquirrelMotor.deserialize(old)
-		t.eq(st.trickKind, 0)
-		t.eq(st.aimYaw, 0)
-		t.eq(#SquirrelMotor.fieldCheck(old, world), 0, "a snapshot from before the trick")
-	end)
+	)
 
 	t.test("the pose: a whole roll and a side-to-side shimmy, zero at both ends, bounded", function()
 		for _, kind in { AirTrick.ROLL, AirTrick.WIGGLE } do
@@ -448,67 +460,83 @@ return function(t)
 		t.eq(AimMarker.fade(AimMarker.SHOWN, false, 1), 1, "and out")
 	end)
 
-	t.test("the grab-leap cooldown: a macro's chain no faster than a person's; a person's and a climb unchanged", function()
-		local function chain(id: number, t0: number, yaw: number, every: number, t1: number, t2: number, up: boolean): number
-			local r = world.registry:get(id)
-			local p = world.registry:pointAt(r, t0)
-			local s = SquirrelMotor.new(p.x, p.y, p.z)
-			s.routeId, s.railT, s.grounded, s.clock, s.yaw = id, t0, false, 0, yaw
-			local x0, y0, z0 = s.x, s.y, s.z
-			local fx, fz = -math.sin(yaw), -math.cos(yaw)
-			local function gone(): number
-				return if up then s.y - y0 else (s.x - x0) * fx + (s.z - z0) * fz
-			end
-			local g1 = 0
-			for f = 1, math.floor(t2 * 60 + 0.5) do
-				local i = SquirrelMotor.idleInput(yaw)
-				i.fw, i.sprint = 1, true
-				i.leap = s.routeId ~= nil or (not s.grounded and f % every == 0)
-				i.grab = not s.grounded and s.routeId == nil and f % every == 0
-				SquirrelMotor.step(s, i, 1 / 60, world)
-				if f == math.floor(t1 * 60 + 0.5) then
-					g1 = gone()
+	t.test(
+		"the grab-leap cooldown: a macro's chain no faster than a person's; a person's and a climb unchanged",
+		function()
+			local function chain(
+				id: number,
+				t0: number,
+				yaw: number,
+				every: number,
+				t1: number,
+				t2: number,
+				up: boolean
+			): number
+				local r = world.registry:get(id)
+				local p = world.registry:pointAt(r, t0)
+				local s = SquirrelMotor.new(p.x, p.y, p.z)
+				s.routeId, s.railT, s.grounded, s.clock, s.yaw = id, t0, false, 0, yaw
+				local x0, y0, z0 = s.x, s.y, s.z
+				local fx, fz = -math.sin(yaw), -math.cos(yaw)
+				local function gone(): number
+					return if up then s.y - y0 else (s.x - x0) * fx + (s.z - z0) * fz
 				end
+				local g1 = 0
+				for f = 1, math.floor(t2 * 60 + 0.5) do
+					local i = SquirrelMotor.idleInput(yaw)
+					i.fw, i.sprint = 1, true
+					i.leap = s.routeId ~= nil or (not s.grounded and f % every == 0)
+					i.grab = not s.grounded and s.routeId == nil and f % every == 0
+					SquirrelMotor.step(s, i, 1 / 60, world)
+					if f == math.floor(t1 * 60 + 0.5) then
+						g1 = gone()
+					end
+				end
+				return (gone() - g1) / (t2 - t1)
 			end
-			return (gone() - g1) / (t2 - t1)
-		end
-		local function heading(id: number, t0: number): number
-			local a, b = world.registry:pointAt(world.registry:get(id), t0), world.registry:pointAt(world.registry:get(id), t0 + 0.1)
-			return math.atan2(-(b.x - a.x), -(b.z - a.z))
-		end
-		local trunk = world.registry:get(604)
-		local up0 = if world.registry:pointAt(trunk, 0).y < world.registry:pointAt(trunk, 1).y then 0.02 else 0.98
-		local cd = P.grabLeapCooldown
-		local function paces(): { number }
-			local out = {}
-			for _, every in { 2, 3, 6 } do
-				table.insert(out, chain(1075, 0.02, heading(1075, 0.02), every, 1, 9, false))
-				table.insert(out, chain(660, 0.02, heading(660, 0.02), every, 1, 9, false))
-				table.insert(out, chain(604, up0, 0, every, 0, 2.5, true))
+			local function heading(id: number, t0: number): number
+				local a, b =
+					world.registry:pointAt(world.registry:get(id), t0),
+					world.registry:pointAt(world.registry:get(id), t0 + 0.1)
+				return math.atan2(-(b.x - a.x), -(b.z - a.z))
 			end
-			return out
-		end
-		P.grabLeapCooldown = 0
-		local before = paces()
-		P.grabLeapCooldown = cd
-		local now = paces()
-		local names = { "parapet", "cable", "trunk up" }
-		for i = 1, 3 do
-			print(
-				string.format(
-					"      %-9s E+Space every 2 / 3 / 6 frames: %.1f / %.1f / %.1f st/s (no cooldown %.1f / %.1f / %.1f)",
-					names[i],
-					now[i],
-					now[3 + i],
-					now[6 + i],
-					before[i],
-					before[3 + i],
-					before[6 + i]
+			local trunk = world.registry:get(604)
+			local up0 = if world.registry:pointAt(trunk, 0).y < world.registry:pointAt(trunk, 1).y then 0.02 else 0.98
+			local cd = P.grabLeapCooldown
+			local function paces(): { number }
+				local out = {}
+				for _, every in { 2, 3, 6 } do
+					table.insert(out, chain(1075, 0.02, heading(1075, 0.02), every, 1, 9, false))
+					table.insert(out, chain(660, 0.02, heading(660, 0.02), every, 1, 9, false))
+					table.insert(out, chain(604, up0, 0, every, 0, 2.5, true))
+				end
+				return out
+			end
+			P.grabLeapCooldown = 0
+			local before = paces()
+			P.grabLeapCooldown = cd
+			local now = paces()
+			local names = { "parapet", "cable", "trunk up" }
+			for i = 1, 3 do
+				print(
+					string.format(
+						"      %-9s E+Space every 2 / 3 / 6 frames: %.1f / %.1f / %.1f st/s (no cooldown %.1f / %.1f / %.1f)",
+						names[i],
+						now[i],
+						now[3 + i],
+						now[6 + i],
+						before[i],
+						before[3 + i],
+						before[6 + i]
+					)
 				)
-			)
-			t.near(now[6 + i], before[6 + i], 0.05, `{names[i]}: a person's chain unchanged`)
-			t.truthy(now[i] <= now[6 + i] + 0.05 and now[3 + i] <= now[6 + i] + 0.05, `{names[i]}: a macro no faster`)
+				t.near(now[6 + i], before[6 + i], 0.05, `{names[i]}: a person's chain unchanged`)
+				t.truthy(
+					now[i] <= now[6 + i] + 0.05 and now[3 + i] <= now[6 + i] + 0.05,
+					`{names[i]}: a macro no faster`
+				)
+			end
+			t.truthy(before[1] > before[7] + 3, "(without it the macro was faster)")
 		end
-		t.truthy(before[1] > before[7] + 3, "(without it the macro was faster)")
-	end)
+	)
 end
