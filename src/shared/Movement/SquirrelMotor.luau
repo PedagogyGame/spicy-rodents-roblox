@@ -3004,6 +3004,10 @@ function SquirrelMotor.envelope(
 			-- within a grab, when the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
 			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
+			-- (the last grab's snap bounded by N's 3-D distance and the drawn offset: the motor takes any sample of the band,
+			-- and one nearer in 3-D than N can lie further across; a first grab's bound, validator round 17, the round-16
+			-- review's MEDIUM 1b)
+			local snap3 = 0
 			-- (a trunk's bark the last grab leaves from: its nearest sample across and the drawn pose's offset off it, 0 for
 			-- any other route)
 			local barkX, barkZ, bark = 0, 0, 0
@@ -3161,6 +3165,7 @@ function SquirrelMotor.envelope(
 				end
 				grabbedId, grabbedT = topId, sT[top]
 				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
+				snap3 = d + m
 				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
@@ -3287,7 +3292,7 @@ function SquirrelMotor.envelope(
 							gz,
 							lowY,
 							spread,
-							d + ar[f + 1],
+							snap3 + ar[f + 1],
 							{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
 						)
 						finish(s)
