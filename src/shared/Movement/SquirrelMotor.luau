@@ -2863,6 +2863,10 @@ local function envelopeCore(
 	-- a rail leaves at 0 or more). A long gap may hide a visit to a rail: only one near `next`, high enough that a launch
 	-- off it explains `next`, and reachable from the launch points by a launch and a grab (railVisit; the grab's reach
 	-- only onto another rail: on the same one it lands at the nearest point)
+	-- (a move off the rail the launch points (and in a long gap the rail-visit geometry) do not explain: "teleport", unless
+	-- in a gap of up to grabSimDt the motor's own leap off the rail and its grabs inside the gap explain it: section 5's
+	-- grab search, seeded with the leap)
+	local leftOver: { string } = {}
 	if prevRoute and not nextRoute then
 		launchUsed = true
 		judged.railLaunch = true
@@ -3063,10 +3067,10 @@ local function envelopeCore(
 			end
 		end
 		if overXZ then
-			add(out, "teleport", 1, `left the rail {nearXZ} st across from the launch point (allowed {allowXZ})`)
+			table.insert(leftOver, `left the rail {nearXZ} st across from the launch point (allowed {allowXZ})`)
 		end
 		if overUp then
-			add(out, "teleport", 1, `left the rail {next.y - topY} st over its stretch in {dt} s`)
+			table.insert(leftOver, `left the rail {next.y - topY} st over its stretch in {dt} s`)
 		end
 		if lowY - next.y > allowDown then
 			add(out, "teleport", 1, `left the rail {lowY - next.y} st down in {dt} s (allowed {allowDown})`)
@@ -3099,13 +3103,18 @@ local function envelopeCore(
 		judged.xz = launchXZ
 	end
 
-	-- 5. Off rail to off rail: ground and air motion.
+	-- 5. Off rail to off rail: ground and air motion. (Its grab search also judges a gap off a rail: section 4's
+	-- leftOver)
 	local arcVy: number? = nil
-	if not prevRoute and not nextRoute then
+	if not nextRoute then
 		local vxz = hypot2(next.vx, next.vz)
-		pounce = pounceAgo(nil)
+		if not prevRoute then
+			pounce = pounceAgo(nil)
+		end
 		-- a launch: the vertical speed rose, or a pounce the window dates (it replaces the velocity, so it may lower it)
-		local launched = not next.grounded and (next.vy > prev.vy + P.gravity * 0.5 * P.substep or pounce ~= nil)
+		local launched = not prevRoute
+			and not next.grounded
+			and (next.vy > prev.vy + P.gravity * 0.5 * P.substep or pounce ~= nil)
 		-- hidden(): a short gap (at most three motor frames) explained by grabs it hides, as the motor makes them
 		-- (validator round 7: "any sample within a grab" let a sample 8.5 st over the body beside a trunk carry it 135 st
 		-- up in 0.37 s): E in the air takes the NEAREST open rail sample within a grab of the body (Motion.nearestRoute)
@@ -3136,6 +3145,10 @@ local function envelopeCore(
 			local index = world.index :: any
 			local accept = Motion.openOnly(world)
 			local h, g = P.substep, P.gravity
+			-- (the motor's grab-and-jump cooldown after a seed's leap off the rail, owner D18: its first grab no sooner than
+			-- grabLeapCooldown after the leap, in whole steps rounded down (a frame's own length is the client's); not yet
+			-- between the air's grab-leaps, where it snapped honest climbs on uneven frames)
+			local seedWait = math.max(1, math.floor(P.grabLeapCooldown / h + 1e-6))
 			-- the body's own arc from `prev`, no grab, frame by frame (entry f + 1: after f frames), and how far across the
 			-- air's steering can have taken it off that arc. The motor's air step per frame either steers the velocity
 			-- toward a heading at moveSpeed (accelAir) or lets it coast (dragAir), or in a pounce's window keeps it: the
@@ -3155,7 +3168,47 @@ local function envelopeCore(
 			local vmax = math.max(v0, leapXZ)
 			local ax, ay, az, ar = { prev.x }, { prev.y }, { prev.z }, { 0 }
 			local lox, loy, loz, hix, hiy, hiz = prev.x, prev.y, prev.z, prev.x, prev.y, prev.z
-			do
+			-- (off a rail, section 4's gap: the motor's leap off it at the start of frame j, from its drawn pose at a
+			-- point of the stretch it ran in the frames before: within seedR[j] across of the drawn pose at `prev`, between
+			-- seedLow[j] and seedTop[j] high. The arc's entries then only bound the gather: the lowest launch point and each
+			-- frame the highest a leap at the first frame reaches, as far across as the latest launch and its flight allow;
+			-- validator round 17, the round-16 review's MEDIUM 1a. The leap's vertical speed is the motor's own, leapUp:
+			-- the server's, no claim. Out of an enclosed run's mouth, none: section 0's)
+			local leftRoute = prevRoute
+			if leftRoute and leftRoute.enclosure then
+				return false
+			end
+			local vis = if leftRoute then visualPosition(prev, world) else nil
+			local seedR, seedTop, seedLow = {}, {}, {}
+			if leftRoute and vis then
+				local cap = SquirrelMotor.routeCap(leftRoute, boosted)
+				local len = math.max(leftRoute.length, 1e-6)
+				for j = 1, frames do
+					local run = cap * E.railTol * (j - 1) * h + E.posSlack
+					local top, low, across = -math.huge, math.huge, 0
+					for k = -4, 4 do
+						local tt = math.clamp(prev.railT + run / len * k / 4, 0, 1)
+						local w = Motion.visualPose(
+							world,
+							leftRoute,
+							tt,
+							reg:pointAt(leftRoute, tt),
+							prev.trunkNormalX,
+							prev.trunkNormalZ
+						)
+						top, low = math.max(top, w.y), math.min(low, w.y)
+						across = math.max(across, hypot2(w.x - vis.x, w.z - vis.z))
+					end
+					seedR[j], seedTop[j], seedLow[j] = across + run / 4 + E.posSlack, top, low
+				end
+				local wide = seedR[frames] + leapXZ * frames * h
+				ax[1], ay[1], az[1], ar[1] = vis.x, seedLow[frames], vis.z, wide
+				for f = 1, frames do
+					ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1] = vis.x, seedTop[frames] + launchUp * f * h, vis.z, wide
+				end
+				lox, loy, loz = math.min(lox, vis.x), math.min(loy, ay[1]), math.min(loz, vis.z)
+				hix, hiy, hiz = math.max(hix, vis.x), math.max(hiy, ay[frames + 1]), math.max(hiz, vis.z)
+			else
 				local ux, uz = if v0 > 1e-6 then prev.vx / v0 else 0, if v0 > 1e-6 then prev.vz / v0 else 0
 				local held = math.max(prev.attackWindow, 0)
 				local fa, fd = 1 - (1 - math.exp(-h * P.accelAir)), math.exp(-h * P.dragAir)
@@ -3331,6 +3384,14 @@ local function envelopeCore(
 			-- within a grab, when the gather does not hold all of N's band, or past the work (fail safe)
 			local band = GS.band
 			local grabbedId, grabbedT = 0, 0 -- (the route and place of the last grab's highest sample)
+			-- (the last grab's snap across, a first grab's bound: the motor takes any sample S of the band, nearest to where
+			-- the body is, within r across of the place modelled and at its height (the arc's own), so no further from it
+			-- than N is (d + r): across, sqrt((d + r)^2 - (S's height off the body's)^2), and S's drawn offset. Not N's
+			-- distance across (one nearer in 3-D can lie further across: validator round 17, the round-16 review's MEDIUM 1b),
+			-- nor N's 3-D distance (a grab from over a rail is mostly down, and that drop let a crafted chain along a rail
+			-- claiming the air trick's swing run 3 % faster). snap3: N's 3-D distance and the drawn offset, for a grab from a
+			-- place whose height is only the highest (a leap off a rail's))
+			local snapAcross, snap3 = 0, 0
 			-- (a trunk's bark the last grab leaves from: its nearest sample across and the drawn pose's offset off it, 0 for
 			-- any other route)
 			local barkX, barkZ, bark = 0, 0, 0
@@ -3390,6 +3451,13 @@ local function envelopeCore(
 				local nx, nz = X[bi], Z[bi]
 				local top, topY = bi, Y[bi]
 				local lowY = topY
+				-- (the highest drawn: a sample's height and its route's lift, so where a trunk and a bough meet the bough's
+				-- lift is kept whichever sample is N; validator round 17)
+				local function liftOf(id: number): number
+					local it = reg:get(id)
+					return if it then drawnOf(world, it).lift else 0
+				end
+				local topDrawn = topY + liftOf(sId[bi])
 				local w2 = w * w + 1e-9
 				local nb = 0
 				local bLo, b1 = binOf(y - w), binOf(y + w)
@@ -3406,7 +3474,10 @@ local function envelopeCore(
 				-- height, so N and its neighbours. Validator round 16, the round-15 review's MEDIUM 1: the bisector test
 				-- against N alone took samples 2r along a rail, and a crafted grab-leap chain ran the governor's ceiling.
 				-- (Half a spacing off the place modelled instead of N snapped an honest grab-leap spam on a jittery link
-				-- once more in the tree fuzz.) Another route, or the same one doubled back, keeps the bisector test)
+				-- once more in the tree fuzz.) Another route, or the same one doubled back, keeps the bisector test, a
+				-- micro-stud's rounding over it: where routes meet their samples coincide but for the float sums of their
+				-- curves, and the motor's grab takes any of them (validator round 17, the round-16 review's MEDIUM 1c: N a
+				-- bough's end, the motor the trunk's top at the same point, drawn 1.5 st across)
 				local idN, tN = sId[bi], sT[bi]
 				local routeN = reg:get(idN)
 				local lenN = if routeN then routeN.length else 0
@@ -3428,16 +3499,18 @@ local function envelopeCore(
 								if sId[e] == idN and math.abs(sT[e] - tN) * lenN <= chord + spacing then
 									taken = chord * chord <= r * across + pad * chord
 								else
-									taken = d2 - best2 <= twoR * across
+									taken = d2 - best2 <= twoR * across + 1e-6
 								end
 							end
 							if taken then
 								nb += 1
 								band[nb] = e
 								local sy = Y[e]
-								if sy > topY then
-									top, topY = e, sy
-								elseif sy < lowY then
+								local drawnY = sy + (if sId[e] == sId[top] then topDrawn - topY else liftOf(sId[e]))
+								if drawnY > topDrawn then
+									top, topY, topDrawn = e, sy, drawnY
+								end
+								if sy < lowY then
 									lowY = sy
 								end
 							end
@@ -3475,6 +3548,7 @@ local function envelopeCore(
 				-- (the band's others across off N; one on another route than the highest's, its own drawn pose off it as
 				-- well)
 				local spread, lastId, lastOff = 0, -1, 0
+				local across, dr2 = 0, (d + r) ^ 2
 				for k = 1, nb do
 					local e = band[k]
 					local id = sId[e]
@@ -3485,9 +3559,14 @@ local function envelopeCore(
 					end
 					local ux, uz = X[e] - X[bi], Z[e] - Z[bi]
 					spread = math.max(spread, math.sqrt(ux * ux + uz * uz) + lastOff)
+					across = math.max(
+						across,
+						math.sqrt(math.max(0, dr2 - (Y[e] - y) ^ 2)) + (if id == topId then m else lastOff)
+					)
 				end
 				grabbedId, grabbedT = topId, sT[top]
 				local hd = math.sqrt((X[bi] - x) ^ 2 + (Z[bi] - z) ^ 2)
+				snap3, snapAcross = d + m, across
 				return px + (X[bi] - tx), topY + lift, pz + (Z[bi] - tz), lowY, hd + m, spread + doubt
 			end
 			-- the explanation kept: its last grab's clock (the earliest), the highest end, and its first grab (where the air
@@ -3513,6 +3592,7 @@ local function envelopeCore(
 				bz: number,
 				bark: number,
 				from: { clock: number, x: number, z: number, reach: number },
+				seed: boolean?, -- (a leap off the rail `prev` is on: its next grab is the first)
 			}
 			local function finish(s: Pattern)
 				local y, vy, r = s.y, s.vy, s.r
@@ -3594,34 +3674,57 @@ local function envelopeCore(
 			-- one grab: from the arc, at any frame two after the last grab the validator knows of, the earliest that explains
 			-- `next` kept
 			local level: { Pattern } = {}
-			for f = 0, frames - 1 do
-				local at = prev.clock + (f + 1) * h
-				if lastGrab == nil or at - lastGrab >= 2 * h - 1e-6 then
-					if work > E.grabWork then
-						spent = true
-						break
-					end
-					local gx, gy, gz, lowY, d, spread = grabWide(ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1])
-					if spent then
-						break
-					end
-					if gx then
-						local s = leap(
-							f,
-							at,
-							gx,
-							gy,
-							gz,
-							lowY,
-							spread,
-							d + ar[f + 1],
-							{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
-						)
-						finish(s)
-						if bestFrom then
+			if leftRoute and vis then
+				-- (off a rail: the leaps off it, a frame each, their grabs at the next level)
+				for j = 1, frames - 1 do
+					table.insert(level, {
+						f = j - 1,
+						x = vis.x,
+						y = seedTop[j],
+						z = vis.z,
+						vy = P.leapUp,
+						r = seedR[j],
+						drop = seedTop[j] - seedLow[j],
+						last = prev.clock,
+						route = leftRoute.id,
+						snap = seedR[j] + hypot2(vis.x - prev.x, vis.z - prev.z),
+						bx = 0,
+						bz = 0,
+						bark = 0,
+						from = { clock = prev.clock + (j - 1) * h, x = vis.x, z = vis.z, reach = seedR[j] },
+						seed = true,
+					})
+				end
+			else
+				for f = 0, frames - 1 do
+					local at = prev.clock + (f + 1) * h
+					if lastGrab == nil or at - lastGrab >= 2 * h - 1e-6 then
+						if work > E.grabWork then
+							spent = true
 							break
 						end
-						table.insert(level, s)
+						local gx, gy, gz, lowY, d, spread = grabWide(ax[f + 1], ay[f + 1], az[f + 1], ar[f + 1])
+						if spent then
+							break
+						end
+						if gx then
+							local s = leap(
+								f,
+								at,
+								gx,
+								gy,
+								gz,
+								lowY,
+								spread,
+								snapAcross,
+								{ clock = at, x = gx, z = gz, reach = d + 2 * ar[f + 1] + spread }
+							)
+							finish(s)
+							if bestFrom then
+								break
+							end
+							table.insert(level, s)
+						end
 					end
 				end
 			end
@@ -3646,7 +3749,7 @@ local function envelopeCore(
 				for _, s in level do
 					local y, vy, r = s.y, s.vy, s.r
 					for f = s.f, frames - 1 do
-						if f > s.f then
+						if f > s.f and (not s.seed or f >= s.f + seedWait) then
 							if work > E.grabWork then
 								spent = true
 								break
@@ -3656,8 +3759,17 @@ local function envelopeCore(
 								break
 							end
 							if gx then
-								local more =
-									leap(f, prev.clock + (f + 1) * h, gx, gy, gz, lowY, spread, s.snap + d, s.from)
+								local more = leap(
+									f,
+									prev.clock + (f + 1) * h,
+									gx,
+									gy,
+									gz,
+									lowY,
+									spread,
+									s.snap + (if s.seed then snap3 else d),
+									s.from
+								)
 								local key = (f * 131072 + grabbedId) * 65536 + math.floor(grabbedT * 65535 + 0.5)
 								local was = same[key]
 								if was then
@@ -3834,208 +3946,237 @@ local function envelopeCore(
 				end
 			end
 		end
-		local fromGroundOrRail = false
-		local capUp = launchUp
-		local capXZ = groundCap
-		if launched then
-			launchUsed = true
-			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
-			-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
-			-- than that leap rises over that floor in the time left (landedIn)
-			local function railVisit(): boolean
-				return if shortGap then hidden() else longVisit()
+		if prevRoute then
+			-- (section 4: a gap off the rail the launch points do not explain is, up to grabSimDt, the motor's leap off it
+			-- and its grabs inside the gap, or a teleport; validator round 17, the round-16 review's MEDIUM 1a: a packet that
+			-- left a bough and grabbed again inside three frames had no hidden grab; at 0.08-0.1 s packets the same off the
+			-- climb's first trunk)
+			if #leftOver > 0 and not grasped() then
+				for _, why in leftOver do
+					add(out, "teleport", 1, why)
+				end
 			end
-			local offGround = landedIn(true)
-			fromGroundOrRail = offGround or railVisit()
-			-- (what the meter pays: a launch off the ground, or a pounce anywhere off a rail, as the motor's doLeap and
-			-- doPounce charge; none for a bounce. Validator round 14, the round-13 review's HIGH 1: a rail launch is free
-			-- only where the server itself puts the body on the rail: in a short gap the motor's own grab stepped from the
-			-- last accepted place (hidden()); a long gap's visit (a rail near the line and over `next`) explains the launch
-			-- but earns nothing: a leap off the ground, charged, its flight no free one)
-			if not tramp and (prev.grounded or not grasped()) then
-				judged.charge = if pounce ~= nil then "pounce" else "leap"
-			elseif not prev.grounded and grasped() and pounce == nil then
-				-- (a pounce off the rail is free but no rail leap's flight: validator round 15, the round-14 review's LOW d)
+		else
+			local fromGroundOrRail = false
+			local capUp = launchUp
+			local capXZ = groundCap
+			if launched then
+				launchUsed = true
+				-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
+				-- the ground within the gap may have landed and leapt again in it (Space held through a landing), no higher
+				-- than that leap rises over that floor in the time left (landedIn)
+				local function railVisit(): boolean
+					return if shortGap then hidden() else longVisit()
+				end
+				local offGround = landedIn(true)
+				fromGroundOrRail = offGround or railVisit()
+				-- (what the meter pays: a launch off the ground, or a pounce anywhere off a rail, as the motor's doLeap and
+				-- doPounce charge; none for a bounce. Validator round 14, the round-13 review's HIGH 1: a rail launch is free
+				-- only where the server itself puts the body on the rail: in a short gap the motor's own grab stepped from the
+				-- last accepted place (hidden()); a long gap's visit (a rail near the line and over `next`) explains the launch
+				-- but earns nothing: a leap off the ground, charged, its flight no free one)
+				if not tramp and (prev.grounded or not grasped()) then
+					judged.charge = if pounce ~= nil then "pounce" else "leap"
+				elseif not prev.grounded and grasped() and pounce == nil then
+					-- (a pounce off the rail is free but no rail leap's flight: validator round 15, the round-14 review's LOW d)
+					judged.railLaunch = true
+				end
+				capUp = if fromGroundOrRail then launchUp else pounceUp
+				capXZ = if fromGroundOrRail then launchXZ else pounceXZ
+				if tramp then
+					capUp = math.max(capUp, trampUp)
+					capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
+				end
+				if next.vy > capUp then
+					add(out, "launch", 1, `vertical launch {next.vy} st/s (cap {capUp})`)
+				end
+				if vxz > capXZ then
+					add(out, "launch", 1, `horizontal launch {vxz} st/s (cap {capXZ})`)
+				end
+				-- every launch (a leap, a pounce, a drop, a bounce) starts going up: by the end of the gap gravity has taken at
+				-- most the gap's worth of it (a launch claimed on a fall is a fall)
+				if next.vy < -P.gravity * dt - gEps then
+					add(out, "launch", 1, `a launch ending at vy {next.vy} in {dt} s`)
+				end
+				-- with nothing within reach to push off, only the motor's pounce launches, and it shows in the window
+				if not fromGroundOrRail and not tramp and pounce == nil then
+					add(out, "launch", 1, `a launch in the air (vy {prev.vy} -> {next.vy}) that is no pounce`)
+				end
+			else
+				if vxz > groundCap then
+					add(out, "speed", math.min(1, vxz / groundCap - 1), `horizontal speed {vxz} st/s (cap {groundCap})`)
+				end
+				-- gravity: airborne at both ends and no launch -> vy drops by exactly g*dt (semi-implicit
+				-- Euler, down to the terminal speed) unless a rail within reach could have been visited in between
+				if not prev.grounded and not next.grounded then
+					local expected = math.max(prev.vy - P.gravity * dt, -P.terminalFall)
+					if math.abs(next.vy - expected) <= gEps then
+						-- a plain arc: the height follows the vertical speed between the two (a body that claims to fall but
+						-- keeps its height is flying), unless a rail it could have visited in between explains it. Stepped
+						-- semi-implicitly (and held at the terminal speed), an arc rises a little less than the mean of its end
+						-- speeds times the gap, rising or falling: no more than that, never a floor at 0 (a falling arc may
+						-- not rise at all)
+						local hi = (prev.vy + next.vy) / 2 * dt + E.posSlack + gEps * dt
+						local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
+						local dy = next.y - prev.y
+						local function visited(): boolean
+							return if shortGap then hidden() else longVisit()
+						end
+						if (dy > hi and not visited()) or (dy < lo and not plausible()) then
+							add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
+						end
+						arcVy = expected
+						-- (and its height, when the arc explained it: no higher than the arc itself, so the slack each packet
+						-- may take never adds up to a slower fall or a higher apex; round 4: a greedy adversary rose a leap's
+						-- apex and the slack of every packet on the way up)
+						if dy <= hi then
+							judged.y = math.min(next.y, prev.y + (prev.vy + next.vy) / 2 * dt + 1e-3)
+						end
+					elseif next.vy >= -P.gravity * dt - gEps and next.vy <= gEps and landedIn(false) then
+						-- (a body that came down on something inside the gap and went off its edge falls from rest, from no
+						-- higher than that floor)
+						judged.landed = true
+					elseif not (if shortGap then hidden() else longVisit()) then
+						-- (a pounce is a launch above; a rail visit zeroes the speed and relaunches it)
+						add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
+					end
+				end
+			end
+			-- horizontal displacement against the fastest plausible speed
+			local dxz = hypot2(next.x - prev.x, next.z - prev.z)
+			local fastest = math.max(groundCap, if launched then launchXZ else 0, hypot2(prev.vx, prev.vz) * E.speedTol)
+			local allowedXZ = fastest * dt + E.posSlack
+			-- (a launch the grab search explains is across where the motor's grab and leap put it: validator round 15, the
+			-- round-14 review's MEDIUM 4, E+Space beside a rail was a "teleport" by the grab's snap onto it)
+			if
+				dxz > allowedXZ
+				and not (not shortGap and plausible() and dxz <= allowedXZ + C.airGrab)
+				and not (launched and grasped())
+			then
+				add(out, "teleport", math.min(1, dxz / allowedXZ - 1), `moved {dxz} st in {dt} s (allowed {allowedXZ})`)
+			end
+			-- vertical displacement: within what the start and end vertical speeds allow
+			local dy = next.y - prev.y
+			-- (rising at the higher end speed, no higher than its own apex: gravity takes it)
+			local up = math.max(prev.vy, next.vy, 0)
+			local upCap = math.min(up * dt, up * up / (2 * P.gravity)) + E.posSlack
+			if launched then
+				-- a launch inside the gap rises what the body rose before it at its earlier speed and what the launch, ending
+				-- at the speed it shows, rose after it: (u^2 - v^2) / 2g, u the launch's own speed (the pounce's, which the
+				-- window dates; else no more than gravity takes in the gap above the speed now, and never above the cap). A
+				-- long gap may hide a landing before it, or from the ground a whole leap onto a ledge (ledge to ledge): only
+				-- where landedIn finds that floor, and in the time the fall or the leap onto it left. (Not the launch speed
+				-- over the gap for every launch: a launch every packet climbed at a leap's speed for as long as it liked; nor
+				-- a whole apex added to every launch from the ground: round 4's greedy adversary claimed two leaps' height in
+				-- one packet every half second, from flat ground onto a 14-stud roof)
+				local v = math.max(next.vy, 0)
+				local u =
+					math.min(capUp, if pounce then next.vy + P.gravity * pounce else next.vy + P.gravity * dt + gEps)
+				local rise = if u > v then (u * u - v * v) / (2 * P.gravity) else 0
+				-- (before the launch, rising at its judged speed: no higher than that speed's own apex; round 4: the speed
+				-- over the whole gap let a launch every packet off a rail "within reach" claim 30 st/s and climb 17 st a packet)
+				local up0 = math.max(prev.vy, 0)
+				local before = math.min(up0 * dt, up0 * up0 / (2 * P.gravity))
+				if pounce and prev.grounded then
+					-- (a pounce in the air after a leap off the ground inside the gap: the leap rose for the time before it)
+					local t1 = math.min(math.max(0, dt - pounce) + E.gravityEps, launchUp / P.gravity)
+					rise += launchUp * t1 - 0.5 * P.gravity * t1 * t1
+				end
+				upCap = before + rise + E.posSlack
+				if
+					dy > upCap
+					and fromGroundOrRail
+					and not shortGap
+					and (if prev.grounded then landedIn(true, launchUp) else landedIn(true))
+				then
+					upCap = dy
+				end
+				if dy > upCap and fromGroundOrRail and not shortGap and longVisit() then
+					-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
+					-- the grab having carried the body up to the rail; in a short gap the grab is the motor's own: hidden)
+					upCap = before + math.max(rise, launchUp * dt) + E.posSlack
+				end
+			end
+			-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
+			-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
+			-- speed nor a landing; the duel pounces every second, and one in about thirty was snapped. Such a gap holds a
+			-- launch only if the end speed is one gravity could have brought a launch down to inside the gap, and the rise
+			-- is what that launch, ending at that speed, could make: (u^2 - v^2) / 2g, u the launch speed. It counts as the
+			-- launch, so the next packet cannot claim a second one stacked on it from a "ground" far below)
+			if not launched and prev.grounded and not next.grounded and dy > upCap then
+				if next.vy >= -P.gravity * dt - gEps then
+					local u = math.min(launchUp, next.vy + P.gravity * dt + gEps)
+					local rise = (u * u - next.vy * next.vy) / (2 * P.gravity)
+					if u > 0 and dy <= rise + E.posSlack then
+						upCap = dy
+						launchUsed = true
+						judged.charge = "leap"
+					end
+				end
+			end
+			local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
+			if prev.grounded then
+				-- (the ground glue carried a grounded body down each frame before it left the ground: off a bough's round
+				-- cylinder, down a kerb; validator round 7, a walk along a bough after a drop)
+				-- (validator round 8, the round-7 review's LOW: never more than a body that kept the ground could follow down
+				-- in the gap: the ground's slope over the distance moved, and one kerb; a frame's allowance each was 22.5 st
+				-- beyond gravity in a 0.5 s gap)
+				downCap -= math.min(
+					frames * math.max(P.glueMin, P.glueSlope * groundCap * P.substep),
+					P.glueMin + P.glueSlope * hypot2(next.x - prev.x, next.z - prev.z)
+				)
+			end
+			if dy > upCap or dy < downCap then
+				-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
+				local landing = next.grounded and math.abs(dy) <= Units.st(1.4)
+				local railVisit = not shortGap
+					and plausible()
+					and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
+					and (dy <= 0 or longVisit())
+				if not landing and not railVisit and (dy > 0 or launched) and hidden() then
+					-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden; down too, a grab's snap
+					-- onto a lower sample: validator round 15)
+					railVisit = true
+				end
+				if not landing and not railVisit then
+					add(out, "teleport", 1, `vertical move {dy} st in {dt} s`)
+				end
+			end
+			-- walls: the straight move must not cross a collider
+			-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall: never
+			-- higher than the highest launch here reaches, whatever speeds the packets claim)
+			local apexUp = if tramp then math.max(launchUp, trampUp) else launchUp
+			local rise =
+				math.min(math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt, apexUp * apexUp / (2 * P.gravity))
+			wallTest(prev.x, prev.y, prev.z, rise, false)
+			-- what the validator keeps: no vertical speed on the ground, gravity's after a plain arc, else the claim within
+			-- the bounds it was judged against (every way into the air leaves at 0 or more: a fall the gap cannot explain is
+			-- none); the horizontal cap it was judged against
+			-- (a packet the grab search explained with no launch seen, the motor's grab-leap chain sent in phase with its
+			-- grabs: each packet ends a frame after a leap, at the vertical speed of the last. A launch off the rail the
+			-- search grabbed all the same, free, for the meter and the speed kept, its flight from the first grab, when the
+			-- vertical speed is a leap's at the search's last grab, gravity since; validator round 17, the round-16
+			-- review's LOW 3)
+			local grabAt = judged.grab
+			if
+				grabAt
+				and not launched
+				and not prev.grounded
+				and pounce == nil
+				and next.vy >= P.leapUp - P.gravity * (next.clock - grabAt) - gEps
+			then
+				launchUsed = true
 				judged.railLaunch = true
 			end
-			capUp = if fromGroundOrRail then launchUp else pounceUp
-			capXZ = if fromGroundOrRail then launchXZ else pounceXZ
-			if tramp then
-				capUp = math.max(capUp, trampUp)
-				capXZ = math.max(capXZ, hypot2(prev.vx, prev.vz) * E.speedTol + Trampoline.C.push * E.launchTol)
+			if next.grounded then
+				judged.vy = 0
+			elseif arcVy then
+				judged.vy = arcVy :: number
+			else
+				judged.vy = math.clamp(next.vy, -P.gravity * dt - gEps, math.max(capUp, prev.vy, 0))
 			end
-			if next.vy > capUp then
-				add(out, "launch", 1, `vertical launch {next.vy} st/s (cap {capUp})`)
-			end
-			if vxz > capXZ then
-				add(out, "launch", 1, `horizontal launch {vxz} st/s (cap {capXZ})`)
-			end
-			-- every launch (a leap, a pounce, a drop, a bounce) starts going up: by the end of the gap gravity has taken at
-			-- most the gap's worth of it (a launch claimed on a fall is a fall)
-			if next.vy < -P.gravity * dt - gEps then
-				add(out, "launch", 1, `a launch ending at vy {next.vy} in {dt} s`)
-			end
-			-- with nothing within reach to push off, only the motor's pounce launches, and it shows in the window
-			if not fromGroundOrRail and not tramp and pounce == nil then
-				add(out, "launch", 1, `a launch in the air (vy {prev.vy} -> {next.vy}) that is no pounce`)
-			end
-		else
-			if vxz > groundCap then
-				add(out, "speed", math.min(1, vxz / groundCap - 1), `horizontal speed {vxz} st/s (cap {groundCap})`)
-			end
-			-- gravity: airborne at both ends and no launch -> vy drops by exactly g*dt (semi-implicit
-			-- Euler, down to the terminal speed) unless a rail within reach could have been visited in between
-			if not prev.grounded and not next.grounded then
-				local expected = math.max(prev.vy - P.gravity * dt, -P.terminalFall)
-				if math.abs(next.vy - expected) <= gEps then
-					-- a plain arc: the height follows the vertical speed between the two (a body that claims to fall but
-					-- keeps its height is flying), unless a rail it could have visited in between explains it. Stepped
-					-- semi-implicitly (and held at the terminal speed), an arc rises a little less than the mean of its end
-					-- speeds times the gap, rising or falling: no more than that, never a floor at 0 (a falling arc may
-					-- not rise at all)
-					local hi = (prev.vy + next.vy) / 2 * dt + E.posSlack + gEps * dt
-					local lo = math.min(prev.vy, next.vy) * dt - E.posSlack - gEps * dt
-					local dy = next.y - prev.y
-					local function visited(): boolean
-						return if shortGap then hidden() else longVisit()
-					end
-					if (dy > hi and not visited()) or (dy < lo and not plausible()) then
-						add(out, "gravity", 1, `rose {dy} st in {dt} s on an arc from vy {prev.vy} to {next.vy}`)
-					end
-					arcVy = expected
-					-- (and its height, when the arc explained it: no higher than the arc itself, so the slack each packet
-					-- may take never adds up to a slower fall or a higher apex; round 4: a greedy adversary rose a leap's
-					-- apex and the slack of every packet on the way up)
-					if dy <= hi then
-						judged.y = math.min(next.y, prev.y + (prev.vy + next.vy) / 2 * dt + 1e-3)
-					end
-				elseif next.vy >= -P.gravity * dt - gEps and next.vy <= gEps and landedIn(false) then
-					-- (a body that came down on something inside the gap and went off its edge falls from rest, from no
-					-- higher than that floor)
-					judged.landed = true
-				elseif not (if shortGap then hidden() else longVisit()) then
-					-- (a pounce is a launch above; a rail visit zeroes the speed and relaunches it)
-					add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
-				end
-			end
+			judged.xz = capXZ
 		end
-		-- horizontal displacement against the fastest plausible speed
-		local dxz = hypot2(next.x - prev.x, next.z - prev.z)
-		local fastest = math.max(groundCap, if launched then launchXZ else 0, hypot2(prev.vx, prev.vz) * E.speedTol)
-		local allowedXZ = fastest * dt + E.posSlack
-		-- (a launch the grab search explains is across where the motor's grab and leap put it: validator round 15, the
-		-- round-14 review's MEDIUM 4, E+Space beside a rail was a "teleport" by the grab's snap onto it)
-		if
-			dxz > allowedXZ
-			and not (not shortGap and plausible() and dxz <= allowedXZ + C.airGrab)
-			and not (launched and grasped())
-		then
-			add(out, "teleport", math.min(1, dxz / allowedXZ - 1), `moved {dxz} st in {dt} s (allowed {allowedXZ})`)
-		end
-		-- vertical displacement: within what the start and end vertical speeds allow
-		local dy = next.y - prev.y
-		-- (rising at the higher end speed, no higher than its own apex: gravity takes it)
-		local up = math.max(prev.vy, next.vy, 0)
-		local upCap = math.min(up * dt, up * up / (2 * P.gravity)) + E.posSlack
-		if launched then
-			-- a launch inside the gap rises what the body rose before it at its earlier speed and what the launch, ending
-			-- at the speed it shows, rose after it: (u^2 - v^2) / 2g, u the launch's own speed (the pounce's, which the
-			-- window dates; else no more than gravity takes in the gap above the speed now, and never above the cap). A
-			-- long gap may hide a landing before it, or from the ground a whole leap onto a ledge (ledge to ledge): only
-			-- where landedIn finds that floor, and in the time the fall or the leap onto it left. (Not the launch speed
-			-- over the gap for every launch: a launch every packet climbed at a leap's speed for as long as it liked; nor
-			-- a whole apex added to every launch from the ground: round 4's greedy adversary claimed two leaps' height in
-			-- one packet every half second, from flat ground onto a 14-stud roof)
-			local v = math.max(next.vy, 0)
-			local u = math.min(capUp, if pounce then next.vy + P.gravity * pounce else next.vy + P.gravity * dt + gEps)
-			local rise = if u > v then (u * u - v * v) / (2 * P.gravity) else 0
-			-- (before the launch, rising at its judged speed: no higher than that speed's own apex; round 4: the speed
-			-- over the whole gap let a launch every packet off a rail "within reach" claim 30 st/s and climb 17 st a packet)
-			local up0 = math.max(prev.vy, 0)
-			local before = math.min(up0 * dt, up0 * up0 / (2 * P.gravity))
-			if pounce and prev.grounded then
-				-- (a pounce in the air after a leap off the ground inside the gap: the leap rose for the time before it)
-				local t1 = math.min(math.max(0, dt - pounce) + E.gravityEps, launchUp / P.gravity)
-				rise += launchUp * t1 - 0.5 * P.gravity * t1 * t1
-			end
-			upCap = before + rise + E.posSlack
-			if
-				dy > upCap
-				and fromGroundOrRail
-				and not shortGap
-				and (if prev.grounded then landedIn(true, launchUp) else landedIn(true))
-			then
-				upCap = dy
-			end
-			if dy > upCap and fromGroundOrRail and not shortGap and longVisit() then
-				-- (a rail within reach: a leap may have caught it inside the gap and the launch seen be the drop off it,
-				-- the grab having carried the body up to the rail; in a short gap the grab is the motor's own: hidden)
-				upCap = before + math.max(rise, launchUp * dt) + E.posSlack
-			end
-		end
-		-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
-		-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
-		-- speed nor a landing; the duel pounces every second, and one in about thirty was snapped. Such a gap holds a
-		-- launch only if the end speed is one gravity could have brought a launch down to inside the gap, and the rise
-		-- is what that launch, ending at that speed, could make: (u^2 - v^2) / 2g, u the launch speed. It counts as the
-		-- launch, so the next packet cannot claim a second one stacked on it from a "ground" far below)
-		if not launched and prev.grounded and not next.grounded and dy > upCap then
-			if next.vy >= -P.gravity * dt - gEps then
-				local u = math.min(launchUp, next.vy + P.gravity * dt + gEps)
-				local rise = (u * u - next.vy * next.vy) / (2 * P.gravity)
-				if u > 0 and dy <= rise + E.posSlack then
-					upCap = dy
-					launchUsed = true
-					judged.charge = "leap"
-				end
-			end
-		end
-		local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
-		if prev.grounded then
-			-- (the ground glue carried a grounded body down each frame before it left the ground: off a bough's round
-			-- cylinder, down a kerb; validator round 7, a walk along a bough after a drop)
-			-- (validator round 8, the round-7 review's LOW: never more than a body that kept the ground could follow down
-			-- in the gap: the ground's slope over the distance moved, and one kerb; a frame's allowance each was 22.5 st
-			-- beyond gravity in a 0.5 s gap)
-			downCap -= math.min(
-				frames * math.max(P.glueMin, P.glueSlope * groundCap * P.substep),
-				P.glueMin + P.glueSlope * hypot2(next.x - prev.x, next.z - prev.z)
-			)
-		end
-		if dy > upCap or dy < downCap then
-			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
-			local landing = next.grounded and math.abs(dy) <= Units.st(1.4)
-			local railVisit = not shortGap
-				and plausible()
-				and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
-				and (dy <= 0 or longVisit())
-			if not landing and not railVisit and (dy > 0 or launched) and hidden() then
-				-- (a short gap hides a grab and a leap all the same, as the motor makes them: hidden; down too, a grab's snap
-				-- onto a lower sample: validator round 15)
-				railVisit = true
-			end
-			if not landing and not railVisit then
-				add(out, "teleport", 1, `vertical move {dy} st in {dt} s`)
-			end
-		end
-		-- walls: the straight move must not cross a collider
-		-- (with the higher end and how far over it the arc could have risen, so a leap over a fence is no wall: never
-		-- higher than the highest launch here reaches, whatever speeds the packets claim)
-		local apexUp = if tramp then math.max(launchUp, trampUp) else launchUp
-		local rise =
-			math.min(math.max(prev.vy, 0) ^ 2 / (2 * P.gravity) + launchUp * dt, apexUp * apexUp / (2 * P.gravity))
-		wallTest(prev.x, prev.y, prev.z, rise, false)
-		-- what the validator keeps: no vertical speed on the ground, gravity's after a plain arc, else the claim within
-		-- the bounds it was judged against (every way into the air leaves at 0 or more: a fall the gap cannot explain is
-		-- none); the horizontal cap it was judged against
-		if next.grounded then
-			judged.vy = 0
-		elseif arcVy then
-			judged.vy = arcVy :: number
-		else
-			judged.vy = math.clamp(next.vy, -P.gravity * dt - gEps, math.max(capUp, prev.vy, 0))
-		end
-		judged.xz = capXZ
 	end
 	if nextRoute then
 		-- (on a rail the motor's velocity is zero: the rail's own pace is judged by its parameter)
