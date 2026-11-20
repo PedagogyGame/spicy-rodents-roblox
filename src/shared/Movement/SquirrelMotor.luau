@@ -1157,6 +1157,20 @@ function SquirrelMotor.reaim(state: State, wantYaw: number?, wantReach: number?,
 	state.aimYaw, state.aimReach = ny, ne
 end
 
+-- SquirrelMotor.freshMove(prev, next, kind): `next` claims a move of `kind` pressed after `prev` (a new one, not the one
+-- `prev` had playing): its press, dated by its time left, later than `prev`'s (a move's time runs down with the clock, so
+-- the same move has no more left than `prev`'s less the gap). Pure; the envelope and the validator's meter use it.
+function SquirrelMotor.freshMove(prev: State, next: State, kind: number): boolean
+	local nt = next.trickTime or 0
+	if next.trickKind ~= kind or nt <= 0 then
+		return false
+	end
+	if prev.trickKind ~= kind then
+		return true
+	end
+	return nt > (prev.trickTime or 0) - (next.clock - prev.clock) + 1e-4
+end
+
 -- SquirrelMotor.unaim(s, toYaw, toReach): a copy of `s` with its velocity as a re-aim at (toYaw, toReach) would have
 -- left it: the step reaim takes undone (the turn back, the scale back at the most a press may reach, the vertical
 -- speed given back). Pure; the envelope judges a re-aimed flight by it (0c).
@@ -4030,14 +4044,15 @@ function SquirrelMotor.envelope(
 	lastGrab: number?
 ): ({ Violation }, boolean, number?, Judged)
 	local pYaw, pReach = prev.aimYaw or 0, prev.aimReach or 0
-	local fresh = next.trickKind == 2 and (prev.trickKind ~= 2 or (next.trickTime or 0) > (prev.trickTime or 0) + 1e-6)
-	if fresh then
+	if SquirrelMotor.freshMove(prev, next, 2) then
 		pYaw, pReach = 0, 0
 	end
 	local nYaw, nReach = next.aimYaw or 0, next.aimReach or 0
 	local trick: { Violation } = {}
 	local judgedNext = next
-	if nYaw ~= pYaw or nReach ~= pReach then
+	-- (on its footing, or with no move, a body has no re-aim (fieldCheck): the flight ended in the gap)
+	local inFlight = not next.grounded and next.routeId == nil and next.trickKind ~= 0
+	if inFlight and (nYaw ~= pYaw or nReach ~= pReach) then
 		if prev.trickKind ~= 2 and next.trickKind ~= 2 then
 			add(trick, "trick", 1, "a re-aim with no wiggle")
 		end
@@ -4048,9 +4063,7 @@ function SquirrelMotor.envelope(
 		then
 			add(trick, "trick", 1, `re-aimed {nYaw - pYaw} rad and {nReach - pReach} in {dt} s`)
 		end
-		if not next.grounded and next.routeId == nil and next.trickKind ~= 0 then
-			judgedNext = SquirrelMotor.unaim(next, pYaw, pReach)
-		end
+		judgedNext = SquirrelMotor.unaim(next, pYaw, pReach)
 	end
 	local out, used, pounce, judged = envelopeCore(prev, judgedNext, dt, world, boosted, lastGrab)
 	for _, v in trick do

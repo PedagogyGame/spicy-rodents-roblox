@@ -1541,10 +1541,15 @@ function MoveValidator._stamina(
 	-- roll's length from its press, dated within the packet: the motor's carry along the ground
 	local trickScale, trickOut = 1, 1
 	if not exempt then
-		local freshWiggle = next.trickKind == 2 and (prev.trickKind ~= 2 or next.trickTime > prev.trickTime + 1e-6)
-		local freshRoll = next.trickKind == 1 and (prev.trickKind ~= 1 or next.trickTime > prev.trickTime + 1e-6)
+		local freshWiggle = SquirrelMotor.freshMove(prev, next, 2)
+		local freshRoll = SquirrelMotor.freshMove(prev, next, 1)
 		if unjudged then
 			marks.trickArmed, marks.rollArmed = true, true
+		end
+		if launched or grabFrom then
+			-- (a launch in the gap, off the ground, a rail or a grab the envelope explained: a new flight, begun after `prev`)
+			marks.trickArmed = true
+			marks.footClock = math.max(marks.footClock or -math.huge, prev.clock)
 		end
 		if freshWiggle then
 			if marks.stamina > 0 then
