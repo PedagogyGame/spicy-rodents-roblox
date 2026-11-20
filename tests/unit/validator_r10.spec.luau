@@ -25,6 +25,7 @@
 --   meter        an endless sprint hidden in gaps (one packet every 0.55 to 1.0 s): snapped for the meter or the gaps
 -- About 20 s (`lune run tests/run.luau validator_r10`); the rail slab cases need build/Town.rbxm (bake first).
 local fs = require("@lune/fs")
+local process = require("@lune/process")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SquirrelWire = require("@shared/Movement/SquirrelWire")
 local BakedWorld = require("@tests/lib/BakedWorld")
@@ -504,9 +505,11 @@ return function(t)
 			end)
 			local drops, flagged = 0, 0
 			local examples = {}
-			for i = 1, #routes, 4 do
+			-- (SPICY_RAILSLAB_ALL=1: every route at three points, the sweep the fix is measured with: 12,195 drops)
+			local all = process.env.SPICY_RAILSLAB_ALL == "1"
+			for i = 1, #routes, if all then 1 else 4 do
 				local r = routes[i]
-				for _, at in { 0.3, 0.7 } do
+				for _, at in if all then { 0.2, 0.5, 0.8 } else { 0.3, 0.7 } do
 					for _, hold in { 0, 0.3, 0.5 } do
 						drops += 1
 						local q = bw.registry:pointAt(r, at)
@@ -550,8 +553,9 @@ return function(t)
 			for _, e in examples do
 				print(`        {e}`)
 			end
-			-- (one known pre-existing case, both ends off the rails: trunk 1210 at 0.8, a 0.27 st step down a flare)
-			t.truthy(flagged <= 1, `honest drops flagged for a slab ({flagged})`)
+			-- (validator round 11: the one pre-existing case, trunk 1210 at 0.8, on a bough inside its trunk part's box, is
+			-- gone: slab() looks past the rails' own props)
+			t.eq(flagged, 0, `honest drops flagged for a slab ({flagged})`)
 		end
 	)
 

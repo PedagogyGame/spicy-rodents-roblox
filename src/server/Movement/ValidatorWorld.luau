@@ -60,7 +60,9 @@ local GroundPlate = Import.shared("World/GroundPlate") :: typeof(require("../../
 
 local ValidatorWorld = {}
 
-export type Ray = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number) -> boolean
+-- (`kind`: the stop rule the ray runs by instead of its own, for the cover ray: "rail", railSlab's column; a ray over no
+-- parts ignores it)
+export type Ray = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?) -> boolean
 
 ValidatorWorld.C = table.freeze({
 	-- the body's core height over the feet (ClientWorld.STEP + PROBE_RADIUS: the narrow probe's centre)
@@ -129,11 +131,16 @@ ValidatorWorld.C = table.freeze({
 	-- ... and the most wall rays one such search casts before a leg (the cost bound: the legs tried in order, the cheap
 	-- L-shaped ways first; a way not reached in it is none). A leg is at most ceil(AROUND_GAP / MAX_CHORD) chords
 	AROUND_RAYS = 360,
+	-- ... and the most wall rays the ways round of one actor's packets and root may cast in a second (MoveValidator.budgeted
+	-- refills a pool of it at that rate, up to that much; validator round 11): four of the dearest searches, where honest
+	-- play on the lossy links measured spent at most 275 in any second (round a house, 0.65 to 0.8 s bursts)
+	AROUND_BUDGET = 1500,
 	-- studs: how near a rail a body must get to take it (railReach; Routes/Motion.C.airGrab, 3.4 st)
 	RAIL_GRAB = 3.4,
-	-- studs under a rail's centreline a move with one end on the rail is slab-judged from (railSlab; validator round 10:
-	-- a bridge's deck, a wire's or a branch's own parts, are the rail's)
-	RAIL_CLEAR = 0.5,
+	-- the props the rails are made of (railSlab's stop rule, "rail": validator round 11): a part whose parent's name starts
+	-- with one of these is a rail's own (a tree's trunk and boughs, a pole, a wire's mast, a pipe, a fence's rails and
+	-- panels: solid columns and bars, nothing to hide in), never a slab a move off a rail went through
+	RAIL_PROPS = table.freeze({ "Tree_", "Pole_", "Wire_", "Pipe_", "Fence_" }),
 	-- floorUnder's bisection: the most rays, and the height it stops at
 	FLOOR_RAYS = 14,
 	FLOOR_STEP = 0.05,
@@ -147,10 +154,18 @@ end
 
 -- stops(kind, name, parentName): does a ray of `kind` stop at a colliding part (in the squirrel's collision group) of
 -- this name under a parent of this name? "floor": every one (the client's ground stands on a bough's cylinder); "wall"
--- and "cover": not a tree's bough cylinders (no wall for the client's motor; a bough over a wall is no roof).
+-- and "cover": not a tree's bough cylinders (no wall for the client's motor; a bough over a wall is no roof); "rail"
+-- (railSlab's column, validator round 11): not the props the rails are made of either (C.RAIL_PROPS).
 function ValidatorWorld.stops(kind: string, name: string, parentName: string): boolean
 	if kind == "floor" then
 		return true
+	end
+	if kind == "rail" then
+		for _, prefix in C.RAIL_PROPS do
+			if string.sub(parentName, 1, #prefix) == prefix then
+				return false
+			end
+		end
 	end
 	return not ValidatorWorld.isBough(name, parentName)
 end
@@ -364,14 +379,20 @@ end
 -- No way longer than `path` (studs: what the body could have run in the time; validator round 10) is tried.
 -- A line longer than `maxLen` (default C.AROUND_MAX) is not asked (true: a gap's third, as before; invariant E keeps it
 -- from the held place). Cost: only for a line already through a wall; legs started while fewer than C.AROUND_RAYS
--- wall rays are cast, each at most ceil(maxLen / C.MAX_CHORD) chords and C.COVER_WALLS covers
+-- wall rays are cast, each at most ceil(maxLen / C.MAX_CHORD) chords and C.COVER_WALLS covers. `pool` (validator round
+-- 11, the round-10 review's LOW: a contrived client could make a few thousand rays a second): the wall rays the actor
+-- being judged has left (MoveValidator.budgeted fills it per actor, C.AROUND_BUDGET a second); a call casts no more than
+-- it holds (a leg started under it may finish past it) and takes what it cast; an empty pool tries no way (none found)
 function ValidatorWorld.around(
 	wall: Ray,
 	down: Ray?,
-	maxLen: number?
+	maxLen: number?,
+	pool: { left: number }?
 ): (number, number, number, number, number, number?, number?, number?, number?) -> boolean
-	-- (the wall rays one call has cast: no leg starts past C.AROUND_RAYS, a way not tried is none)
+	-- (the wall rays one call has cast: no leg starts past `cap`, C.AROUND_RAYS or what the pool holds, a way not tried
+	-- is none)
 	local cast = 0
+	local cap = C.AROUND_RAYS
 	local function counted(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		cast += 1
 		return wall(ox, oy, oz, dx, dy, dz)
@@ -384,13 +405,13 @@ function ValidatorWorld.around(
 	local function leg(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, top: number): boolean
 		-- (past the ray budget, or longer than its chords cover end to end: crossesLong samples a longer line, and a
 		-- way round's leg must be judged whole)
-		if cast > C.AROUND_RAYS or (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > (C.MAX_CHORDS * C.MAX_CHORD) ^ 2 then
+		if cast > cap or (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > (C.MAX_CHORDS * C.MAX_CHORD) ^ 2 then
 			return true
 		end
 		local lo, hi = math.min(y0, y1), math.max(y0, y1)
 		return long(x0, z0, x1, z1, lo, hi, math.max(0, top - hi), y1)
 	end
-	return function(
+	local function search(
 		x0: number,
 		z0: number,
 		x1: number,
@@ -478,6 +499,32 @@ function ValidatorWorld.around(
 			end
 		end
 		return false
+	end
+	if pool == nil then
+		return search
+	end
+	return function(
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		yLow: number,
+		yHigh: number?,
+		rise: number?,
+		endY: number?,
+		path: number?
+	): boolean
+		if (x1 - x0) ^ 2 + (z1 - z0) ^ 2 > most * most then
+			return true -- (too long to tell, as search has it)
+		end
+		if pool.left <= 0 then
+			return false -- (the actor's rays for this second are spent: no way tried, none found)
+		end
+		cap = math.min(C.AROUND_RAYS, pool.left)
+		local found = search(x0, z0, x1, z1, yLow, yHigh, rise, endY, path)
+		cap = C.AROUND_RAYS
+		pool.left -= cast
+		return found
 	end
 end
 
@@ -576,7 +623,9 @@ end
 -- judged whatever its drop (SLAB_DY now gates rises only), and a fall the down ray found nothing for casts one ray up,
 -- at the end's column from SLAB_ON over the end's feet to SLAB_ON over the start's: it meets a slab's underside the down
 -- ray started inside (the body's own box swept that column; an honest one has nothing there). A grounded claim stands
--- within SLAB_ON under a top at most (floorNear), so the down ray starts over the top it stood on
+-- within SLAB_ON under a top at most (floorNear), so the down ray starts over the top it stood on. Validator round 11: the
+-- rays run by the stop rule "rail", past the rails' own props (C.RAIL_PROPS): a tree's trunk, a pole or a fence is no
+-- floor, roof or ceiling of anything (an honest Q off trunk 1210 came down on a bough inside its trunk part's box)
 function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number, number, number?) -> boolean
 	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, standY: number?): boolean
 		local fell = y1 < y0
@@ -587,17 +636,17 @@ function ValidatorWorld.slab(ray: Ray): (number, number, number, number, number,
 		local drop = math.max(0, y0 - y1)
 		local part = if across <= C.SLAB_REACH then drop else drop * C.SLAB_REACH / across
 		local top = y1 + C.RAY_ABOVE + part
-		if ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0) then
+		if ray(x1, top, z1, 0, y1 + C.SLAB_ON - top, 0, "rail") then
 			return true
 		end
 		if standY and across > C.SLAB_REACH and standY - C.SLAB_ON > top then
 			local from = standY + C.SLAB_ON
-			if ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0) then
+			if ray(x1, from, z1, 0, math.max(top, standY - C.SLAB_ON) - from, 0, "rail") then
 				return true
 			end
 		end
 		-- (the up ray: a slab whose top the down ray started under)
-		return fell and ray(x1, y1 + C.SLAB_ON, z1, 0, drop, 0)
+		return fell and ray(x1, y1 + C.SLAB_ON, z1, 0, drop, 0, "rail")
 	end
 end
 
@@ -605,25 +654,25 @@ end
 -- centreline) and the other off it (o: feet) go through a floor, a roof or a ceiling? (Validator round 10, the round-9
 -- review's MEDIUM: slab() skipped any move with a rail end, so a drop (Q) off a bridge or a branch over a house, the
 -- packets held back until the first one off the rail was under the ceiling, was never judged, and every packet after it
--- was judged from inside.) Only for an off-rail end lower than the rail: the off-rail end's column, from C.SLAB_ON over
--- its feet up to C.RAIL_CLEAR under the rail (the rail's own deck or parts), and no higher than the move's drop over its
--- last C.SLAB_REACH studs across over C.RAY_ABOVE (an honest body that came in beside an overhang's edge, as slab() has
--- it); one ray down and one up (a slab either one starts inside the other meets). Nothing in the river's water.
--- The same for a body that went onto a rail from below (the column it rose from). Cost: two rays, for such moves only
+-- was judged from inside.) Only for an off-rail end lower than the rail: the off-rail end's whole column, from C.SLAB_ON
+-- over its feet up to the rail's own height, one ray down and one up (a slab either one starts inside the other meets),
+-- by the stop rule "rail": past the rails' own props (a tree's trunk and boughs, poles, masts, pipes, fences: C.RAIL_PROPS)
+-- and nothing else. Validator round 11 (the round-10 review's MEDIUM): the column stopped a fixed 0.5 st under the
+-- rail, which is under the plate of a pitched roof a bridge lies 0 to 0.5 st inside (a drop straight into the attic), and
+-- its top was lowered by the move's slant (an aslant drop 5 to 12 st aside into a sealed storey met no ceiling); neither
+-- now. Nothing in the river's water. The same for a body that went onto a rail from below (the column it rose from).
+-- Cost: two rays, for such moves only
 function ValidatorWorld.railSlab(ray: Ray): (number, number, number, number, number, number) -> boolean
-	return function(ox: number, oy: number, oz: number, rx: number, ry: number, rz: number): boolean
+	return function(ox: number, oy: number, oz: number, _rx: number, ry: number, _rz: number): boolean
 		if Height.insideRiverWater(ox, oz) then
 			return false
 		end
-		local drop = ry - oy
-		local across = math.sqrt((rx - ox) ^ 2 + (rz - oz) ^ 2)
-		local part = if across <= C.SLAB_REACH then drop else drop * C.SLAB_REACH / across
-		local top = math.min(ry - C.RAIL_CLEAR, oy + C.RAY_ABOVE + part)
+		local top = ry
 		local bottom = oy + C.SLAB_ON
 		if top <= bottom then
 			return false
 		end
-		return ray(ox, top, oz, 0, bottom - top, 0) or ray(ox, bottom, oz, 0, top - bottom, 0)
+		return ray(ox, top, oz, 0, bottom - top, 0, "rail") or ray(ox, bottom, oz, 0, top - bottom, 0, "rail")
 	end
 end
 
@@ -638,11 +687,11 @@ export type Options = { wall: Ray?, down: Ray?, cover: Ray?, cars: Cars? }
 function ValidatorWorld.withCars(wall: Ray?, down: Ray?, cars: Cars, cover: Ray?): (Ray, Ray, Ray)
 	local walls, floors = cars.walls, cars.floors
 	local function over(set: any, ray: Ray?): Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
 			if set.n > 0 and Solid.ray(set, ox, oy, oz, dx, dy, dz) then
 				return true
 			end
-			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz)
+			return ray ~= nil and ray(ox, oy, oz, dx, dy, dz, kind)
 		end
 	end
 	return over(walls, wall), over(floors, down), over(floors, cover or down)
@@ -654,6 +703,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 	local o: Options = opts or {}
 	local wall, down, cover = o.wall, o.down, o.cover or o.down
 	local slabRay = cover -- (before the cars: a car is drawn behind the server's box)
+	local pool = { left = math.huge }
 	if o.cars then
 		wall, down, cover = ValidatorWorld.withCars(wall, down, o.cars, cover)
 	end
@@ -670,9 +720,12 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		-- (the centre line alone, chord by chord: where a body's centre went, validator round 10; MoveValidator's
 		-- wall anchor and reachable, the root's anchor)
 		crossesCenter = if wall then ValidatorWorld.crossesLong(wall, cover, "center") else nil,
-		around = if wall then ValidatorWorld.around(wall, cover, C.AROUND_GAP) else nil,
+		around = if wall then ValidatorWorld.around(wall, cover, C.AROUND_GAP, pool) else nil,
 		aroundMax = C.AROUND_GAP,
-		aroundFar = if wall then ValidatorWorld.around(wall, cover, C.AROUND_FAR) else nil,
+		aroundFar = if wall then ValidatorWorld.around(wall, cover, C.AROUND_FAR, pool) else nil,
+		-- (the rays the actor being judged has left for ways round, and how many a second: MoveValidator.budgeted)
+		aroundPool = pool,
+		aroundBudget = C.AROUND_BUDGET,
 		aroundFarMax = C.AROUND_FAR,
 		floorBelow = if down then ValidatorWorld.floor(down) else nil,
 		floorNear = if down then ValidatorWorld.floorNear(down) else nil,
@@ -692,7 +745,8 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 	}
 end
 
--- engineRays(exclude): the three rays on the live server. `wall`: colliding parts in the squirrel's group, past the
+-- engineRays(exclude): the three rays on the live server (each takes a stop rule in place of its own as a 7th argument:
+-- the cover ray's "rail" for railSlab). `wall`: colliding parts in the squirrel's group, past the
 -- bough cylinders, not the terrain, nor anything under `exclude` (the bodies, the vehicles). `down`: colliding parts
 -- in the squirrel's group, the bough cylinders included, the terrain, the water, the vehicles and the town's ground
 -- plates (Shared/World/GroundPlate) counted as floor. `cover`: `down` past the bough cylinders (stops: one rule each).
@@ -718,8 +772,9 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	end
 	local floorParams = params(floorList)
 	floorParams.IgnoreWater = false
-	local function cast(p: RaycastParams, kind: string): Ray
-		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+	local function cast(p: RaycastParams, own: string): Ray
+		return function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, rule: string?): boolean
+			local kind = rule or own
 			local origin = Vector3.new(ox, oy, oz)
 			local left = Vector3.new(dx, dy, dz)
 			for _ = 1, 4 do
@@ -793,8 +848,8 @@ function ValidatorWorld.engineRays(exclude: { Instance }): (Ray, Ray, Ray)
 	local function down(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
 		return solidDown(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
 	end
-	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
-		return solidCover(ox, oy, oz, dx, dy, dz) or plate(ox, oy, oz, dx, dy, dz)
+	local function cover(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, kind: string?): boolean
+		return solidCover(ox, oy, oz, dx, dy, dz, kind) or plate(ox, oy, oz, dx, dy, dz)
 	end
 	return cast(wallParams, "wall"), down, cover
 end

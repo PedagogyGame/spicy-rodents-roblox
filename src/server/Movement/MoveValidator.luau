@@ -56,6 +56,10 @@
 --     with one end on a rail slab-judged at the off-rail end's column (world.railSlab), a way round a corner or a
 --     building's end up to ValidatorWorld.C.AROUND_GAP explains a gap's wall (a third, never escalated: verdict.cornered),
 --     the sprint meter on the packets' own clocks (a gap drains the least sprint that covers it), gapMax 6.
+--   * Round 11 (2026-11-20, the round-10 review): the sprint meter on the motor's rules (_stamina: a launch off the ground
+--     charged, winded as the motor's, refilled only on the ground or a rail, a gap from the ground charged whatever its
+--     end), railSlab's column up to the rail past the rails' own props, and a ray budget per actor for the ways round a
+--     corner (budgeted).
 
 local Import = require("../Import")
 local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
@@ -132,6 +136,11 @@ type Marks = {
 	wallGaps: { number }, -- server times of the recent gaps whose straight line went through a wall
 	stamina: number, -- the server's own sprint meter (stamina()): 1 full, below 0 the client sprints on credit
 	staminaAt: number, -- server time it was last brought up to date
+	-- the server's meter ran out (at -C.STAMINA_SLACK) and has not come back by the motor's sprintRecover since (_stamina:
+	-- a launch now is a winded one); the body is in the flight of such a launch; the last pounce was such a one
+	winded: boolean?,
+	tiredFlight: boolean?,
+	tiredLunge: boolean?,
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
 	-- of up to 0.25 s, 1 s and C.GOV_WINDOW (governorPeak: the honest margin the specs report)
@@ -148,6 +157,9 @@ type Marks = {
 	wallZ: number?,
 	wallAt: number?, -- (server time the anchor was set, and its client clock: the run a way round from it may stand for)
 	wallClock: number?,
+	-- the wall rays its ways round may still cast, and the server time that was counted at (budgeted; validator round 11)
+	rays: number?,
+	raysAt: number?,
 }
 
 -- What a body keeps of its last driver when no one drives it (forget), for the next (takeOver): the constraints, never
@@ -239,6 +251,9 @@ MoveValidator.C = table.freeze({
 	STAMINA_GROUND = 0.6, -- studs: a packet "in the air" this near a floor ...
 	STAMINA_AIR_VY = 3, -- ... with less vertical speed than this (studs/s) is on the ground for the meter
 	STAMINA_SLACK = 0.5, -- how far below empty it may go (two seconds of sprint: landings' carry, rounding)
+	-- ... and how much sooner than the motor's sprintRecover over that floor the server's meter stops being winded (the
+	-- moments on the ground of a packet that lands or launches, which the server does not refill)
+	STAMINA_RECOVER_SLACK = 0.1,
 	-- seconds: the longest gap the meter takes for an honest loss burst (the least sprint that covers it drains, the rest
 	-- refills); a longer one drains all of its time when faster than a walk, and never refills (validator round 10)
 	STAMINA_BURST = 1.2,
@@ -445,8 +460,15 @@ local function verdict(
 	}
 end
 
--- accept(actorId, packet, serverTime) -> verdict. The first packet of an unknown actor is the baseline.
+-- accept(actorId, packet, serverTime) -> verdict. The first packet of an unknown actor is the baseline. (Its ways round a
+-- corner within the actor's ray budget: budgeted)
 function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet, serverTime: number): Verdict
+	return MoveValidator.budgeted(self, actorId, serverTime, function(): any
+		return MoveValidator._accept(self, actorId, packet, serverTime)
+	end)
+end
+
+function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet, serverTime: number): Verdict
 	local actor = self._actors[actorId]
 	if not SquirrelWire.sane(packet.snapshot) or not (math.abs(packet.seq) < SquirrelWire.MAX_MAGNITUDE) then
 		-- a number off the wire that is NaN, infinite or out of the world: never judged, never a baseline
@@ -619,6 +641,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 	local resync = false
 	local cornered = false -- (a wall third a way round a corner explains: verdict.cornered)
 	local launched = false
+	local charge: string? = nil -- (a launch the meter pays for: the envelope's judged.charge)
 	local pounceAt: number? = nil
 	-- what the validator keeps of the packet's speeds (the round-3 review: no later packet is judged by a speed only the
 	-- client claimed): the envelope's Judged, or, for a move it does not judge, the claim held to the motor's own bounds
@@ -676,6 +699,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			table.insert(violations, v)
 		end
 		keepVy, keepXZ, landed = judged.vy, judged.xz, judged.landed
+		charge = judged.charge
 		if judged.y then
 			-- (a plain arc: the baseline no higher than the arc, whatever slack the packet took)
 			next.y = judged.y :: number
@@ -729,6 +753,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		resync or dt > SquirrelMotor.envelopeParams.maxDt,
 		boosted or riverLanding,
 		landed,
+		charge,
 		violations
 	)
 
@@ -889,7 +914,7 @@ end
 -- (world.slab; `standY`: the height it last stood at, for a long slanting fall), neither end by a trampoline's bed. Both
 -- ends off the rails: world.slab. One end on a rail (validator round 10, the round-9 review's MEDIUM: such a move was
 -- never judged, so a drop off a bridge over a house with its packets held back landed in the sealed storey under it):
--- world.railSlab at the off-rail end's column, from just over its feet to C.RAIL_CLEAR under the rail. Both on rails:
+-- world.railSlab at the off-rail end's column, from just over its feet up to the rail. Both on rails:
 -- the rails' own (the envelope's transfers).
 function MoveValidator.throughSlab(
 	world: World,
@@ -1014,6 +1039,31 @@ local function marksOf(self: MoveValidator, actorId: any): Marks
 		self._marks[actorId] = marks
 	end
 	return marks :: Marks
+end
+
+-- budgeted(actorId, now, fn) -> fn(): fn run with the actor's own ray budget for ways round a corner in the world's pool
+-- (ValidatorWorld.around's `pool`; validator round 11, the round-10 review's LOW): refilled at the world's aroundBudget
+-- (ValidatorWorld.C.AROUND_BUDGET) a second up to that much, kept in the actor's marks (a snap or a reset refills none).
+-- accept() runs in it; so do MovementService's root path, gate hop and reachable. Not nested.
+function MoveValidator.budgeted(self: MoveValidator, actorId: any, now: number, fn: () -> any): any
+	local pool = self.world.aroundPool
+	if pool == nil then
+		return fn()
+	end
+	local marks = marksOf(self, actorId)
+	local most = self.world.aroundBudget or math.huge
+	local left = if marks.rays == nil
+		then most
+		else math.min(most, (marks.rays :: number) + math.max(0, now - (marks.raysAt or now)) * most)
+	local outer = pool.left
+	pool.left = left
+	local ok, result = pcall(fn)
+	marks.rays, marks.raysAt = pool.left, now
+	pool.left = outer
+	if not ok then
+		error(result, 0)
+	end
+	return result
 end
 
 -- railAbove(index, x, y, z, r, minY): a rail sample within `r` of the point no lower than minY (the rail a body high
@@ -1237,23 +1287,38 @@ function MoveValidator.reachable(
 	return round(from.x, from.z, next.x, next.z, lo, hi, rise, next.y, path)
 end
 
--- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full). Faster
--- on the ground than a walk can explain (MoveValidator.C.STAMINA_WALK times the walk) between two packets off the
--- rails drains it as the motor's sprint does (a full meter is sprintSeconds). On the ground: grounded, or a packet
--- that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
--- flipping its grounded flag to hide a sprint); a leap or a pounce in the air is not. Anything else refills it at the
--- motor's rate (sprintRefill), so a ride, a stall or a respawn never leaves it short. The time a move stands for is
--- the packets' own clocks (validator round 10, the round-9 review: refilled by the server's arrivals, a loss burst's
--- time was lost to the meter, and a run of packets held up and delivered together refilled nothing after the first; 18
--- honest "stamina" snaps sprinting through 0.5 s bursts): the client clock's gap, never more than the clock check lets
--- it stand for (dtEff); the server's own time a ride, a hold or a move it made took refills it on the first packet
--- after (accept). A gap too long to judge move by move (`unjudged`) as long as an honest loss burst (C.STAMINA_BURST)
--- drains the least sprint that covers its distance (the rest of its time at a walk, which refills); a longer one drains
--- all its time when faster than a walk and never refills: a client that hides a sprint in a gap pays for every stud. The server's meter never drains where the client's does not, but for a landing's carry and a sprint's
--- slowing down (a moment faster than a walk with the key let go), which C.STAMINA_SLACK covers. Below
--- -C.STAMINA_SLACK the client is sprinting on credit: half a flag a packet's worth of sprint (a gap's span, a whole
--- one), and the meter held there. The chili rush (boostOf) runs faster than a sprint and is left out, and so is the
--- client's own river recovery.
+-- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full), on the
+-- motor's own rules (SquirrelMotor.params: sprintSeconds, sprintRefill, leapCost, pounceCost, leapForwardWinded):
+--   * Drain. Faster on the ground than a walk can explain (C.STAMINA_WALK times the walk) between two packets off the
+--     rails drains it as the motor's sprint does (a full meter is sprintSeconds). On the ground: grounded, or a packet
+--     that says it is in the air but is within C.STAMINA_GROUND of a floor with hardly a vertical speed (a client
+--     flipping its grounded flag to hide a sprint).
+--   * Launches (validator round 11, the round-10 review's HIGH: a client that kept its own meter full hopped at 35 st/s
+--     for good): a leap off the ground costs leapCost, a pounce anywhere off a rail pounceCost (the envelope's
+--     judged.charge); off a rail or a trampoline's bed both are free. A launch made while the meter is winded (it ran
+--     out, at -C.STAMINA_SLACK, and has not come back by the motor's sprintRecover since, less C.STAMINA_RECOVER_SLACK:
+--     the motor's own rule, or a pounce every cooldown refilled the little it needed between) is a winded one, which the
+--     motor carries no faster than leapForwardWinded: the launch, and every packet of its flight until it lands, faster
+--     than that is a sprint on credit.
+--   * A pounce's lunge runs on along the ground, unsteered, for the motor's pounceWindow: paid with pounceCost, so the
+--     ground packets inside it no faster than the lunge drain nothing (a winded pounce's lunge is a walk: not exempt).
+--   * Refill, at the motor's rate (sprintRefill), only for a move whose ends are both on the ground or on a rail: never
+--     in the air ("or a hop would pay for itself"). A ride, a stall or a respawn refill by the server's own time on the
+--     first packet after (accept).
+--   * The time a move stands for is the packets' own clocks (validator round 10): the client clock's gap, never more than
+--     the clock check lets it stand for (dtEff).
+--   * A gap too long to judge move by move (`unjudged`) that starts on the ground, whatever its end (validator round 11:
+--     a sprint hidden in gaps that ended a moment into a hop drained nothing), pays the least the motor could have
+--     covered its distance with: a sprint for what a walk does not cover, or a leap (leapCost) whose carry covers part
+--     of it and a sprint for the rest. One as long as an honest loss burst (C.STAMINA_BURST) refills the rest of its
+--     time when it ends on the ground; a longer one drains all its time when faster than a walk and never refills (a
+--     client that hides its moves gets no credit for them). A gap inside a winded flight faster than a winded leap
+--     carries is on credit as a whole.
+-- The server's meter never drains where the client's does not, but for a landing's carry and a sprint's slowing down (a
+-- moment faster than a walk with the key let go) and the moments on the ground of a packet that lands or launches (not
+-- refilled), which C.STAMINA_SLACK covers. Below -C.STAMINA_SLACK the client is sprinting on credit: half a flag a
+-- packet's worth of sprint (a gap's span, a whole one), and the meter held there. The chili rush (boostOf) runs faster
+-- than a sprint and is left out, and so is the client's own river recovery.
 function MoveValidator._stamina(
 	self: MoveValidator,
 	actor: Actor,
@@ -1265,55 +1330,123 @@ function MoveValidator._stamina(
 	unjudged: boolean,
 	exempt: boolean,
 	landed: boolean,
+	charge: string?,
 	violations: { Violation }
 )
 	local marks = actor.marks
 	marks.staminaAt = serverTime
 	local P = SquirrelMotor.params
+	local E = SquirrelMotor.envelopeParams
 	local C = MoveValidator.C
 	local landable = self.world.landable
 	-- (a packet whose landing the gap hid, `hidden`, came down on a floor and walked off its edge: on the ground; every
 	-- vertical speed here is the validator's own)
 	local function onGround(s: State, hidden: boolean): boolean
-		return s.grounded
-			or hidden
-			or (math.abs(s.vy) < C.STAMINA_AIR_VY and landable ~= nil and landable(s.x, s.y, s.z, C.STAMINA_GROUND))
+		return s.routeId == nil
+			and (
+				s.grounded
+				or hidden
+				or (math.abs(s.vy) < C.STAMINA_AIR_VY and landable ~= nil and landable(s.x, s.y, s.z, C.STAMINA_GROUND))
+			)
+	end
+	local function onCredit(sprinted: number, why: string)
+		if marks.stamina < -C.STAMINA_SLACK then
+			marks.stamina = -C.STAMINA_SLACK
+			table.insert(violations, {
+				code = "stamina",
+				-- (half a flag a packet's worth of sprint on credit: a gap's whole span is a whole flag)
+				severity = math.min(1, 0.5 * sprinted / SquirrelWire.SEND_EVERY),
+				detail = why,
+			})
+		end
 	end
 	local span = math.min(math.max(dt, 0), math.max(dtEff, 0))
+	local groundA = onGround(prev, actor.lastLanded)
+	local groundB = onGround(next, landed)
+	local footB = groundB or next.routeId ~= nil
+	-- launches: the motor's leapCost / pounceCost; a winded one (the meter empty before it) carries at a walk
+	if charge ~= nil and not exempt then
+		local tired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+		marks.stamina -= if charge == "pounce" then P.pounceCost else P.leapCost
+		marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
+		marks.tiredFlight = tired and not footB
+		if charge == "pounce" then
+			marks.tiredLunge = tired
+		end
+		local hxz = math.sqrt(next.vx * next.vx + next.vz * next.vz)
+		if tired and hxz > P.leapForwardWinded * E.launchTol then
+			table.insert(violations, {
+				code = "stamina",
+				severity = 0.5,
+				detail = `a {charge} at {hxz} st/s with the sprint meter empty (a winded one carries at a walk)`,
+			})
+		end
+	elseif footB then
+		marks.tiredFlight = nil
+	end
+	-- (winded once the meter is at its floor, until it is back by the motor's sprintRecover, less a little)
+	local function settle()
+		if marks.stamina <= -C.STAMINA_SLACK + 1e-6 then
+			marks.winded = true
+		elseif marks.stamina >= -C.STAMINA_SLACK + P.sprintRecover - C.STAMINA_RECOVER_SLACK then
+			marks.winded = nil
+		end
+	end
 	if span <= 1e-3 then
+		settle()
 		return
 	end
 	local walk = P.walk * C.STAMINA_WALK
 	local across = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+	local winded = P.leapForwardWinded * E.speedTol * span + E.posSlack
 	local sprinted = 0
-	if
-		not exempt
-		and prev.routeId == nil
-		and next.routeId == nil
-		and onGround(prev, actor.lastLanded)
-		and onGround(next, landed)
-		and across / span > walk
-	then
-		-- (a move judged packet by packet, or a gap longer than an honest loss burst: all of it; a burst's gap: the
-		-- least sprint that covers its distance)
-		sprinted = if unjudged and span <= C.STAMINA_BURST
-			then math.clamp((across - walk * span) / math.max(P.sprint - walk, 1e-3), 0, span)
-			else math.max(span, 0)
+	if exempt then
+		sprinted = 0
+	elseif unjudged and groundA then
+		-- (a gap from the ground, whatever its end)
+		if across / span > walk then
+			if span <= C.STAMINA_BURST then
+				-- the least the motor covers it with: a sprint for what a walk does not, or a leap paid with leapCost
+				-- whose carry (at most a leap's flight, at the leap's speed over a walk) covers part of it
+				local over = across - walk * span
+				local rate = math.max(P.sprint - walk, 1e-3)
+				local flight = math.min(span, 2 * P.leapUp / P.gravity)
+				local carry = math.max(0, P.leapForward * E.launchTol - walk) * flight
+				local byLeap = P.leapCost * P.sprintSeconds + math.max(0, over - carry) / rate
+				sprinted = math.clamp(math.min(over / rate, byLeap), 0, span)
+			else
+				sprinted = span
+			end
+		end
+	elseif marks.tiredFlight and not groundA and (unjudged or not footB) and across > winded then
+		-- a winded flight (a launch made with the meter empty), or a gap inside one: no faster across than a winded
+		-- leap carries
+		marks.stamina -= span / P.sprintSeconds
+		onCredit(
+			span,
+			`{across} st in {span} s in the air ({if unjudged then "a gap" else "a packet"}) with the sprint meter empty`
+		)
+		settle()
+		return
+	elseif not unjudged and groundA and groundB and across / span > walk then
+		-- (a pounce's lunge runs on along the ground for its window, unsteered: paid with pounceCost, not the sprint)
+		local pounced = actor.lastPounce
+		local lunge = pounced ~= nil
+			and not marks.tiredLunge
+			and prev.clock >= pounced - 1e-3
+			and next.clock <= pounced + P.pounceWindow + 1e-3
+			and across <= P.pounceSpeedFast * E.speedTol * span + E.posSlack
+		sprinted = if lunge then 0 else span
 	end
-	-- (a gap longer than an honest loss burst never refills: a client hiding its moves gets no credit for them)
-	local refill = if unjudged and span > C.STAMINA_BURST then 0 else math.max(0, span - sprinted)
 	marks.stamina -= sprinted / P.sprintSeconds
-	if marks.stamina < -C.STAMINA_SLACK then
-		marks.stamina = -C.STAMINA_SLACK
-		table.insert(violations, {
-			code = "stamina",
-			-- (half a flag a packet's worth of sprint on credit: a gap's whole span is a whole flag)
-			severity = math.min(1, 0.5 * sprinted / SquirrelWire.SEND_EVERY),
-			detail = "faster than a walk on the ground for longer than the sprint meter lasts",
-		})
+	onCredit(sprinted, "faster than a walk on the ground for longer than the sprint meter lasts")
+	-- (the rest of the move's time refills, as the motor's does off the sprint, only on the ground or a rail; a gap longer
+	-- than an honest loss burst never refills: a client hiding its moves gets no credit for them)
+	local footA = groundA or prev.routeId ~= nil
+	if footA and footB and not (unjudged and span > C.STAMINA_BURST) then
+		marks.stamina = math.min(1, marks.stamina + math.max(0, span - sprinted) / P.sprintRefill)
 	end
-	-- (the rest of the move's time refills, as the motor's does off the sprint)
-	marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
+	settle()
 end
 
 -- wallGap(actorId, now) -> n: a straight line too long to be sure of (a gap, a jump of the root) went through a wall;
