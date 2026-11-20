@@ -1643,6 +1643,25 @@ function MoveValidator._stamina(
 		local maxY = next.y + math.max(0, -vy) ^ 2 / (2 * P.gravity) + Motion.C.airGrab
 		return tau, railWithin(self.world.index, next.x, next.z, reach, minY, maxY)
 	end
+	-- (a leap off the ground a gap hid, validator round 13: the motor charges leapCost down to an empty meter, never below,
+	-- and a winded body leaps at leapForwardWinded. Winded already, or short of leapCost with the end no faster than a
+	-- winded leap carries, it is read as a winded one: the meter taken to empty at most, its carry a winded one's (an
+	-- honest body on a lossy link leaps winded far more often than the server's lagging meter can tell); else a full one,
+	-- paid in full whatever the claim (P1), winding the meter at its floor. Returns the leap's horizontal speed)
+	local function hiddenLeap(): number
+		local windedXZ = P.leapForwardWinded * E.launchTol
+		local tiredBefore = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+		if tiredBefore or (marks.stamina < P.leapCost and hxz <= windedXZ) then
+			marks.stamina -= math.clamp(marks.stamina, 0, P.leapCost)
+			if marks.stamina <= 1e-6 then
+				marks.winded = true
+			end
+			return windedXZ
+		end
+		spend(P.leapCost)
+		marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
+		return P.leapForward * E.launchTol
+	end
 	-- (the least sprint a distance past the walk-steered step needs: the sprint steers it no more than this faster)
 	local rate = math.max(P.sprint - P.walk, if free then V54.sprint - V54.walk else 0, 1e-3)
 	local sprinted = 0
@@ -1715,12 +1734,7 @@ function MoveValidator._stamina(
 			local _, atRail = hiddenLaunch()
 			local cap = SquirrelMotor.launchCapXZ(false) * E.launchTol
 			if not atRail and next.vy > 0 then
-				local leapTired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
-				spend(P.leapCost)
-				marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
-				if leapTired then
-					cap = P.leapForwardWinded * E.launchTol
-				end
+				cap = hiddenLeap()
 			end
 			keepModel(math.min(hxz, cap), P.sprint, nil, atRail, next)
 		end
@@ -1734,7 +1748,11 @@ function MoveValidator._stamina(
 		-- (validator round 13: one that ends in the air rising hid a launch, free off a rail at hand where `next` is
 		-- (hiddenLaunch), else a leap off the ground paid with leapCost whatever the claim (a fall off an edge, at no rising
 		-- speed, is none; a trampoline in reach bounces it for nothing); a leap made winded carries at a winded one's speed)
-		local leapTired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+		local leapXZ = (
+			if marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
+				then P.leapForwardWinded
+				else P.leapForward
+		) * E.launchTol
 		local leapPaid = false
 		if not footB then
 			local _, atRail = hiddenLaunch()
@@ -1746,12 +1764,9 @@ function MoveValidator._stamina(
 				SquirrelMotor.launchCapXZ(false) * E.launchTol * span
 			)
 			if not atRail and not bed and next.vy > 0 then
-				spend(P.leapCost)
-				marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
+				leapXZ = hiddenLeap()
+				gapCap = leapXZ
 				leapPaid = true
-				if leapTired then
-					gapCap = P.leapForwardWinded * E.launchTol
-				end
 			end
 		end
 		local dW = stepped(0, true, 0, 0)
@@ -1759,7 +1774,6 @@ function MoveValidator._stamina(
 		if over > 0 then
 			if span <= C.STAMINA_BURST then
 				local flight = math.min(span, 2 * P.leapUp / P.gravity)
-				local leapXZ = (if leapTired then P.leapForwardWinded else P.leapForward) * E.launchTol
 				local carry = math.max(0, leapXZ - P.walk * tol) * flight
 				local byLeap = (if leapPaid then 0 else P.leapCost * P.sprintSeconds) + math.max(0, over - carry) / rate
 				sprinted = math.clamp(math.min(over / rate, byLeap), 0, span)
@@ -1820,6 +1834,9 @@ function MoveValidator._stamina(
 		-- review's LOW a)
 		local gapTired = marks.winded == true or marks.stamina <= -C.STAMINA_SLACK + 1e-6
 		local leapXZ = (if gapTired then P.leapForwardWinded else P.leapForward) * E.launchTol
+		if tau > 0 and not offRail then
+			leapXZ = hiddenLeap()
+		end
 		if tau > 0 then
 			d3, u3, s3 = SquirrelMotor.speedBound(
 				if offRail then launchCap else leapXZ,
@@ -1831,8 +1848,6 @@ function MoveValidator._stamina(
 				if offRail then V54.walk else nil
 			)
 			if not offRail then
-				spend(P.leapCost)
-				marks.stamina = math.max(marks.stamina, -C.STAMINA_SLACK)
 				u3 = math.min(u3, leapXZ)
 			end
 		end
