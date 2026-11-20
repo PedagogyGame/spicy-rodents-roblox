@@ -4283,7 +4283,8 @@ local function envelopeCore(
 				and not launched
 				and not prev.grounded
 				and pounce == nil
-				and next.vy >= P.leapUp - P.gravity * (next.clock - grabAt) - gEps
+				-- (a chained leap's rise, chainLift of a leap's: owner D19)
+				and next.vy >= P.leapUp * P.chainLift - P.gravity * (next.clock - grabAt) - gEps
 			then
 				launchUsed = true
 				judged.railLaunch = true
