@@ -239,6 +239,9 @@ MoveValidator.C = table.freeze({
 	STAMINA_GROUND = 0.6, -- studs: a packet "in the air" this near a floor ...
 	STAMINA_AIR_VY = 3, -- ... with less vertical speed than this (studs/s) is on the ground for the meter
 	STAMINA_SLACK = 0.5, -- how far below empty it may go (two seconds of sprint: landings' carry, rounding)
+	-- seconds: the longest gap the meter takes for an honest loss burst (the least sprint that covers it drains, the rest
+	-- refills); a longer one drains all of its time when faster than a walk, and never refills (validator round 10)
+	STAMINA_BURST = 1.2,
 	-- studs: the widest any rail query of the validator looks (its world's index is bounded to it: a packet's numbers,
 	-- a long silence, never widen a query's scan, which grows with the cube of its radius); a body high in the air after
 	-- leaving the tallest trunk is within this of it
@@ -471,6 +474,12 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		self:reset(actorId, packet.snapshot, serverTime, packet.seq)
 		-- (the governor from the place the server anchored, for the time since: MovementService's gate)
 		local first = self._actors[actorId]
+		-- (the meter brought up to date by the server's own time since its last packet: a ride, a hold, a move the
+		-- server made refill it as the motor's does; validator round 10: the meter is otherwise judged on the packets'
+		-- clocks, and none covers that time)
+		local fm = first.marks
+		fm.stamina = math.min(1, fm.stamina + math.max(0, serverTime - fm.staminaAt) / SquirrelMotor.params.sprintRefill)
+		fm.staminaAt = serverTime
 		local gov = first.marks.gov
 		local govFaults: { Violation } = {}
 		-- (the first packet after a snap or a hand-off: a creep's walls from the kept anchor, as any packet's)
@@ -1236,9 +1245,10 @@ end
 -- the packets' own clocks (validator round 10, the round-9 review: refilled by the server's arrivals, a loss burst's
 -- time was lost to the meter, and a run of packets held up and delivered together refilled nothing after the first; 18
 -- honest "stamina" snaps sprinting through 0.5 s bursts): the client clock's gap, never more than the clock check lets
--- it stand for (dtEff). A gap too long to judge move by move (`unjudged`) drains the least sprint that covers its
--- distance (the rest of its time at a walk, which refills): a client that hides a sprint in a gap pays for every stud
--- of it. The server's meter never drains where the client's does not, but for a landing's carry and a sprint's
+-- it stand for (dtEff); the server's own time a ride, a hold or a move it made took refills it on the first packet
+-- after (accept). A gap too long to judge move by move (`unjudged`) as long as an honest loss burst (C.STAMINA_BURST)
+-- drains the least sprint that covers its distance (the rest of its time at a walk, which refills); a longer one drains
+-- all its time when faster than a walk and never refills: a client that hides a sprint in a gap pays for every stud. The server's meter never drains where the client's does not, but for a landing's carry and a sprint's
 -- slowing down (a moment faster than a walk with the key let go), which C.STAMINA_SLACK covers. Below
 -- -C.STAMINA_SLACK the client is sprinting on credit: half a flag a packet's worth of sprint (a gap's span, a whole
 -- one), and the meter held there. The chili rush (boostOf) runs faster than a sprint and is left out, and so is the
@@ -1283,11 +1293,14 @@ function MoveValidator._stamina(
 		and onGround(next, landed)
 		and across / span > walk
 	then
-		-- (a move judged packet by packet: all of it; a gap: the least sprint that covers its distance)
-		sprinted = if unjudged
+		-- (a move judged packet by packet, or a gap longer than an honest loss burst: all of it; a burst's gap: the
+		-- least sprint that covers its distance)
+		sprinted = if unjudged and span <= C.STAMINA_BURST
 			then math.clamp((across - walk * span) / math.max(P.sprint - walk, 1e-3), 0, span)
-			else math.max(dt, 0)
+			else math.max(span, 0)
 	end
+	-- (a gap longer than an honest loss burst never refills: a client hiding its moves gets no credit for them)
+	local refill = if unjudged and span > C.STAMINA_BURST then 0 else math.max(0, span - sprinted)
 	marks.stamina -= sprinted / P.sprintSeconds
 	if marks.stamina < -C.STAMINA_SLACK then
 		marks.stamina = -C.STAMINA_SLACK
@@ -1299,7 +1312,7 @@ function MoveValidator._stamina(
 		})
 	end
 	-- (the rest of the move's time refills, as the motor's does off the sprint)
-	marks.stamina = math.min(1, marks.stamina + math.max(0, span - sprinted) / P.sprintRefill)
+	marks.stamina = math.min(1, marks.stamina + refill / P.sprintRefill)
 end
 
 -- wallGap(actorId, now) -> n: a straight line too long to be sure of (a gap, a jump of the root) went through a wall;

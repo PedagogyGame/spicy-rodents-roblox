@@ -1116,7 +1116,10 @@ function MovementService.new(deps: Deps): Movement
 		-- a doubt no packet came to clear (invariant E; validator round 10, the round-9 review's LOW-MEDIUM: judged only
 		-- when a packet arrived, so a client that sent one doubtful packet and then nothing, or only under a stale epoch,
 		-- kept it for good): back to the held place once it has stood C.DOUBT_SNAP and no packet came for C.DOUBT_QUIET
-		local noHold: boolean? = nil
+		-- (a wall the root crossed in the old grace window: not counted toward a hold, as a packet's is; validator round 9)
+		local noHold: boolean? = if why == "wall"
+			then sq.possessedAt ~= nil and sq.possessedAt ~= 0 and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+			else nil
 		local doubtAt = sq.doubtAt
 		if
 			why == nil

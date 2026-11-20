@@ -34,8 +34,9 @@
 --   Traffic/Solid sets); withCars(wall?, down?, cars) -> (wall?, down?); crosses(wall, down?) ->
 --   (x0, z0, x1, z1, yLow, yHigh?, rise?, endY?) -> boolean (a rise only as high as the far end is open above:
 --   cover(down) -> (x, z, footY, top) -> number?); crossesLong(wall, down?, mode?) -> the same, chord by chord, for any
---   length; around(wall, down?, maxLen?) -> the same args, path? -> boolean (a way round a corner or a building's end is
---   clear, no longer than `path`);
+--   length (mode "center": the centre line's rays alone); around(wall, down?, maxLen?) -> the same args, path? ->
+--   boolean (a way round a corner or a building's end is clear, no longer than `path`); the world's crossesCenter,
+--   around (C.AROUND_GAP) and aroundMax, aroundFar (C.AROUND_FAR) and aroundFarMax;
 --   floor(down, depth?, above?) -> (x, y, z) -> boolean (the world's floorBelow); floorNear(down) (C.FLOOR_NEAR under,
 --   C.SLAB_ON over the feet); railSlab(cover) -> (ox, oy, oz, rx, ry, rz) -> boolean (a move with one end on a rail
 --   through a slab at the off-rail end's column);
@@ -119,9 +120,9 @@ ValidatorWorld.C = table.freeze({
 	-- counted 73 honest "wall" snaps running close round a house with 0.65 to 0.8 s loss bursts, every gap's line longer
 	-- than AROUND_MAX and so "too long to tell": a sprint over a 1.2 s burst). The envelope's long lines, hop()'s gaps
 	-- and the root's jumps: a line through a wall with a way round is explained, with none a whole flag; a longer one is
-	-- a gap's third, the second in MoveValidator.C.WALL_GAP_WINDOW a whole flag. Cost: each leg at most
-	-- ceil(AROUND_GAP / MAX_CHORD) = 10 chords (60 wall rays) and C.COVER_WALLS covers, 8 legs, only for a line already
-	-- through a wall
+	-- a gap's third, the second in MoveValidator.C.WALL_GAP_WINDOW a whole flag (MoveValidator's wall anchor and the
+	-- root's ask it too). Cost: legs started while fewer than C.AROUND_RAYS wall rays are cast, each at most
+	-- C.MAX_CHORDS chords, only for a line already through a wall
 	AROUND_GAP = 40,
 	-- ... and how far out (fractions of the line's length) the two-corner ways round an end of a building go
 	AROUND_OUT = table.freeze({ 0.5, 1 }),

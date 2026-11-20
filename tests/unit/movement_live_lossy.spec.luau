@@ -10,7 +10,8 @@
 --   * the S3 driver in town (leaps, pounces, sprints, transfers on the rails).
 -- The round-9 review measured, before round 10: 73 "wall" snaps over 64 runs x 40 s hugging a house with 0.65 to 0.8 s
 -- bursts every 5 s, and 18 "stamina" snaps over 32 sprint runs with 0.5 s bursts every 5 s.
--- SPICY_LOSSY_RUNS=<n> plays n runs of each kind (default 4; the sweep the fix was measured with: 32).
+-- SPICY_LOSSY_RUNS=<n> plays n runs of each kind (default 4; the sweep the fix was measured with: 32);
+-- SPICY_LOSSY_BURSTS="lo,hi,every0,every1" sets the bursts (seconds; default "0.3,1.0,2,5").
 local process = require("@lune/process")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("@tests/lib/BakedWorld")
@@ -20,6 +21,10 @@ local LiveRig = require("@tests/lib/LiveRig")
 type State = SquirrelMotor.State
 
 local RUNS = tonumber(process.env.SPICY_LOSSY_RUNS) or 4
+local B = { 0.3, 1.0, 2, 5 }
+for i, v in string.split(process.env.SPICY_LOSSY_BURSTS or "", ",") do
+	B[i] = tonumber(v) or B[i]
+end
 local SECONDS = 40
 
 -- bursts(rng, seconds, lo, hi, every0, every1): a loss schedule: a burst lo..hi s long every every0..every1 s
@@ -123,7 +128,7 @@ return function(t)
 	end
 
 	t.test(
-		`honest: running close round a house, lost bursts of 0.3 to 1.0 s every 2 to 5 s ({RUNS} runs walking, {RUNS} sprinting): 0 snaps`,
+		`honest: running close round a house, lost bursts of {B[1]} to {B[2]} s every {B[3]} to {B[4]} s ({RUNS} runs walking, {RUNS} sprinting): 0 snaps`,
 		function()
 			t.truthy(#rings >= 3, `houses with a clear ring ({#rings})`)
 			for run = 1, 2 * RUNS do
@@ -134,7 +139,7 @@ return function(t)
 				local rig = LiveRig.new({
 					world = world,
 					vworld = vworld,
-					link = lossy(rng, 0.3, 1.0, 2, 5),
+					link = lossy(rng, B[1], B[2], B[3], B[4]),
 					seed = 1000 + run,
 				})
 				rig:possess(SquirrelMotor.new(start.x, world.groundHeight, start.z), hug(ring, sprint, run % 2 == 0))
@@ -156,14 +161,14 @@ return function(t)
 	)
 
 	t.test(
-		`honest: sprinting with the key held, the meter running out and back, lost bursts of 0.3 to 1.0 s every 2 to 5 s ({RUNS} runs): 0 snaps`,
+		`honest: sprinting with the key held, the meter running out and back, lost bursts of {B[1]} to {B[2]} s every {B[3]} to {B[4]} s ({RUNS} runs): 0 snaps`,
 		function()
 			for run = 1, RUNS do
 				local rng = Rng.new(2000 + run)
 				local rig = LiveRig.new({
 					world = town.noWalls,
 					vworld = vworld,
-					link = lossy(rng, 0.3, 1.0, 2, 5),
+					link = lossy(rng, B[1], B[2], B[3], B[4]),
 					seed = 2000 + run,
 				})
 				local leapEvery = 1.3 + run * 0.4
@@ -196,14 +201,14 @@ return function(t)
 	)
 
 	t.test(
-		`honest: the S3 driver in town (rails, leaps, pounces), lost bursts of 0.3 to 1.0 s every 2 to 5 s ({RUNS} runs): 0 snaps`,
+		`honest: the S3 driver in town (rails, leaps, pounces), lost bursts of {B[1]} to {B[2]} s every {B[3]} to {B[4]} s ({RUNS} runs): 0 snaps`,
 		function()
 			for run = 1, RUNS do
 				local rng = Rng.new(3000 + run)
 				local rig = LiveRig.new({
 					world = world,
 					vworld = vworld,
-					link = lossy(rng, 0.3, 1.0, 2, 5),
+					link = lossy(rng, B[1], B[2], B[3], B[4]),
 					seed = 3000 + run,
 				})
 				rig:possess(town.startAt(rng), town.driven(rng))
