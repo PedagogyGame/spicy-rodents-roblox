@@ -1545,7 +1545,7 @@ function MoveValidator._stamina(
 	local refill = 0
 	local airT, airFirst = 0, true
 	-- (the speed kept after the move, when a branch sets it: u, s, hold, rail)
-	local after: { any }? = nil
+	local after: { u: number, s: number, rail: boolean? }? = nil
 	if launched then
 		-- (the launch's own packet: the moments on the ground before it refill; the flight starts at the launch's speed)
 		if footA then
@@ -1648,17 +1648,16 @@ function MoveValidator._stamina(
 		if groundB and span <= C.STAMINA_BURST then
 			refill = math.max(0, rest - sprinted)
 		end
+		local ku, ks, kr = u1, s1, free
 		if tau > 0 then
-			after = { math.min(hxz, u3), s3, nil, railNear }
+			ku, ks, kr = math.min(hxz, u3), s3, railNear
 		elseif groundB then
-			after = { u2, s2, nil, nil }
-		else
-			after = { u1, s1, nil, free }
+			ku, ks, kr = u2, s2, false
 		end
 		if sprinted > 0 then
-			after[1] = math.max(after[1], P.sprint)
-			after[2] = P.sprint
+			ku, ks = math.max(ku, P.sprint), P.sprint
 		end
+		after = { u = ku, s = ks, rail = if kr then true else nil }
 	else
 		-- a move judged move by move: on the ground, in the air, or one that lands or walks off an edge
 		if groundA and groundB then
@@ -1712,7 +1711,7 @@ function MoveValidator._stamina(
 	-- ends in the air hid a launch)
 	local _, nu, ns = stepped(airT, airFirst, span - sprinted, span)
 	if after then
-		keepModel(after[1], after[2], after[3], after[4])
+		keepModel(after.u, after.s, nil, after.rail)
 	elseif unjudged and groundA and not footB then
 		keepModel(math.min(hxz, SquirrelMotor.launchCapXZ(false) * E.launchTol), ns, nil, nearRail())
 	elseif groundB then
