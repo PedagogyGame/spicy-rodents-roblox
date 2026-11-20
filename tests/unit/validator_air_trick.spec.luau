@@ -18,7 +18,6 @@ local process = require("@lune/process")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local MoveValidator = require("@server/Movement/MoveValidator")
-local AirTrickButton = require("@client/UI/AirTrickButton")
 local TestWorld = require("@tests/cheat/TestWorld")
 local Rng = require("@tests/cheat/Rng")
 local LiveRig = require("@tests/lib/LiveRig")
@@ -181,9 +180,7 @@ return function(t)
 					moves += c1.n + c2.n
 					packets += r1.packets + r2.packets
 				end
-				print(
-					`      {RUNS} runs x 2 kinds x {SECONDS} s: {moves} presses, {packets} packets, {snaps} snaps`
-				)
+				print(`      {RUNS} runs x 2 kinds x {SECONDS} s: {moves} presses, {packets} packets, {snaps} snaps`)
 				t.truthy(OFF or moves > 20 * RUNS, "tricks were done")
 				t.eq(snaps, 0, "snaps")
 			end
@@ -399,49 +396,55 @@ return function(t)
 	end)
 
 	-- the honest trick's own pace, for the crafted streams above (the motor alone, 60 fps, flat open ground and the parapet)
-	t.test("the honest trick's pace: hopping with the wiggle out at its best, a roll's carry, the parapet chain", function()
-		local tw = TestWorld.build({ boxes = {} })
-		-- hopping north (W + Shift), Space on landing (or after the roll, `roll`), the wiggle `at` frames into each
-		-- flight with the aim full out (nil: no trick); the pace over `secs` from a full or an empty meter
-		local function hops(at: number?, roll: boolean, secs: number, empty: boolean): number
-			local s = SquirrelMotor.new(Units.st(-560), tw.groundHeight, Units.st(-545))
-			if empty then
-				s.stamina, s.winded = 0, true
-			end
-			local z0 = s.z
-			local f, inAir = 0, 0
-			for _ = 1, math.floor(secs * 60) do
-				local i = SquirrelMotor.idleInput(math.pi)
-				i.fw, i.sprint = 1, true
-				if s.grounded then
-					inAir = 0
-					i.leap = not roll or s.trickKind ~= 1
-					i.trick = roll and s.footAgo <= 0.02
-				else
-					inAir += 1
-					i.trick = at ~= nil and (inAir == at or (roll and s.trickKind == 2 and s.vy < 0))
-					i.aimReach = 1
+	t.test(
+		"the honest trick's pace: hopping with the wiggle out at its best, a roll's carry, the parapet chain",
+		function()
+			local tw = TestWorld.build({ boxes = {} })
+			-- hopping north (W + Shift), Space on landing (or after the roll, `roll`), the wiggle `at` frames into each
+			-- flight with the aim full out (nil: no trick); the pace over `secs` from a full or an empty meter
+			local function hops(at: number?, roll: boolean, secs: number, empty: boolean): number
+				local s = SquirrelMotor.new(Units.st(-560), tw.groundHeight, Units.st(-545))
+				if empty then
+					s.stamina, s.winded = 0, true
 				end
-				SquirrelMotor.step(s, i, 1 / 60, tw)
-				f += 1
+				local z0 = s.z
+				local f, inAir = 0, 0
+				for _ = 1, math.floor(secs * 60) do
+					local i = SquirrelMotor.idleInput(math.pi)
+					i.fw, i.sprint = 1, true
+					if s.grounded then
+						inAir = 0
+						i.leap = not roll or s.trickKind ~= 1
+						i.trick = roll and s.footAgo <= 0.02
+					else
+						inAir += 1
+						i.trick = at ~= nil and (inAir == at or (roll and s.trickKind == 2 and s.vy < 0))
+						i.aimReach = 1
+					end
+					SquirrelMotor.step(s, i, 1 / 60, tw)
+					f += 1
+				end
+				return (s.z - z0) / secs
 			end
-			return (s.z - z0) / secs
-		end
-		local rows = {
-			{ "no trick", nil, false },
-			{ "wiggle out at frame 15", 15, false },
-			{ "wiggle out + roll, then leap", 15, true },
-		}
-		for _, r in rows do
-			print(
-				string.format(
-					"      open ground, %-30s full meter 6 s %.1f st/s, from empty 30 s %.1f st/s",
-					r[1],
-					hops(r[2], r[3], 6, false),
-					hops(r[2], r[3], 30, true)
+			local rows = {
+				{ "no trick", nil, false },
+				{ "wiggle out at frame 15", 15, false },
+				{ "wiggle out + roll, then leap", 15, true },
+			}
+			for _, r in rows do
+				print(
+					string.format(
+						"      open ground, %-30s full meter 6 s %.1f st/s, from empty 30 s %.1f st/s",
+						r[1],
+						hops(r[2], r[3], 6, false),
+						hops(r[2], r[3], 30, true)
+					)
 				)
+			end
+			t.truthy(
+				hops(15, false, 6, false) <= hops(nil, false, 6, false) * 1.09,
+				"the trick's hop no more than 9 % on"
 			)
 		end
-		t.truthy(hops(15, false, 6, false) <= hops(nil, false, 6, false) * 1.09, "the trick's hop no more than 9 % on")
-	end)
+	)
 end
