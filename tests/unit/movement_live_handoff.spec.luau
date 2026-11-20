@@ -327,7 +327,7 @@ return function(t)
 				s.routeId = id
 				s.grounded = true
 				local codes = {}
-				for _, x in v:hop("a", from, s, 0.6, 100) do
+				for _, x in (v:hop("a", from, s, 0.6, 100)) do
 					table.insert(codes, x.code)
 				end
 				return codes

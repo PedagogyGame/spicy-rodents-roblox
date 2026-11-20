@@ -9,7 +9,8 @@
 --     its root replicated to the server at opts.link.rootHz;
 --   the link, both ways: base latency, uniform jitter, random loss (up only: the motor state is unreliable), and
 --     two kinds of burst: `hold` (everything sent in holdFor seconds arrives together at its end) and `drop`
---     (everything sent in dropFor seconds is lost), every holdEvery / dropEvery seconds; reliable messages down
+--     (everything sent in dropFor seconds is lost), every holdEvery / dropEvery seconds, or on a schedule of its own
+--     (dropAt); reliable messages down
 --     (Correction, the grant, the ride's end) keep their order, the server's own writes of the root keep theirs,
 --     and the two streams race;
 --   the server: MovementService with the validator, its engine.correct and engine.hold as Boot/Game has them (a snap
@@ -56,6 +57,8 @@ export type Link = {
 	holdFor: number?,
 	dropEvery: number?, -- seconds between loss bursts (nil: none)
 	dropFor: number?,
+	-- a loss burst schedule of its own (true: everything sent up at t is lost), in place of or with dropEvery
+	dropAt: ((t: number) -> boolean)?,
 	rootHz: number?, -- the root's replication to the server (default 30)
 }
 
@@ -175,6 +178,9 @@ function LiveRig.new(opts: Options): Rig
 	-- an up packet's fate at send time t: nil (lost) or its arrival
 	local function upArrival(t: number): number?
 		if link.dropEvery and (t % link.dropEvery) < (link.dropFor or 0) then
+			return nil
+		end
+		if link.dropAt and link.dropAt(t) then
 			return nil
 		end
 		if rng.next() < loss then
