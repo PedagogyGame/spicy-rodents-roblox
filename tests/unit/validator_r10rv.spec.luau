@@ -4,12 +4,19 @@
 --                     ceiling 5 to 12 st aside (still under it): railSlab's column top is lowered by the slant
 --                     (C.SLAB_REACH / across) and meets no ceiling; nothing else judges a move with a rail end (no wall
 --                     test, the wall anchor moves to it) and reachable() asks the same column
+--   roof the rail runs in  the bridges over the core houses lie on or up to 0.5 st inside their pitched roofs: 0.5 st
+--                     under the rail is under the roof plate, so a drop straight down into the attic (floor 11.1, the
+--                     roof 8 to 14 st over it) is never judged, and the held place goes there
+--   meter, gaps       a sprint hidden in gaps of 1.19 s (6 in 10 s), each ending a moment into a little hop: no drain,
+--                     and the gap's whole time refills (round 10's refill of a burst's gap)
 --   endless hop       a client that keeps its own meter full and hops with the sprint key held: the server's meter never
 --                     drains (a leap's packets are in the air: no drain, and a full refill), 35 st/s for as long as it
 --                     likes against an honest 19 to 23 st/s
 --   log, lossy        honest: in at the fallen log's hole on a lossy link (5 % loss, or loss bursts): a root "wall" snap
 --                     (the crossing by the log's run at x -37 is never explained)
--- The rail slab case needs build/Town.rbxm (bake first). About 15 s: `lune run tests/run.luau validator_r10rv`.
+--   root freeze       a root written every 1.4 s while clean packets come steadily (ROOT_STALE_MAX 1.5): the body others
+--                     see stands up to 25 st behind, never drift
+-- The three rail slab cases need build/Town.rbxm (bake first). About 10 s: `lune run tests/run.luau validator_r10rv`.
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
@@ -232,6 +239,135 @@ return function(t)
 			t.eq(held, 0, "an aslant drop off a rail through a ceiling never puts the held place inside")
 		end
 	)
+
+	t.test(
+		"rail slab, a roof the rail runs in: the bridges over the core houses lie on or up to 0.5 st inside their pitched roofs, so 0.5 st under the rail is under the roof; straight down into the attic, the packets held back: judged, the held place never inside (needs build/Town.rbxm)",
+		function()
+			if not baked() then
+				t.truthy(false, "build/Town.rbxm (lune run tools/bake/main.luau)")
+				return
+			end
+			local reg = bw.registry
+			local function solid(p: any): boolean
+				local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
+				return p.squirrelSolid and not ValidatorWorld.isBough(p.name, parentName)
+			end
+			local total, judged, held = 0, 0, 0
+			local where: { [string]: number } = {}
+			for _, r in reg:all() do
+				local n = math.clamp(math.floor(r.length or 50), 2, 800)
+				for k = 0, n do
+					local p = reg:pointAt(r, k / n)
+					-- (a roof whose top is within 0.6 st over or under the rail point, a closed space under it)
+					local tt, part = town.raycast(p.x, p.y + 3, p.z, 0, -4.5, 0, solid)
+					if not (tt and part) then
+						continue
+					end
+					local top = p.y + 3 - 4.5 * tt
+					if math.abs(top - p.y) > 0.6 then
+						continue
+					end
+					-- (the roof's underside at this column, and the floor under it)
+					local t1 = town.raycast(p.x, p.y - 8, p.z, 0, 8, 0, solid)
+					if t1 == nil then
+						continue
+					end
+					local roofUnder = p.y - 8 + 8 * t1
+					local t2, floor = town.raycast(p.x, roofUnder - 0.05, p.z, 0, -40, 0, solid)
+					if not (t2 and floor) then
+						continue
+					end
+					local fy = roofUnder - 0.05 - 40 * t2
+					if roofUnder - fy < 2 then
+						continue
+					end
+					local closed = true
+					for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+						if town.raycast(p.x, fy + 1.1, p.z, d[1] * 30, 0, d[2] * 30, solid) == nil then
+							closed = false
+						end
+					end
+					if not closed then
+						continue
+					end
+					total += 1
+					local on = SquirrelMotor.new(p.x, p.y, p.z)
+					on.routeId, on.railT, on.grounded = r.id, k / n, false
+					local off = SquirrelMotor.new(p.x, fy, p.z)
+					off.grounded = true
+					if MoveValidator.throughSlab(bvworld, on :: any, off) then
+						judged += 1
+						continue
+					end
+					-- end to end: on the rail, then the first packet on the floor under the roof, then standing there
+					local snaps = 0
+					local ms = MovementService.new({
+						validator = MoveValidator.new(bvworld),
+						enforce = true,
+						poseOf = function(_a: any): (number, number, number)
+							return p.x, p.y, p.z
+						end,
+						engine = {
+							correct = function(_id: any, msg: any)
+								if msg.snap then
+									snaps += 1
+								end
+							end,
+							pin = function(): boolean
+								return true
+							end,
+							hold = function() end,
+						},
+					})
+					ms:onHandoff({ id = "a", species = "squirrel" }, nil, "possess")
+					local epoch = ms:epochOf("a")
+					local seq, now = 0, 100
+					local function send(st: any, dt: number)
+						seq += 1
+						now += dt
+						st.clock = now - 90
+						local _, e, dec =
+							SquirrelWire.decode(SquirrelWire.encode(seq, epoch, SquirrelMotor.serialize(st)))
+						ms:packet("a", "squirrel", { seq = seq, epoch = e, snapshot = dec }, now)
+						ms:watch("a", st.x, st.y, st.z, now)
+						epoch = ms:epochOf("a")
+					end
+					for _ = 1, 15 do
+						local st = SquirrelMotor.new(p.x, p.y, p.z)
+						st.routeId, st.railT, st.grounded = r.id, k / n, false
+						send(st, 1 / 30)
+					end
+					local tau = math.sqrt(2 * (p.y - fy) / SquirrelMotor.params.gravity)
+					local st = SquirrelMotor.new(p.x, fy, p.z)
+					st.grounded = true
+					send(st, tau)
+					for _ = 1, 45 do
+						send(SquirrelMotor.new(p.x, fy, p.z), 1 / 30)
+					end
+					local _, hy = ms:heldPlace("a")
+					if hy ~= nil and hy < roofUnder - 1 and snaps == 0 then
+						held += 1
+						local key =
+							`{r.kind} {r.id} under {part.path} (floor {string.format("%.1f", fy)}, roof's underside {string.format(
+								"%.1f",
+								roofUnder
+							)})`
+						where[key] = (where[key] or 0) + 1
+					end
+				end
+			end
+			for k, v in where do
+				print(`      {k}: held inside after {v} drops`)
+			end
+			print(
+				`      {total} rail samples on or in a roof over a closed space: {judged} straight drops judged, {held} held inside`
+			)
+			t.truthy(total > 20, `drops tried ({total})`)
+			t.eq(judged, total, "every drop through a roof the rail runs in is judged")
+			t.eq(held, 0, "never held inside")
+		end
+	)
+
 	-- the sprint meter --------------------------------------------------------------------------------------------------
 	-- (open ground: no walls, the ground at y 0, as validator_r10's "meter")
 	local function flat(): any
@@ -416,6 +552,64 @@ return function(t)
 			end
 			print(`      {snaps} snaps over {runs} runs in at the fallen log`)
 			t.eq(snaps, 0, "honest runs into the fallen log on a lossy link are not snapped")
+		end
+	)
+
+	-- the root held still while the packets run on ------------------------------------------------------------------------
+	t.test(
+		"root freeze: a root written only every 1.4 s while clean packets come steadily at 30 Hz (no burst: the root's updates are not held up with them), walking 12 s: snapped",
+		function()
+			local snaps: { string } = {}
+			local at = { x = 0, y = 0, z = -200 }
+			local ms = MovementService.new({
+				validator = MoveValidator.new(flat()),
+				enforce = true,
+				poseOf = function(_a: any): (number, number, number)
+					return at.x, at.y, at.z
+				end,
+				engine = {
+					correct = function(_id: any, msg: any)
+						if msg.snap then
+							table.insert(snaps, msg.why)
+						end
+					end,
+					pin = function(): boolean
+						return true
+					end,
+					hold = function() end,
+				},
+			})
+			ms:onHandoff({ id = "a", species = "squirrel" }, nil, "possess")
+			local speed = SquirrelMotor.params.walk
+			local seq, now = 0, 100
+			local x, rx, lastRoot, worst = at.x, at.x, now, 0
+			for i = 1, 12 * 30 do
+				seq += 1
+				now += 1 / 30
+				if i > 10 then
+					x += speed / 30
+				end
+				local st = SquirrelMotor.new(x, 0, at.z)
+				st.vx = if i > 10 then speed else 0
+				st.clock = now - 90
+				local _, e, dec =
+					SquirrelWire.decode(SquirrelWire.encode(seq, ms:epochOf("a"), SquirrelMotor.serialize(st)))
+				ms:packet("a", "squirrel", { seq = seq, epoch = e, snapshot = dec }, now)
+				if now - lastRoot >= 1.4 then
+					lastRoot, rx = now, x
+				end
+				if i % 2 == 0 then
+					ms:watch("a", rx, 0, at.z, now)
+				end
+				worst = math.max(worst, x - rx)
+			end
+			print(
+				`      the root up to {string.format("%.1f", worst)} st behind the packets for 12 s: snaps [{table.concat(
+					snaps,
+					", "
+				)}]`
+			)
+			t.truthy(#snaps > 0, "a root held still while the packets come steadily is drift")
 		end
 	)
 end
