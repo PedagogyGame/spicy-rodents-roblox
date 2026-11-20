@@ -91,6 +91,7 @@ local MoveValidator = require("../Movement/MoveValidator")
 local ValidatorWorld = require("../Movement/ValidatorWorld")
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
+local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local CombatService = require("../Combat/CombatService")
@@ -1002,6 +1003,22 @@ function Game.start(opts: Opts?): any
 				{ seq = seq, epoch = epoch, snapshot = snapshot },
 				workspace:GetServerTimeNow()
 			)
+			-- the air trick (owner D17): an accepted packet's move goes on the body for every other client to pose
+			-- (Shared/Movement/AirTrick: AirTrick, AirTrickAt; a snapped one is not shown)
+			local body = actor.body :: Model?
+			if type(v) == "table" and v.accepted and not v.snapped and body then
+				local kind, at = AirTrick.mark(
+					body:GetAttribute(AirTrick.ATTR.kind),
+					body:GetAttribute(AirTrick.ATTR.at),
+					tonumber(snapshot.trickKind) or 0,
+					tonumber(snapshot.trickTime) or 0,
+					workspace:GetServerTimeNow()
+				)
+				if kind and at then
+					body:SetAttribute(AirTrick.ATTR.kind, kind)
+					body:SetAttribute(AirTrick.ATTR.at, at)
+				end
+			end
 			local click = if type(v) == "table" then v.click else nil
 			if click and clickCopy then
 				clickCopy(player, click.clock, click.seq)

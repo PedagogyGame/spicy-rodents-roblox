@@ -23,6 +23,7 @@ local SewerAmbience = require("@client/World/SewerAmbience")
 local ClientGames = require("@client/Minigames/ClientGames")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
 local NutMeter = require("@client/UI/NutMeter")
+local AirTrick = require("@shared/Movement/AirTrick")
 
 local UPLOAD_PLAN = 12 -- uploads planned at most (40 a month working, at least 50 kept for the owner's other games)
 
@@ -67,6 +68,7 @@ return function(t)
 			["Server/Rides/SkyLiftService CUES"] = sky,
 			["Client/Minigames (every game's sounds)"] = MinigameSounds.CUES,
 			["Client/UI/NutMeter PICK_SOUND"] = { ["Nuts.Pick"] = NutMeter.PICK_SOUND.id },
+			["Shared/Movement/AirTrick SOUNDS"] = AirTrick.SOUNDS,
 		}
 	end
 
