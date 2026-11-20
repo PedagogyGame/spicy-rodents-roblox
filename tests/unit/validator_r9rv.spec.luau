@@ -11,7 +11,8 @@
 --   rail         reachable() takes a line "on the rails" (both ends within ROUTE_NEAR, 8.5 st, of the route one of
 --                them claims) with no wall test: the held place on a tree trunk beside a closed room, one long packet
 --                through the wall, then clean packets inside within 8.5 st of the trunk: held inside. (In the baked town
---                every core house has its trunk within 8.5 st of its sealed storey.)
+--                every core house has its trunk within 8.5 st of its sealed storey.) Also through a snap's gate: snapped back
+--                onto the trunk, the new epoch's first packet 6 st inside passes the gate (onRails along) with no doubt.
 --   root creep   the root's wall test (MovementService._rootPath: crosses) judges no move shorter than MIN_CHORD: a root
 --                written 0.033 st a watch sample walks through any wall while clean packets stand outside (within
 --                DRIFT_BASE and SILENT_MOVE), and stays there (the duel's pose is the root once the packets stop).
@@ -213,123 +214,138 @@ return function(t)
 		)
 	end
 	-- rail -------------------------------------------------------------------------------------------------------------
-	t.test(
-		"rail: the held place on a trunk beside a closed room, one long packet through the wall, clean packets inside within 8.5 st of the trunk: held inside",
-		function()
-			local base = TestWorld.build({})
-			-- (a trunk of the generated town near the middle, its foot on the ground)
-			local trunk: any = nil
-			for _, r in Driver.targetsAround(base, 0, 0, 400) do
-				local foot = base.registry:foot(r)
-				if math.abs(foot.y - base.groundHeight) < 1 then
-					trunk = r
-					break
-				end
-			end
-			local foot = base.registry:foot(trunk)
-			-- (the room's west wall 3 to 4 st east of the trunk's centreline)
-			local ox, oz = foot.x + 4, foot.z
-			local boxes = roomBoxes(ox, oz, true)
-			local inside = insideOf(ox, oz)
-			local world, vworld = worlds(boxes, base)
-			local g = world.groundHeight
-			local jumped = false
-			local rootAt: V3? = nil
-			local rig: any
-			rig = LiveRig.new({
-				world = world,
-				vworld = vworld,
-				link = { latency = 0.05, jitter = 0, loss = 0 },
-				seed = 92,
-				silent = function(at: number): boolean
-					return at >= 4 and at < 4.25
-				end,
-				-- (off the trunk and 9 st east of it, inside, at the end of the pause: one long line through the wall)
-				cheat = function(state: State, _input: any, at: number, _w: any)
-					if not jumped and at >= 4.23 then
-						jumped = true
-						SquirrelMotor.place(state, foot.x + 9, g, foot.z, true)
+	for _, viaGate in { false, true } do
+		t.test(
+			if viaGate
+				then "rail (gate): on a trunk beside a closed room, snapped back onto it (any bad packet), the new epoch's first packet inside within 8.5 st of the trunk: passes the gate, held inside"
+				else "rail: the held place on a trunk beside a closed room, one long packet through the wall, clean packets inside within 8.5 st of the trunk: held inside",
+			function()
+				local base = TestWorld.build({})
+				-- (a trunk of the generated town near the middle, its foot on the ground)
+				local trunk: any = nil
+				for _, r in Driver.targetsAround(base, 0, 0, 400) do
+					local foot = base.registry:foot(r)
+					if math.abs(foot.y - base.groundHeight) < 1 then
+						trunk = r
+						break
 					end
-				end,
-				-- (the root stays where the trunk had it)
-				rootCheat = function(p: V3, _now: number, _s: State)
-					if not jumped then
-						rootAt = { x = p.x, y = p.y, z = p.z }
-					elseif rootAt then
-						p.x, p.y, p.z = rootAt.x, rootAt.y, rootAt.z
+				end
+				local foot = base.registry:foot(trunk)
+				-- (the room's west wall 3 to 4 st east of the trunk's centreline)
+				local ox, oz = foot.x + 4, foot.z
+				local boxes = roomBoxes(ox, oz, true)
+				local inside = insideOf(ox, oz)
+				local world, vworld = worlds(boxes, base)
+				local g = world.groundHeight
+				local jumped = false
+				local rootAt: V3? = nil
+				local rig: any
+				rig = LiveRig.new({
+					world = world,
+					vworld = vworld,
+					link = { latency = 0.05, jitter = 0, loss = 0 },
+					seed = 92,
+					silent = function(at: number): boolean
+						return at >= 4 and at < (if viaGate then 4.45 else 4.25)
+					end,
+					-- (gate: one packet 30 st off, a teleport: snapped back to the held place, the trunk, under a new epoch)
+					packetCheat = function(snap: { [string]: any }, at: number): boolean?
+						if viaGate and at >= 3.95 and at < 4 then
+							snap.x += 30
+						end
+						return nil
+					end,
+					-- (off the trunk and 9 st east of it, inside, at the end of the pause: one long line through the wall;
+					-- gate: 6 st east of it, the new epoch's first packet)
+					cheat = function(state: State, _input: any, at: number, _w: any)
+						if not jumped and at >= (if viaGate then 4.43 else 4.23) then
+							jumped = true
+							SquirrelMotor.place(state, foot.x + (if viaGate then 6 else 9), g, foot.z, true)
+						end
+					end,
+					-- (the root stays where the trunk had it)
+					rootCheat = function(p: V3, _now: number, _s: State)
+						if not jumped then
+							rootAt = { x = p.x, y = p.y, z = p.z }
+						elseif rootAt then
+							p.x, p.y, p.z = rootAt.x, rootAt.y, rootAt.z
+						end
+					end,
+				})
+				local west = BakedWorld.cameraYawToward(-1, 0)
+				local onTrunkAt: any = nil
+				local function keys(at: number, s: State): SquirrelMotor.Input
+					if at < 4 then
+						-- (onto the trunk: E within its grab)
+						local i = SquirrelMotor.idleInput(west)
+						i.grab = at > 1 and at < 1.05
+						if s.routeId ~= nil and onTrunkAt == nil then
+							onTrunkAt = { id = s.routeId, x = s.x, y = s.y, z = s.z }
+						end
+						return i
 					end
-				end,
-			})
-			local west = BakedWorld.cameraYawToward(-1, 0)
-			local onTrunkAt: any = nil
-			local function keys(at: number, s: State): SquirrelMotor.Input
-				if at < 4 then
-					-- (onto the trunk: E within its grab)
-					local i = SquirrelMotor.idleInput(west)
-					i.grab = at > 1 and at < 1.05
-					if s.routeId ~= nil and onTrunkAt == nil then
-						onTrunkAt = { id = s.routeId, x = s.x, y = s.y, z = s.z }
+					-- (inside: walk back west to within 7 st of the trunk, then stand)
+					if s.x > foot.x + 7 then
+						return BakedWorld.keys(west, { fw = 1 })
 					end
-					return i
+					return SquirrelMotor.idleInput(west)
 				end
-				-- (inside: walk back west to within 7 st of the trunk, then stand)
-				if s.x > foot.x + 7 then
-					return BakedWorld.keys(west, { fw = 1 })
+				rig:possess(SquirrelMotor.new(foot.x - 2, g, foot.z), keys)
+				rig:run(4)
+				local before = rig:place() :: V3
+				local beforeSnaps = rig:result().snaps
+				local inHeld = 0
+				for _ = 1, 30 do
+					rig:run(0.05)
+					local h = rig:place()
+					if h and inside(h) then
+						inHeld += 1
+					end
 				end
-				return SquirrelMotor.idleInput(west)
-			end
-			rig:possess(SquirrelMotor.new(foot.x - 2, g, foot.z), keys)
-			rig:run(4)
-			local before = rig:place() :: V3
-			local beforeSnaps = rig:result().snaps
-			local inHeld = 0
-			for _ = 1, 30 do
-				rig:run(0.05)
-				local h = rig:place()
-				if h and inside(h) then
-					inHeld += 1
-				end
-			end
-			local held = rig:place() :: V3
-			local rel = rig:release() :: V3
-			rig:run(0.75)
-			rig.server.count -= 1
-			rig:possess(SquirrelMotor.new(rel.x, rel.y, rel.z), idle)
-			rig:run(2)
-			local where = rig:place() :: V3
-			local r = rig:result()
-			print(
-				string.format(
-					"      trunk %s foot %.1f, %.1f; on it %s; held before %.1f, %.1f, %.1f; held place inside %d of 30 samples; held %.1f, %.1f, %.1f; released at %.1f, %.1f (inside %s); after the retake %.1f, %.1f (inside %s); snaps %d %s",
-					tostring(trunk.id),
-					foot.x,
-					foot.z,
-					if onTrunkAt then string.format("route %d at y %.1f", onTrunkAt.id, onTrunkAt.y) else "never",
-					before.x,
-					before.y,
-					before.z,
-					inHeld,
-					held.x,
-					held.y,
-					held.z,
-					rel.x,
-					rel.z,
-					tostring(inside(rel)),
-					where.x,
-					where.z,
-					tostring(inside(where)),
-					r.snaps - beforeSnaps,
-					LiveRig.describe("", r)
+				local held = rig:place() :: V3
+				local rel = rig:release() :: V3
+				rig:run(0.75)
+				rig.server.count -= 1
+				rig:possess(SquirrelMotor.new(rel.x, rel.y, rel.z), idle)
+				rig:run(2)
+				local where = rig:place() :: V3
+				local r = rig:result()
+				print(
+					string.format(
+						"      trunk %s foot %.1f, %.1f; on it %s; held before %.1f, %.1f, %.1f; held place inside %d of 30 samples; held %.1f, %.1f, %.1f; released at %.1f, %.1f (inside %s); after the retake %.1f, %.1f (inside %s); snaps %d %s",
+						tostring(trunk.id),
+						foot.x,
+						foot.z,
+						if onTrunkAt then string.format("route %d at y %.1f", onTrunkAt.id, onTrunkAt.y) else "never",
+						before.x,
+						before.y,
+						before.z,
+						inHeld,
+						held.x,
+						held.y,
+						held.z,
+						rel.x,
+						rel.z,
+						tostring(inside(rel)),
+						where.x,
+						where.z,
+						tostring(inside(where)),
+						r.snaps - beforeSnaps,
+						LiveRig.describe("", r)
+					)
 				)
-			)
-			for _, v in r.violations do
-				print("        " .. v)
+				for _, v in r.violations do
+					print("        " .. v)
+				end
+				t.truthy(onTrunkAt ~= nil, "the body was on the trunk")
+				t.eq(inHeld, 0, "the held place never inside a closed room")
+				t.truthy(
+					not inside(rel) and not inside(where),
+					"a body outside a closed room is never let go inside it"
+				)
 			end
-			t.truthy(onTrunkAt ~= nil, "the body was on the trunk")
-			t.eq(inHeld, 0, "the held place never inside a closed room")
-			t.truthy(not inside(rel) and not inside(where), "a body outside a closed room is never let go inside it")
-		end
-	)
+		)
+	end
 	-- creep (the root) --------------------------------------------------------------------------------------------------
 	t.test(
 		"root creep: the root the client writes creeps through a closed room's wall at 0.5 st/s (0.033 st a watch sample) while clean packets stand outside, then the packets stop: never snapped",
