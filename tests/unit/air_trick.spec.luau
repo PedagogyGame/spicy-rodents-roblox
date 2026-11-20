@@ -354,41 +354,266 @@ return function(t)
 		end
 	)
 
-	t.test("the pose: a whole roll and a side-to-side shimmy, zero at both ends, bounded", function()
-		for _, kind in { AirTrick.ROLL, AirTrick.WIGGLE } do
-			local d = AirTrick.duration(kind)
-			t.eq(next(AirTrick.pose(kind, 0)), nil, "nothing at the start")
-			t.eq(next(AirTrick.pose(kind, d)), nil, "nothing at the end")
-			local L = AirTrick.LIMIT
-			for i = 1, 99 do
-				for bone, r in AirTrick.pose(kind, d * i / 100) do
-					for k = 1, 3 do
-						local lim = if bone == "Root" and k == 3 and kind == AirTrick.ROLL then L.roll else L.swing
-						t.truthy(math.abs(r[k] or 0) <= lim + 1e-9, `{bone}[{k}] {r[k]} at {i} %`)
-					end
-					for k = 4, 6 do
-						t.truthy(math.abs(r[k] or 0) <= L.shift + 1e-9, `{bone} shift {r[k]}`)
-					end
-					-- (the wiggle swings side to side only: no pitch of the hips, no shift up or forward)
-					if kind == AirTrick.WIGGLE then
-						t.eq(r[1] or 0, 0, `{bone}: no pitch in the wiggle`)
-						t.eq(r[5] or 0, 0)
-						t.eq(r[6] or 0, 0)
-					end
-				end
-			end
-			for bone, r in AirTrick.pose(kind, d * 0.01) do
-				t.truthy(math.abs(r[3] or 0) < 0.05 and math.abs(r[2] or 0) < 0.05, `{bone} eases in`)
+	-- (the rotation CFrame.Angles(rx, ry, rz) makes, as rows: Rx Ry Rz)
+	local function rot(r: { number }?): { number }
+		local a, b, c = if r then r[1] or 0 else 0, if r then r[2] or 0 else 0, if r then r[3] or 0 else 0
+		local ca, sa, cb, sb, cc, sc = math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(c), math.sin(c)
+		return {
+			cb * cc,
+			-cb * sc,
+			sb,
+			ca * sc + sa * sb * cc,
+			ca * cc - sa * sb * sc,
+			-sa * cb,
+			sa * sc - ca * sb * cc,
+			sa * cc + ca * sb * sc,
+			ca * cb,
+		}
+	end
+	-- (the angle between two rotations)
+	local function apart(m: { number }, n: { number }): number
+		local tr = 0
+		for i = 0, 2 do
+			for j = 0, 2 do
+				tr += m[i * 3 + j + 1] * n[i * 3 + j + 1]
 			end
 		end
+		return math.acos(math.clamp((tr - 1) / 2, -1, 1))
+	end
+	local IDENTITY = rot(nil)
+
+	t.test("the pose: the roll a whole turn; every twitch zero at both ends, upright at the end, bounded", function()
+		local d = AirTrick.duration(AirTrick.ROLL)
+		t.eq(next(AirTrick.pose(AirTrick.ROLL, 0)), nil, "nothing at the start")
+		t.eq(next(AirTrick.pose(AirTrick.ROLL, d)), nil, "nothing at the end")
 		t.near(AirTrick.pose(AirTrick.ROLL, P.trickRoll / 2).Root[3], math.pi, 1e-6, "half a turn at the middle")
 		t.near(AirTrick.pose(AirTrick.ROLL, P.trickRoll * 0.999).Root[3], 2 * math.pi, 1e-3, "a whole turn")
+		local L = AirTrick.LIMIT
+		local worstEnd, cases = 0, 0
+		for seed = 0, 1023, 7 do
+			for _, aim in
+				{ { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 0.7, 0.7 }, { -0.6, -0.8 }, { 0.2, -0.1 } }
+			do
+				local yaw = aim[1] * P.trickAimYaw
+				t.eq(next(AirTrick.pose(AirTrick.WIGGLE, 0, yaw, aim[2], seed)), nil)
+				t.eq(next(AirTrick.pose(AirTrick.WIGGLE, P.trickWiggle, yaw, aim[2], seed)), nil)
+				for i = 1, 99, 7 do
+					for bone, r in AirTrick.pose(AirTrick.WIGGLE, P.trickWiggle * i / 100, yaw, aim[2], seed) do
+						local lim = if bone == "Root" then L.roll else L.swing
+						for k = 1, 3 do
+							t.truthy(math.abs(r[k] or 0) <= lim + 1e-9, `{bone}[{k}] {r[k]}`)
+						end
+						t.truthy(math.abs(r[4] or 0) <= L.shift + 1e-9 and (r[5] or 0) == 0 and (r[6] or 0) == 0)
+					end
+				end
+				-- upright and facing its heading at the end: the Root's turn back to none, the rest nearly none
+				local last = AirTrick.pose(AirTrick.WIGGLE, P.trickWiggle * 0.999, yaw, aim[2], seed)
+				worstEnd = math.max(worstEnd, apart(rot(last.Root), IDENTITY))
+				for bone, r in last do
+					if bone ~= "Root" then
+						t.truthy(math.abs(r[1]) + math.abs(r[2]) + math.abs(r[3]) < 0.05, `{bone} settles`)
+					end
+				end
+				cases += 1
+			end
+		end
+		print(
+			string.format(
+				"      %d twitches: the furthest from upright at 99.9 %% of the move %.4f rad",
+				cases,
+				worstEnd
+			)
+		)
+		t.truthy(worstEnd < 0.02, "every twitch ends upright, facing its heading")
 		local plain = AnimationDriver.heroLayers("squirrel", 1000, 3)
 		local withTrick = AnimationDriver.heroLayers("squirrel", 1000, 3, nil, AirTrick.pose(AirTrick.ROLL, 0.2))
 		t.eq(next(plain), nil)
 		t.truthy(withTrick.Root ~= nil and withTrick.Root[3] > 0, "the roll on the hero's Root")
 	end)
 
+	t.test("the twitch: nine moves, drawn partly at random by the aim; the wiggle the most common", function()
+		-- how often each move is drawn over every seed, for an aim
+		local function counts(side: number, reach: number): { [string]: number }
+			local c: { [string]: number } = {}
+			for _, m in AirTrick.MOVES do
+				c[m] = 0
+			end
+			for seed = 0, 1023 do
+				local m = AirTrick.drawn(side, reach, seed)
+				c[m] += 1
+			end
+			return c
+		end
+		local situations = {
+			neutral = { 0, 0 },
+			small = { 0.15, -0.1 },
+			right = { 1, 0 },
+			left = { -1, 0 },
+			out = { 0, 1 },
+			["in"] = { 0, -1 },
+			outSide = { 0.8, 0.8 },
+			inSide = { -0.8, -0.8 },
+		}
+		local at: { [string]: { [string]: number } } = {}
+		for name, a in situations do
+			at[name] = counts(a[1], a[2])
+		end
+		for _, name in { "neutral", "small", "right", "out", "in", "outSide", "inSide" } do
+			local c = at[name]
+			local line = string.format("      %-8s", name)
+			for _, m in AirTrick.MOVES do
+				line ..= string.format(" %s %d", m, c[m])
+			end
+			print(line)
+		end
+		-- ordinary play: small re-aims mostly (60 %), the rest anywhere: the wiggle is drawn most
+		local rng = 12345
+		local function rand(): number
+			rng = (rng * 1103515245 + 12345) % 2147483648
+			return rng / 2147483648
+		end
+		local overall: { [string]: number } = {}
+		for _, m in AirTrick.MOVES do
+			overall[m] = 0
+		end
+		for n = 1, 4000 do
+			local side, reach
+			if rand() < 0.6 then
+				side, reach = (rand() * 2 - 1) * 0.3, (rand() * 2 - 1) * 0.3
+			else
+				side, reach = rand() * 2 - 1, rand() * 2 - 1
+			end
+			local m = AirTrick.drawn(side, reach, n % 1024)
+			overall[m] += 1
+		end
+		for _, m in AirTrick.MOVES do
+			if m ~= "wiggle" then
+				t.truthy(overall.wiggle > overall[m], `the wiggle ({overall.wiggle}) over {m} ({overall[m]})`)
+			end
+		end
+		t.truthy(at.neutral.wiggle > 512, "a near-neutral aim: mostly the wiggle")
+		-- each move turns up for its situation more often than at a neutral aim
+		local own =
+			{ spin = "right", flip = "out", tuck = "in", corkscrew = "outSide", cartwheel = "inSide", whip = "right" }
+		for m, where in own do
+			t.truthy(at[where][m] > at.neutral[m] * 2, `{m}: {at[where][m]} at {where}, {at.neutral[m]} at neutral`)
+		end
+		t.truthy(at.small.pretzel > at.out.pretzel, "the pretzel: a small aim's oddity")
+		t.truthy(at.out.starfish > at.neutral.starfish, "the starfish: a hard push's")
+		-- every move is reachable, and the same aim draws different moves on different jumps
+		for _, m in AirTrick.MOVES do
+			local seen = 0
+			for _, c in at do
+				seen += c[m]
+			end
+			t.truthy(seen > 0, `{m} is drawn somewhere`)
+		end
+		local kinds = 0
+		for _, n in at.right do
+			kinds += if n > 0 then 1 else 0
+		end
+		t.truthy(kinds >= 4, `a hard push right draws {kinds} different moves over the seeds`)
+	end)
+
+	t.test("the twitch: each move distinct; the same inputs the same pose; a moving aim blends, never pops", function()
+		-- a seed and an aim that draw each move (its share over 0.9), and its pose at the middle
+		local probes = {
+			{ 0, 0 },
+			{ 1, 0 },
+			{ -1, 0 },
+			{ 0, 1 },
+			{ 0, -1 },
+			{ 0.8, 0.8 },
+			{ -0.8, 0.8 },
+			{ 0.8, -0.8 },
+			{ -0.8, -0.8 },
+			{ 0.1, 0 },
+		}
+		local found: { [string]: { number } } = {}
+		for _, a in probes do
+			for seed = 0, 1023 do
+				local m = AirTrick.drawn(a[1], a[2], seed)
+				if found[m] == nil and AirTrick.blend(a[1], a[2], seed)[m] > 0.9 then
+					found[m] = { a[1], a[2], seed }
+				end
+			end
+		end
+		local names = {}
+		for m in found do
+			table.insert(names, m)
+		end
+		table.sort(names)
+		print(`      moves found clearly drawn: {table.concat(names, ", ")}`)
+		t.eq(#names, #AirTrick.MOVES, "every move drawn on its own somewhere")
+		local function differ(x: { [string]: { number } }, y: { [string]: { number } }): number
+			local most = 0
+			for _, pose in { x, y } do
+				for bone in pose do
+					local u, v = x[bone] or {}, y[bone] or {}
+					for k = 1, 4 do
+						most = math.max(most, math.abs((u[k] or 0) - (v[k] or 0)))
+					end
+				end
+			end
+			return most
+		end
+		for i = 1, #names do
+			for j = i + 1, #names do
+				local u, v = found[names[i]], found[names[j]]
+				local most = 0
+				for _, p in { 0.25, 0.4, 0.55, 0.7 } do
+					most = math.max(
+						most,
+						differ(AirTrick.twitch(p, u[1], u[2], u[3]), AirTrick.twitch(p, v[1], v[2], v[3]))
+					)
+				end
+				t.truthy(most > 0.08, `{names[i]} and {names[j]} differ`)
+			end
+		end
+		-- the same inputs, the same pose (every client draws alike)
+		t.eq(differ(AirTrick.twitch(0.37, 0.4, -0.2, 77), AirTrick.twitch(0.37, 0.4, -0.2, 77)), 0)
+		t.eq(AirTrick.seedOf(AirTrick.pressOf(12.5 + 0.2, P.trickWiggle - 0.2)), AirTrick.seedOf(12.5))
+		local ax, ay = AirTrick.aimAttr(P.trickAimYaw * 0.333, -0.71)
+		t.near(ax, 0.35, 1e-12)
+		t.near(ay, -0.7, 1e-12)
+		local kyaw, kreach, kseed = AnimationDriver.trickAim(
+			{ moveSpeed = 0, cadence = 0, climb = 0, trickAimYaw = 0.2, trickAimReach = -0.5, trickSeed = 9 },
+			nil,
+			nil
+		)
+		t.truthy(kyaw == 0.2 and kreach == -0.5 and kseed == 9, "the held body reads its own motor's aim")
+		-- the aim swung across during the twitch (left, through out, to right): every frame close to the last
+		local worstTurn, worstBend = 0, 0
+		for seed = 0, 1023, 3 do
+			local prev: { [string]: { number } }? = nil
+			for f = 1, 29 do
+				local p = f / 30
+				local ang = math.pi * p
+				local pose = AirTrick.twitch(p, -math.cos(ang), math.sin(ang), seed)
+				if prev then
+					worstTurn = math.max(worstTurn, apart(rot(pose.Root), rot(prev.Root)))
+					for bone, r in pose do
+						if bone ~= "Root" then
+							local q = prev[bone] or { 0, 0, 0 }
+							for k = 1, 3 do
+								worstBend = math.max(worstBend, math.abs(r[k] - (q[k] or 0)))
+							end
+						end
+					end
+				end
+				prev = pose
+			end
+		end
+		print(
+			string.format(
+				"      the aim swung left -> out -> right over the twitch, 342 seeds: at most %.2f rad of turn and %.2f of bend a frame (30 fps)",
+				worstTurn,
+				worstBend
+			)
+		)
+		t.truthy(worstTurn < 1.6, "the body's turn never pops")
+		t.truthy(worstBend < 0.5, "no bone pops")
+	end)
 	t.test("others see it: the server's attributes, written once a move, read back while it plays", function()
 		local now = 100
 		local kind, at = AirTrick.mark(nil, nil, 1, P.trickRoll - 0.1, now)

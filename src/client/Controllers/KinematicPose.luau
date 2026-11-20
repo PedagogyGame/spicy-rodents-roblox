@@ -25,6 +25,10 @@ export type Pose = {
 	-- the seconds of it left (0: none playing)
 	trick: number?,
 	trickLeft: number?,
+	-- (owner D18) the twitch's aim as the motor applies it (radians; -1 in .. 1 out) and its seed (AirTrick.seedOf)
+	trickAimYaw: number?,
+	trickAimReach: number?,
+	trickSeed: number?,
 }
 
 local KinematicPose = {}

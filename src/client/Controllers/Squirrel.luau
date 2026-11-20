@@ -72,6 +72,7 @@ local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
 local AirTrickButton = require("../UI/AirTrickButton")
 local AimMarker = require("../UI/AimMarker")
+local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
 
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 
@@ -440,6 +441,8 @@ function Squirrel.start(
 			metrics.lastEvent = e.kind
 			if e.kind == "trick" and e.reason == "wiggle" then
 				aimFrom = { yaw = f.cameraYaw, pitch = cameraPitch() }
+				-- (the twitch's seed, as the server dates it from this flight's packets: AirTrick.pressOf)
+				kin.trickSeed = AirTrick.seedOf(AirTrick.pressOf(state.clock, state.trickTime))
 			end
 		end
 		local aiming = aimFrom ~= nil and state.trickKind == 2 and not state.grounded and state.routeId == nil
@@ -500,6 +503,7 @@ function Squirrel.start(
 		kin.stalk = state.focus
 		kin.winded = state.winded
 		kin.trick, kin.trickLeft = state.trickKind, state.trickTime
+		kin.trickAimYaw, kin.trickAimReach = state.aimYaw, state.aimReach
 		if trickButton then
 			trickButton.set(AirTrickButton.shows(state :: any))
 		end

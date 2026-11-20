@@ -1017,6 +1017,19 @@ function Game.start(opts: Opts?): any
 				if kind and at then
 					body:SetAttribute(AirTrick.ATTR.kind, kind)
 					body:SetAttribute(AirTrick.ATTR.at, at)
+					if kind == AirTrick.WIGGLE then
+						-- (the twitch's seed, from the press the packet dates: the client draws the same from its own clock)
+						local press = AirTrick.pressOf(tonumber(snapshot.clock) or 0, tonumber(snapshot.trickTime) or 0)
+						body:SetAttribute(AirTrick.ATTR.seed, AirTrick.seedOf(press))
+					end
+				end
+				-- (owner D18: the twitch follows the aim; written in twentieths, only when it moves, while a wiggle plays)
+				if snapshot.trickKind == AirTrick.WIGGLE and (tonumber(snapshot.trickTime) or 0) > 0 then
+					local ax, ay = AirTrick.aimAttr(tonumber(snapshot.aimYaw) or 0, tonumber(snapshot.aimReach) or 0)
+					local was = body:GetAttribute(AirTrick.ATTR.aim)
+					if typeof(was) ~= "Vector2" or was.X ~= ax or was.Y ~= ay then
+						body:SetAttribute(AirTrick.ATTR.aim, Vector2.new(ax, ay))
+					end
 				end
 			end
 			local click = if type(v) == "table" then v.click else nil

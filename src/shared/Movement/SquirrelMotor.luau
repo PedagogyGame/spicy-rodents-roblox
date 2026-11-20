@@ -4120,10 +4120,10 @@ function SquirrelMotor.envelope(
 		local most = P.trickDown * math.min(1, P.trickReachRate * dt)
 		local down = math.max(SquirrelMotor.aimDown(-1) - SquirrelMotor.aimDown(r), -most)
 		local up = math.min(-SquirrelMotor.aimDown(r), most)
-		for _, push in { down, up } do
-			if push ~= 0 then
+		for _, extra in { down, up } do
+			if extra ~= 0 then
 				local p2 = table.clone(prev)
-				p2.vy += push
+				p2.vy += extra
 				local o2, u2, po2, j2 = envelopeCore(p2, judgedNext, dt, world, boosted, lastGrab)
 				if #o2 == 0 then
 					out, used, pounce, judged = o2, u2, po2, j2
