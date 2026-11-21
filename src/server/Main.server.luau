@@ -15,6 +15,15 @@ if ServerScriptService:FindFirstChild("S2Main", true) or ServerScriptService:Fin
 end
 
 local Game = require("./Boot/Game")
+local Import = require("./Import")
+local Flags = Import.shared("Config/Flags") :: typeof(require("../shared/Config/Flags"))
+
+-- The movement validator runs LOG-ONLY in the live game since 2026-11-21: version 51, the first the owner played with
+-- its enforcement on, snapped his honest squirrel back to the start after a few seconds and lagged. Nothing is pinned
+-- or snapped; every server system reads the newest packet's place (Movement/MovementService.heldPlace); a failure in
+-- judging a packet is caught (MovementService.packet). Turn it back on only after the validator has been seen clean in
+-- the real engine with real clients (docs/HANDOFF.md section 0). The specs keep the flag's default (on).
+Flags.set("moveValidatorEnforce", false)
 
 print("[SpicyRodents] first playable build: starting")
 local ok, err = xpcall(function()

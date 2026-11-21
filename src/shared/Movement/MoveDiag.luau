@@ -111,7 +111,7 @@ function MoveDiag.sample(meter: Meter, stats: any, now: number, enforcing: boole
 		snaps = num(stats.snaps),
 		pins = num(stats.pins),
 		holds = num(stats.holds),
-		errors = num(stats.errors),
+		errors = num(stats.judgeErrors),
 		firstError = if type(stats.firstError) == "string" then stats.firstError else nil,
 		benched = num(stats.benched),
 		unjudged = num(stats.unjudged),

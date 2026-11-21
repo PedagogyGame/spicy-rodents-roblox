@@ -65,8 +65,9 @@
 -- by its own arrival offset when that is later than the spread explains (a clock slowed while a lunge is held), a click
 -- dated at most C.CLICK_EARLY before it arrived and on its arrival when it came long after the launch it says it
 -- preceded, the spread never above the round trip the engine measures, and the pace by the validator's kept speeds.
--- SAFE MODE (Flags "moveValidatorEnforce" off, the default since 2026-11-21: versions 50 and 51 enforced, were never
--- played in the real engine first, and the owner could not play them): log-only. The client is believed, as in version
+-- SAFE MODE (Flags "moveValidatorEnforce" off: Server/Main switches it off for the live game since 2026-11-21, the
+-- flag's default stays on for the specs; versions 50 and 51 enforced, were never played in the real engine first, and
+-- the owner could not play them): log-only. The client is believed, as in version
 -- 47, and the validator only counts:
 --   * no pin, no snap, no hold, no "ignored" telling: nothing here moves a body or corrects its driver. (A move the
 --     game itself makes, teleported(): the Reset button, a minigame's knock, the lift's end, still tells the driver
@@ -81,10 +82,11 @@
 --   * a pounce is dated by the packet's own attack window; a place a Reset may use is any grounded packet off the rails;
 --   * the validator still judges every packet, for the numbers only, inside pcall: an error anywhere in it is caught,
 --     counted, logged at most once per C.FAULT_LOG seconds per body, and the packet stands unjudged; a packet whose
---     judging took longer than C.JUDGE_BUDGET benches that body's judging for C.JUDGE_BENCH seconds (counted);
+--     judging took longer than C.JUDGE_BUDGET, the second within C.JUDGE_WINDOW, benches that body's judging for
+--     C.JUDGE_BENCH seconds (counted);
 --   * watch() only remembers the root. Every other call into the validator here (a teleport's rebase, a hand-off, the
 --     meter, a re-seat's reach, a Reset's floor) is caught the same way.
--- stats() carries what the owner's panel shows (Shared/Movement/MoveDiag): accepted, codes, errors, firstError, judged,
+-- stats() carries what the owner's panel shows (Shared/Movement/MoveDiag): accepted, codes, judgeErrors, firstError, judged,
 -- judgeMs, judgeMaxMs, benched, unjudged, believed.
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:silent(actorId, now) -> boolean; M:fault(what, actorId, err); M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
@@ -165,7 +167,7 @@ export type Stats = {
 	reasons: { [string]: number },
 	accepted: number, -- squirrel packets taken as the body's place
 	codes: { [string]: number }, -- violations by code, every packet judged (flagged or not)
-	errors: number, -- errors caught in the validator's code (safe mode) or reported by the game (fault)
+	judgeErrors: number, -- errors caught in the validator's code (safe mode) or reported by the game (fault)
 	firstError: string?, -- the first of them (truncated)
 	lastError: string?,
 	judged: number, -- packets judged in safe mode, and what judging them cost:
@@ -244,6 +246,7 @@ type Squirrel = {
 	clickSeq: number?,
 	seq: number?, -- safe mode: the newest packet number taken (an older one overtaken on the way is dropped)
 	benchUntil: number?, -- safe mode: no packet of this body is judged before this server time (C.JUDGE_BENCH)
+	slowAt: number?, -- safe mode: server time of the last packet whose judging went over C.JUDGE_BUDGET
 }
 
 -- a crossing of a wall by the root's line, from (fx, fy, fz) to (x, y, z), at server time `at`
@@ -364,6 +367,7 @@ MovementService.C = table.freeze({
 	FLOOR_SEARCH = 200, -- studs: how far under a held place with no floor a Reset looks for one (safeTarget)
 	-- safe mode (log-only):
 	JUDGE_BUDGET = 0.002, -- seconds: judging one packet longer than this ...
+	JUDGE_WINDOW = 1, -- ... twice within this many seconds (one alone: a cold cache, a collection) ...
 	JUDGE_BENCH = 5, -- ... stops that body's judging for this many seconds
 	FAULT_LOG = 5, -- seconds between two log lines of one body's validator errors
 	FAULT_TEXT = 160, -- characters of an error kept for the owner's panel
@@ -435,7 +439,7 @@ function MovementService.new(deps: Deps): Movement
 			reasons = {},
 			accepted = 0,
 			codes = {},
-			errors = 0,
+			judgeErrors = 0,
 			firstError = nil,
 			lastError = nil,
 			judged = 0,
@@ -460,7 +464,7 @@ function MovementService.new(deps: Deps): Movement
 	-- seconds per body
 	local function fault(self: Movement, what: string, id: any, err: any)
 		local st = self._stats
-		st.errors += 1
+		st.judgeErrors += 1
 		local text = string.sub(`{what}: {tostring(err)}`, 1, C.FAULT_TEXT)
 		st.firstError = st.firstError or text
 		st.lastError = text
@@ -919,7 +923,9 @@ function MovementService.new(deps: Deps): Movement
 		if sq == nil then
 			return nil, nil, nil, nil
 		end
-		return sq.shot, sq.lastAt, sq.pounceAt, sq.cleanAt
+		-- (log-only, Flags "moveValidatorEnforce" off: nothing is judged against the body, so the newest packet counts
+		-- as its clean one: a bite must not wait on a verdict nobody enforces)
+		return sq.shot, sq.lastAt, sq.pounceAt, if enforcing() then sq.cleanAt else sq.lastAt
 	end
 
 	-- paceOf(actorId): the body's flat pace by its accepted packets (where each put it, at the server time it came in:
@@ -1051,27 +1057,33 @@ function MovementService.new(deps: Deps): Movement
 		if sq == nil then
 			return nil, nil, nil
 		end
-		local good = sq.good
 		if not enforcing() then
-			-- safe mode, strict or not: the newest word there is. The root the server sees once it is newer than the
-			-- last packet (or the server's last move) by C.SAFE_SILENT (the packets stopped or never came: the place a
-			-- body had before the live validator), else the newest packet, else where the server put the body
-			local g = sq.gate or sq.base
+			-- safe mode (log-only): nothing is snapped or pinned, so the body is where its client has it: the newest
+			-- word there is, whatever the validator made of it (a stale "last clean" place would leave bites, nuts and
+			-- hollows behind the body). The root the server sees once it is newer than the last packet (or the
+			-- server's last move) by C.SAFE_SILENT (the packets stopped or never came: the place a body had before the
+			-- live validator), else the newest packet. With neither: where the server put the body (strict mode: nil,
+			-- no pick-up before the body's first word)
+			local g = sq.gate or sq.pinAt or sq.base
 			local heldAt = sq.lastAt or (if g then g.at else nil) or -math.huge
 			if sq.rootX and not sq.suspended and sq.rootAt - heldAt > C.SAFE_SILENT then
 				return sq.rootX, sq.rootY, sq.rootZ
 			end
-			if good then
-				return good.x :: number, good.y :: number, good.z :: number
+			if sq.placed and sq.lastAt then
+				return sq.lastX, sq.lastY, sq.lastZ
+			end
+			if current then
+				return nil, nil, nil
 			end
 			if g then
 				return g.x, g.y, g.z
 			end
-			if sq.rootX then
-				return sq.rootX, sq.rootY, sq.rootZ
+			if sq.placed then
+				return sq.lastX, sq.lastY, sq.lastZ
 			end
 			return nil, nil, nil
 		end
+		local good = sq.good
 		if current then
 			if good == nil or sq.doubtAt ~= nil or sq.cleanAt == nil or sq.cleanAt ~= sq.lastAt then
 				return nil, nil, nil
@@ -1592,7 +1604,8 @@ function MovementService.new(deps: Deps): Movement
 	-- judge(self, actorId, sq, packet, now) -> verdict?: safe mode: the validator's word on a packet already taken, for
 	-- the numbers only. Inside pcall: an error anywhere in MoveValidator, ValidatorWorld or the envelope is caught
 	-- (fault), the validator starts afresh from the next packet, and this one stands unjudged (nil). A packet that
-	-- took longer than C.JUDGE_BUDGET to judge benches this body's judging for C.JUDGE_BENCH (nil until then)
+	-- took longer than C.JUDGE_BUDGET to judge, the second within C.JUDGE_WINDOW, benches this body's judging for
+	-- C.JUDGE_BENCH (nil until then)
 	local function judge(self: Movement, actorId: any, sq: Squirrel, packet: any, now: number): any
 		local st = self._stats
 		local validator = self.deps.validator :: any
@@ -1623,14 +1636,19 @@ function MovementService.new(deps: Deps): Movement
 			fault(self, "packet", actorId, if ok then "the validator gave no verdict" else v)
 		end
 		if ms > C.JUDGE_BUDGET * 1000 then
-			sq.benchUntil = now + C.JUDGE_BENCH
-			st.benched += 1
-			self.log:every(
-				`bench:{actorId}`,
-				C.FAULT_LOG,
-				"warn",
-				`{actorId}: judging a packet took {ms} ms; not judged for {C.JUDGE_BENCH} s`
-			)
+			local slowAt = sq.slowAt
+			sq.slowAt = now
+			if slowAt and now - slowAt <= C.JUDGE_WINDOW then
+				sq.benchUntil = now + C.JUDGE_BENCH
+				sq.slowAt = nil
+				st.benched += 1
+				self.log:every(
+					`bench:{actorId}`,
+					C.FAULT_LOG,
+					"warn",
+					`{actorId}: judging a packet took {ms} ms, the second in {C.JUDGE_WINDOW} s; not judged for {C.JUDGE_BENCH} s`
+				)
+			end
 		end
 		if not good or sq.benchUntil then
 			-- (whatever it left half done, or the gap the bench makes: the next packet judged is its new baseline)
@@ -1758,7 +1776,7 @@ function MovementService.new(deps: Deps): Movement
 		return out
 	end
 
-	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
+	(m :: any)._judge = function(self: Movement, actorId: any, kind: string, packet: any, now: number): any
 		self._stats.packets += 1
 		local enforce = enforcing()
 		local validator = self.deps.validator
@@ -2089,6 +2107,39 @@ function MovementService.new(deps: Deps): Movement
 			PoseHistory.push(history(self, actorId), now, p.x, p.y, p.z)
 		end
 		return { ok = not over, accepted = true, flagged = over }
+	end
+
+	-- packet(actorId, kind, packet, now): a motor packet from a body's driver, judged (_judge). Safe mode (log-only,
+	-- Flags "moveValidatorEnforce" off) the validator must never break play: a squirrel's packet goes through believe
+	-- (inside _judge), whose own judging is caught; should anything else in here fail, that is caught too, counted and
+	-- logged (fault), and the packet's place is still taken as the body's
+	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
+		if enforcing() then
+			return (self :: any):_judge(actorId, kind, packet, now)
+		end
+		local ok, result = pcall((m :: any)._judge, self, actorId, kind, packet, now)
+		if ok and type(result) == "table" and result.logOnly then
+			return result -- (believe's own verdict: the place already taken, or dropped for a reason)
+		end
+		if not ok then
+			fault(self, "packet", actorId, result)
+			result = { ok = true, accepted = true, violations = {}, flagged = false, unjudged = true, logOnly = true }
+		end
+		-- whatever was made of it, the body is where its client has it: the newest packet's place is the held place
+		-- (heldPlace), unless the server itself has the body elsewhere (riding, or a move the client has not heard of)
+		local sq = if RAIL_KINDS[kind] then self.squirrels[actorId] else nil
+		local shot = if type(packet) == "table" then packet.snapshot else nil
+		if
+			sq
+			and not sq.suspended
+			and (packet.epoch == nil or packet.epoch == sq.epoch)
+			and type(shot) == "table"
+			and SquirrelWire.sane(shot)
+		then
+			sq.lastAt, sq.lastX, sq.lastY, sq.lastZ, sq.placed = now, shot.x, shot.y, shot.z, true
+			sq.shot, sq.good, sq.cleanAt = shot, shot, now
+		end
+		return result
 	end
 
 	function m.pose(self: Movement, actorId: any, t: number): (number?, number?, number?)
