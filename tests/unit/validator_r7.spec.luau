@@ -124,6 +124,10 @@ return function(t)
 				local ms = MovementService.new({
 					validator = MoveValidator.new(vworld),
 					enforce = false,
+					-- (safe mode benches a body whose packets are slow to judge: on a clock that stands still, nobody)
+					clock = function(): number
+						return 0
+					end,
 					poseOf = function(_actor: any): (number, number, number)
 						return where.x, 0.45, 0
 					end,

@@ -41,6 +41,9 @@ export type Menu = {
 local PlayMenu = {}
 
 local InputMap = require("../Input/InputMap")
+local Import = require("../Import")
+local MoveDiag = Import.shared("Movement/MoveDiag") :: typeof(require("../../shared/Movement/MoveDiag"))
+local MoveDiagPanel = require("./MoveDiagPanel")
 
 PlayMenu.CHOICES = table.freeze({
 	{
@@ -71,13 +74,14 @@ local CLIMB = {
 	"W into a tree, pole or downspout  climb it",
 	"A / D  choose the way at a fork",
 	"Space  leap   ·   Q  drop   ·   E  grab",
-	"G (pad R1, the TRICK button)  mid-jump: a wiggle, then aim the rest of the jump with the mouse",
+	"G (pad R1, the TRICK button)  mid-jump: a twist and a burst the way you face, then aim the rest of the jump with the mouse",
 	"   (pad: right stick; touch: drag from the button) up to 30 degrees either way; up a little further, down sooner",
 	"G as you land  a barrel roll that keeps your speed",
 }
 
--- The help panel's lines for a role and device (device: nil | "vehicle" | "drone").
-function PlayMenu.helpLines(role: string?, device: string?): { string }
+-- The help panel's lines for a role and device (device: nil | "vehicle" | "drone"); `owner`: the place's owner also
+-- gets the line for the movement diagnostics panel (UI/MoveDiagPanel, Shared/Movement/MoveDiag.HELP).
+function PlayMenu.helpLines(role: string?, device: string?, owner: boolean?): { string }
 	if device == "vehicle" then
 		return {
 			"W  gas   ·   S  brake / reverse",
@@ -120,6 +124,9 @@ function PlayMenu.helpLines(role: string?, device: string?): { string }
 		table.insert(lines, "I  invert look up/down   ·   Alt  free the cursor")
 	end
 	table.insert(lines, "M  menu   ·   Esc > Reset  if you get stuck")
+	if owner then
+		table.insert(lines, MoveDiag.HELP)
+	end
 	return lines
 end
 
@@ -564,11 +571,12 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	local function attrs(): { [string]: any }
 		return player:GetAttributes()
 	end
+	local isOwner = MoveDiagPanel.isOwner(player) -- (the owner's help has the diagnostics key)
 
 	local function refresh()
 		local a = attrs()
 		local role = a.PlayRole :: string?
-		local lines = PlayMenu.helpLines(role, device)
+		local lines = PlayMenu.helpLines(role, device, isOwner)
 		local title = if device == "vehicle"
 			then "Driving the patrol car"
 			elseif device == "drone" then "Flying the police drone"

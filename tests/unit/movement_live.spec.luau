@@ -89,7 +89,7 @@ return function(t)
 		s.bridge = { fx = 1, fy = 2, fz = 3, tx = 4, ty = 5, tz = 6, elapsed = 0.125, duration = 0.25 }
 		local b = SquirrelWire.encode(77, 3, SquirrelMotor.serialize(s))
 		t.eq(buffer.len(b), Schemas.SquirrelState.size)
-		t.eq(Schemas.SquirrelState.size, 180)
+		t.eq(Schemas.SquirrelState.size, 188)
 		local seq, epoch, snap = SquirrelWire.decode(b)
 		t.eq(seq, 77)
 		t.eq(epoch, 3)

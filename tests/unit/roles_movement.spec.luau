@@ -22,7 +22,15 @@ return function(t)
 					table.insert(self.marked, id)
 				end,
 			}
-			local m = MovementService.new({ validator = MoveValidator.new(world), swept = swept, enforce = false })
+			local m = MovementService.new({
+				validator = MoveValidator.new(world),
+				swept = swept,
+				enforce = false,
+				-- (safe mode benches a body whose packets are slow to judge: on a clock that stands still, nobody)
+				clock = function(): number
+					return 0
+				end,
+			})
 			local s = SquirrelMotor.new(10, world.groundHeight, 10)
 			-- (a body's first packet is judged from a place the server holds: validator round 6)
 			m:teleported("sq", s.x, s.y, s.z, "spawn", 0)

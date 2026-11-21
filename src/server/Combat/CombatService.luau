@@ -113,7 +113,8 @@ export type Opts = {
 
 -- seconds since the last accepted packet, since the last clean one (nil: the same), and since the last pounce launch a
 -- clean packet showed
-export type Motor = { age: number, cleanAge: number?, launchAgo: number? }
+-- (believed: the movement validator's safe mode with no packet of the rodent coming: the click alone is the pounce)
+export type Motor = { age: number, cleanAge: number?, launchAgo: number?, believed: boolean? }
 
 export type Zone = { x: number, z: number, at: number, untilT: number, biter: number }
 
@@ -230,6 +231,7 @@ function CombatService.new(opts: Opts): Service
 			zones = 0,
 			chases = 0,
 			noMotor = 0,
+			believed = 0,
 			dropped = 0,
 			rallied = 0,
 			rallyAttack = 0,
@@ -1049,7 +1051,11 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 			-- never clean): a click alone bites nobody, and neither does a lunge held back for a better moment
 			local m = motorOf(id)
 			local launchAt = if m and m.launchAgo then now - m.launchAgo else nil
-			if
+			if m and m.believed then
+				-- (the movement validator's safe mode with no packet of the rodent coming, Boot/Game: the click alone
+				-- is the pounce, as before the live validator)
+				self._stats.believed += 1
+			elseif
 				m == nil
 				or m.age > P.motorFresh
 				or (m.cleanAge or m.age) > P.motorFresh

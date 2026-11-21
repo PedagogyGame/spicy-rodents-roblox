@@ -51,7 +51,7 @@ Schemas.MotorState = BufferCodec.layout({
 	{ name = "vz", kind = "f32" },
 })
 
--- 180 bytes: Movement/SquirrelWire.
+-- 188 bytes: Movement/SquirrelWire.
 Schemas.SquirrelState = SquirrelWire.LAYOUT
 
 -- 13 bytes per vehicle (§1.6 VehiclePoses): yaw and speed pre-quantised to bytes by the sender.
@@ -88,6 +88,7 @@ Schemas.REMOTES = {
 	["Possession.Granted"] = { dir = "s2c", reliable = true },
 	["Possession.Revoked"] = { dir = "s2c", reliable = true },
 	Correction = { dir = "s2c", reliable = true },
+	["Move.Diag"] = { dir = "s2c", reliable = false }, -- the movement diagnostics, to the place's owner (Movement/MoveDiag)
 	ActionResult = { dir = "s2c", reliable = true },
 	Telegraph = { dir = "s2c", reliable = false },
 	VehiclePoses = { dir = "s2c", reliable = false },

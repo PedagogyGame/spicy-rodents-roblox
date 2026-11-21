@@ -57,6 +57,7 @@ local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
 local SneakMeter = require("./UI/SneakMeter")
 local NutMeter = require("./UI/NutMeter")
+local MoveDiagPanel = require("./UI/MoveDiagPanel")
 local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
@@ -132,6 +133,11 @@ end
 local sneakOk, sneakErr = pcall(SneakMeter.start)
 if not sneakOk then
 	warn(`Client: SneakMeter failed: {sneakErr}`)
+end
+-- the owner's movement diagnostics (F8; nothing for anyone else): the server's validator numbers and this client's
+local diagOk, diagErr = pcall(MoveDiagPanel.start)
+if not diagOk then
+	warn(`Client: MoveDiagPanel failed: {diagErr}`)
 end
 -- the squirrel's nuts: carried, and the hollow tree it holds (the server's Foraging/ForageService and HollowService)
 local nutOk, nutErr = pcall(NutMeter.start)

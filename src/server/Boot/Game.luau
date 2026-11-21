@@ -82,6 +82,8 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local PowerRules = Import.shared("Rodent/PowerRules") :: typeof(require("../../shared/Rodent/PowerRules"))
 local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
+local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
+local MoveDiag = Import.shared("Movement/MoveDiag") :: typeof(require("../../shared/Movement/MoveDiag"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
@@ -177,6 +179,8 @@ export type MovementDeps = {
 	cover: ValidatorWorld.Ray?, -- the down ray the roof check casts (past the bough cylinders); default `down`
 	cars: ValidatorWorld.Cars?, -- the cars' boxes the rays meet as well (TrafficService.solids)
 	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of a squirrel's chili rush
+	-- snap flagged squirrels back (MovementService's deps.enforce); nil: Flags "moveValidatorEnforce" (off: safe mode)
+	enforce: boolean?,
 }
 
 -- movement(deps): the movement service the game runs, with the squirrel validator switched on (spike S3: every
@@ -188,7 +192,19 @@ function Game.movement(deps: MovementDeps): any
 	local world =
 		ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down, cover = deps.cover, cars = deps.cars })
 	local validator = MoveValidator.new(world, { boostOf = deps.boostOf })
-	return MovementService.new({ swept = deps.swept, validator = validator })
+	return MovementService.new({ swept = deps.swept, validator = validator, enforce = deps.enforce })
+end
+
+-- placeOwner(player): the one who reads the movement diagnostics (Shared/Movement/MoveDiag): a dev (Config/Flags: any
+-- player in Studio, the dev list) or the account that owns the place
+function Game.placeOwner(player: any): boolean
+	local ok, yes = pcall(function(): boolean
+		if Flags.isDev(player) then
+			return true
+		end
+		return game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId
+	end)
+	return ok and yes == true
 end
 
 export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
@@ -1029,6 +1045,14 @@ function Game.start(opts: Opts?): any
 						-- (the twitch's seed, from the press the packet dates: the client draws the same from its own clock)
 						local press = AirTrick.pressOf(tonumber(snapshot.clock) or 0, tonumber(snapshot.trickTime) or 0)
 						body:SetAttribute(AirTrick.ATTR.seed, AirTrick.seedOf(press))
+						-- (owner D20: the turn its burst was asked, for the throw every other client poses; none when the
+						-- wiggle came with no burst)
+						local thrown =
+							AirTrick.thrown(tonumber(snapshot.trickTime) or 0, tonumber(snapshot.burstWait) or 0)
+						body:SetAttribute(
+							AirTrick.ATTR.turn,
+							if thrown then AirTrick.turnAttr(tonumber(snapshot.trickTurn) or 0) else nil
+						)
 					end
 				end
 				-- (owner D18: the twitch follows the aim; written in twentieths, only when it moves, while a wiggle plays)
@@ -1074,20 +1098,59 @@ function Game.start(opts: Opts?): any
 			local body = if actor and isSquirrelFamily(actor) then actor.body :: Model else nil
 			local root = if body then body.PrimaryPart else nil
 			if actor and body and root then
-				local ride = body:GetAttribute("Ride") ~= nil
-				local p = root.Position
-				if ride ~= (onLift[actor.id] == true) then
-					onLift[actor.id] = ride
-					movement:suspend(actor.id, ride)
-					if not ride then
-						-- off the sky lift where the platform put it, under a new epoch
-						movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, "ride", t)
+				-- (each body in its own pcall: one body's failure costs the others nothing, and is counted for the
+				-- owner's panel, logged at most every few seconds: MovementService.fault)
+				local ok, err = pcall(function()
+					local ride = body:GetAttribute("Ride") ~= nil
+					local p = root.Position
+					if ride ~= (onLift[actor.id] == true) then
+						onLift[actor.id] = ride
+						movement:suspend(actor.id, ride)
+						if not ride then
+							-- off the sky lift where the platform put it, under a new epoch
+							movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, "ride", t)
+						end
 					end
-				end
-				if not ride then
-					movement:watch(actor.id, p.X, p.Y - hipOf(body), p.Z, t)
+					if not ride then
+						movement:watch(actor.id, p.X, p.Y - hipOf(body), p.Z, t)
+					end
+				end)
+				if not ok then
+					movement:fault("watch", actor.id, err)
 				end
 			end
+		end
+	end
+	-- the movement diagnostics (Shared/Movement/MoveDiag): the validator's counters as rates, once a second to the
+	-- place's owner (Net "Move.Diag"; the panel on F8, Client/UI/MoveDiagPanel) and every MoveDiag.LOG_EVERY seconds
+	-- to the server log
+	local diagMeter, diagLog = MoveDiag.new(), MoveDiag.new()
+	local diagAcc, diagLogAcc = 0, 0
+	local function enforcingNow(): boolean
+		local e = movement.deps.enforce
+		if e ~= nil then
+			return e
+		end
+		return Flags.enabled("moveValidatorEnforce")
+	end
+	local function diagnose(dt: number)
+		diagAcc += dt
+		diagLogAcc += dt
+		if diagAcc >= MoveDiag.SEND_EVERY then
+			diagAcc = 0
+			local report = MoveDiag.sample(diagMeter, movement:stats(), workspace:GetServerTimeNow(), enforcingNow())
+			if net then
+				for _, player in Players:GetPlayers() do
+					if Game.placeOwner(player) then
+						net:fire(player, "Move.Diag", report)
+					end
+				end
+			end
+		end
+		if diagLogAcc >= MoveDiag.LOG_EVERY then
+			diagLogAcc = 0
+			local report = MoveDiag.sample(diagLog, movement:stats(), workspace:GetServerTimeNow(), enforcingNow())
+			print("[SpicyRodents] " .. table.concat(MoveDiag.lines(report, nil), " | "))
 		end
 	end
 
@@ -1581,11 +1644,16 @@ function Game.start(opts: Opts?): any
 				if actor == nil then
 					return nil
 				end
+				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
+				if movement:silent(actor.id, t) then
+					-- (the validator's safe mode and no packet of this body coming: the click alone is believed, as
+					-- before the live validator; the bite is judged at the body's root, poseOf below)
+					return { age = 0, cleanAge = 0, believed = true }
+				end
 				local snap, at, pounceAt, cleanAt = movement:motorOf(actor.id)
 				if snap == nil or at == nil then
 					return nil
 				end
-				local t = workspace:GetServerTimeNow() -- (the validator's clock; the duel has its own)
 				return {
 					age = t - at,
 					cleanAge = if cleanAt then t - cleanAt else math.huge,
@@ -1742,8 +1810,9 @@ function Game.start(opts: Opts?): any
 			watchSquirrels(dt)
 		end)
 		if not okSq then
-			warn(`[SpicyRodents] squirrel watch failed: {errSq}`)
+			movement:fault("watch", "all", errSq) -- (counted, logged at most every few seconds: never a line a frame)
 		end
+		pcall(diagnose, dt)
 		-- the fleet steps, then an even 15 pose sends a second go out stamped with `now`: one call that
 		-- the headless replay (tools/sim) makes too, so what it measures is what this server does
 		local hits = traffic:frame(dt, now, trafficWorld() :: any, net)

@@ -43,6 +43,7 @@ local Quadruped = require("../Controllers/Quadruped")
 local Vehicle = require("../Controllers/Vehicle")
 local Drone = require("../Controllers/Drone")
 local MotorLink = require("../Controllers/MotorLink")
+local MotorHealth = require("../Controllers/MotorHealth")
 local SkyLiftView = require("../Rides/SkyLiftView")
 local Telescope = require("../Rides/Telescope")
 
@@ -221,6 +222,7 @@ function PossessionClient.start(opts: Opts): Client
 	local link = MotorLink.new(function(b: buffer)
 		if up then
 			(up :: any):FireServer(b)
+			MotorHealth.sent() -- (the owner's movement panel: packets sent a second)
 		end
 	end)
 	if down then
