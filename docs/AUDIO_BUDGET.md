@@ -205,6 +205,7 @@ Mild: no crunch, no pain sounds. Played at the body.
 | `Duel.Windup` | the rodent's pounce wind-up, or a feint | Creature Vocal, Spider Hiss Exhale 1: a short hiss (9113990336) |
 | `Duel.Strike` | a person's kick, swing or baton comes down | Whoosh Heavy Punches 3: arm swings (9120729007) |
 | `Duel.Blow` | the blow lands on the rodent | Squeaky Toy 2: a toy hit and squeak (9119536562) |
+| `Road.Flat` (`src/server/Wildlife/RoadSquirrels.luau` `SOUNDS`) | a car knocks one of the computer's squirrels flat (owner D21) | the same Squeaky Toy 2 (9119536562): no new sound, no upload |
 | `Duel.Batted` | a bite batted away | Baseball Fist Slap Into Glove (9125376871) |
 | `Duel.Squareup` | someone squares up to the rodent | Video Game Effects 18: a fight yell (9120416894) |
 | `Duel.Shout` | someone on the scene of a bite backs off | Male Vocal Gasps Exclamations 3 (9116457156) |

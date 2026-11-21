@@ -198,7 +198,8 @@ local function lookAI(self: Service, now: number, day: number)
 	local C = ForageRules.C
 	for _, a in self.squirrels do
 		local id = a.id
-		if self.world.possessed[id] or not ForageRules.forages(a.species, a.variant) then
+		-- (not a body a player holds, not the Spicy Rodent, not one a car knocked flat: Wildlife/RoadSquirrels)
+		if self.world.possessed[id] or a.gone or not ForageRules.forages(a.species, a.variant) then
 			continue
 		end
 		local feet = a.y - (a.hip or 0)

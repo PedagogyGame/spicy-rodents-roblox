@@ -39,6 +39,7 @@
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
 --   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
 --   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?); setReach(world, fn);
+--   setRoad(world, cars) -> n (the computer's squirrels cross the roads: Shared/Wildlife/RoadCrossing);
 --   listen(world, fn) -> unlisten; addCover(world, cover) -> remove; covered(world, id) -> space?
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
@@ -59,6 +60,7 @@ local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../share
 local WalkWay = Import.shared("World/WalkWay") :: typeof(require("../../shared/World/WalkWay"))
 local LookoutHill = Import.shared("Rides/LookoutHill") :: typeof(require("../../shared/Rides/LookoutHill"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
+local RoadCrossing = Import.shared("Wildlife/RoadCrossing") :: typeof(require("../../shared/Wildlife/RoadCrossing"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -232,7 +234,8 @@ local function placeThreat(world: World, actor: Common.Actor)
 			TownAI.emit(world, { kind = "uncovered", id = actor.id, t = world.now, space = was })
 		end
 	end
-	if space then
+	if space or actor.gone then
+		-- (hidden by a cover, or knocked flat on the road and away: Server/Wildlife/RoadSquirrels)
 		world.grid:remove(actor.id)
 	else
 		world.grid:set(actor.id, actor.x, actor.z)
@@ -623,6 +626,39 @@ function TownAI.setReach(
 	fn: (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) -> boolean
 )
 	world.reach = fn
+end
+
+-- setRoad(world, cars): the computer's squirrels may cross the roads from now on (Shared/Wildlife/RoadCrossing, owner
+-- D21). `cars()` is the fleet as the server has it (Traffic/TrafficService:cars: places and velocities). The crossings
+-- are found here, once: every tree (a trunk route with an end within FOOT of the ground, not an enclosed run) by a
+-- road's asphalt with a clear run (World/WalkWay.clear) to the kerb, across, and on to a tree on the other side.
+-- Without this call no squirrel leaves its rails (the specs' towns, a place without traffic). Returns how many trees
+-- have a crossing.
+TownAI.FOOT = 2.5 -- studs over the ground: a trunk's end this low is the tree's foot
+function TownAI.setRoad(world: World, cars: () -> { any }): number
+	local ends = {}
+	for _, r in world.routes.routes do
+		if r.kind ~= "trunk" or world.routes.enclosed(r.id) then
+			continue
+		end
+		for _, i in { 1, #r.points } do
+			local p = r.points[i]
+			local h = p[2] - Height.at(p[1], p[3])
+			if h > -1 and h < TownAI.FOOT then
+				table.insert(ends, { route = r.id, s = if i == 1 then 0 else r.length, x = p[1], z = p[3] })
+			end
+		end
+	end
+	local way = world.way
+	local sites = RoadCrossing.sites(ends, world.town.strips, function(x0: number, z0: number, x1: number, z1: number)
+		return WalkWay.clear(way, x0, z0, x1, z1)
+	end)
+	world.ctx.road = { cars = cars, sites = sites, crossing = 0 }
+	local n = 0
+	for _ in sites do
+		n += 1
+	end
+	return n
 end
 
 function TownAI.setFocus(world: World, fn: () -> { BrainScheduler.Focus })

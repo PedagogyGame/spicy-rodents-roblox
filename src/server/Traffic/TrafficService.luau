@@ -7,7 +7,9 @@
 --            step, then the pose stream's send through Traffic/PoseStream);
 --            :dispatchResponder(dest, opts?); :releaseResponder(v); :responderIdle() -> n;
 --            :responderHome() -> {x, z}; :dispatchIncident(scene); :markTeleported(actorId) (HANDOFF
---            rule 12); :stats(); :kinds(); :solids() -> { walls, floors } (Traffic/Solid sets, below); RunOver
+--            rule 12); :stats(); :kinds(); :solids() -> { walls, floors } (Traffic/Solid sets, below);
+--            :cars() -> { { id, x, z, vx, vz, width, length } } (every visible vehicle and its velocity over the last
+--            tick, studs/s: what the computer's squirrels look at before they cross, Shared/Wildlife/RoadCrossing); RunOver
 --            (Util/Signal); :start(ctx) (engine only: a Heartbeat loop over `frame`; never called on require).
 -- Solid cars for the movement validator (owner's playtest 2026-11-18: "I did run right through a car"; Server/Movement/
 -- ValidatorWorld): each client draws the cars a little behind this state (Traffic/Ghost: the playout delay and the
@@ -23,6 +25,10 @@
 -- fire RunOver(actorId, vehicle). Lanes are the compiled records with handedness unified (drive on the
 -- right), stop lines from Traffic/Control at the existing sign sites, the fleet from Traffic/Fleet.
 -- Vehicles are server state only; clients render ghosts from `poseRecords()` (Traffic/Ghost).
+-- The squirrels in the fatal test are whoever `world.squirrels` names this tick: the players' always, the computer's
+-- only while one is out on the asphalt (Boot/Game: owner D21). A squirrel that was not in the last tick's list has no
+-- previous place (its first tick is never a sweep): one that comes back after a while is not swept from where it was
+-- last time.
 -- A vehicle's `teleported` flag lasts one tick (1/30 s) and the stream sends every other tick, so the
 -- service remembers every jump until the next `poseRecords()` carries it: a wrap, an appearance or a
 -- responder turning round at a scene is never drawn as a slide across the road.
@@ -60,6 +66,8 @@ export type Squirrel = { id: any, x: number, y: number, z: number, teleported: b
 -- the AI drove straight through a player's car.
 export type PlayerCar = { id: any, x: number, z: number, yaw: number, width: number, length: number, speed: number? }
 export type World = { people: { Person }?, squirrels: { Squirrel }?, cars: { PlayerCar }? }
+-- A visible fleet vehicle as a squirrel at the kerb sees it (cars()): where it is and how fast it is going
+export type Car = { id: any, x: number, z: number, vx: number, vz: number, width: number, length: number }
 
 export type Stats = {
 	ticks: number,
@@ -124,6 +132,9 @@ export type TrafficService = typeof(setmetatable(
 		RunOver: Signal,
 		unified: { string },
 		still: { [number]: number }, -- seconds each vehicle has stood still (visible, not moved)
+		_cars: { Car }, -- the visible vehicles and their velocities (cars(); refilled every tick, records reused)
+		_carPool: { Car },
+		_listed: { [any]: boolean }, -- scratch: the squirrels named this tick
 		_solids: Solids,
 		-- an observer called at the end of every simulation tick (the headless replay records the true
 		-- state from it); nil in the game
@@ -286,6 +297,9 @@ function TrafficService.new(opts: Opts): TrafficService
 		RunOver = Signal.new(),
 		unified = unified,
 		still = {},
+		_cars = {},
+		_carPool = {},
+		_listed = {},
 		_solids = { walls = Solid.newSet(), floors = Solid.newSet() },
 		onTick = nil :: ((self: any) -> ())?,
 	}, TrafficService)
@@ -399,6 +413,35 @@ function TrafficService.fillSolids(
 	end
 end
 
+-- cars() -> the visible vehicles with their velocities over the last tick (a vehicle that jumped has none). The list
+-- and its records are the service's own, refilled every tick: read them, do not keep them.
+function TrafficService.cars(self: TrafficService): { Car }
+	return self._cars
+end
+
+local function fillCars(self: TrafficService, dt: number)
+	local cars, pool = self._cars, self._carPool
+	table.clear(cars)
+	local n = 0
+	for _, v in self.vehicles do
+		if v.visible then
+			n += 1
+			local c = pool[n]
+			if c == nil then
+				c = { id = v.id, x = 0, z = 0, vx = 0, vz = 0, width = 0, length = 0 }
+				pool[n] = c
+			end
+			local p = self.prev[v.id]
+			local moved = p ~= nil and p.visible and not v.teleported
+			c.id, c.x, c.z = v.id, v.x, v.z
+			c.vx = if moved then (v.x - p.x) / dt else 0
+			c.vz = if moved then (v.z - p.z) / dt else 0
+			c.width, c.length = v.box.width, v.box.length
+			cars[n] = c
+		end
+	end
+end
+
 -- solids() -> { walls, floors }: the validator's car boxes (Traffic/Solid sets, refilled every tick; header).
 function TrafficService.solids(self: TrafficService): Solids
 	return self._solids
@@ -439,9 +482,24 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 		end
 	end
 	TrafficService.fillSolids(self._solids, self.still, self.vehicles, self.prev, dt)
+	fillCars(self, dt)
 	-- the fatal test
 	local actors: { SweptCollision.ActorPose } = {}
-	for _, s in (world.squirrels or {}) :: { Squirrel } do
+	local listed = world.squirrels or {}
+	-- (a squirrel not in this tick's list keeps no previous place: see the header)
+	if next(self.prevActors) ~= nil then
+		local here = self._listed
+		table.clear(here)
+		for _, s in listed :: { Squirrel } do
+			here[s.id] = true
+		end
+		for id in self.prevActors do
+			if not here[id] then
+				self.prevActors[id] = nil
+			end
+		end
+	end
+	for _, s in listed :: { Squirrel } do
 		local p = self.prevActors[s.id]
 		table.insert(actors, {
 			id = s.id,

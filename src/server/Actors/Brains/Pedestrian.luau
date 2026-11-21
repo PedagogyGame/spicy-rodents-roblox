@@ -1,8 +1,9 @@
 --!strict
 -- ServerScriptService.Server.Actors.Brains.Pedestrian
 -- Pedestrian brain, minimal W0 version (spike S5): sidewalk-lane walking with goals, the v5.4 spot
--- reaction (flee along the lane for 8 s), traffic-free, plus a "gather" event (fender-bender
--- bystanders). Numbers from humans_actors §4.2-§4.3 (lanes 12.1 u off the road centreline, goal step
+-- reaction (flee along the lane for 8 s) to the squirrels people fear (Actors/Species.feared: the Spicy Rodent and the
+-- infected; an ordinary squirrel, a player's or the computer's, is walked past: owner D21), traffic-free, plus a
+-- "gather" event (fender-bender bystanders). Numbers from humans_actors §4.2-§4.3 (lanes 12.1 u off the road centreline, goal step
 -- R(37, 95) u, new goal within 1.7 u, inward beyond +/-225 u, clamp [-260, 260] u; speeds walk
 -- R(0.8, 1.6), cyclist R(3.2, 5.2), flee 7.1 u/s) and §5.2 (alert 8, return to walk under 2).
 -- The bite-to-hospital sequence (owner 2026-11-10) adds: a Directive (Brains/Directive: down, hidden,
@@ -31,6 +32,10 @@
 -- along the lane until untilTime, also once back on the lane after a rejoin; "end") is the same standing, closing in or
 -- backing away, looking up at a squirrel overhead. It never cuts into a duel's order (the duel's "duel" event does cut
 -- into it), a flight, a gathering or a medical order.
+-- Jumped at (Server/Wildlife/TownSquirrels, owner D21): the event "jumpedAt" (the squirrel's x and z, speed, untilTime) is
+-- a start at an ORDINARY squirrel that jumped right on the person or at them: a couple of quick steps away from it (the
+-- duel's backing away, for well under a second), then back to the lane and on their way. No alert, no report, no flight.
+-- Never into a medical order, a gathering, a flight, a duel's or the overhead watch's order; a rider rides on.
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -38,6 +43,7 @@
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../../shared/Config/Tunables"))
+local Species = Import.shared("Actors/Species") :: typeof(require("../../../shared/Actors/Species"))
 local Common = require("./Common")
 local Directive = require("./Directive")
 local Perception = require("../Perception")
@@ -73,7 +79,8 @@ type Brain = Common.Brain & {
 	gatherZ: number,
 	gatherUntil: number,
 	duel: Duel?, -- an order from Combat/CombatService while the person faces the rodent
-	duelSource: string?, -- who gave the order: "duel" (Combat/CombatService) or "overhead" (the overhead watch)
+	-- who gave the order: "duel" (Combat/CombatService), "overhead" (the overhead watch) or "startle" (jumped at)
+	duelSource: string?,
 	hurryUntil: number, -- walking on briskly (the overhead watch's "hurry") until then ...
 	hurryX: number, -- ... away from here
 	hurryZ: number,
@@ -307,8 +314,9 @@ local function speedOf(threat: Common.Actor, ctx: Common.Ctx): number
 	return if v ~= nil then v else threat.speed
 end
 
--- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted() (and is not stalking
--- them unseen: stalkedUnseen).
+-- Perception at the brain's own tick: the nearest feared squirrel (Species.feared: the Spicy Rodent or an infected one;
+-- an ordinary squirrel is nobody's fright, however near, fast or loud: owner D21) that passes spotted() (and is not
+-- stalking them unseen: stalkedUnseen).
 local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local actor = self.actor
 	local n = ctx.threats:query(actor.x, actor.z, SPOT_RADIUS, ctx.queryBuffer)
@@ -322,8 +330,8 @@ local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local bestD = math.huge
 	for i = 1, n do
 		local threat = ctx.actorsById[ctx.queryBuffer[i]]
-		local speed = if threat then speedOf(threat, ctx) else 0
-		if threat and not stalkedUnseen(actor, threat, speed) then
+		local speed = if threat and Species.feared(threat) then speedOf(threat, ctx) else 0
+		if threat and Species.feared(threat) and not stalkedUnseen(actor, threat, speed) then
 			local t = self.target
 			t.x, t.y, t.z = threat.x, threat.y, threat.z
 			t.groundY = ctx.groundAt(threat.x, threat.z)
@@ -597,6 +605,20 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 			faceX = evt.faceX,
 			faceZ = evt.faceZ,
 		}
+		return
+	end
+	if evt.type == "jumpedAt" then
+		-- (a start, the least of the orders: it cuts into nothing but the walk and the walk back to the lane)
+		if
+			Directive.active(self.directive)
+			or (self.state ~= "walk" and self.state ~= "rejoin")
+			or self.params.cyclist == true
+		then
+			return
+		end
+		self.state = "duel"
+		self.duelSource = "startle"
+		self.duel = { mode = "back", x = evt.x, z = evt.z, speed = evt.speed or 0, untilTime = evt.untilTime }
 		return
 	end
 	if evt.type == "duel" then

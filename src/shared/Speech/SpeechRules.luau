@@ -87,6 +87,10 @@ SpeechRules.CHANCE = table.freeze({
 	overheadReply = 1,
 	overheadWary = 0.6,
 	overheadLost = 0.5,
+	-- an ordinary squirrel (Server/Wildlife/TownSquirrels, owner D21): the friendly word is rare by that service's own
+	-- pacing (so every one it asks for may be said); the yelp of someone jumped at is theirs to make
+	squirrelNear = 1,
+	jumpedAt = 1,
 }) :: { [string]: number }
 
 -- How often a spotting line is the owner's own, when it was not the last line said in town.

@@ -70,43 +70,51 @@ return function(t)
 		t.eq(brain:suspend().goal, snap.goal)
 	end)
 
-	t.test("pedestrian: a loud squirrel 5 u ahead is spotted; the human flees along the lane and calms down", function()
-		local rng = lcg(2)
-		local grid = Perception.newGrid(40)
-		local byId: { [number]: Common.Actor } = {}
-		local human = Common.newActor(1, "human", "townsperson", "Pedestrian", 0, -30.25, 2.5)
-		local brain = Pedestrian.new(human, {
-			lanes = Pedestrian.defaultLanes(),
-			coreLanes = 1,
-			speedMin = Units.st(1),
-			speedMax = Units.st(1),
-			rng = rng,
-		})
-		local c = ctx(grid, byId)
-		brain:think(0.1, c)
-		-- face +x along lane 1 (z = -12.1 u) and put a sprinting squirrel 5 u ahead at ground level
-		human.yaw = math.pi / 2
-		local squirrel = Common.newActor(2, "squirrel", "normal", "Squirrel", human.x + Units.st(5), human.z, 0.9)
-		squirrel.y = 0.5
-		squirrel.speed = Units.st(16.8)
-		byId[2] = squirrel
-		grid:set(2, squirrel.x, squirrel.z)
-		brain:think(0.1, c)
-		t.eq(brain.state, "flee")
-		t.near(human.alert, 8, 1e-9)
-		t.near(human.intent.speed, Units.st(7.6))
-		t.truthy(human.intent.tx < human.x, "flees away from the squirrel along -x")
-		-- without the squirrel the alert decays and the walk resumes under 2 s of alert
-		grid:remove(2)
-		byId[2] = nil
-		c.now = 7
-		brain:think(6.5, c)
-		t.eq(brain.state, "walk")
-		brain:onEvent({ type = "gather", x = 100, z = 100, untilTime = 60 })
-		c.now = 8
-		brain:think(1, c)
-		t.eq(human.intent.tx, 100)
-	end)
+	t.test(
+		"pedestrian: a loud Spicy Rodent 5 u ahead is spotted; the human flees along the lane and calms down",
+		function()
+			local rng = lcg(2)
+			local grid = Perception.newGrid(40)
+			local byId: { [number]: Common.Actor } = {}
+			local human = Common.newActor(1, "human", "townsperson", "Pedestrian", 0, -30.25, 2.5)
+			local brain = Pedestrian.new(human, {
+				lanes = Pedestrian.defaultLanes(),
+				coreLanes = 1,
+				speedMin = Units.st(1),
+				speedMax = Units.st(1),
+				rng = rng,
+			})
+			local c = ctx(grid, byId)
+			brain:think(0.1, c)
+			-- face +x along lane 1 (z = -12.1 u) and put a sprinting squirrel 5 u ahead at ground level
+			human.yaw = math.pi / 2
+			-- (an ordinary squirrel there, sprinting, is walked past: owner D21; tests/unit/regular_squirrel_people.spec)
+			local squirrel = Common.newActor(2, "squirrel", "normal", "Squirrel", human.x + Units.st(5), human.z, 0.9)
+			squirrel.y = 0.5
+			squirrel.speed = Units.st(16.8)
+			byId[2] = squirrel
+			grid:set(2, squirrel.x, squirrel.z)
+			brain:think(0.1, c)
+			t.eq(brain.state, "walk", "nobody runs from an ordinary squirrel")
+			t.eq(human.alert, 0)
+			squirrel.variant = "spicy"
+			brain:think(0.1, c)
+			t.eq(brain.state, "flee")
+			t.near(human.alert, 8, 1e-9)
+			t.near(human.intent.speed, Units.st(7.6))
+			t.truthy(human.intent.tx < human.x, "flees away from the squirrel along -x")
+			-- without the squirrel the alert decays and the walk resumes under 2 s of alert
+			grid:remove(2)
+			byId[2] = nil
+			c.now = 7
+			brain:think(6.5, c)
+			t.eq(brain.state, "walk")
+			brain:onEvent({ type = "gather", x = 100, z = 100, untilTime = 60 })
+			c.now = 8
+			brain:think(1, c)
+			t.eq(human.intent.tx, 100)
+		end
+	)
 
 	t.test("staff: circuit of 4 points around the station, pauses, advances, round-trips", function()
 		local actor = Common.newActor(1, "human", "hospitalStaff", "Staff", 0, 0, 2.5)

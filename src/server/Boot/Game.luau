@@ -17,7 +17,8 @@
 --      click, "pounce", and F, "feint"), Event (server -> client: picked, refused, bite, bitten, med, hurt, died, kick,
 --      duel).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
--- people and the player-held squirrels (RunOver kills: "RUN OVER"), poses stream to clients at 15 Hz
+-- people and the player-held squirrels (RunOver kills: "RUN OVER") and the computer's squirrels out on the asphalt
+-- (RunOver knocks one flat: Wildlife/RoadSquirrels), poses stream to clients at 15 Hz
 -- (Net VehiclePoses, rendered by Client/Render/VehicleView), the duel steps ten times a second (Combat/CombatService:
 -- the rodent bites at the right moment of a pounce, never on contact; the townspeople and officers near it fight back,
 -- vigilantes close in, a bite opens an alert zone and sends the police; Power per Rodent/PowerRules, brief v2 §15),
@@ -56,7 +57,9 @@
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
 --   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
---   the town's people looking up at a squirrel overhead; nil when it could not start), cornerStore (Items/CornerStore;
+--   the town's people looking up at a squirrel overhead; nil when it could not start), townSquirrels (Wildlife/
+--   TownSquirrels: the people and the ordinary squirrels, owner D21; nil when it could not start), roadSquirrels
+--   (Wildlife/RoadSquirrels: the computer's squirrels a car knocks flat; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
@@ -86,6 +89,7 @@ local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
 local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 local ActorsRuntime = require("../Actors/ActorsRuntime")
+local TownAI = require("../AI/TownAI")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local BodyPin = require("../Movement/BodyPin")
@@ -120,6 +124,8 @@ local PlayerSaves = require("../Persistence/PlayerSaves")
 local Wardrobe = require("../Cosmetics/Wardrobe")
 local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
+local TownSquirrels = require("../Wildlife/TownSquirrels")
+local RoadSquirrels = require("../Wildlife/RoadSquirrels")
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
 local PeopleArt = require("../Assets/PeopleArt")
@@ -573,6 +579,8 @@ function Game.start(opts: Opts?): any
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
 	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
+	local townSquirrels: any = nil -- the people and the ordinary squirrels (section 6b-3 below), the same
+	local roadSquirrels: any = nil -- the computer's squirrels a car knocks flat (section 6b-4 below), the same
 	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
@@ -1476,14 +1484,25 @@ function Game.start(opts: Opts?): any
 		return true
 	end
 
+	-- a car's sweep hit a squirrel: a player's is knocked out ("RUN OVER"); one of the computer's ordinary squirrels,
+	-- out on the asphalt, is knocked flat and comes back later at a tree (Wildlife/RoadSquirrels; owner D21)
 	traffic.RunOver:connect(function(actorId: any, _vehicle: any)
 		local actor = rt.actors:get(actorId)
-		if actor and possession:controllerOf(actor) ~= "ai" then
+		if actor == nil then
+			return
+		end
+		if possession:controllerOf(actor) ~= "ai" then
 			kill(actor, "traffic")
+		elseif roadSquirrels then
+			local tid = townIdOf[actor.id]
+			if tid then
+				roadSquirrels:hit(tid)
+			end
 		end
 	end)
 
-	-- the traffic world: people (AI and held humans) and the player-held squirrels (fatal sweep)
+	-- the traffic world: people (AI and held humans), the player-held squirrels and the computer's squirrels that are
+	-- out on the asphalt (fatal sweep)
 	local people: { { [string]: any } } = {}
 	local squirrels: { { [string]: any } } = {}
 	local cars: { { [string]: any } } = {}
@@ -1504,7 +1523,7 @@ function Game.start(opts: Opts?): any
 				-- own people or for anyone at a scene; a patient out of sight is nobody's hazard
 				rec.hospital = infection ~= nil and infection:trafficFlags(a.id)
 				rec.visible = (a.lift or 0) == 0
-			elseif isSquirrelFamily(actor) and actor.mode ~= "ai" then
+			elseif isSquirrelFamily(actor) and (actor.mode ~= "ai" or a.crossing) then
 				table.insert(squirrels, { id = actor.id, x = a.x, y = a.y - a.hip, z = a.z })
 			end
 		end
@@ -1911,6 +1930,22 @@ function Game.start(opts: Opts?): any
 				end
 			end
 		end
+		if roadSquirrels then
+			local okRS, errRS = pcall(roadSquirrels.step, roadSquirrels, dt)
+			if not okRS then
+				warn(`[SpicyRodents] the squirrels on the roads stopped: {errRS}`)
+				pcall(roadSquirrels.stop, roadSquirrels)
+				roadSquirrels = nil
+			end
+		end
+		if townSquirrels then
+			local okTS, errTS = pcall(townSquirrels.step, townSquirrels, dt)
+			if not okTS then
+				warn(`[SpicyRodents] the people and the ordinary squirrels stopped: {errTS}`)
+				pcall(townSquirrels.stop, townSquirrels)
+				townSquirrels = nil
+			end
+		end
 	end
 
 	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
@@ -2186,6 +2221,91 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the overhead watch failed to start: {errO}`)
 	end
 
+	-- 6b-3. the town's people and the ORDINARY squirrels (Wildlife/TownSquirrels; owner D21): nobody runs from one; a
+	-- player's that leaps right on someone or at them makes them start (a step back, a yelp), and now and then
+	-- someone has a glance and a friendly word for one going by
+	do
+		local okTS, errTS = pcall(function()
+			townSquirrels = TownSquirrels.new({
+				world = world,
+				speech = townSpeech,
+				-- the leap as the validator's last accepted packet has it (the places are the AI world's record of the held
+				-- body: Movement/MovementService.heldPlace through ActorsRuntime.feedHeld)
+				airborne = function(id: number): boolean?
+					local actor = rt.byTownId[id]
+					if actor == nil then
+						return nil
+					end
+					local snap, at = movement:motorOf(actor.id)
+					return TownSquirrels.airborne(snap, if at then workspace:GetServerTimeNow() - at else nil)
+				end,
+				busy = function(id: number): boolean
+					return (infection ~= nil and infection:engaged(id))
+						or (combat ~= nil and combat:guardOf(id) ~= nil)
+						or (overhead ~= nil and overhead:stageOf(id) ~= "none")
+				end,
+				setAttr = setTownAttr,
+				gaze = function(id: number, x: number?, y: number?, z: number?)
+					setTownAttr(id, "Gaze", if x and y and z then Vector3.new(x, y, z) else nil)
+				end,
+				serverTime = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+			})
+		end)
+		if not okTS then
+			townSquirrels = nil
+			warn(`[SpicyRodents] the people and the ordinary squirrels failed to start: {errTS}`)
+		end
+	end
+
+	-- 6b-4. the computer's squirrels and the roads (owner D21): they cross by themselves, looking first (Brains/Squirrel
+	-- on Shared/Wildlife/RoadCrossing, with the fleet as this server has it), and one a car gets is knocked flat and
+	-- comes back later at a tree (Wildlife/RoadSquirrels; the RunOver handler above)
+	do
+		local okRS, errRS = pcall(function()
+			roadSquirrels = RoadSquirrels.new({
+				world = world,
+				setAttr = setTownAttr,
+				setPossessable = function(id: number, value: boolean)
+					local actor = rt.byTownId[id]
+					if actor then
+						actor.possessable = value
+					end
+				end,
+				onDown = function(id: number)
+					if hollows then
+						hollows:drop(id) -- (the nuts it carried are lost)
+					end
+				end,
+				cue = function(id: number, name: string)
+					local actor = rt.byTownId[id]
+					local root = if actor then (actor.body :: Model).PrimaryPart else nil
+					local soundId = RoadSquirrels.SOUNDS[name] or ""
+					if root and soundId ~= "" then
+						local snd = Instance.new("Sound")
+						snd.Name = name
+						snd.SoundId = soundId
+						snd.RollOffMaxDistance = 80
+						snd.Parent = root
+						snd:Play()
+						Debris:AddItem(snd, 4)
+					end
+				end,
+				serverTime = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+			})
+			TownAI.setRoad(world, function(): { any }
+				return traffic:cars()
+			end)
+		end)
+		if not okRS then
+			roadSquirrels = nil
+			warn(`[SpicyRodents] the squirrels on the roads failed to start: {errRS}`)
+		end
+	end
+
 	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
 	local dogs: any = nil
 	local okD, errD = pcall(function()
@@ -2446,6 +2566,8 @@ function Game.start(opts: Opts?): any
 		skylift = skylift,
 		rafters = rafters,
 		overhead = overhead,
+		townSquirrels = townSquirrels,
+		roadSquirrels = roadSquirrels,
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
@@ -2475,6 +2597,12 @@ function Game.start(opts: Opts?): any
 			end
 			if overhead then
 				overhead:stop()
+			end
+			if townSquirrels then
+				townSquirrels:stop()
+			end
+			if roadSquirrels then
+				roadSquirrels:stop()
 			end
 			if lounge then
 				lounge:stop()
