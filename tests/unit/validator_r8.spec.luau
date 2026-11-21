@@ -315,7 +315,9 @@ return function(t)
 			["Attractions/AttractionService.luau"] = 4,
 			["Attractions/LoungeService.luau"] = 11,
 			["Attractions/RafterService.luau"] = 5,
-			["Boot/Game.luau"] = 11,
+			-- (12th, 2026-11-21, owner D21: the road squirrels' cue parents a Sound to a knocked-flat body's PrimaryPart:
+			-- a parent kept, not a place read; the body is the computer's)
+			["Boot/Game.luau"] = 12,
 			["Items/CornerStore.luau"] = 1,
 			["Items/ItemWorld.luau"] = 13,
 			["Minigames/BowlingLane.luau"] = 2,
