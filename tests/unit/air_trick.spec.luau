@@ -1066,7 +1066,26 @@ return function(t)
 			local _, _, _, theirs = AnimationDriver.trickAim(nil, nil, 3, 1.25)
 			t.eq(theirs, 1.25, "another body's attribute")
 			local _, _, _, none = AnimationDriver.trickAim(nil, nil, nil, nil)
-			t.eq(none, 0)
+			t.eq(none, nil, "no burst: no throw")
+			local _, _, _, mineNone = AnimationDriver.trickAim(kin :: any, nil, nil, 2)
+			t.eq(mineNone, nil)
+			-- a wiggle with no burst is not posed as a throw; one with a burst is (the rest dates the same press)
+			t.truthy(AirTrick.thrown(P.trickWiggle - 0.1, P.trickBurstRest - 0.1), "pressed together")
+			t.truthy(AirTrick.thrown(P.trickWiggle - 0.1, P.trickBurstRest - 0.11), "to a frame")
+			t.falsy(AirTrick.thrown(P.trickWiggle - 0.1, 0), "no burst")
+			t.falsy(
+				AirTrick.thrown(P.trickWiggle - 0.1, P.trickBurstRest - 0.4),
+				"an earlier burst's rest still running"
+			)
+			t.eq(AirTrick.pose(AirTrick.WIGGLE, 0.1, 0, 0, 5).FrontL_Upper, nil, "no throw without a burst")
+			t.truthy(AirTrick.pose(AirTrick.WIGGLE, 0.1, 0, 0, 5, 0).FrontL_Upper ~= nil, "straight ahead: the stretch")
+			local held = leapt({ fw = 1, sprint = true }, 15)
+			step(held, { fw = 1, sprint = true, trick = true })
+			t.truthy(AirTrick.thrown(held.trickTime, held.burstWait), "the motor's burst reads as thrown")
+			local chained = leapt({ fw = 1, sprint = true }, 15)
+			chained.leapScale = P.chainCarry
+			step(chained, { fw = 1, sprint = true, trick = true })
+			t.falsy(AirTrick.thrown(chained.trickTime, chained.burstWait), "a chained leap's wiggle does not")
 		end
 	)
 

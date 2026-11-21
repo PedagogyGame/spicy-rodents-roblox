@@ -58,6 +58,14 @@ function AirTrick.turnAttr(trickTurn: number): number
 	return math.floor(math.clamp(trickTurn, -math.pi, math.pi) * 20 + 0.5) / 20
 end
 
+-- thrown(trickTime, burstWait): a wiggle with `trickTime` s left came with a burst (the motor's rest, burstWait, dates
+-- the same press: a wiggle in a chained leap's flight, or inside the rest of the last burst, has none and is not posed
+-- as a throw). Pure; the held body's controller and the server (from the packet) ask it.
+function AirTrick.thrown(trickTime: number, burstWait: number): boolean
+	local P = SquirrelMotor.params
+	return burstWait > 0 and math.abs((P.trickBurstRest - burstWait) - (P.trickWiggle - trickTime)) < 0.02
+end
+
 -- aimAttr(aimYaw, aimReach) -> (x, y): the aim as the body attribute carries it (sideways -1..1, reach -1..1, each in
 -- twentieths: a write only when it moves that far)
 function AirTrick.aimAttr(aimYaw: number, aimReach: number): (number, number)
@@ -469,7 +477,8 @@ function AirTrick.throw(elapsed: number, turn: number): { [string]: { number } }
 end
 
 -- twitch(p, sideways, reach, seed, turn?): the twitch's offsets at p (0..1) for an aim, a seed and the turn the press's
--- burst made (radians; none: 0): the throw onto the new line first, the drawn moves over and after it (pure).
+-- burst made (radians; nil: the press had no burst, so no throw): the throw onto the new line first, the drawn moves
+-- over and after it (pure).
 function AirTrick.twitch(
 	p: number,
 	sideways: number,
@@ -535,7 +544,9 @@ function AirTrick.twitch(
 		body(out, extra, (p - from) / (1 - from), 0.7 * vigour, -sg)
 	end
 	-- the throw onto the new line (owner D20), over and before the rest
-	AirTrick.onto(out, AirTrick.throw(p * SquirrelMotor.params.trickWiggle, turn or 0))
+	if turn ~= nil then
+		AirTrick.onto(out, AirTrick.throw(p * SquirrelMotor.params.trickWiggle, turn))
+	end
 	-- bounds: every bone but the Root's turn held to LIMIT
 	local L = AirTrick.LIMIT
 	for bone, r in out do
@@ -554,7 +565,7 @@ end
 
 -- pose(kind, elapsed, aimYaw?, aimReach?, seed?, turn?): the joint offsets of move `kind` `elapsed` seconds in ({}
 -- outside it): the barrel roll, or the twitch for the aim (radians, -1..1; none: no aim), the twitch's seed (seedOf; 0)
--- and the turn its press's burst made (radians; none: 0).
+-- and the turn its press's burst made (radians; nil: no burst, no throw).
 function AirTrick.pose(
 	kind: number,
 	elapsed: number,

@@ -1021,8 +1021,14 @@ function Game.start(opts: Opts?): any
 						-- (the twitch's seed, from the press the packet dates: the client draws the same from its own clock)
 						local press = AirTrick.pressOf(tonumber(snapshot.clock) or 0, tonumber(snapshot.trickTime) or 0)
 						body:SetAttribute(AirTrick.ATTR.seed, AirTrick.seedOf(press))
-						-- (owner D20: the turn its burst was asked, for the throw every other client poses)
-						body:SetAttribute(AirTrick.ATTR.turn, AirTrick.turnAttr(tonumber(snapshot.trickTurn) or 0))
+						-- (owner D20: the turn its burst was asked, for the throw every other client poses; none when the
+						-- wiggle came with no burst)
+						local thrown =
+							AirTrick.thrown(tonumber(snapshot.trickTime) or 0, tonumber(snapshot.burstWait) or 0)
+						body:SetAttribute(
+							AirTrick.ATTR.turn,
+							if thrown then AirTrick.turnAttr(tonumber(snapshot.trickTurn) or 0) else nil
+						)
 					end
 				end
 				-- (owner D18: the twitch follows the aim; written in twentieths, only when it moves, while a wiggle plays)

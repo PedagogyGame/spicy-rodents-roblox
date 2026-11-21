@@ -29,7 +29,8 @@ export type Pose = {
 	trickAimYaw: number?,
 	trickAimReach: number?,
 	trickSeed: number?,
-	-- (owner D20) the turn the wiggle's burst was asked (radians, + left; the motor's trickTurn)
+	-- (owner D20) the turn the wiggle's burst was asked (radians, + left; the motor's trickTurn); nil: the wiggle had
+	-- no burst (AirTrick.thrown)
 	trickTurn: number?,
 }
 

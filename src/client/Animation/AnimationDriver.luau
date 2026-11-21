@@ -671,21 +671,21 @@ end
 
 -- The twitch's aim, seed and the turn its press's burst made, for a body (pure): its own motor's when the controller
 -- holds it, else the server's attributes (AirTrickAim, a Vector2 of the turn over its most and the reach; AirTrickSeed;
--- AirTrickTurn, radians). (aimYaw, aimReach, seed, turn)
+-- AirTrickTurn, radians; none when the press had no burst). (aimYaw, aimReach, seed, turn?)
 function AnimationDriver.trickAim(
 	kin: KinematicPose.Pose?,
 	aim: any,
 	seed: any,
 	turn: any
-): (number, number, number, number)
+): (number, number, number, number?)
 	if kin then
-		return kin.trickAimYaw or 0, kin.trickAimReach or 0, kin.trickSeed or 0, kin.trickTurn or 0
+		return kin.trickAimYaw or 0, kin.trickAimReach or 0, kin.trickSeed or 0, kin.trickTurn
 	end
 	local yaw, reach = 0, 0
 	if typeof(aim) == "Vector2" then
 		yaw, reach = aim.X * AirTrick.MAX_YAW, aim.Y
 	end
-	return yaw, reach, if type(seed) == "number" then seed else 0, if type(turn) == "number" then turn else 0
+	return yaw, reach, if type(seed) == "number" then seed else 0, if type(turn) == "number" then turn else nil
 end
 
 -- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the

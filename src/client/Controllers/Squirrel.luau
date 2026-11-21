@@ -446,7 +446,7 @@ function Squirrel.start(
 				aimFrom = { yaw = f.cameraYaw, pitch = cameraPitch() }
 				-- (the twitch's seed, as the server dates it from this flight's packets: AirTrick.pressOf)
 				kin.trickSeed = AirTrick.seedOf(AirTrick.pressOf(state.clock, state.trickTime))
-				kin.trickTurn = state.trickTurn
+				kin.trickTurn = if AirTrick.thrown(state.trickTime, state.burstWait) then state.trickTurn else nil
 			end
 		end
 		local aiming = aimFrom ~= nil and state.trickKind == 2 and not state.grounded and state.routeId == nil
