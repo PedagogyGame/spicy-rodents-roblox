@@ -16,6 +16,9 @@
 -- calling others over), overheadLost (it has gone from sight). The one who points it out names the place only when it
 -- is so (review of the overhead watch, L5): overheadWire, overheadFence, overheadTree, overheadRoof by what it is on
 -- (Server/Stealth/OverheadService.SURFACE), the plain "overhead" lines anywhere else; no line says how it moves.
+-- An ordinary squirrel (owner D21, Server/Wildlife/TownSquirrels) frightens nobody: squirrelNear is the friendly word
+-- someone now and then has for one going by; jumpedAt is the yelp of someone it jumped right on or at (a start, never
+-- an alarm: no line calls anyone or tells anyone to run).
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
 -- Pure. No side effects on require.
@@ -174,6 +177,27 @@ Lines.GROUPS = table.freeze({
 		"Is it still up there somewhere?",
 		"I don't see it anymore.",
 	}),
+	-- an ordinary squirrel going by: a friendly word now and then (owner D21: nobody runs from a regular squirrel)
+	squirrelNear = table.freeze({
+		"Aw, a squirrel.",
+		"Hello, little one.",
+		"Look at that fluffy tail!",
+		"Busy day, squirrel?",
+		"Cute little thing.",
+		"Mind the road, little guy.",
+		"Well, hello there.",
+		"Off to find some acorns?",
+	}),
+	-- ... and one that jumped right on them or at them: a yelp, then they carry on
+	jumpedAt = table.freeze({
+		"Whoa!",
+		"Yikes! You made me jump!",
+		"Hey! Watch it, squirrel!",
+		"Eek!",
+		"Oh! Goodness, you startled me!",
+		"Hey! Not on me!",
+		"Whoa there, little guy!",
+	}),
 }) :: { [string]: { string } }
 
 Lines.SITUATIONS = table.freeze({
@@ -198,6 +222,8 @@ Lines.SITUATIONS = table.freeze({
 	"overheadReply",
 	"overheadWary",
 	"overheadLost",
+	"squirrelNear",
+	"jumpedAt",
 })
 
 function Lines.of(situation: string): { string }

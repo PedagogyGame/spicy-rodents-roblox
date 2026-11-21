@@ -32,6 +32,10 @@
 -- along the lane until untilTime, also once back on the lane after a rejoin; "end") is the same standing, closing in or
 -- backing away, looking up at a squirrel overhead. It never cuts into a duel's order (the duel's "duel" event does cut
 -- into it), a flight, a gathering or a medical order.
+-- Jumped at (Server/Wildlife/TownSquirrels, owner D21): the event "jumpedAt" (the squirrel's x and z, speed, untilTime) is
+-- a start at an ORDINARY squirrel that jumped right on the person or at them: a couple of quick steps away from it (the
+-- duel's backing away, for well under a second), then back to the lane and on their way. No alert, no report, no flight.
+-- Never into a medical order, a gathering, a flight, a duel's or the overhead watch's order; a rider rides on.
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -75,7 +79,8 @@ type Brain = Common.Brain & {
 	gatherZ: number,
 	gatherUntil: number,
 	duel: Duel?, -- an order from Combat/CombatService while the person faces the rodent
-	duelSource: string?, -- who gave the order: "duel" (Combat/CombatService) or "overhead" (the overhead watch)
+	-- who gave the order: "duel" (Combat/CombatService), "overhead" (the overhead watch) or "startle" (jumped at)
+	duelSource: string?,
 	hurryUntil: number, -- walking on briskly (the overhead watch's "hurry") until then ...
 	hurryX: number, -- ... away from here
 	hurryZ: number,
@@ -600,6 +605,20 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 			faceX = evt.faceX,
 			faceZ = evt.faceZ,
 		}
+		return
+	end
+	if evt.type == "jumpedAt" then
+		-- (a start, the least of the orders: it cuts into nothing but the walk and the walk back to the lane)
+		if
+			Directive.active(self.directive)
+			or (self.state ~= "walk" and self.state ~= "rejoin")
+			or self.params.cyclist == true
+		then
+			return
+		end
+		self.state = "duel"
+		self.duelSource = "startle"
+		self.duel = { mode = "back", x = evt.x, z = evt.z, speed = evt.speed or 0, untilTime = evt.untilTime }
 		return
 	end
 	if evt.type == "duel" then

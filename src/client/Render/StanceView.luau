@@ -11,6 +11,8 @@
 --   flinch   both arms up over the face, the body leaning away
 --   point    (the body's Gesture attribute, while no Stance is set: Server/Stealth/OverheadService) the right arm up and
 --            forward, pointing at a squirrel overhead
+--   flinch   also as a Gesture (Server/Wildlife/TownSquirrels: an ordinary squirrel jumped right on them or at them,
+--            owner D21): the same start, for under a second
 -- Nothing gory, no weapon: a stance. The bodies are R15s (the rounded townspeople keep the same Motor6Ds:
 -- Assets/PeopleArt); a body without the joints is left as it is.
 -- No service access at require time (Lune requires this module).
@@ -56,12 +58,12 @@ function StanceView.turns(stance: any): { [string]: { number } }
 	return if type(stance) == "string" then (TURNS[stance] or {}) else {}
 end
 
--- the pose a body shows: the duel's Stance, else its Gesture (a stance always wins)
+-- the pose a body shows: the duel's Stance, else its Gesture (a stance always wins): pointing, or a start
 function StanceView.effective(stance: any, gesture: any): any
 	if type(stance) == "string" then
 		return stance
 	end
-	return if gesture == "point" then gesture else nil
+	return if gesture == "point" or gesture == "flinch" then gesture else nil
 end
 
 type Entry = { body: Model, conn: RBXScriptConnection, conn2: RBXScriptConnection?, base: { [Motor6D]: CFrame } }

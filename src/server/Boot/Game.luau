@@ -56,7 +56,8 @@
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
 --   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
 --   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
---   the town's people looking up at a squirrel overhead; nil when it could not start), cornerStore (Items/CornerStore;
+--   the town's people looking up at a squirrel overhead; nil when it could not start), townSquirrels (Wildlife/
+--   TownSquirrels: the people and the ordinary squirrels, owner D21; nil when it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
@@ -118,6 +119,7 @@ local PlayerSaves = require("../Persistence/PlayerSaves")
 local Wardrobe = require("../Cosmetics/Wardrobe")
 local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
+local TownSquirrels = require("../Wildlife/TownSquirrels")
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
 local PeopleArt = require("../Assets/PeopleArt")
@@ -557,6 +559,7 @@ function Game.start(opts: Opts?): any
 	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	local rafters: any = nil -- the people under the alley's rafters (section 6b below), stepped from step(dt)
 	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
+	local townSquirrels: any = nil -- the people and the ordinary squirrels (section 6b-3 below), the same
 	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
@@ -1842,6 +1845,14 @@ function Game.start(opts: Opts?): any
 				end
 			end
 		end
+		if townSquirrels then
+			local okTS, errTS = pcall(townSquirrels.step, townSquirrels, dt)
+			if not okTS then
+				warn(`[SpicyRodents] the people and the ordinary squirrels stopped: {errTS}`)
+				pcall(townSquirrels.stop, townSquirrels)
+				townSquirrels = nil
+			end
+		end
 	end
 
 	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
@@ -2117,6 +2128,44 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] the overhead watch failed to start: {errO}`)
 	end
 
+	-- 6b-3. the town's people and the ORDINARY squirrels (Wildlife/TownSquirrels; owner D21): nobody runs from one; a
+	-- player's that leaps right on someone or at them makes them start (a step back, a yelp), and now and then
+	-- someone has a glance and a friendly word for one going by
+	do
+		local okTS, errTS = pcall(function()
+			townSquirrels = TownSquirrels.new({
+				world = world,
+				speech = townSpeech,
+				-- the leap as the validator's last accepted packet has it (the places are the AI world's record of the held
+				-- body: Movement/MovementService.heldPlace through ActorsRuntime.feedHeld)
+				airborne = function(id: number): boolean?
+					local actor = rt.byTownId[id]
+					if actor == nil then
+						return nil
+					end
+					local snap, at = movement:motorOf(actor.id)
+					return TownSquirrels.airborne(snap, if at then workspace:GetServerTimeNow() - at else nil)
+				end,
+				busy = function(id: number): boolean
+					return (infection ~= nil and infection:engaged(id))
+						or (combat ~= nil and combat:guardOf(id) ~= nil)
+						or (overhead ~= nil and overhead:stageOf(id) ~= "none")
+				end,
+				setAttr = setTownAttr,
+				gaze = function(id: number, x: number?, y: number?, z: number?)
+					setTownAttr(id, "Gaze", if x and y and z then Vector3.new(x, y, z) else nil)
+				end,
+				serverTime = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+			})
+		end)
+		if not okTS then
+			townSquirrels = nil
+			warn(`[SpicyRodents] the people and the ordinary squirrels failed to start: {errTS}`)
+		end
+	end
+
 	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
 	local dogs: any = nil
 	local okD, errD = pcall(function()
@@ -2377,6 +2426,7 @@ function Game.start(opts: Opts?): any
 		skylift = skylift,
 		rafters = rafters,
 		overhead = overhead,
+		townSquirrels = townSquirrels,
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
@@ -2406,6 +2456,9 @@ function Game.start(opts: Opts?): any
 			end
 			if overhead then
 				overhead:stop()
+			end
+			if townSquirrels then
+				townSquirrels:stop()
 			end
 			if lounge then
 				lounge:stop()
