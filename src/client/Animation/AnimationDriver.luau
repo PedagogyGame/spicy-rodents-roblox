@@ -46,6 +46,11 @@
 -- 9 studs/s, the ambulance crew at 8.6) flipped between the two clips many times a second, each flip
 -- restarting a 0.2 s cross-fade: the observed speed ripples with the replication steps. The choice
 -- now has a band (gaitClip) and its own slower speed (pace).
+-- People move smoothly and torso-led (owner D27; Animation/PeopleMotion has the numbers): a computer-run person
+-- near the camera is drawn following its root (place and facing, through the same visual root), and its clip keeps
+-- pace with the drawn body, not with the steps its root arrives in; on every person walking or running (computer-run
+-- or held) the hips' and chest's roll and yaw from the stock clip are cut to a small counter-swing, the chest leans
+-- forward with the pace and turns into a turn first. Written after the Animator, in Stepped, as the patients' legs.
 -- No side effects on require.
 -- A sculpted hero squirrel (Server/Assets/HeroArt, attribute Hero) plays its own authored clips (owner
 -- 2026-11-10: the run looked "rigid, unalive": the procedural gait only swings the legs under a stiff body,
@@ -77,6 +82,7 @@
 local Gait = require("./Gait")
 local Creep = require("./Creep")
 local Liveliness = require("./Liveliness")
+local PeopleMotion = require("./PeopleMotion")
 local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
 local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
@@ -175,6 +181,17 @@ type Entry = {
 	lean: number, -- 0..1: how much of the stagger sway is on (eased)
 	roll: number, -- rad the visible body leans by now (about the soles)
 	pitch: number,
+	-- people (Animation/PeopleMotion; nil for every other body): the drawn body following its root, where the visible
+	-- body is drawn from the root now (studs and rad), and the hips' and chest's joints with what the clip last gave
+	-- each and what was last written to it
+	follow: PeopleMotion.Follow?,
+	dx: number,
+	dz: number,
+	dyaw: number,
+	torso: { { joint: any, chest: boolean, base: CFrame, wrote: CFrame? } }?,
+	torsoW: number, -- 0..1: how much of the steadying is on (eased: walking or running, near the camera)
+	twist: number, -- rad the chest is turned toward where the person is going
+	bend: number, -- rad the chest leans forward
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -922,16 +939,35 @@ function AnimationDriver.start(opts: Opts): Driver
 			lean = 0,
 			roll = 0,
 			pitch = 0,
+			follow = nil,
+			dx = 0,
+			dz = 0,
+			dyaw = 0,
+			torso = nil,
+			torsoW = 0,
+			twist = 0,
+			bend = 0,
 		}
 		if animator and gait == nil then
-			local legs = entries[model].legs
+			local e = entries[model]
+			local legs = e.legs
+			local person = e.humanoid ~= nil and species == "human"
+			local torso = {}
 			for _, d in model:GetDescendants() do
-				if
-					(d:IsA("Motor6D") or d:IsA("AnimationConstraint"))
-					and table.find(AnimationDriver.FLAT_JOINTS, d.Name) ~= nil
-				then
-					table.insert(legs, d)
+				if d:IsA("Motor6D") or d:IsA("AnimationConstraint") then
+					if table.find(AnimationDriver.FLAT_JOINTS, d.Name) ~= nil then
+						table.insert(legs, d)
+					elseif person and (d.Name == "Root" or d.Name == "Waist") then
+						table.insert(
+							torso,
+							{ joint = d, chest = d.Name == "Waist", base = CFrame.identity, wrote = nil }
+						)
+					end
 				end
+			end
+			if person then
+				e.follow = PeopleMotion.newFollow()
+				e.torso = torso
 			end
 		end
 		if hero then
@@ -964,7 +1000,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			for _, j in e.joints do
 				j.motor.Transform = CFrame.identity
 			end
-			if e.applied ~= 0 or e.roll ~= 0 or e.pitch ~= 0 then
+			if e.applied ~= 0 or e.roll ~= 0 or e.pitch ~= 0 or e.dx ~= 0 or e.dz ~= 0 or e.dyaw ~= 0 then
 				local rj, ra = e.rootJoint, e.rootAttach
 				if rj then
 					rj.C0 = e.baseC0
@@ -1012,17 +1048,42 @@ function AnimationDriver.start(opts: Opts): Driver
 	probe.FilterDescendantsInstances = { opts.container, workspace.CurrentCamera }
 	local DOWN = Vector3.new(0, -(AnimationDriver.PROBE_UP - AnimationDriver.FIX_MIN + 0.5), 0)
 
-	-- the visible body's vertical offset from its root (world up, whatever the root's attitude), and
-	-- its lean (a stagger: about the soles, so the feet stay where they are)
-	local function applyOffset(e: Entry, off: number, roll: number?, pitch: number?)
+	-- the visible body's offset from its root: up (world up, whatever the root's attitude), its lean (a stagger: about
+	-- the soles, so the feet stay where they are) and, for a person drawn following its root, over the ground
+	-- (dx, dz, world) and turned (dyaw)
+	local function applyOffset(
+		e: Entry,
+		off: number,
+		roll: number?,
+		pitch: number?,
+		dx: number?,
+		dz: number?,
+		dyaw: number?
+	)
 		local r, p = roll or 0, pitch or 0
-		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) or r ~= e.roll or p ~= e.pitch then
+		local sx, sz, sy = dx or 0, dz or 0, dyaw or 0
+		if
+			math.abs(off - e.applied) > 0.002
+			or (off == 0 and e.applied ~= 0)
+			or r ~= e.roll
+			or p ~= e.pitch
+			or sx ~= e.dx
+			or sz ~= e.dz
+			or sy ~= e.dyaw
+			or sx ~= 0
+			or sz ~= 0 -- (an offset over the ground is in the root's own frame, which turns)
+		then
 			e.applied, e.roll, e.pitch = off, r, p
-			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
+			e.dx, e.dz, e.dyaw = sx, sz, sy
+			local shifted = e.baseC0
 			if r ~= 0 or p ~= 0 then
 				local soles = Vector3.new(0, -e.footDrop, 0)
 				shifted = CFrame.new(soles) * CFrame.Angles(p, 0, r) * CFrame.new(-soles) * shifted
 			end
+			if sy ~= 0 then
+				shifted = CFrame.Angles(0, sy, 0) * shifted
+			end
+			shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(sx, off, sz))) * shifted
 			local rj, ra = e.rootJoint, e.rootAttach
 			if rj then
 				rj.C0 = shifted
@@ -1030,6 +1091,31 @@ function AnimationDriver.start(opts: Opts): Driver
 				ra.CFrame = shifted
 			end
 		end
+	end
+
+	-- where a person is drawn from its root this frame (Animation/PeopleMotion.follow): a computer-run person near
+	-- the camera follows its root; anyone else is drawn at the root, what offset there was dying away
+	local function followRoot(e: Entry, pos: Vector3, dt: number, on: boolean): (number, number, number)
+		local fol = e.follow
+		if fol == nil then
+			return 0, 0, 0
+		end
+		local dx, dz, dyaw
+		if on then
+			local look = e.root.CFrame.LookVector
+			dx, dz, dyaw = PeopleMotion.follow(fol, pos.X, pos.Z, PeopleMotion.facing(look.X, look.Z), dt)
+		else
+			fol.live = false
+			local k = math.exp(-dt * AnimationDriver.KIN_RATE)
+			dx, dz, dyaw = e.dx * k, e.dz * k, e.dyaw * k
+		end
+		if math.abs(dx) < 0.002 and math.abs(dz) < 0.002 then
+			dx, dz = 0, 0
+		end
+		if math.abs(dyaw) < 0.0005 then
+			dyaw = 0
+		end
+		return dx, dz, dyaw
 	end
 
 	-- the visual root of one body this frame (after physics: root.Position is what renders)
@@ -1043,6 +1129,9 @@ function AnimationDriver.start(opts: Opts): Driver
 			-- on the sky lift (Client/Rides/SkyLiftView puts the root on its seat each frame): no settle, no probe
 			e.settle.live = false
 			e.fix, e.fixTarget = 0, 0
+			if e.follow then
+				e.follow.live = false
+			end
 			applyOffset(e, 0)
 			return
 		end
@@ -1122,12 +1211,38 @@ function AnimationDriver.start(opts: Opts): Driver
 				e.lean = wantLean
 			end
 		end
+		local dx, dz, dyaw = followRoot(e, pos, dt, anchored and (pos - camPos).Magnitude < PeopleMotion.RANGE)
 		if e.lean > 0 then
 			local roll, pitch = AnimationDriver.sway("symptomatic", now, e.phase)
-			applyOffset(e, off, roll * e.lean, pitch * e.lean)
+			applyOffset(e, off, roll * e.lean, pitch * e.lean, dx, dz, dyaw)
 		else
-			applyOffset(e, off)
+			applyOffset(e, off, nil, nil, dx, dz, dyaw)
 		end
+	end
+
+	-- a person's torso this frame (Animation/PeopleMotion): how much of the steadying is on, the chest's turn toward
+	-- where they are going and its forward lean; gaitStep writes them after the Animator
+	local function torsoFrame(e: Entry, pos: Vector3, dt: number, camPos: Vector3)
+		local moving = (e.current == "walk" or e.current == "run") and (pos - camPos).Magnitude < PeopleMotion.RANGE
+		local want = if moving then 1 else 0
+		if e.torsoW ~= want then
+			e.torsoW += (want - e.torsoW) * (1 - math.exp(-dt * PeopleMotion.TWIST_RATE))
+			if math.abs(want - e.torsoW) < 0.01 then
+				e.torsoW = want
+			end
+		end
+		if e.torsoW == 0 then
+			e.twist, e.bend = 0, 0
+			return
+		end
+		local fol = e.follow
+		if fol and fol.live then
+			e.twist = PeopleMotion.twist(e.twist, fol.yaw, fol.vx, fol.vz, dt)
+		else
+			local look, v = e.root.CFrame.LookVector, e.root.AssemblyLinearVelocity
+			e.twist = PeopleMotion.twist(e.twist, PeopleMotion.facing(look.X, look.Z), v.X, v.Z, dt)
+		end
+		e.bend = PeopleMotion.lean(e.speed)
 	end
 
 	local function step(dt: number)
@@ -1156,11 +1271,18 @@ function AnimationDriver.start(opts: Opts): Driver
 				e.speed, e.vy = kin.moveSpeed, 0
 				e.pace = kin.moveSpeed
 			else
-				e.speed += (inst - e.speed) * alpha
+				-- a person drawn following its root moves at the drawn body's pace (no steps in it): the clip keeps
+				-- time with what is seen
+				local fol = e.follow
+				local seen = if fol and fol.live then fol.speed else nil
+				e.speed = if seen then seen else e.speed + (inst - e.speed) * alpha
 				e.vy += (vy - e.vy) * alpha
-				e.pace = AnimationDriver.pace(e.pace, inst, dt)
+				e.pace = AnimationDriver.pace(e.pace, seen or inst, dt)
 			end
 			visualRoot(e, pos, dt, now, camPos)
+			if e.torso then
+				torsoFrame(e, pos, dt, camPos)
+			end
 			local heroSet = e.hero
 			if heroSet then
 				-- what the body is doing: the controller says so for a held body; for the rest, a root
@@ -1399,6 +1521,25 @@ function AnimationDriver.start(opts: Opts): Driver
 				-- left to put back when the pose ends)
 				for _, joint in e.legs do
 					joint.Transform = CFrame.identity
+				end
+			end
+			local torso = e.torso
+			if torso and e.torsoW > 0 then
+				-- a person walking or running: the hips and the chest steadied, the chest leaning forward and turning
+				-- into a turn, on what the clip gave each joint this frame (if the Animator did not write since, from
+				-- what it last gave: nothing is applied twice)
+				local w = e.torsoW
+				for _, j in torso do
+					local now = j.joint.Transform
+					local base = if j.wrote == now then j.base else now
+					local rx, ry, rz = base:ToOrientation()
+					local at = base.Position
+					local sx, sy, sz, px, py = PeopleMotion.steady(rx, ry, rz, at.X, at.Y, w)
+					local out = if j.chest
+						then CFrame.new(px, at.Y, at.Z) * CFrame.fromOrientation(sx - e.bend * w, sy + e.twist * w, sz)
+						else CFrame.new(px, py, at.Z) * CFrame.fromOrientation(sx, sy, sz)
+					j.base, j.wrote = base, out
+					j.joint.Transform = out
 				end
 			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then
