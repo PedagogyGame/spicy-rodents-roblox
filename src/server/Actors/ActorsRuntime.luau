@@ -415,11 +415,10 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			local actor = byTownId[a.id]
 			if actor.mode == "ai" then
 				table.insert(parts, roots[a.id])
-				-- `lift` sinks a hidden patient out of sight (Infection/InfectionService.SINK)
-				table.insert(
-					cfs,
-					Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id] + (a.lift or 0), a.z))
-				)
+				-- `lift` sinks a hidden patient out of sight (Infection/InfectionService.SINK); `roll` lays a squirrel a
+				-- car knocked flat on its side (Wildlife/RoadSquirrels)
+				local cf = Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id] + (a.lift or 0), a.z))
+				table.insert(cfs, if a.roll then cf * CFrame.Angles(0, 0, a.roll) else cf)
 				if writeAttrs then
 					local body = actor.body :: Model
 					body:SetAttribute(PossessionState.ATTR.Speed, math.floor(a.speed * 10 + 0.5) / 10)

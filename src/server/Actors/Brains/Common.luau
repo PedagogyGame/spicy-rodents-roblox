@@ -2,7 +2,7 @@
 -- ServerScriptService.Server.Actors.Brains.Common
 -- Shared contract for the minimal W0 brains: the Actor state they read, the Intent they write and
 -- the per-tick Ctx the scheduler hands them (BUILD_PLAN §1.4 Brains/*, §1.5 Actor; spike S5).
--- Interface: types Actor, Intent, Ctx (with the optional `emit` event sink and the town's `way` and `clear`),
+-- Interface: types Actor, Intent, Ctx (with the optional `emit` event sink, the town's `way` and `clear`, and `road`),
 --   Brain, Snapshot, Leg; newIntent(), newActor(), halt(actor), newLeg(), toward(leg, actor, ctx, tx, tz) (the
 --   point to walk to now on the way to a spot, never through a wall), forget(leg), steer helpers.
 -- Pure. Positions are studs, yaw is the HTML yaw (0 faces +Z; Config/Units adds the +pi at the
@@ -46,6 +46,10 @@ export type Actor = {
 	task: string?, -- what a member of staff is doing at a work stop (Brains/Staff; the body's Task attribute)
 	job: string?, -- a named employee's job (Shared/Attractions/AlleyStaff: "shoe_clerk", "mechanic", ...)
 	ride: number?, -- a street rider's slot (Shared/Vehicles/RidePuppet.rider: 1 the mime, 2-6 the kids, 7-8 the scooters)
+	-- the computer's squirrels and the roads (owner D21; Brains/Squirrel, Server/Wildlife/RoadSquirrels):
+	crossing: boolean?, -- out on the asphalt right now: in the cars' fatal sweep (Boot/Game's traffic world)
+	gone: boolean?, -- knocked flat by a car, until it comes back at a tree: out of every grid, hunt, forage and pick
+	roll: number?, -- radians the drawn body is rolled about its length (knocked flat: it lies on its side)
 }
 
 export type Grid = {
@@ -76,6 +80,16 @@ export type Ctx = {
 	-- optional: a held body's flat pace by its validated motor packets (Boot/Game: Movement/MovementService:paceOf);
 	-- nil for a body nobody holds (its `speed` is the brain's own). A held body's `speed` is what its client reports
 	paceOf: ((id: number) -> number?)?,
+	-- optional (AI/TownAI.setRoad): the roads for the computer's squirrels (Shared/Wildlife/RoadCrossing): the cars as
+	-- the server has them now, each tree's crossing by its trunk's route id, and how many squirrels are on their way
+	-- across (the town's cap). Without it no squirrel ever leaves its rails
+	road: Road?,
+}
+
+export type Road = {
+	cars: () -> { any }, -- RoadCrossing.Car
+	sites: { [number]: any }, -- route id -> RoadCrossing.Site
+	crossing: number,
 }
 
 -- A walk to a spot that may be round a corner (Common.toward keeps it): the spot, the way there, the point on it
