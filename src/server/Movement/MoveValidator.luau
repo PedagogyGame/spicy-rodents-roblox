@@ -752,8 +752,17 @@ function MoveValidator._accept(self: MoveValidator, actorId: any, packet: Packet
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
-		local found, launchUsed, pounceAgo, judged =
-			SquirrelMotor.envelope(prev, next, dt, self.world, boosted, actor.marks.lastGrab)
+		local found, launchUsed, pounceAgo, judged = SquirrelMotor.envelope(
+			prev,
+			next,
+			dt,
+			self.world,
+			boosted,
+			actor.marks.lastGrab,
+			-- (`prev`'s flight is a leap off a rail the server knows of (a free flight on its arc): a grab in it is a
+			-- chained grab-leap's, owner D19)
+			actor.marks.speedRail == true and prev.routeId == nil and not prev.grounded
+		)
 		if judged.grab then
 			actor.marks.lastGrab = judged.grab
 		end
@@ -2473,7 +2482,11 @@ function MoveValidator.governorBounds(self: MoveValidator, boosted: boolean): Go
 		-- than half the index's sample spacing, so the regrab lands on the sample it left and the body climbs nothing
 		-- (measured: 0.8 st in 3 s; every second frame 28.9 st/s); over a two-frame cycle gravity takes g * substep of the
 		-- launch's speed on average)
-		vRail = math.max(railClimbOf(self.world.registry, boosted) * E.railTol, launchUp - P.gravity * P.substep),
+		-- (owner D19: a leap that follows another off a rail rises chainLift of a leap's; the first's extra is the one-off's)
+		vRail = math.max(
+			railClimbOf(self.world.registry, boosted) * E.railTol,
+			launchUp * P.chainLift - P.gravity * P.substep
+		),
 		-- (a leap rises its apex in leapUp / g; the ground probe takes the feet onto a ledge a step over them)
 		vLedge = (MoveValidator.leapRise() + step) / (P.leapUp / P.gravity),
 		vTramp = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol,
