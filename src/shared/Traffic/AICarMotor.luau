@@ -4,7 +4,8 @@
 -- teleport flags (BUILD_PLAN §4.4 W1 #9, D9; traffic.md §5, §6, §13). Movement/CarMotor is the player
 -- kinematic car (Track A #5); this is the lane layer the server fleet runs.
 -- Interface: new(entry, lane, opts) -> Vehicle; step(v, ctx, dt) -> events; dispatch(v, route, ctx, held?);
---            release(v); body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT
+--            release(v); body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT; leads(v, body, ahead) -> boolean (of two
+--            vehicles that each have the other's centre ahead, is v the one in front: the corner standoff, routeGap)
 --
 -- Behaviour classes port v5.4 movers (studs; the HTML constants x 2.5):
 --   sedan    updateCars (§5.1): exponential speed (accel 1.3, brake 9), the people corridor (lateral 3.3,
@@ -954,8 +955,26 @@ end
 -- route round its corners: looking straight ahead, a responder coming round a corner drove into the one
 -- that had just turned in front of it. A vehicle whose centre is behind v's (along v's heading) is never in
 -- front of it: the route's first points are only a stud ahead of v's centre, so mid-turn a wide lorry close
--- behind came within reach of them, and the two stood for good (the ambulance standoff).
+-- behind came within reach of them, and the two stood for good (the ambulance standoff). Nor is one that v leads:
+-- two vehicles converging at a corner can each have the other's centre ahead along its own heading (an ambulance
+-- turning left out of a side road across the nose of a sedan in the lane it is joining: the sedan's centre a stud
+-- ahead of the ambulance's along the ambulance's heading, the ambulance six studs ahead of the sedan along the
+-- sedan's). The sedan stops behind the ambulance (bracesFor, gapAhead), and the ambulance took the sedan for a
+-- vehicle ahead on its route: both stood for good, and the street behind them (infection_service's chaos run, seed
+-- 1: two responders, a sedan, a lorry, an RV and a rider for 25 minutes). Of such a pair the one further ahead of
+-- the other leads, and only the other waits (leads; the same distance: the lower id).
 local ROUTE_STEP = st(1)
+
+-- leads(v, b, ahead): `b`'s centre is `ahead` studs in front of v's along v's heading; is v nevertheless the one in
+-- front, being further ahead of b along b's own heading? (never of a player's vehicle: it waits for nobody)
+local function leads(v: Vehicle, b: LaneMath.Body, ahead: number): boolean
+	if b.player == true then
+		return false
+	end
+	local mine = (v.x - b.x) * math.sin(b.yaw) + (v.z - b.z) * math.cos(b.yaw)
+	return mine > ahead or (mine == ahead and type(b.id) == "number" and v.id < (b.id :: number))
+end
+AICarMotor.leads = leads
 local function routeGap(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, reach: number): number
 	local half = v.box.width / 2
 	local nose = (v.box.length - v.box.width) / 2
@@ -966,7 +985,8 @@ local function routeGap(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, reach: number
 		local p = LaneMath.pointAt(lane, v.s + d, v.dir)
 		local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
 		for _, b in ctx.bodies do
-			if b.visible ~= false and b.id ~= v.id and (b.x - v.x) * hx + (b.z - v.z) * hz >= 0 then
+			local ahead = (b.x - v.x) * hx + (b.z - v.z) * hz
+			if b.visible ~= false and b.id ~= v.id and ahead >= 0 and not leads(v, b, ahead) then
 				local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
 				if b.player == true or ux * fx + uz * fz > 0.3 then
 					-- b as a capsule along its heading
