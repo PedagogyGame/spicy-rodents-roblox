@@ -59,7 +59,7 @@ InputMap.BINDINGS = table.freeze({
 	chooseLeft = { "A", "Left", "DPadLeft" },
 	chooseRight = { "D", "Right", "DPadRight" },
 	pounce = { "MouseButton1", "ButtonR2" },
-	-- the air trick (owner D17, redone D18: mid-jump a wiggle and the re-aim, as you land a roll): G and R1 are bound by no other on-foot verb (G is paintball's scoreboard and R1 the
+	-- the air trick (owner D17, redone D18, D20: mid-jump a wiggle, its burst and the re-aim, as you land a roll): G and R1 are bound by no other on-foot verb (G is paintball's scoreboard and R1 the
 	-- telescope's and pool's, each only inside its own game or ride)
 	trick = { "G", "ButtonR1" },
 	interact = { "E", "ButtonY" },
@@ -82,9 +82,9 @@ function InputMap.HINTS(role: string): string
 	if role == "human" then
 		return "WASD move · Shift run · Space jump · F kick · E get in a vehicle · V first person"
 	elseif role == "rodent" then
-		return "WASD run · Shift sprint · Space leap · G mid-jump: wiggle + aim with the mouse, G as you land: roll · Click pounce · F feint · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
+		return "WASD run · Shift sprint · Space leap · G mid-jump: a burst the way you face, then aim with the mouse, G as you land: roll · Click pounce · F feint · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
 	elseif role == "squirrel" then
-		return "WASD run · Shift sprint · Space leap · G mid-jump: wiggle + aim with the mouse, G as you land: roll · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
+		return "WASD run · Shift sprint · Space leap · G mid-jump: a burst the way you face, then aim with the mouse, G as you land: roll · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
 	elseif role == "quadruped" then
 		return "WASD move · Shift run · Space jump"
 	elseif role == "vehicle" then

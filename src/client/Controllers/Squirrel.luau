@@ -38,7 +38,10 @@
 -- either side, its look up = further out, down = nearer in, full at AIM_PITCH). The mouse IS the look on foot
 -- (Camera/CameraRig) and the right stick too, so the camera follows the aimed heading and nothing swings it besides;
 -- on a touch screen a drag from the button is the aim instead (AirTrickButton.aimOf). UI/AimMarker shows where the
--- flight comes down while the aim is live (this player only).
+-- flight comes down while the aim is live (this player only). The press is also the burst (owner D20; the motor's own:
+-- the flight thrown onto the line the keys steer from the camera, shifted along it and popped); the marker's spot is
+-- the motor's landingSpot, which counts what is left of it, and the turn asked goes to the pose (KinematicPose
+-- trickTurn).
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -443,6 +446,7 @@ function Squirrel.start(
 				aimFrom = { yaw = f.cameraYaw, pitch = cameraPitch() }
 				-- (the twitch's seed, as the server dates it from this flight's packets: AirTrick.pressOf)
 				kin.trickSeed = AirTrick.seedOf(AirTrick.pressOf(state.clock, state.trickTime))
+				kin.trickTurn = if AirTrick.thrown(state.trickTime, state.burstWait) then state.trickTurn else nil
 			end
 		end
 		local aiming = aimFrom ~= nil and state.trickKind == 2 and not state.grounded and state.routeId == nil
@@ -452,11 +456,10 @@ function Squirrel.start(
 		-- (the marker: where the flight comes down, while the aim is live)
 		local mx, my, mz = nil, nil, nil
 		if aiming then
-			local land =
-				SquirrelMotor.landingIn(state.x, state.y, state.z, state.vx, state.vy, state.vz, motorWorld :: any)
-			if land < 5 then
-				mx, mz = state.x + state.vx * land, state.z + state.vz * land
-				my = world.groundAt(mx :: number, mz :: number, state.y)
+			local lx, lz, land = SquirrelMotor.landingSpot(state, motorWorld :: any)
+			if lx and lz and land and land < 5 then
+				mx, mz = lx, lz
+				my = world.groundAt(lx, lz, state.y)
 			end
 		end
 		marker.set(mx, my, mz, dt)
