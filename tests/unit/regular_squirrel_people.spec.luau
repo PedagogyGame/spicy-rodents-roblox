@@ -286,8 +286,11 @@ local function walkRound(T: any): Tally
 	return tally
 end
 
--- the Spicy Rodent's walk (walkRound) before owner D21's change, measured on 26c47c8 with this very script
-local SPICY = { fledIt = 5, spottedIt = 5, fear = 6, guards = 3, stages = 5 }
+-- the Spicy Rodent's walk (walkRound) before owner D21's change, measured on 26c47c8 with this very script; measured
+-- again after owner D27 (people's turns are eased in and out, Movement/HumanAIMotor.easeTurn: who faces where at a
+-- given moment moved by a few frames): the same five people run and report it and the same stages are reached; one
+-- fearful line fewer is said (6 -> 5) and one more person squares up (3 -> 4)
+local SPICY = { fledIt = 5, spottedIt = 5, fear = 5, guards = 4, stages = 5 }
 
 return function(t)
 	t.test("who is feared: the Spicy Rodent and the infected; an ordinary squirrel is not", function()
