@@ -364,14 +364,21 @@ SquirrelMotor.params = {
 	-- or any other quick run of short flights gets two a second at most, about 7 st/s on its pace. Measured along the
 	-- parapet 1075 / the cable 660, E, a frame on the rail, Space, G, E again 10 frames on (st/s): no G 25.6 / 29.1,
 	-- with G before these two rules 38.4 / 37.8, now 24.6 / 29.1 (chained leaps: the wiggle alone, and its meter cost).
-	trickShift = 2.5,
+	-- Owner, 1.1 (2026-11-21: "i need a bit more, a little bit further propelant by the g button push ... the squirrel
+	-- re-directs, within 30 degrees left or right, or if the s button is being held, drops the jump back a little bit,
+	-- or if the w button is being held, gives you that ... forward burst"): the press throws the flight toward the
+	-- camera's facing, at most trickSnapYaw (30 degrees) either side of the jump's own line. W held: the whole burst
+	-- (trickShift, trickPop); no key: trickPlain of it; S held: no burst, the flight's speed across cut by trickBack.
+	trickShift = 4.5,
 	trickShiftTime = 0.12,
-	trickPop = 0.25,
+	trickPop = 0.45,
 	trickPopTime = 0.3,
+	trickPlain = 0.7,
+	trickBack = 0.3,
 	trickWinded = 2 / 3,
-	trickSnapYaw = math.rad(60),
+	trickSnapYaw = math.rad(30),
 	trickTurnRate = 40,
-	trickTotal = 0.19,
+	trickTotal = 0.3,
 	trickBurstRest = 0.5,
 	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds after a leap off a rail before E grabs in the air again.
 	-- Measured at 60 fps, W and sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue
@@ -1406,8 +1413,12 @@ local function doTrick(state: State, world: World, input: Input, events: { Event
 			local across = math.sqrt(state.vx * state.vx + state.vz * state.vz)
 			local shift, pop = 0, 0
 			local bursts = state.burstWait <= 0 and state.leapScale == 1
+			-- (owner, 1.1: W held: the whole burst; no key: trickPlain of it; S held: no burst, the jump dropped back)
+			local back = input.fw < 0
 			if bursts then
 				shift, pop = SquirrelMotor.burstOf(state.winded and not state.tireless)
+				local k = if back then 0 elseif input.fw > 0 then 1 else P.trickPlain
+				shift, pop = shift * k, pop * k
 			end
 			state.trickReach = SquirrelMotor.trickReachAt(
 				state.footAgo,
@@ -1418,15 +1429,18 @@ local function doTrick(state: State, world: World, input: Input, events: { Event
 			state.trickTurn, state.shiftX, state.shiftZ, state.trickPop = 0, 0, 0, 0
 			if bursts then
 				-- the burst: the line turned (a body hardly moving across has none to turn: its heading's), the speed popped
-				local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, input.fw, input.side)
+				-- (owner, 1.1: toward the camera's facing, within trickSnapYaw either side of the jump's own line; the
+				-- shift goes along the line the flight is turned onto)
+				local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, 1, 0)
 				local line = if across > 1e-3 then math.atan2(state.vx, state.vz) else state.yaw
 				local turn = math.atan2(fx, fz) - line
 				turn = math.atan2(math.sin(turn), math.cos(turn))
 				local snap = math.clamp(turn, -P.trickSnapYaw, P.trickSnapYaw)
-				local c, s = math.cos(snap) * (1 + pop), math.sin(snap) * (1 + pop)
+				local scale = if back then 1 - P.trickBack else 1 + pop
+				local c, s = math.cos(snap) * scale, math.sin(snap) * scale
 				state.vx, state.vz = state.vx * c + state.vz * s, state.vz * c - state.vx * s
 				state.trickTurn, state.trickPop = turn, pop
-				state.shiftX, state.shiftZ = fx * shift, fz * shift
+				state.shiftX, state.shiftZ = math.sin(line + snap) * shift, math.cos(line + snap) * shift
 				state.burstWait = P.trickBurstRest
 			end
 			if not state.tireless and state.stamina > 0 then

@@ -248,8 +248,11 @@ return function(t)
 	t.test(
 		"the burst: the press pops the speed and shifts the body along its line at once; no lift; once a flight",
 		function()
-			t.truthy(P.trickShift >= 2.5 and P.trickShift <= 3.5, "the shift: 2.5 to 3.5 studs")
-			t.truthy(P.trickPop >= 0.25 and P.trickPop <= 0.3, "the pop: a quarter to three tenths of the speed")
+			t.truthy(
+				P.trickShift >= 4 and P.trickShift <= 5,
+				"the shift (W held): 4 to 5 studs (owner 1.1: more propellant)"
+			)
+			t.truthy(P.trickPop >= 0.4 and P.trickPop <= 0.5, "the pop (W held): four to five tenths of the speed")
 			t.truthy(P.trickPopTime >= 0.3 and P.trickPopTime <= 0.4, "easing back over 0.3 to 0.4 s")
 			t.truthy(
 				P.trickShiftTime >= 0.08 and P.trickShiftTime <= 0.15,
@@ -357,26 +360,48 @@ return function(t)
 			low.stamina = 0.04
 			step(low, { fw = 1, trick = true })
 			t.truthy(low.winded and low.shiftZ == P.trickShift, "the press that empties the meter: still a full burst")
-			-- a body with no speed across: the shift alone, exactly, along the camera's facing
+			-- a body with no speed across: the shift alone, exactly, along the camera's facing (no key held: trickPlain of it)
+			local plainShift = P.trickShift * P.trickPlain
 			local d = fresh()
 			SquirrelMotor.place(d, d.x, d.y + 30, d.z, false)
 			local x0, z0 = d.x, d.z
 			step(d, { trick = true, cameraYaw = math.pi + 0.5 })
 			for i = 1, shiftFrames + 2 do
-				local done = SquirrelMotor.shiftDone(i / 60) * P.trickShift
+				local done = SquirrelMotor.shiftDone(i / 60) * plainShift
 				t.near(d.x - x0, math.sin(0.5) * done, 1e-9, "the shift's path")
 				t.near(d.z - z0, math.cos(0.5) * done, 1e-9)
 				local sx, sz = SquirrelMotor.landingSpot(d, world)
-				t.near(sx :: number, x0 + math.sin(0.5) * P.trickShift, 1e-9, "the marker's spot: where it comes down")
-				t.near(sz :: number, z0 + math.cos(0.5) * P.trickShift, 1e-9)
+				t.near(sx :: number, x0 + math.sin(0.5) * plainShift, 1e-9, "the marker's spot: where it comes down")
+				t.near(sz :: number, z0 + math.cos(0.5) * plainShift, 1e-9)
 				step(d, {})
 			end
 			t.eq(across(d), 0, "no speed made of nothing")
 		end
 	)
 
+	t.test("owner 1.1: W held the whole burst, no key trickPlain of it, S held the jump dropped back", function()
+		local function pressed(o: { [string]: any }): State
+			local s = leapt({ fw = 1, sprint = true }, 15)
+			SquirrelMotor.step(s, keys(with(o, { trick = true, cameraYaw = math.pi })), 0, world)
+			return s
+		end
+		local base = leapt({ fw = 1, sprint = true }, 15)
+		local v0 = across(base)
+		local w = pressed({ fw = 1, sprint = true })
+		t.near(across(w), v0 * (1 + P.trickPop), 1e-9, "W: the whole pop")
+		t.near(w.shiftZ, P.trickShift, 1e-9, "W: the whole shift")
+		local n = pressed({})
+		t.near(across(n), v0 * (1 + P.trickPop * P.trickPlain), 1e-9, "no key: trickPlain of the pop")
+		t.near(n.shiftZ, P.trickShift * P.trickPlain, 1e-9)
+		local b = pressed({ fw = -1 })
+		t.near(across(b), v0 * (1 - P.trickBack), 1e-9, "S: the speed across cut, the jump drops back")
+		t.eq(b.shiftX + b.shiftZ + b.trickPop, 0, "S: no shift, no pop")
+		t.eq(b.vy, base.vy, "no lift either way")
+		t.truthy(P.trickSnapYaw <= math.rad(30) + 1e-9, "the turn: 30 degrees either side at most")
+	end)
+
 	t.test(
-		"the burst: the flight turns onto the line the keys steer from the camera, 60 degrees at most; the heading follows",
+		"the burst: the flight turns toward the camera's facing, 30 degrees at most either side of its line; the heading follows",
 		function()
 			-- the line: the camera's facing with W or no key, the keys' own direction from it otherwise
 			local cam = 0.7
@@ -406,22 +431,32 @@ return function(t)
 				t.near(heading(s), snap, 1e-9, `{deg} degrees asked: the flight turned {math.deg(snap)} at the press`)
 				t.near(across(s), v0 * (1 + P.trickPop), 1e-9, "the speed it had, popped: a turn takes none")
 				t.eq(s.vy, vy0, "no lift")
-				t.near(s.shiftX, math.sin(turn) * P.trickShift, 1e-9, "the shift along the line asked")
-				t.near(s.shiftZ, math.cos(turn) * P.trickShift, 1e-9)
+				t.near(
+					s.shiftX,
+					math.sin(snap) * P.trickShift,
+					1e-9,
+					"the shift along the line the flight is turned onto"
+				)
+				t.near(s.shiftZ, math.cos(snap) * P.trickShift, 1e-9)
 				-- the body's heading comes round to the line while the shift runs
 				for _ = 1, math.ceil(P.trickShiftTime * 60) do
 					step(s, with(hold, { cameraYaw = math.pi + turn }))
 				end
-				local off = s.yaw - turn
-				t.truthy(math.abs(math.atan2(math.sin(off), math.cos(off))) < 0.05, "the heading on the new line")
+				local off = s.yaw - snap
+				off = math.atan2(math.sin(off), math.cos(off))
+				-- (the flight's new line, or beyond it toward the camera's facing the keys steer the body to: never short)
+				local beyond = turn - snap
+				t.truthy(
+					if beyond >= 0 then off > -0.05 and off < beyond + 0.05 else off < 0.05 and off > beyond - 0.05,
+					"the heading on the new line (or past it toward the camera)"
+				)
 			end
-			t.near(P.trickSnapYaw, math.rad(60), 1e-12)
-			-- with a strafe key held the line is the key's, not the camera's
+			t.near(P.trickSnapYaw, math.rad(30), 1e-12)
+			-- a strafe key held changes nothing (owner 1.1): the line is still the camera's facing, here the leap's own
 			local s = leapt({ fw = 1 }, 15)
 			step(s, { side = 1, trick = true })
-			local kx, kz = SquirrelMotor.burstFacing(math.pi, 0, 1)
-			t.near(s.shiftX, kx * P.trickShift, 1e-9)
-			t.near(s.shiftZ, kz * P.trickShift, 1e-9)
+			t.near(s.shiftX, 0, 1e-9, "a strafe key: the camera's facing all the same")
+			t.near(s.shiftZ, P.trickShift * P.trickPlain, 1e-9, "no W held: trickPlain of the shift")
 			-- the landing lands turned: a sprint leap pressed 16 frames in with the camera 30 degrees round
 			local function landed(turn: number?): State
 				local f = leapt(hold, 15)
@@ -617,12 +652,12 @@ return function(t)
 						mostAll * 100
 					)
 				)
-				local shift = SquirrelMotor.burstOf(winded)
+				local shift = SquirrelMotor.burstOf(winded) * (if (o :: any).fw == 1 then 1 else P.trickPlain)
 				t.truthy(least * plain > shift, `{name}: the burst carries more than its shift`)
-				t.truthy(most <= 0.19, `{name}: the burst alone {most}`)
-				t.truthy(mostAll <= 0.22, `{name}: the whole trick {mostAll}`)
+				t.truthy(most <= 0.32, `{name}: the burst alone {most}`)
+				t.truthy(mostAll <= 0.36, `{name}: the whole trick {mostAll}`)
 			end
-			t.truthy(P.trickTotal <= 0.2)
+			t.truthy(P.trickTotal <= 0.3)
 		end
 	)
 
@@ -691,8 +726,8 @@ return function(t)
 			"9 % of the whole carry: half of it left, twice that"
 		)
 		t.near(
-			SquirrelMotor.trickReachAt(1, 10, 10, 2),
-			(P.trickTotal * 20 - 2) / 10,
+			SquirrelMotor.trickReachAt(1, 10, 10, 5),
+			(P.trickTotal * 20 - 5) / 10,
 			1e-12,
 			"with a burst: what it leaves of trickTotal of the whole carry"
 		)

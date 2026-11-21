@@ -175,3 +175,15 @@ rail gets about 35-38 studs per second, against the game's own 28-33.
 The server's movement checks are switched off in the live game for now (since version 54; they only log). They are kept correct for when they come back.
 
 In our tests, players doing a trick on every jump (bursting with the camera swung any way, aiming every which way, rolling on landings), on a good connection and on a bad one with lost packets, were never flagged for the trick (8 runs of each kind, about 7,400 presses each). The server counts the burst itself: one per jump and no more than one every half second. A message stream that takes the burst without claiming it, takes twice the burst, or takes a second burst in the same jump or inside the half second is flagged. A cheat that claims a trick in every message along the river bridge parapet gets 33.3 studs per second against 33.4 without the claims (20 messages a second) and 38.8 against 37.8 (4 a second); on open ground the claims only slowed it.
+
+## 1.1: the G press, stronger and simpler (21 November)
+
+What the owner asked: "a bit more, a little bit further propellant by the g button push ... the squirrel re-directs, within 30 degrees left or right, or if the s button is being held, drops the jump back a little bit, or if the w button is being held, gives you that ... forward burst".
+
+- **Direction:** the jump turns toward where the camera is facing, at most 30 degrees left or right of the jump's own line. Turn the camera with the mouse mid-jump, then press G.
+- **W held:** the full burst: about 6 to 9 studs farther (a sprint leap of 30 studs lands about 7 to 8 studs farther).
+- **No key held:** a smaller burst, about 4 to 6 studs farther.
+- **S held:** no burst; the jump is pulled back and lands shorter.
+- **No extra height** in any case. Once per jump. On an empty meter, about two thirds.
+
+The numbers you can ask to change: how strong the burst is (W), how much of it you get with no key (now 70 %), how far S pulls the jump back (now 30 % of its speed), and the 30 degrees.
