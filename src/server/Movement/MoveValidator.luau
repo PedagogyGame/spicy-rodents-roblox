@@ -187,6 +187,8 @@ type Marks = {
 	rollArmed: boolean?,
 	footClock: number?,
 	trickReach: number?,
+	-- (owner D20) the flight's wiggle was its first by the server's count: its burst is the motor's (_stamina)
+	trickBurst: boolean?,
 	trickHidden: boolean?, -- (this packet's move needed a wiggle the gap hid: SquirrelMotor.Judged.trickHidden)
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
@@ -1550,7 +1552,12 @@ function MoveValidator._stamina(
 	-- scales as the re-aim's reach changed, at that reach (the motor's aimScale; it telescopes, so a re-aim to and fro
 	-- buys nothing). A fresh roll after a flight the server saw holds the speed (neither steered nor dragged) for the
 	-- roll's length from its press, dated within the packet: the motor's carry along the ground
+	-- The wiggle's burst (owner D20): the first wiggle of a flight also moves the body across by the motor's own burst,
+	-- the shift's part and the pop's carry over the move's time since the press, as the packets date it (burstFrom,
+	-- burstTo: seconds after the press; a wiggle's time only runs down, so the parts add up to one burst at most); the
+	-- move's distance is judged less that. A later wiggle of the same flight earns none.
 	local trickScale, trickOut = 1, 1
+	local burstFrom, burstTo = 0, 0
 	if not exempt then
 		local freshWiggle = SquirrelMotor.freshMove(prev, next, 2)
 		local freshRoll = SquirrelMotor.freshMove(prev, next, 1)
@@ -1576,7 +1583,14 @@ function MoveValidator._stamina(
 			marks.trickReach = if marks.trickArmed
 				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0, 0)
 				else 0
+			marks.trickBurst = marks.trickArmed
 			marks.trickArmed = nil
+		end
+		if marks.trickBurst and (freshWiggle or prev.trickKind == 2) then
+			burstFrom = if freshWiggle then 0 else P.trickWiggle - prev.trickTime
+			burstTo = if next.trickKind == 2
+				then math.max(burstFrom, P.trickWiggle - next.trickTime)
+				else burstFrom + math.max(dt, 0)
 		end
 		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind ~= 0) then
 			local R = marks.trickReach or 0
@@ -1591,6 +1605,7 @@ function MoveValidator._stamina(
 		end
 		if next.routeId ~= nil or next.grounded then
 			marks.trickArmed = true
+			marks.trickBurst = nil
 			marks.footClock = next.clock
 		else
 			marks.rollArmed = true
@@ -1672,6 +1687,15 @@ function MoveValidator._stamina(
 	end
 	local tol = C.STAMINA_WALK
 	local across = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+	if burstTo > burstFrom then
+		-- (the wiggle's burst: the shift's part, and the pop's carry at the most the flight's own speed is)
+		across = math.max(
+			0,
+			across
+				- P.trickShift * (SquirrelMotor.shiftDone(burstTo) - SquirrelMotor.shiftDone(burstFrom))
+				- P.trickPop * SquirrelMotor.popCarry(burstFrom, burstTo) * math.max(u, sprintLo or P.sprint)
+		)
+	end
 	-- (the time an arc from `prev` takes to come down to height y; its apex's when it never reaches it)
 	local function fallTo(y: number): number
 		local vy = prev.vy
