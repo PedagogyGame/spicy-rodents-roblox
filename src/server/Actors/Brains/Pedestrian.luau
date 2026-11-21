@@ -119,6 +119,9 @@ local HURRY_SPEED = Units.st(2.6) -- walking on briskly from under a squirrel (6
 local HURRY_STEP = Units.st(37) -- how far along the lane the brisk walk heads
 local BACK_STEP = 4 -- studs: how far ahead a step back from the rodent heads (renewed every think)
 local DODGE_BEFORE, DODGE_AFTER = 3, 3 -- studs before and after a post on the lane its step aside is held
+-- seconds of walking before a post from which the step aside starts: the motor walks it as a shallow diagonal
+-- (Movement/HumanAIMotor.laneSide: 2.4 studs aside takes about 2 s at a stroll), never a slide sideways (owner D27)
+local DODGE_LEAD = 2.5
 
 -- The v5.4 sidewalk lanes (humans_actors §4.2 table), in studs. 4 core lanes first.
 function Pedestrian.defaultLanes(): { Lane }
@@ -184,8 +187,8 @@ local function setWalkIntent(self: Brain, goalU: number, speed: number, damp: nu
 	local intent = self.actor.intent
 	local lane = self.lane
 	intent.mode = "walk"
-	-- a pole or a tree trunk on the lane ahead (or just passed): stepped round, the lane lock aside of it (one think
-	-- ahead too: a far body thinks once a second)
+	-- a pole or a tree trunk on the lane ahead (or just passed): stepped round, the lane lock aside of it (from
+	-- DODGE_LEAD seconds ahead: the step aside is walked, and a far body thinks once a second)
 	local coord = lane.fixed
 	local dodges = lane.dodges
 	if dodges then
@@ -193,7 +196,7 @@ local function setWalkIntent(self: Brain, goalU: number, speed: number, damp: nu
 		local dir = if goalU >= u then 1 else -1
 		for _, p in dodges do
 			local ahead = (p[1] - u) * dir
-			if ahead > -DODGE_AFTER and ahead < DODGE_BEFORE + speed then
+			if ahead > -DODGE_AFTER and ahead < DODGE_BEFORE + speed * DODGE_LEAD then
 				coord = lane.fixed + p[2]
 				break
 			end
