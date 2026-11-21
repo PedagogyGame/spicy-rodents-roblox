@@ -39,7 +39,7 @@ end
 -- start(opts?): the panel for this player, nil for anyone but the owner. opts.parent: the gui's parent (default
 -- PlayerGui); opts.net: the Net folder (default ReplicatedStorage.Net).
 function MoveDiagPanel.start(opts: { parent: Instance?, net: Instance? }?): Handle?
-	local o = opts or {}
+	local o: { parent: Instance?, net: Instance? } = opts or {}
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
 	local UserInputService = game:GetService("UserInputService")

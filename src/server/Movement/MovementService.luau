@@ -479,7 +479,7 @@ function MovementService.new(deps: Deps): Movement
 			fn()
 			return true
 		end
-		local ok, err = pcall(fn)
+		local ok, err = pcall(fn :: any)
 		if not ok then
 			fault(self, what, id, err)
 		end
