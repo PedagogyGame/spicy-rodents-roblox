@@ -1,7 +1,8 @@
 --!strict
 -- ReplicatedStorage.Shared.Actors.Species
 -- Species definitions (body kind, motor, brains, hitbox, sockets, stock looks, reference speeds).
--- Interface (BUILD_PLAN §1.4): def(species), list(), variants(species), stockLook(species, index)
+-- Interface (BUILD_PLAN §1.4): def(species), list(), variants(species), stockLook(species, index);
+--   squirrelFamily(species) -> boolean; feared(body) -> boolean (the squirrels people are afraid of: owner D21)
 -- Pure: every length is in studs through Config/Units (the single unit boundary, D21); the HTML
 -- source numbers are cited next to each value. Requiring this module has no side effects.
 --
@@ -189,6 +190,23 @@ end
 function Species.rodentLook(): StockLook
 	local looks = DEFS.squirrel.stockLooks
 	return looks[#looks]
+end
+
+-- A squirrel-family body: the squirrel species (the Spicy Rodent is its "spicy" variant) or a body tagged "rodent".
+function Species.squirrelFamily(species: string?): boolean
+	return species == "squirrel" or species == "rodent"
+end
+
+-- feared(body): is this one of the squirrels the town's people are afraid of? The Spicy Rodent (variant "spicy", or a
+-- body of species "rodent") and any infected squirrel ("one of those squirrels"). An ordinary squirrel, a player's or
+-- the computer's, is not: nobody runs from it, backs away, raises an alarm or calls anyone (owner D21, 2026-11-21:
+-- "the regular squirrel should not be ran away from by npcs, unless it jumps right on them or at them"). `body` is
+-- anything with species, variant and infected (a Brains/Common actor, an Actors/ActorService actor).
+function Species.feared(body: { species: string?, variant: string?, infected: boolean?, [string]: any }): boolean
+	if not Species.squirrelFamily(body.species) then
+		return false
+	end
+	return body.species == "rodent" or body.variant == "spicy" or body.infected == true
 end
 
 -- Deer fawn scale (wildlife_foraging §11.8 "Fawn size 0.55"; RigSpec: Model:ScaleTo).

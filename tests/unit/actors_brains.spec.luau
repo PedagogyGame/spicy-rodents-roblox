@@ -70,7 +70,7 @@ return function(t)
 		t.eq(brain:suspend().goal, snap.goal)
 	end)
 
-	t.test("pedestrian: a loud squirrel 5 u ahead is spotted; the human flees along the lane and calms down", function()
+	t.test("pedestrian: a loud Spicy Rodent 5 u ahead is spotted; the human flees along the lane and calms down", function()
 		local rng = lcg(2)
 		local grid = Perception.newGrid(40)
 		local byId: { [number]: Common.Actor } = {}
@@ -86,11 +86,16 @@ return function(t)
 		brain:think(0.1, c)
 		-- face +x along lane 1 (z = -12.1 u) and put a sprinting squirrel 5 u ahead at ground level
 		human.yaw = math.pi / 2
+		-- (an ordinary squirrel there, sprinting, is walked past: owner D21; tests/unit/regular_squirrel_people.spec)
 		local squirrel = Common.newActor(2, "squirrel", "normal", "Squirrel", human.x + Units.st(5), human.z, 0.9)
 		squirrel.y = 0.5
 		squirrel.speed = Units.st(16.8)
 		byId[2] = squirrel
 		grid:set(2, squirrel.x, squirrel.z)
+		brain:think(0.1, c)
+		t.eq(brain.state, "walk", "nobody runs from an ordinary squirrel")
+		t.eq(human.alert, 0)
+		squirrel.variant = "spicy"
 		brain:think(0.1, c)
 		t.eq(brain.state, "flee")
 		t.near(human.alert, 8, 1e-9)
