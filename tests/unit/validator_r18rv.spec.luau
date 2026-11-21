@@ -8,12 +8,28 @@
 --                     steering in every flight for a claimed wiggle with a hair of reach, which costs an empty meter
 --                     nothing. A stream that hops on landing and claims that every flight holds about 30 st/s for ever
 --                     on an empty meter; the motor's own best from empty is 22 (trick hopping; a held sprint 22.1).
+--   carried wiggle    a wiggle is dated by its time left alone (freshMove), and the server's reach for it (marks.trickReach)
+--                     is never cleared: a stream that claims one wiggle at a flight's apex (reach 0.25), then never sends
+--                     a landing (each landing and leap hidden in a 0.1 s gap) keeps trickKind 2 with no time left over
+--                     every later flight: never fresh, never charged again, its old reach kept, the re-aim run back on
+--                     each launch packet and out again. About 35 st/s for ever on an empty meter.
 --   rail chain        the crafted grab-leap chain along a long rail (round 15's greedy, any launch speed a packet) in
 --                     0.1 s and 0.25 s packets runs about 42 and 40 st/s, the pace of the motor BEFORE D19; the motor's
 --                     own best along that rail is now 29.7 (Space held; E+Space 28.0). In 0.05 s packets it is held to
 --                     33.7. validator_r15rv compares with a chain the motor cannot make (the cooldown switched off).
+--   lost wiggle       HONEST: W and Shift held, hopping, the wiggle mid-jump aimed out and the button held down the fall
+--                     (the roll as it lands). When the packets that show the wiggle are lost (0.2 to 0.3 s), the first
+--                     the server sees says trickKind 1 (the roll) with the re-aim out: _stamina scales its air bound
+--                     only for a fresh wiggle or a move on `prev`, so the flight is held to a walk's steering and, the
+--                     meter being empty as a hopper's is, each packet is "stamina" (sprinting on credit). The same
+--                     losses with no trick: clean.
+--   lost landing      HONEST: the wiggle pulled in every flight. A loss that hides the landing, the next leap and its
+--                     wiggle's press (0.45 s): envelope 0c takes the packet's height back toward "the unaimed arc from
+--                     prev" by the re-aim's fall x the whole gap, an arc the body left when it landed: the judged height
+--                     is up to 3 st over the true one, "launch in the air" x2 and "teleport". The same loss with no
+--                     trick: clean.
 -- The bar in each: the motor's own best there x 1.15 (the owner's accepted residual, D19).
--- About 60 s: `lune run tests/run.luau validator_r18rv`.
+-- About 15 s: `lune run tests/run.luau validator_r18rv`.
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local MoveValidator = require("@server/Movement/MoveValidator")
@@ -76,34 +92,37 @@ return function(t)
 		return feed, try, v
 	end
 
+	-- the motor's own best from an empty meter on open ground, 30 s at 60 fps, W and Shift held: a held sprint, hops on
+	-- landing, hops with the wiggle full out at its best moment
+	local function motorFromEmpty(tw: any): number
+		local function honest(leap: boolean, trickAt: number?): number
+			local s = SquirrelMotor.new(Units.st(-560), tw.groundHeight, Units.st(-545))
+			s.stamina, s.winded = 0, true
+			local z0, inAir = s.z, 0
+			for _ = 1, 30 * 60 do
+				local i = SquirrelMotor.idleInput(math.pi)
+				i.fw, i.sprint = 1, true
+				if s.grounded then
+					inAir = 0
+					i.leap = leap
+				else
+					inAir += 1
+					i.trick = inAir == trickAt
+					i.aimReach = 1
+				end
+				SquirrelMotor.step(s, i, 1 / 60, tw)
+			end
+			return (s.z - z0) / 30
+		end
+		return math.max(honest(false, nil), honest(true, nil), honest(true, 12), honest(true, 15), honest(true, 20))
+	end
+
 	-- trick floor ------------------------------------------------------------------------------------------------------
 	t.test(
 		"trick floor: a wiggle claimed with a hair of reach every flight buys an empty meter no sprint's steering",
 		function()
 			local tw, vworld = flat()
-			-- the motor's own best from an empty meter on open ground, 30 s at 60 fps, W and Shift held: a held sprint, hops
-			-- on landing, hops with the wiggle full out at its best moment
-			local function honest(leap: boolean, trickAt: number?): number
-				local s = SquirrelMotor.new(Units.st(-560), tw.groundHeight, Units.st(-545))
-				s.stamina, s.winded = 0, true
-				local z0, inAir = s.z, 0
-				for _ = 1, 30 * 60 do
-					local i = SquirrelMotor.idleInput(math.pi)
-					i.fw, i.sprint = 1, true
-					if s.grounded then
-						inAir = 0
-						i.leap = leap
-					else
-						inAir += 1
-						i.trick = inAir == trickAt
-						i.aimReach = 1
-					end
-					SquirrelMotor.step(s, i, 1 / 60, tw)
-				end
-				return (s.z - z0) / 30
-			end
-			local motor =
-				math.max(honest(false, nil), honest(true, nil), honest(true, 12), honest(true, 15), honest(true, 20))
+			local motor = motorFromEmpty(tw)
 			-- the crafted stream: each packet's height, vertical speed and footing are the motor's own (hops on landing, a
 			-- packet every three frames); across, as far as the validator takes with no violation; `claim`: every airborne
 			-- packet says a wiggle is on (fresh on the flight's first), its re-aim 0.02 out
@@ -172,6 +191,205 @@ return function(t)
 			)
 		end
 	)
+
+	-- carried wiggle ---------------------------------------------------------------------------------------------------
+	t.test(
+		"carried wiggle: one wiggle kept over landings that are never sent buys no later flight a reach nor a free re-aim",
+		function()
+			local tw, vworld = flat()
+			local motor = motorFromEmpty(tw)
+			local feed, try, v = rig(vworld)
+			local m = SquirrelMotor.new(-1400, tw.groundHeight, -1360)
+			m.clock, m.stamina, m.winded = 0, 0, true
+			local z = m.z
+			feed(m)
+			v._marks.a.stamina, v._marks.a.winded = 0, true
+			local prev: State = SquirrelMotor.clone(m)
+			local started, flightAt, fedFlight, wasAir = false, 0, 0, false
+			local dirty, wiggles = 0, 0
+			local secs = 20
+			for _ = 1, secs * 20 do
+				for _ = 1, 3 do
+					local i = SquirrelMotor.idleInput(math.pi)
+					i.fw, i.sprint, i.leap = 1, true, m.grounded
+					SquirrelMotor.step(m, i, 1 / 60, tw)
+					if not m.grounded and not wasAir then
+						flightAt = m.clock
+					end
+					wasAir = not m.grounded
+				end
+				if m.grounded and started then
+					-- (the landing is never sent: the next packet is the next flight's, 0.1 s on)
+					continue
+				end
+				local c = SquirrelMotor.clone(m)
+				c.x, c.vx = -1400, 0
+				c.trickKind, c.trickTime, c.aimYaw, c.aimReach = 0, 0, 0, 0
+				local gap = c.clock - prev.clock
+				if not c.grounded then
+					if not started then
+						-- (the one wiggle the stream ever presses: at the first flight's apex, where the timing earns 0.25)
+						if c.clock - flightAt >= P.leapUp / P.gravity then
+							started, fedFlight = true, flightAt
+							wiggles += 1
+							c.trickKind, c.trickTime = 2, P.trickWiggle
+							c.aimReach = math.min(1, P.trickReachRate * gap)
+						end
+					else
+						c.trickKind = 2
+						c.trickTime = math.max(0, prev.trickTime - gap)
+						if flightAt ~= fedFlight then
+							-- (a new flight's first packet: the re-aim run back as far as the rate lets it)
+							fedFlight = flightAt
+							c.aimReach = math.max(0, prev.aimReach - P.trickReachRate * (gap + 1 / 60) + 0.01)
+						else
+							c.aimReach = math.min(1, prev.aimReach + P.trickReachRate * gap)
+						end
+					end
+				end
+				local best: State? = nil
+				local D = 70 * gap
+				while D >= 0 and best == nil do
+					local cc = SquirrelMotor.clone(c)
+					cc.z, cc.vz = z + D, D / gap
+					if try(cc) then
+						best = cc
+					end
+					D -= gap
+				end
+				if best == nil then
+					best = SquirrelMotor.clone(c)
+					best.z, best.vz = z, 0
+				end
+				dirty += #feed(best).violations
+				z = best.z
+				prev = best
+			end
+			local pace = (z + 1360) / secs
+			print(
+				string.format(
+					"      empty meter, open ground, %d s: the motor's own best %.1f st/s; one wiggle carried over every landing %.1f st/s (%d violations, %d wiggle pressed)",
+					secs,
+					motor,
+					pace,
+					dirty,
+					wiggles
+				)
+			)
+			t.eq(dirty, 0, "(the stream is clean)")
+			t.truthy(
+				pace <= motor * RESIDUAL,
+				`a carried wiggle {pace} st/s on an empty meter against the motor's {motor}`
+			)
+		end
+	)
+
+	-- honest tricks through chosen losses --------------------------------------------------------------------------------
+	-- the motor hopping north on open ground from an empty meter (W and Shift held, Space on landing), a packet every
+	-- three frames straight to the validator, some lost on every third flight. `mode` "roll": the wiggle 24 frames into
+	-- each flight aimed full out, the button held down the fall (the roll as it lands); the packets that show the wiggle
+	-- lost (with no trick: the same frames). "in": the wiggle 3 frames in, pulled full in; a loss of 0.45 s from 0.28 s
+	-- before the landing (the landing, the next leap and its wiggle's press inside it).
+	-- Returns the violations by code and how many there were
+	local function lossyHops(mode: string, tricks: boolean): ({ [string]: number }, number)
+		local tw, vworld = flat()
+		local v = MoveValidator.new(vworld)
+		local s = SquirrelMotor.new(-1400, tw.groundHeight, -1360)
+		s.clock, s.stamina, s.winded = 0, 0, true
+		local seq = 0
+		local function feed(): any
+			seq += 1
+			return v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, s.clock + 1)
+		end
+		feed()
+		v._marks.a.stamina, v._marks.a.winded = 0, true
+		local inAir, flights, lostUntil = 0, 0, -1
+		local codes: { [string]: number } = {}
+		local n = 0
+		for f = 1, 30 * 60 do
+			local i = SquirrelMotor.idleInput(math.pi)
+			i.fw, i.sprint = 1, true
+			if s.grounded then
+				if inAir > 0 then
+					flights += 1
+				end
+				inAir = 0
+				i.leap = true
+			else
+				inAir += 1
+				if tricks and mode == "roll" then
+					i.trick = inAir == 24 or (s.trickKind == 2 and s.vy < 0)
+					i.aimReach = 1
+				elseif tricks then
+					i.trick = inAir == 3
+					i.aimReach = -1
+				end
+			end
+			SquirrelMotor.step(s, i, 1 / 60, tw)
+			if f % 3 ~= 0 then
+				continue
+			end
+			local third = flights % 3 == 2
+			local drop = false
+			if mode == "roll" then
+				drop = third and not s.grounded and (if tricks then s.trickKind == 2 else inAir >= 24 and inAir <= 42)
+			else
+				if third and lostUntil < 0 and not s.grounded and s.vy < 0 then
+					if SquirrelMotor.landingIn(s.x, s.y, s.z, s.vx, s.vy, s.vz, tw) <= 0.28 then
+						lostUntil = s.clock + 0.45
+					end
+				end
+				if lostUntil >= 0 then
+					drop = s.clock < lostUntil - 1e-6
+					if not drop and not third then
+						lostUntil = -1
+					end
+				end
+			end
+			if not drop then
+				for _, x in feed().violations do
+					codes[x.code] = (codes[x.code] or 0) + 1
+					n += 1
+				end
+			end
+		end
+		return codes, n
+	end
+	local function listed(codes: { [string]: number }): string
+		local out = {}
+		for c, k in codes do
+			table.insert(out, `{c} {k}`)
+		end
+		table.sort(out)
+		return table.concat(out, ", ")
+	end
+	local lossy = {
+		{
+			mode = "roll",
+			name = "lost wiggle: the wiggle's own packets lost, the roll the first the server sees of the flight",
+		},
+		{
+			mode = "in",
+			name = "lost landing: a pulled-in flight's landing, the next leap and its wiggle's press in one 0.45 s loss",
+		},
+	}
+	for _, case in lossy do
+		t.test(`honest, {case.name}: no violation`, function()
+			local base, n0 = lossyHops(case.mode, false)
+			local with, n1 = lossyHops(case.mode, true)
+			print(
+				string.format(
+					"      30 s of hops from an empty meter, the loss on every third flight: no trick %d violations [%s]; with the trick %d [%s]",
+					n0,
+					listed(base),
+					n1,
+					listed(with)
+				)
+			)
+			t.eq(n0, 0, "(the same losses with no trick are clean)")
+			t.eq(n1, 0, "the honest trick through the loss")
+		end)
+	end
 
 	-- rail chain -------------------------------------------------------------------------------------------------------
 	-- the motor's own pace along a route from t1 to t2 s (W and sprint held; on the rail Space; in the air Space, or
