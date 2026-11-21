@@ -29,3 +29,4 @@ __pycache__/
 
 # Background build worktrees (agents work here on their own branches)
 /.claude/worktrees/
+tools/ci_rest_tmp.sh
