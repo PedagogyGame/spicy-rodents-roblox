@@ -5,7 +5,18 @@
 -- an actor's Intent every frame the way v5.4 steps its humans (humans_actors §5.2 11-14: smoothed
 -- speed, step <= speed dt, turn-rate clamp, lane lock damp lambda 8, world clamp, ground snap) and
 -- wildlife (heading steering). Rail mode walks a route polyline by arc length (RouteLike points).
--- Interface: step(actor, dt, ctx), railPose(route, s) -> x, y, z, serialize(actor), deserialize(actor, snap)
+-- People move smoothly (owner D27: "waddles, jolts left right ... does not walk or run in a straight smooth line"):
+--   * a turn is eased in and out (easeTurn: the yaw rate rises at TURN_ACCEL x the brain's turn rate and falls away
+--     in proportion to the angle left), where the v5.4 clamp started and stopped it within one frame;
+--   * a step aside on a lane (round a post, back onto the lane's line) is walked as a shallow diagonal (laneSide: no
+--     steeper than LANE_SLOPE, eased in and out, the pace along the ground unchanged), where the v5.4 lane lock slid
+--     the body sideways at up to 8 x the offset a second while it faced straight on;
+--   * the body faces where it is going (the diagonal included), so the torso leads.
+--   The path between the points of a walk is unchanged (straight legs: World/WalkWay keeps them off the walls).
+--   Wildlife keep the v5.4 steps.
+-- Interface: step(actor, dt, ctx), railPose(route, s) -> x, y, z, serialize(actor), deserialize(actor, snap);
+--   easeTurn(yaw, rate, desired, cap, dt) -> yaw, rate (pure); laneSide(side, err, pace, dt) -> studs/s (pure);
+--   TURN_GAIN, TURN_ACCEL, LANE_GAIN, LANE_SLOPE, LANE_ACCEL
 -- Pure; studs; yaw is the HTML yaw (0 faces +Z). No side effects on require.
 
 -- Structural types (the server's Brains/Common.Actor and Ctx satisfy them).
@@ -106,6 +117,44 @@ local function damp(current: number, target: number, lambda: number, dt: number)
 	return current + (target - current) * k
 end
 
+HumanAIMotor.TURN_GAIN = 8 -- 1/s: the last of a turn dies away at this rate (the yaw rate is at most this x the angle left)
+HumanAIMotor.TURN_ACCEL = 10 -- 1/s: the yaw rate changes by at most this x the turn rate a second (0.1 s to full rate)
+HumanAIMotor.LANE_GAIN = 3 -- 1/s: the last of a step aside dies away at this rate
+HumanAIMotor.LANE_SLOPE = 0.4 -- a step aside is walked no steeper than this to the lane (about 22 degrees)
+HumanAIMotor.LANE_ACCEL = 2 -- 1/s: the sideways pace changes by at most this x the walking pace a second
+
+-- easeTurn(yaw, rate, desired, cap, dt): one frame of a person's turn toward `desired`, `rate` the yaw rate it has
+-- now (rad/s, signed): at most `cap`, never more than TURN_GAIN x the angle left (so it arrives without passing),
+-- and changed by at most TURN_ACCEL x cap a second. Returns the yaw and the rate.
+function HumanAIMotor.easeTurn(yaw: number, rate: number, desired: number, cap: number, dt: number): (number, number)
+	local d = angleDelta(yaw, desired)
+	local want = math.clamp(HumanAIMotor.TURN_GAIN * d, -cap, cap)
+	local change = HumanAIMotor.TURN_ACCEL * cap * dt
+	local w = rate + math.clamp(want - rate, -change, change)
+	local step = w * dt
+	if d == 0 or step * d < 0 then
+		-- (still turning the other way: slowed first, which `change` does; an angle of 0 just holds)
+		return yaw + step, w
+	elseif math.abs(step) >= math.abs(d) then
+		return yaw + d, 0
+	end
+	return yaw + step, w
+end
+
+-- laneSide(side, err, pace, dt): the sideways pace (studs/s, signed) of a person `err` studs off the line they
+-- walk along at `pace`, one frame on: toward the line no steeper than LANE_SLOPE, dying away at LANE_GAIN as it
+-- arrives, changed by at most LANE_ACCEL x pace a second.
+function HumanAIMotor.laneSide(side: number, err: number, pace: number, dt: number): number
+	local cap = HumanAIMotor.LANE_SLOPE * pace
+	local want = math.clamp(HumanAIMotor.LANE_GAIN * err, -cap, cap)
+	local change = HumanAIMotor.LANE_ACCEL * math.max(pace, 1) * dt
+	return side + math.clamp(want - side, -change, change)
+end
+
+local function person(actor: Actor): boolean
+	return actor.species == "human"
+end
+
 local function turnToward(yaw: number, desired: number, rate: number, dt: number): number
 	local d = angleDelta(yaw, desired)
 	local maxStep = rate * dt
@@ -117,11 +166,23 @@ local function turnToward(yaw: number, desired: number, rate: number, dt: number
 	return yaw + d
 end
 
+-- a person's eased turn (the yaw rate kept on the actor); wildlife turn at the plain clamp
+local function turnActor(actor: Actor, desired: number, cap: number, dt: number)
+	if person(actor) then
+		actor.yaw, actor.yawRate = HumanAIMotor.easeTurn(actor.yaw, actor.yawRate or 0, desired, cap, dt)
+	else
+		actor.yaw = turnToward(actor.yaw, desired, cap, dt)
+	end
+end
+
 function HumanAIMotor.step(actor: Actor, dt: number, ctx: Ctx)
 	local intent = actor.intent
 	local mode = intent.mode
 	local x0, y0, z0 = actor.x, actor.y, actor.z
 
+	if mode ~= "walk" then
+		actor.side = nil -- (a step aside is a walk's)
+	end
 	if mode == "rail" then
 		local routes = ctx.routes
 		local route: Route? = if routes then routes.byId(intent.routeId) else nil
@@ -152,26 +213,60 @@ function HumanAIMotor.step(actor: Actor, dt: number, ctx: Ctx)
 	elseif mode == "stand" then
 		actor.speed = damp(actor.speed, 0, 10, dt)
 		if intent.heading ~= actor.yaw and intent.heading ~= 0 then
-			actor.yaw = turnToward(actor.yaw, intent.heading, 4, dt)
+			turnActor(actor, intent.heading, 4, dt)
 		end
 		actor.y = ctx.groundAt(actor.x, actor.z) + actor.hip
 	elseif mode == "walk" then
 		local dx, dz = intent.tx - actor.x, intent.tz - actor.z
-		local dist = math.sqrt(dx * dx + dz * dz)
+		local axis, coord = intent.laneAxis, intent.laneCoord
 		actor.speed = damp(actor.speed, intent.speed, intent.damp, dt)
-		local stepLen = math.min(dist, actor.speed * dt)
-		if dist > 1e-4 and stepLen > 0 then
-			local desiredYaw = yawOf(dx, dz)
-			actor.yaw = turnToward(actor.yaw, desiredYaw, intent.turnRate, dt)
-			local ux, uz = dx / dist, dz / dist
-			actor.x += ux * stepLen
-			actor.z += uz * stepLen
-		end
-		-- lane lock (walk state only): damp the cross-axis coordinate back to the lane (lambda 8)
-		if intent.laneAxis == "x" and intent.laneCoord then
-			actor.z = damp(actor.z, intent.laneCoord :: number, 8, dt)
-		elseif intent.laneAxis == "z" and intent.laneCoord then
-			actor.x = damp(actor.x, intent.laneCoord :: number, 8, dt)
+		if person(actor) and coord and (axis == "x" or axis == "z") then
+			-- along a lane: straight along its line, any step aside (round a post, back onto the line) a shallow
+			-- diagonal at the same pace over the ground; the body faces where it goes
+			local du, err
+			if axis == "x" then
+				du, err = dx, coord - actor.z
+			else
+				du, err = dz, coord - actor.x
+			end
+			local side = HumanAIMotor.laneSide(actor.side or 0, err, actor.speed, dt)
+			if math.abs(err) < 1e-3 and math.abs(side) < 1e-3 then
+				side = 0
+			end
+			actor.side = side
+			local forward = math.sqrt(math.max(0, actor.speed * actor.speed - side * side))
+			local stepU = math.min(math.abs(du), forward * dt) * (if du >= 0 then 1 else -1)
+			local stepC = side * dt
+			if math.abs(stepC) > math.abs(err) and stepC * err > 0 then
+				stepC = err
+			end
+			local mx, mz
+			if axis == "x" then
+				mx, mz = stepU, stepC
+			else
+				mx, mz = stepC, stepU
+			end
+			if mx * mx + mz * mz > 1e-10 then
+				turnActor(actor, yawOf(mx, mz), intent.turnRate, dt)
+				actor.x += mx
+				actor.z += mz
+			end
+		else
+			actor.side = nil
+			local dist = math.sqrt(dx * dx + dz * dz)
+			local stepLen = math.min(dist, actor.speed * dt)
+			if dist > 1e-4 and stepLen > 0 then
+				turnActor(actor, yawOf(dx, dz), intent.turnRate, dt)
+				local ux, uz = dx / dist, dz / dist
+				actor.x += ux * stepLen
+				actor.z += uz * stepLen
+			end
+			-- lane lock (wildlife and bare actors): damp the cross-axis coordinate back to the lane (lambda 8)
+			if axis == "x" and coord then
+				actor.z = damp(actor.z, coord, 8, dt)
+			elseif axis == "z" and coord then
+				actor.x = damp(actor.x, coord, 8, dt)
+			end
 		end
 		actor.y = ctx.groundAt(actor.x, actor.z) + actor.hip
 	elseif mode == "heading" then
