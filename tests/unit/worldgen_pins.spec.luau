@@ -78,7 +78,9 @@ return function(t)
 		t.eq(Bake.fnv(table.concat(sky, "\n")), "af884146e9696e8c", "Skyline or lamps moved: re-pin only on purpose")
 		-- re-pinned 2026-11-11: the police station stands on a level site (World/Height.SITES), which
 		-- flattened the one segment of its slab road that tilted (rd_114_police_slab Seg003)
-		t.eq(Bake.fnv(table.concat(props, "\n")), "5222db9c85fcb7d2", "props or roads moved: re-pin only on purpose")
+		-- re-pinned 2026-11-21: the trees' leaf sprays are baked leaf green, not the importer's grey (owner: "make sure
+		-- they eventually populate as being green on the leaves, each tree": the part colour shows until the map arrives)
+		t.eq(Bake.fnv(table.concat(props, "\n")), "1c39aa9ba081cfa5", "props or roads moved: re-pin only on purpose")
 	end)
 
 	t.test("pin: the collidable massing of every lot and its first part are exactly as before", function()

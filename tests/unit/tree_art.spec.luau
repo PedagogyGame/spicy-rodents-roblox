@@ -58,6 +58,34 @@ local function asset(names: { string }, origin: any?, offset: any?, bare: { [str
 end
 
 return function(t)
+	t.test("greenLeaves: every leaf spray gets its tree's leaf green at once; bark and fruit are left alone", function()
+		local town = Instance.new("Folder")
+		local own = tree(town, "1", { "Bark", "LeavesShade", "LeavesMid", "LeavesSun", "Apples" }, 7)
+		local plain = tree(town, nil, { "Bark", "LeavesMid" }, 8)
+		local next: any = { [7] = { trunkRoute = 7, assetId = "5", pivot = { 0, 0, 0 }, leaf = { 100, 141, 73 } } }
+		local bark0 = own.Bark.Color
+		t.eq(TreeArt.greenLeaves(town, next, env), 4, "four sprays in the town")
+		for _, name in { "LeavesShade", "LeavesMid", "LeavesSun" } do
+			local c = own[name].Color
+			t.near(c.R * 255, 100, 0.6, name)
+			t.near(c.G * 255, 141, 0.6)
+			t.near(c.B * 255, 73, 0.6)
+		end
+		local d = plain.LeavesMid.Color
+		t.near(d.R * 255, TreeArt.LEAF[1], 0.6, "a tree with no green of its own: the default")
+		t.near(d.G * 255, TreeArt.LEAF[2], 0.6)
+		t.truthy(d.G > d.R and d.G > d.B, "green")
+		t.eq(own.Bark.Color, bark0, "the bark keeps its colour")
+	end)
+
+	t.test("the baked data's leaf sprays: every one is baked leaf green by the tree builder", function()
+		local src = require("@lune/fs").readFile("src/worldgen/Builders/Trees.luau")
+		t.truthy(
+			string.find(src, "color = if isLeaf then { 106, 148, 77 } else m.color", 1, true) ~= nil,
+			"Builders/Trees bakes a leaf spray's part colour green"
+		)
+	end)
+
 	t.test("apply moves each SurfaceAppearance onto the baked part of the same name, once", function()
 		local town = Instance.new("Folder")
 		local a = tree(town, "101", { "Bark", "LeavesSun" })

@@ -17,6 +17,10 @@
 --     load or swap, gets that Model's SurfaceAppearances (colour, normal and roughness maps) moved onto its baked
 --     parts of the same name.
 -- A tree whose Model does not load keeps what was baked, so nothing here can leave a tree bare.
+-- Green from the first frame (owner, 2026-11-21: "make sure they eventually populate as being green on the leaves, each
+-- tree"): the baked leaf sprays carried the importer's grey as their part colour, which is what shows until a spray's
+-- colour map has arrived (and under its clear texels). greenLeaves gives every leaf spray in the town its tree's leaf
+-- green (the v2 data's, else TreeArt.LEAF) before anything is loaded, and every spray put in later gets it too.
 -- Interface: trees(town, next?) -> { Model }; apply(tree, asset) -> moved; swap(tree, asset, pivot, env?, leaf?) -> parts;
 --   nextByTrunk(list?) -> { [trunkRoute]: Next }; run(town, opts?) -> { trees, upgraded, swapped, failed, seconds }
 --   (yields: call it from a task)
@@ -28,6 +32,9 @@ local TreeArt = {}
 
 -- the MeshParts a tree Model carries (tools/blender/trees: build_trees.py LEAF_PARTS, Bark, Apples)
 TreeArt.MESHES = table.freeze({ Bark = true, LeavesShade = true, LeavesMid = true, LeavesSun = true, Apples = true })
+
+-- the leaf green of a tree with none of its own in the data (the v2 trees' run 100-125, 141-161, 73-83)
+TreeArt.LEAF = table.freeze({ 106, 148, 77 })
 
 export type Next = { trunkRoute: number, assetId: string?, pivot: { number }, leaf: { number }? }
 export type Env = { CFrame: any, Enum: any, Color3: any }
@@ -100,6 +107,24 @@ local function isLeaves(p: Instance): boolean
 	return string.sub(p.Name, 1, 6) == "Leaves"
 end
 
+-- greenLeaves(town, next?, env?) -> sprays: every leaf spray in the town given its tree's leaf green as its part
+-- colour (what shows while its colour map is on its way). Cheap: one write a spray, once.
+function TreeArt.greenLeaves(town: Instance, next: { [number]: Next }?, env: Env?): number
+	local e = env or engineEnv()
+	local n = 0
+	for _, d in town:GetDescendants() do
+		if d:IsA("MeshPart") and isLeaves(d) then
+			local tree = d.Parent
+			local trunk = if tree then tonumber(tree:GetAttribute("TrunkRoute")) else nil
+			local own = if next and trunk and next[trunk] then next[trunk].leaf else nil
+			local c = own or TreeArt.LEAF
+			d.Color = e.Color3.fromRGB(c[1], c[2], c[3])
+			n += 1
+		end
+	end
+	return n
+end
+
 -- A leaf spray part: alpha-cut cards seen from both sides (a script may not be allowed to set these: then they stay
 -- as the importer left them, or as baked). True when both read back as written.
 local function cutLeaves(p: MeshPart, e: Env): boolean
@@ -159,8 +184,9 @@ function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: E
 		if not cutLeaves(p, e) then
 			return 0
 		end
-		if leaf and isLeaves(p) then
-			p.Color = e.Color3.fromRGB(leaf[1], leaf[2], leaf[3])
+		if isLeaves(p) then
+			local c = leaf or TreeArt.LEAF
+			p.Color = e.Color3.fromRGB(c[1], c[2], c[3])
 		end
 	end
 	-- (Model:PivotTo, done part by part: the uploaded Model's pivot is its FBX origin, the tree's root)
@@ -200,6 +226,8 @@ function TreeArt.run(
 			return game:GetService("InsertService"):LoadAsset(assetId)
 		end
 	local next = TreeArt.nextByTrunk(o.next)
+	-- (green at once, before the first Model is asked for)
+	pcall(TreeArt.greenLeaves, town, next, o.env)
 	local list = TreeArt.trees(town, next)
 	local near = o.near
 	if near then

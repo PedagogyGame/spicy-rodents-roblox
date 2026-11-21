@@ -378,7 +378,8 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				sx = m.size[1],
 				sy = m.size[2],
 				sz = m.size[3],
-				color = m.color,
+				-- (a leaf spray's part colour is what shows until its colour map arrives: leaf green, not the importer's grey)
+				color = if isLeaf then { 106, 148, 77 } else m.color,
 				material = m.material,
 				canCollide = false,
 				transparency = 0,
