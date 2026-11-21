@@ -88,6 +88,7 @@ Schemas.REMOTES = {
 	["Possession.Granted"] = { dir = "s2c", reliable = true },
 	["Possession.Revoked"] = { dir = "s2c", reliable = true },
 	Correction = { dir = "s2c", reliable = true },
+	["Move.Diag"] = { dir = "s2c", reliable = false }, -- the movement diagnostics, to the place's owner (Movement/MoveDiag)
 	ActionResult = { dir = "s2c", reliable = true },
 	Telegraph = { dir = "s2c", reliable = false },
 	VehiclePoses = { dir = "s2c", reliable = false },

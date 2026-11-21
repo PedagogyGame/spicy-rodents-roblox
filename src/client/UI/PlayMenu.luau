@@ -41,6 +41,9 @@ export type Menu = {
 local PlayMenu = {}
 
 local InputMap = require("../Input/InputMap")
+local Import = require("../Import")
+local MoveDiag = Import.shared("Movement/MoveDiag") :: typeof(require("../../shared/Movement/MoveDiag"))
+local MoveDiagPanel = require("./MoveDiagPanel")
 
 PlayMenu.CHOICES = table.freeze({
 	{
@@ -76,8 +79,9 @@ local CLIMB = {
 	"G as you land  a barrel roll that keeps your speed",
 }
 
--- The help panel's lines for a role and device (device: nil | "vehicle" | "drone").
-function PlayMenu.helpLines(role: string?, device: string?): { string }
+-- The help panel's lines for a role and device (device: nil | "vehicle" | "drone"); `owner`: the place's owner also
+-- gets the line for the movement diagnostics panel (UI/MoveDiagPanel, Shared/Movement/MoveDiag.HELP).
+function PlayMenu.helpLines(role: string?, device: string?, owner: boolean?): { string }
 	if device == "vehicle" then
 		return {
 			"W  gas   ·   S  brake / reverse",
@@ -120,6 +124,9 @@ function PlayMenu.helpLines(role: string?, device: string?): { string }
 		table.insert(lines, "I  invert look up/down   ·   Alt  free the cursor")
 	end
 	table.insert(lines, "M  menu   ·   Esc > Reset  if you get stuck")
+	if owner then
+		table.insert(lines, MoveDiag.HELP)
+	end
 	return lines
 end
 
@@ -564,11 +571,12 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	local function attrs(): { [string]: any }
 		return player:GetAttributes()
 	end
+	local isOwner = MoveDiagPanel.isOwner(player) -- (the owner's help has the diagnostics key)
 
 	local function refresh()
 		local a = attrs()
 		local role = a.PlayRole :: string?
-		local lines = PlayMenu.helpLines(role, device)
+		local lines = PlayMenu.helpLines(role, device, isOwner)
 		local title = if device == "vehicle"
 			then "Driving the patrol car"
 			elseif device == "drone" then "Flying the police drone"
