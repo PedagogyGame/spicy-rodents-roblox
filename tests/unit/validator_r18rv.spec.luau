@@ -17,6 +17,9 @@
 --                     0.1 s and 0.25 s packets runs about 42 and 40 st/s, the pace of the motor BEFORE D19; the motor's
 --                     own best along that rail is now 29.7 (Space held; E+Space 28.0). In 0.05 s packets it is held to
 --                     33.7. validator_r15rv compares with a chain the motor cannot make (the cooldown switched off).
+--   old motor         the simplest crafted client: the motor with D19 switched off (chainCarry and chainLift 1), a
+--                     person's E+Space every sixth frame along the avenue cable, a packet every 0.1 s: 41.6 st/s and
+--                     not one violation (the motor's own there 28.2).
 --   lost wiggle       HONEST: W and Shift held, hopping, the wiggle mid-jump aimed out and the button held down the fall
 --                     (the roll as it lands). When the packets that show the wiggle are lost (0.2 to 0.3 s), the first
 --                     the server sees says trickKind 1 (the roll) with the re-aim out: _stamina scales its air bound
@@ -532,4 +535,57 @@ return function(t)
 			end
 		)
 	end
+	t.test(
+		"old motor: the motor with D19 switched off, E+Space every sixth frame along a cable in 0.1 s packets, is not clean",
+		function()
+			local tw, vworld = flat()
+			local id, t0 = 660, 0.02 -- (the avenue cable)
+			local reg = tw.registry
+			local r = reg:get(id)
+			local a, b = reg:pointAt(r, t0), reg:pointAt(r, 1)
+			local yaw = math.atan2(-(b.x - a.x), -(b.z - a.z))
+			local own = motorChain(tw, id, t0, yaw, 6, 1, 9)
+			-- (the client's motor steps with the chained leap's carry and lift at 1: the leap of before D19; the validator
+			-- judges with the params as they are)
+			local params = P :: any
+			local carry, lift = params.chainCarry, params.chainLift
+			local v = MoveValidator.new(vworld)
+			local s = SquirrelMotor.new(a.x, a.y, a.z)
+			s.routeId, s.railT, s.grounded, s.clock, s.yaw = id, t0, false, 0, yaw
+			local x0, z0 = s.x, s.z
+			local fx, fz = -math.sin(yaw), -math.cos(yaw)
+			local seq = 0
+			local function feed(): any
+				seq += 1
+				return v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, s.clock + 1)
+			end
+			feed()
+			local dirty, g1 = 0, 0
+			for f = 1, 9 * 60 do
+				local i = SquirrelMotor.idleInput(yaw)
+				i.fw, i.sprint = 1, true
+				i.leap = s.routeId ~= nil or (not s.grounded and f % 6 == 0)
+				i.grab = not s.grounded and s.routeId == nil and f % 6 == 0
+				params.chainCarry, params.chainLift = 1, 1
+				SquirrelMotor.step(s, i, 1 / 60, tw)
+				params.chainCarry, params.chainLift = carry, lift
+				if f == 60 then
+					g1 = (s.x - x0) * fx + (s.z - z0) * fz
+				end
+				if f % 6 == 0 then
+					dirty += #feed().violations
+				end
+			end
+			local pace = ((s.x - x0) * fx + (s.z - z0) * fz - g1) / 8
+			print(
+				string.format(
+					"      E+Space every 6 frames along the cable, 10 packets a second: the motor's own %.1f st/s; with D19 switched off %.1f st/s, %d violations",
+					own,
+					pace,
+					dirty
+				)
+			)
+			t.truthy(dirty > 0 or pace <= own * RESIDUAL, `the old motor's chain {pace} st/s, clean, against {own}`)
+		end
+	)
 end
