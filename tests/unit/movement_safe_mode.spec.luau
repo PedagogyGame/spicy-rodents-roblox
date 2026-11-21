@@ -396,7 +396,14 @@ return function(t)
 		function()
 			Log.capture()
 			local world = TestWorld.build({ boxes = {} })
-			local m = MovementService.new({ validator = MoveValidator.new(world), enforce = false })
+			local m = MovementService.new({
+				validator = MoveValidator.new(world),
+				enforce = false,
+				-- (the judging budget on a clock that stands still: a loaded machine benches nobody here)
+				clock = function(): number
+					return 0
+				end,
+			})
 			local s = SquirrelMotor.new(10, world.groundHeight, 10)
 			m:teleported("sq", s.x, s.y, s.z, "spawn", 0)
 			local inp = SquirrelMotor.idleInput(0)
