@@ -371,16 +371,20 @@ SquirrelMotor.params = {
 	-- (trickShift, trickPop); no key: trickPlain of it; S held: no burst, the flight's speed across cut by trickBack.
 	-- (owner, later that day: "slightly big more of a lunge in the direction you are turning or looking": 4.5 -> 5.5,
 	-- 0.45 -> 0.55)
-	trickShift = 5.5,
+	-- (and again: "still ... very little efficacy ... make the side movements more dynamic and meaningful ... a little
+	-- slightly bit more forward boost as well": 5.5 -> 6.5, 0.55 -> 0.65; the turn 30 -> 55 degrees; A or D held: a
+	-- side lunge of trickSideK of the burst, 45 degrees to that side of the camera)
+	trickShift = 6.5,
 	trickShiftTime = 0.12,
-	trickPop = 0.55,
+	trickPop = 0.65,
 	trickPopTime = 0.3,
 	trickPlain = 0.7,
+	trickSideK = 1.2,
 	trickBack = 0.3,
 	trickWinded = 2 / 3,
-	trickSnapYaw = math.rad(30),
+	trickSnapYaw = math.rad(55),
 	trickTurnRate = 40,
-	trickTotal = 0.45,
+	trickTotal = 0.55,
 	trickBurstRest = 0.5,
 	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds after a leap off a rail before E grabs in the air again.
 	-- Measured at 60 fps, W and sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue
@@ -1416,10 +1420,13 @@ local function doTrick(state: State, world: World, input: Input, events: { Event
 			local shift, pop = 0, 0
 			local bursts = state.burstWait <= 0 and state.leapScale == 1
 			-- (owner, 1.1: W held: the whole burst; no key: trickPlain of it; S held: no burst, the jump dropped back)
+			-- (later that day: A or D held: a side lunge, trickSideK of the burst, the line thrown 45 degrees to that side
+			-- of the camera's facing)
 			local back = input.fw < 0
+			local sideways = input.side ~= 0 and not back
 			if bursts then
 				shift, pop = SquirrelMotor.burstOf(state.winded and not state.tireless)
-				local k = if back then 0 elseif input.fw > 0 then 1 else P.trickPlain
+				local k = if back then 0 elseif sideways then P.trickSideK elseif input.fw > 0 then 1 else P.trickPlain
 				shift, pop = shift * k, pop * k
 			end
 			state.trickReach = SquirrelMotor.trickReachAt(
@@ -1433,7 +1440,7 @@ local function doTrick(state: State, world: World, input: Input, events: { Event
 				-- the burst: the line turned (a body hardly moving across has none to turn: its heading's), the speed popped
 				-- (owner, 1.1: toward the camera's facing, within trickSnapYaw either side of the jump's own line; the
 				-- shift goes along the line the flight is turned onto)
-				local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, 1, 0)
+				local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, 1, if sideways then input.side else 0)
 				local line = if across > 1e-3 then math.atan2(state.vx, state.vz) else state.yaw
 				local turn = math.atan2(fx, fz) - line
 				turn = math.atan2(math.sin(turn), math.cos(turn))
@@ -4584,12 +4591,12 @@ function SquirrelMotor.envelope(
 		if not freshBurst then
 			pAt = P.trickBurstRest - prev.burstWait
 			if prev.trickKind == 2 and not prev.grounded and prev.routeId == nil then
-				pPop = P.trickPop * SquirrelMotor.popAt(pAt)
+				pPop = P.trickPop * P.trickSideK * SquirrelMotor.popAt(pAt)
 			end
 		end
 		nAt = if nw > 0 then math.max(pAt, P.trickBurstRest - nw) else P.trickBurstRest
 		if inFlight and next.trickKind == 2 then
-			nPop = P.trickPop * SquirrelMotor.popAt(nAt)
+			nPop = P.trickPop * P.trickSideK * SquirrelMotor.popAt(nAt)
 			if freshBurst then
 				snap = math.clamp(next.trickTurn or 0, -P.trickSnapYaw, P.trickSnapYaw)
 			end
@@ -4600,8 +4607,8 @@ function SquirrelMotor.envelope(
 		end
 		-- (the flight's own speed over the gap: no more than it had, or what the air steers it to)
 		local own = math.max(hypot2(judgedPrev.vx, judgedPrev.vz), SquirrelMotor.V54.sprint)
-		gapAim.shift = P.trickShift * (SquirrelMotor.shiftDone(nAt) - SquirrelMotor.shiftDone(pAt))
-			+ P.trickPop * SquirrelMotor.popCarry(pAt, nAt) * own
+		gapAim.shift = P.trickShift * P.trickSideK * (SquirrelMotor.shiftDone(nAt) - SquirrelMotor.shiftDone(pAt))
+			+ P.trickPop * P.trickSideK * SquirrelMotor.popCarry(pAt, nAt) * own
 	end
 	if inFlight and (nYaw ~= pYaw or nReach ~= pReach or nPop ~= 0 or snap ~= 0) then
 		if prev.trickKind ~= 2 and next.trickKind ~= 2 and not fromNone then

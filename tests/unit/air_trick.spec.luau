@@ -249,10 +249,10 @@ return function(t)
 		"the burst: the press pops the speed and shifts the body along its line at once; no lift; once a flight",
 		function()
 			t.truthy(
-				P.trickShift >= 5 and P.trickShift <= 6,
-				"the shift (W held): 5 to 6 studs (owner 1.1: more of a lunge)"
+				P.trickShift >= 6 and P.trickShift <= 7,
+				"the shift (W held): 6 to 7 studs (owner: more of a lunge, then a little more forward)"
 			)
-			t.truthy(P.trickPop >= 0.5 and P.trickPop <= 0.6, "the pop (W held): five to six tenths of the speed")
+			t.truthy(P.trickPop >= 0.6 and P.trickPop <= 0.7, "the pop (W held): six to seven tenths of the speed")
 			t.truthy(P.trickPopTime >= 0.3 and P.trickPopTime <= 0.4, "easing back over 0.3 to 0.4 s")
 			t.truthy(
 				P.trickShiftTime >= 0.08 and P.trickShiftTime <= 0.15,
@@ -397,11 +397,11 @@ return function(t)
 		t.near(across(b), v0 * (1 - P.trickBack), 1e-9, "S: the speed across cut, the jump drops back")
 		t.eq(b.shiftX + b.shiftZ + b.trickPop, 0, "S: no shift, no pop")
 		t.eq(b.vy, base.vy, "no lift either way")
-		t.truthy(P.trickSnapYaw <= math.rad(30) + 1e-9, "the turn: 30 degrees either side at most")
+		t.truthy(P.trickSnapYaw <= math.rad(55) + 1e-9, "the turn: 55 degrees either side at most")
 	end)
 
 	t.test(
-		"the burst: the flight turns toward the camera's facing, 30 degrees at most either side of its line; the heading follows",
+		"the burst: the flight turns toward the camera's facing, 55 degrees at most either side of its line; the heading follows",
 		function()
 			-- the line: the camera's facing with W or no key, the keys' own direction from it otherwise
 			local cam = 0.7
@@ -451,12 +451,23 @@ return function(t)
 					"the heading on the new line (or past it toward the camera)"
 				)
 			end
-			t.near(P.trickSnapYaw, math.rad(30), 1e-12)
-			-- a strafe key held changes nothing (owner 1.1): the line is still the camera's facing, here the leap's own
+			t.near(P.trickSnapYaw, math.rad(55), 1e-12)
+			-- a strafe key held: a side lunge (owner: "make the side movements more dynamic"): the line 45 degrees to that
+			-- side of the camera's facing, trickSideK of the burst
 			local s = leapt({ fw = 1 }, 15)
-			step(s, { side = 1, trick = true })
-			t.near(s.shiftX, 0, 1e-9, "a strafe key: the camera's facing all the same")
-			t.near(s.shiftZ, P.trickShift * P.trickPlain, 1e-9, "no W held: trickPlain of the shift")
+			local line0 = math.atan2(s.vx, s.vz)
+			SquirrelMotor.step(s, keys({ side = 1, trick = true, cameraYaw = math.pi }), 0, world)
+			local kx, kz = SquirrelMotor.burstFacing(math.pi, 1, 1)
+			local want = math.atan2(kx, kz) - line0
+			want = math.clamp(math.atan2(math.sin(want), math.cos(want)), -P.trickSnapYaw, P.trickSnapYaw)
+			t.truthy(math.abs(want) > math.rad(40), "a clear turn to the side")
+			t.near(math.atan2(s.vx, s.vz), line0 + want, 1e-9, "the flight thrown to that side")
+			t.near(
+				math.sqrt(s.shiftX * s.shiftX + s.shiftZ * s.shiftZ),
+				P.trickShift * P.trickSideK,
+				1e-9,
+				"a side lunge: trickSideK of the shift"
+			)
 			-- the landing lands turned: a sprint leap pressed 16 frames in with the camera 30 degrees round
 			local function landed(turn: number?): State
 				local f = leapt(hold, 15)
@@ -654,10 +665,10 @@ return function(t)
 				)
 				local shift = SquirrelMotor.burstOf(winded) * (if (o :: any).fw == 1 then 1 else P.trickPlain)
 				t.truthy(least * plain > shift, `{name}: the burst carries more than its shift`)
-				t.truthy(most <= 0.42, `{name}: the burst alone {most}`)
-				t.truthy(mostAll <= 0.52, `{name}: the whole trick {mostAll}`)
+				t.truthy(most <= 0.52, `{name}: the burst alone {most}`)
+				t.truthy(mostAll <= 0.62, `{name}: the whole trick {mostAll}`)
 			end
-			t.truthy(P.trickTotal <= 0.45)
+			t.truthy(P.trickTotal <= 0.55)
 		end
 	)
 
@@ -726,8 +737,8 @@ return function(t)
 			"9 % of the whole carry: half of it left, twice that"
 		)
 		t.near(
-			SquirrelMotor.trickReachAt(1, 10, 10, 8),
-			(P.trickTotal * 20 - 8) / 10,
+			SquirrelMotor.trickReachAt(1, 10, 10, 10),
+			(P.trickTotal * 20 - 10) / 10,
 			1e-12,
 			"with a burst: what it leaves of trickTotal of the whole carry"
 		)

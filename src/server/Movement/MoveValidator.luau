@@ -1711,8 +1711,11 @@ function MoveValidator._stamina(
 		across = math.max(
 			0,
 			across
-				- P.trickShift * (SquirrelMotor.shiftDone(burstTo) - SquirrelMotor.shiftDone(burstFrom))
-				- P.trickPop * SquirrelMotor.popCarry(burstFrom, burstTo) * math.max(u, sprintLo or P.sprint)
+				- P.trickShift * P.trickSideK * (SquirrelMotor.shiftDone(burstTo) - SquirrelMotor.shiftDone(burstFrom))
+				- P.trickPop
+					* P.trickSideK
+					* SquirrelMotor.popCarry(burstFrom, burstTo)
+					* math.max(u, sprintLo or P.sprint)
 		)
 	end
 	-- (the time an arc from `prev` takes to come down to height y; its apex's when it never reaches it)

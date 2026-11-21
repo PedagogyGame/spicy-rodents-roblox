@@ -191,3 +191,10 @@ The numbers you can ask to change: how strong the burst is (W), how much of it y
 ## 1.2: a bigger lunge (21 November)
 
 The G press's burst is a step bigger. Holding W, a sprint leap of 30 studs now lands about 8 to 9 studs farther (1.1: about 7); with no key held, about 5 to 6 studs farther. Direction (toward the camera, 30 degrees either side), S pulling the jump back, and no extra height are unchanged.
+
+## 1.4: more forward, and real side lunges (21 November)
+
+- **Forward (W held):** a little more again: a sprint leap of 30 studs lands about 9 to 10 studs farther.
+- **Turning:** the jump now turns toward the camera by up to 55 degrees either side (it was 30).
+- **Side lunge (A or D held when you press G):** the jump is thrown 45 degrees to that side of where the camera faces, about a fifth stronger than the forward burst. Try jump, hold D, press G.
+- **S held** still pulls the jump back; no extra height in any case; once per jump.

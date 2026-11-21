@@ -128,8 +128,10 @@ function HeroArt.prepare(model: any, name: string, entry: Entry, lib: Lib?): any
 			local light = Instance.new("PointLight")
 			light.Name = "EyeGlow"
 			light.Color = Color3.fromRGB(255, 40, 20)
-			light.Brightness = 0.9
-			light.Range = 5
+			-- (owner, 2026-11-21: "greatly dial back, but not remove the red spotlight-like circle shining around the
+			-- spicy rodent": was 0.9 over 5 studs)
+			light.Brightness = 0.25
+			light.Range = 3
 			light.Shadows = false
 			light.Parent = head
 		end
