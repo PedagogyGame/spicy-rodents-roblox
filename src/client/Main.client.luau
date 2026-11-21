@@ -37,6 +37,7 @@ local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local StanceView = require("./Render/StanceView")
+local FlatView = require("./Render/FlatView")
 local GazeView = require("./Render/GazeView")
 local DuelWords = require("./UI/DuelWords")
 local SpeechBubbles = require("./UI/SpeechBubbles")
@@ -153,6 +154,12 @@ task.spawn(function()
 	local okG, errG = pcall(GazeView.start, { bodies = bodies :: Instance })
 	if not okG then
 		warn(`Client: GazeView failed: {errG}`)
+	end
+	-- one of the computer's squirrels knocked flat by a car (Server/Wildlife/RoadSquirrels: the body's Flat): a puff
+	-- of dust and a fade
+	local okF, errF = pcall(FlatView.start, { bodies = bodies :: Instance })
+	if not okF then
+		warn(`Client: FlatView failed: {errF}`)
 	end
 	local okV, errV = pcall(MedicalView.start, { bodies = bodies :: Instance })
 	if not okV then
