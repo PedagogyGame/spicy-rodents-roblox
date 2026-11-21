@@ -669,17 +669,23 @@ function AnimationDriver.trickOf(kin: KinematicPose.Pose?, kind: any, at: any, n
 	return AirTrick.playing(kind, at, now)
 end
 
--- The twitch's aim and seed for a body (pure): its own motor's when the controller holds it, else the server's
--- attributes (AirTrickAim, a Vector2 of the turn over its most and the reach; AirTrickSeed). (aimYaw, aimReach, seed)
-function AnimationDriver.trickAim(kin: KinematicPose.Pose?, aim: any, seed: any): (number, number, number)
+-- The twitch's aim, seed and the turn its press's burst made, for a body (pure): its own motor's when the controller
+-- holds it, else the server's attributes (AirTrickAim, a Vector2 of the turn over its most and the reach; AirTrickSeed;
+-- AirTrickTurn, radians). (aimYaw, aimReach, seed, turn)
+function AnimationDriver.trickAim(
+	kin: KinematicPose.Pose?,
+	aim: any,
+	seed: any,
+	turn: any
+): (number, number, number, number)
 	if kin then
-		return kin.trickAimYaw or 0, kin.trickAimReach or 0, kin.trickSeed or 0
+		return kin.trickAimYaw or 0, kin.trickAimReach or 0, kin.trickSeed or 0, kin.trickTurn or 0
 	end
 	local yaw, reach = 0, 0
 	if typeof(aim) == "Vector2" then
 		yaw, reach = aim.X * AirTrick.MAX_YAW, aim.Y
 	end
-	return yaw, reach, if type(seed) == "number" then seed else 0
+	return yaw, reach, if type(seed) == "number" then seed else 0, if type(turn) == "number" then turn else 0
 end
 
 -- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the
@@ -1345,12 +1351,13 @@ function AnimationDriver.start(opts: Opts): Driver
 				end)
 			end
 		end
-		local aimYaw, aimReach, seed = AnimationDriver.trickAim(
+		local aimYaw, aimReach, seed, turn = AnimationDriver.trickAim(
 			KinematicPose.get(e.body),
 			e.body:GetAttribute(AirTrick.ATTR.aim),
-			e.body:GetAttribute(AirTrick.ATTR.seed)
+			e.body:GetAttribute(AirTrick.ATTR.seed),
+			e.body:GetAttribute(AirTrick.ATTR.turn)
 		)
-		return AirTrick.pose(kind, elapsed, aimYaw, aimReach, seed)
+		return AirTrick.pose(kind, elapsed, aimYaw, aimReach, seed, turn)
 	end
 
 	-- the procedural gait writes Motor6D.Transform in Stepped (before the joints are solved)

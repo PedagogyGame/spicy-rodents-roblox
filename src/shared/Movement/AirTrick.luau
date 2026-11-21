@@ -20,6 +20,18 @@
 --   * playing(kind, at, now) -> (kind, elapsed)? reads them back; own(kind, left) -> (kind, elapsed)? reads the held
 --     body's own motor (no round trip for the player's own squirrel);
 --   * SOUNDS: one licensed library sound per move (docs/AUDIO_BUDGET.md), played at the body by each client.
+-- THE THROW (owner D20: "twist and contort, stretch and turn in that instant and reposition the jump"; "like a cat or
+-- rabbit, guinea pig ... flexible and spasmatic ... almost seems to redirect or convert movement in another direction";
+-- "slightly like a dash"): the wiggle's press throws the flight onto a new line (the motor's burst: the velocity turned
+-- and popped, the body's place shifted along the line, its heading brought round). throw(elapsed, turn) is the body
+-- doing it, in the same tenth of a second: the head and the chest snap toward the new line first, the hips are left
+-- behind and then kick out and round past it (a rabbit's binky), the tail lashes the other way, the body banks into the
+-- turn, and the whole animal stretches long along the line (fore paws reaching, hind legs trailing, back hollowed, head
+-- low, ears flat, tail streaming), held a beat while the pop's speed lasts, then let go. Every part of it springs: in
+-- within THROW.snap s, a little past, and back (spasm). `turn` (radians, + to the left; the motor's trickTurn, which
+-- the packet carries and the server writes on the body as AirTrickTurn) sets the twist's side and size: none for a
+-- press straight ahead (a stretch and a snap forward only), full at a quarter turn. The turn also weighs the twitch that
+-- follows (weights' `turn`): to a side the spin and the tail whip, back toward the camera the back tuck.
 -- Pure; no side effects on require.
 
 local SquirrelMotor = require("./SquirrelMotor")
@@ -37,7 +49,14 @@ AirTrick.ATTR = table.freeze({
 	-- twentieths), and its seed (seedOf)
 	aim = "AirTrickAim",
 	seed = "AirTrickSeed",
+	-- (owner D20) the turn the wiggle's burst was asked (turnAttr: radians, in twentieths), written with the seed
+	turn = "AirTrickTurn",
 })
+
+-- turnAttr(trickTurn) -> the turn as the body attribute carries it (radians within a half turn, in twentieths)
+function AirTrick.turnAttr(trickTurn: number): number
+	return math.floor(math.clamp(trickTurn, -math.pi, math.pi) * 20 + 0.5) / 20
+end
 
 -- aimAttr(aimYaw, aimReach) -> (x, y): the aim as the body attribute carries it (sideways -1..1, reach -1..1, each in
 -- twentieths: a write only when it moves that far)
@@ -131,12 +150,24 @@ local function hash(seed: number, salt: number): number
 	return (h + 0.5) / 2147483648
 end
 
--- weights(sideways, reach): each move's weight for an aim (sideways -1..1: the aim's turn over its most; reach -1 in ..
--- 1 out). Pure.
-function AirTrick.weights(sideways: number, reach: number): { [string]: number }
-	local s = math.min(math.abs(sideways), 1)
-	local o, i = math.clamp(reach, 0, 1), math.clamp(-reach, 0, 1)
-	local mag = math.min(1, math.sqrt(s * s + reach * reach))
+-- turnParts(turn) -> (side, back): how far a burst's turn (radians, + left) threw the body to a side (-1 right .. 1
+-- left: full at a quarter turn, none again at a half turn) and back toward where it came from (0 .. 1: from a quarter
+-- turn to a half turn). Pure.
+function AirTrick.turnParts(turn: number): (number, number)
+	local a = math.min(math.abs(turn), math.pi)
+	local back = math.clamp((a - math.pi / 2) / (math.pi / 2), 0, 1)
+	local side = math.min(a / (math.pi / 2), 1) * (1 - back)
+	return if turn < 0 then -side else side, back
+end
+
+-- weights(sideways, reach, turn?): each move's weight for an aim (sideways -1..1: the aim's turn over its most; reach -1
+-- in .. 1 out) and the turn the press's burst made (radians; none: 0): a throw to a side counts as a push to that side
+-- (the spin, the tail whip), one back toward the camera weighs the back tuck (it folds and flips). Pure.
+function AirTrick.weights(sideways: number, reach: number, turn: number?): { [string]: number }
+	local side, back = AirTrick.turnParts(turn or 0)
+	local s = math.min(math.abs(sideways + side), 1)
+	local o, i = math.clamp(reach, 0, 1), math.min(1, math.clamp(-reach, 0, 1) + back)
+	local mag = math.min(1, math.sqrt(s * s + reach * reach + back * back))
 	local small = (1 - mag) ^ 2
 	-- (a move that turns to a side fades out as the aim comes to the middle: it has no side to turn to there, and an aim
 	-- that swings across lets it go and draws it again the other way instead of reversing it mid-turn)
@@ -154,9 +185,10 @@ function AirTrick.weights(sideways: number, reach: number): { [string]: number }
 	}
 end
 
--- blend(sideways, reach, seed): each move's share of the twitch (they sum to 1): the seed's weighted draw, softened.
-function AirTrick.blend(sideways: number, reach: number, seed: number): { [string]: number }
-	local w = AirTrick.weights(sideways, reach)
+-- blend(sideways, reach, seed, turn?): each move's share of the twitch (they sum to 1): the seed's weighted draw,
+-- softened.
+function AirTrick.blend(sideways: number, reach: number, seed: number, turn: number?): { [string]: number }
+	local w = AirTrick.weights(sideways, reach, turn)
 	local score: { [string]: number } = {}
 	local top = -math.huge
 	for k, name in AirTrick.MOVES do
@@ -179,8 +211,8 @@ function AirTrick.blend(sideways: number, reach: number, seed: number): { [strin
 end
 
 -- the move a twitch mostly is (the largest share), for the specs and the owner's sheet
-function AirTrick.drawn(sideways: number, reach: number, seed: number): string
-	local b = AirTrick.blend(sideways, reach, seed)
+function AirTrick.drawn(sideways: number, reach: number, seed: number, turn: number?): string
+	local b = AirTrick.blend(sideways, reach, seed, turn)
 	local best, at = "wiggle", -1
 	for _, name in AirTrick.MOVES do
 		if b[name] > at then
@@ -342,15 +374,118 @@ local function axisOf(name: string, sg: number): (number, number, number)
 	return 0, 0, 0
 end
 
--- twitch(p, sideways, reach, seed): the twitch's offsets at p (0..1) for an aim and a seed (pure).
-function AirTrick.twitch(p: number, sideways: number, reach: number, seed: number): { [string]: { number } }
+-- The throw's shape (owner D20). snap: seconds the spasm takes in (its first swing's length; it is at its most a third
+-- of the way through, back through none at the end and a little past after); settle: how fast it dies (1/s); lag: how
+-- far the hips trail the head (s), tailLag a tail segment more (s); the stretch comes in over `reach` s, is held to
+-- `hold` and is gone by `release` (the pop's time: SquirrelMotor.params.trickPopTime).
+AirTrick.THROW = table.freeze({
+	snap = 0.1,
+	settle = 9,
+	lag = 0.025,
+	tailLag = 0.01,
+	reach = 0.07,
+	hold = 0.2,
+	release = 0.36,
+	-- radians at a full throw (a quarter turn): the head, the neck and the chest toward the line, the hips against it,
+	-- each tail segment against it, the bank; and of the stretch: the back hollowed, the head lowered, the fore legs
+	-- forward, the hind legs back, the hips' kick, each tail segment laid out, the ears flat; studs: the lunge ahead
+	head = 0.45,
+	neck = 0.25,
+	chest = 0.2,
+	hips = 0.45,
+	tail = 0.3,
+	bank = 0.25,
+	back = 0.12,
+	nose = 0.2,
+	fore = 0.5,
+	hind = 0.5,
+	kick = 0.2,
+	stream = 0.1,
+	ears = 0.35,
+	lunge = 0.15,
+})
+
+-- spasm(t): the throw's spring, t seconds after the press: 0 at the press, 1 at its most (a third of THROW.snap in),
+-- back through 0 at THROW.snap, a little the other way after, and dying away. Pure.
+function AirTrick.spasm(t: number): number
+	if t <= 0 then
+		return 0
+	end
+	local T = AirTrick.THROW
+	local w = math.pi / T.snap
+	-- (a damped sine over its own most: the most is where w cos(wt) = settle sin(wt))
+	local at = math.atan2(w, T.settle) / w
+	return math.exp(-T.settle * t) * math.sin(w * t) / (math.exp(-T.settle * at) * math.sin(w * at))
+end
+
+-- stretch(t): how far the body is stretched along its line t seconds after the press (0..1 and a little over as it
+-- snaps out): in over THROW.reach, held, let go by THROW.release. Pure.
+function AirTrick.stretch(t: number): number
+	local T = AirTrick.THROW
+	if t <= 0 or t >= T.release then
+		return 0
+	end
+	local a = math.clamp(t / T.reach, 0, 1)
+	local b = math.clamp((t - T.hold) / (T.release - T.hold), 0, 1)
+	return a * a * (3 - 2 * a) * (1 - b * b * (3 - 2 * b)) + 0.12 * AirTrick.spasm(t - T.reach / 2)
+end
+
+-- throw(elapsed, turn): the body throwing itself onto its new line, `elapsed` seconds after the wiggle's press, for the
+-- burst's turn (radians, + left; the motor's trickTurn). Offsets on the rig's axes, zero at the press and from
+-- THROW.release on (the spasm has died by then). Pure.
+function AirTrick.throw(elapsed: number, turn: number): { [string]: { number } }
+	local out: { [string]: { number } } = {}
+	local T = AirTrick.THROW
+	if elapsed <= 0 or elapsed >= SquirrelMotor.params.trickWiggle then
+		return out
+	end
+	-- (the spring let go smoothly before the twitch's end, so nothing is left at it)
+	local fade = 1 - ease((elapsed - T.release) / (SquirrelMotor.params.trickWiggle - T.release))
+	local side = AirTrick.turnParts(turn)
+	-- the twist: the head leads, the chest follows, the hips trail and whip past, the tail against them
+	local lead = AirTrick.spasm(elapsed) * fade * side
+	local trail = AirTrick.spasm(elapsed - T.lag) * fade * side
+	local st = AirTrick.stretch(elapsed) * fade
+	out.Root = { 0, 0, T.bank * lead, 0, 0, -T.lunge * st }
+	out.Head = { -T.nose * st, T.head * lead, 0 }
+	out.Neck = { -T.nose * 0.5 * st, T.neck * lead, 0 }
+	out.Spine2 = { T.back * st, T.chest * lead, 0 }
+	out.Spine1 = { T.back * st, 0, 0 }
+	-- (the hind end: against the turn while the front goes, then round past it; and kicked out behind)
+	out.Hips = { T.kick * AirTrick.spasm(elapsed - T.lag) * fade, -T.hips * trail, 0 }
+	for i = 1, K.tailBones do
+		local lash = AirTrick.spasm(elapsed - T.lag - i * T.tailLag) * fade * side
+		out[`Tail{i}`] = { T.stream * st, -T.tail * lash, 0 }
+	end
+	out.EarL = { 0, 0, T.ears * st }
+	out.EarR = { 0, 0, -T.ears * st }
+	for _, leg in { "FrontL_Upper", "FrontR_Upper" } do
+		out[leg] = { T.fore * st, 0, 0 }
+	end
+	for _, leg in { "BackL_Upper", "BackR_Upper" } do
+		out[leg] = { -T.hind * st, 0, 0 }
+	end
+	return out
+end
+
+-- twitch(p, sideways, reach, seed, turn?): the twitch's offsets at p (0..1) for an aim, a seed and the turn the press's
+-- burst made (radians; none: 0): the throw onto the new line first, the drawn moves over and after it (pure).
+function AirTrick.twitch(
+	p: number,
+	sideways: number,
+	reach: number,
+	seed: number,
+	turn: number?
+): { [string]: { number } }
 	local out: { [string]: { number } } = {}
 	if p <= 0 or p >= 1 then
 		return out
 	end
-	-- (the side, eased through the middle: an aim that swings across turns the other way through none, never a flip)
-	local sg = math.clamp(sideways / 0.25, -1, 1)
-	local b = AirTrick.blend(sideways, reach, seed)
+	local thrown = AirTrick.turnParts(turn or 0)
+	-- (the side, eased through the middle: an aim that swings across turns the other way through none, never a flip; a
+	-- throw to a side turns that way)
+	local sg = math.clamp((sideways + thrown) / 0.25, -1, 1)
+	local b = AirTrick.blend(sideways, reach, seed, turn)
 	local mag = math.min(1, math.sqrt(sideways * sideways + reach * reach))
 	local vigour = 0.6 + 0.4 * mag
 	-- the whole-body turn: about the turning moves' blended axis, their share of a whole number of turns
@@ -399,6 +534,8 @@ function AirTrick.twitch(p: number, sideways: number, reach: number, seed: numbe
 		local from = 0.25 + 0.2 * hash(seed, 59)
 		body(out, extra, (p - from) / (1 - from), 0.7 * vigour, -sg)
 	end
+	-- the throw onto the new line (owner D20), over and before the rest
+	AirTrick.onto(out, AirTrick.throw(p * SquirrelMotor.params.trickWiggle, turn or 0))
 	-- bounds: every bone but the Root's turn held to LIMIT
 	local L = AirTrick.LIMIT
 	for bone, r in out do
@@ -407,20 +544,24 @@ function AirTrick.twitch(p: number, sideways: number, reach: number, seed: numbe
 				r[k] = math.clamp(r[k], -L.swing, L.swing)
 			end
 		else
-			r[4] = math.clamp(r[4] or 0, -L.shift, L.shift)
+			for k = 4, 6 do
+				r[k] = math.clamp(r[k] or 0, -L.shift, L.shift)
+			end
 		end
 	end
 	return out
 end
 
--- pose(kind, elapsed, aimYaw?, aimReach?, seed?): the joint offsets of move `kind` `elapsed` seconds in ({} outside
--- it): the barrel roll, or the twitch for the aim (radians, -1..1; none: no aim) and the twitch's seed (seedOf; 0).
+-- pose(kind, elapsed, aimYaw?, aimReach?, seed?, turn?): the joint offsets of move `kind` `elapsed` seconds in ({}
+-- outside it): the barrel roll, or the twitch for the aim (radians, -1..1; none: no aim), the twitch's seed (seedOf; 0)
+-- and the turn its press's burst made (radians; none: 0).
 function AirTrick.pose(
 	kind: number,
 	elapsed: number,
 	aimYaw: number?,
 	aimReach: number?,
-	seed: number?
+	seed: number?,
+	turn: number?
 ): { [string]: { number } }
 	local out: { [string]: { number } } = {}
 	local d = AirTrick.duration(kind)
@@ -430,7 +571,7 @@ function AirTrick.pose(
 	local p = elapsed / d
 	if kind ~= AirTrick.ROLL then
 		local side = math.clamp((aimYaw or 0) / SquirrelMotor.params.trickAimYaw, -1, 1)
-		return AirTrick.twitch(p, side, math.clamp(aimReach or 0, -1, 1), seed or 0)
+		return AirTrick.twitch(p, side, math.clamp(aimReach or 0, -1, 1), seed or 0, turn)
 	end
 	local hump = math.sin(math.pi * p) -- 0 at both ends, 1 in the middle
 	out.Root = { 0, 0, AirTrick.LIMIT.roll * ease(p) }

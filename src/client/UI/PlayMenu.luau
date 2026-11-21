@@ -71,7 +71,7 @@ local CLIMB = {
 	"W into a tree, pole or downspout  climb it",
 	"A / D  choose the way at a fork",
 	"Space  leap   ·   Q  drop   ·   E  grab",
-	"G (pad R1, the TRICK button)  mid-jump: a wiggle, then aim the rest of the jump with the mouse",
+	"G (pad R1, the TRICK button)  mid-jump: a twist and a burst the way you face, then aim the rest of the jump with the mouse",
 	"   (pad: right stick; touch: drag from the button) up to 30 degrees either way; up a little further, down sooner",
 	"G as you land  a barrel roll that keeps your speed",
 }

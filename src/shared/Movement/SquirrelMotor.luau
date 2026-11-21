@@ -40,7 +40,9 @@
 -- flight, that much faster for a moment); and the body's place shifts trickShift studs along the line over the first
 -- trickShiftTime s (shiftDone: most of it in the first frames, never one frame's jump; swept against walls with the
 -- step's own move), while the body's heading whips round to the line (trickTurnRate). Winded, trickWinded of the shift
--- and the pop. The vertical speed is untouched. Once a flight (the wiggle's rule). The re-aim then runs on as before,
+-- and the pop. The vertical speed is untouched. Once a flight (the wiggle's rule), and so that quick hops along a rail
+-- cannot spam it: none in a chained leap's flight (owner D19's: leapScale under 1), and none sooner than trickBurstRest
+-- after the last one (burstWait); such a press is the wiggle and its re-aim alone. The re-aim then runs on as before,
 -- its reach out capped so that the burst and "farther out" together add no more than trickTotal to a jump on flat
 -- ground (trickReachAt's `burst`).
 -- GRAB-LEAP COOLDOWN (owner D18): E in the air grabs nothing until grabLeapCooldown s after a leap off a rail, so a
@@ -233,6 +235,8 @@ export type State = {
 	shiftX: number,
 	shiftZ: number,
 	trickPop: number,
+	-- seconds before a wiggle's press bursts again (trickBurstRest after the last burst; it runs down everywhere)
+	burstWait: number,
 	-- seconds since the body last left or touched its footing (the ground or a rail): its time in the air, or on the
 	-- ground since its landing
 	footAgo: number,
@@ -352,8 +356,13 @@ SquirrelMotor.params = {
 	-- trickSnapYaw: the most the flight's line turns at the press (rad); trickTurnRate: how fast the body's heading comes
 	-- round to the line during the shift (1/s, Motion.turnToward); trickTotal: the most the burst and "farther out"
 	-- together add to a jump on flat ground (a fraction of its whole carry).
-	-- Measured on flat ground at 60 fps (tests/unit/air_trick.spec prints the table): the burst alone adds 3.2 to 3.7
+	-- Measured on flat ground at 60 fps (tests/unit/air_trick.spec prints the table): the burst alone adds 3.1 to 3.8
 	-- studs (2.1 winded) whenever it is pressed.
+	-- trickBurstRest: seconds from one burst to the next at the soonest. A leap's flight is 0.85 s, so jump after jump
+	-- each has its burst; a grab-and-leap chain along a rail (its leaps chained, owner D19: no burst in those at all)
+	-- or any other quick run of short flights gets two a second at most, about 7 st/s on its pace. Measured along the
+	-- parapet 1075 / the cable 660, E, a frame on the rail, Space, G, E again 10 frames on (st/s): no G 25.6 / 29.1,
+	-- with G before these two rules 38.4 / 37.8, now 24.6 / 29.1 (chained leaps: the wiggle alone, and its meter cost).
 	trickShift = 2.5,
 	trickShiftTime = 0.12,
 	trickPop = 0.25,
@@ -361,7 +370,8 @@ SquirrelMotor.params = {
 	trickWinded = 2 / 3,
 	trickSnapYaw = math.rad(60),
 	trickTurnRate = 40,
-	trickTotal = 0.2,
+	trickTotal = 0.19,
+	trickBurstRest = 0.5,
 	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds after a leap off a rail before E grabs in the air again.
 	-- Measured at 60 fps, W and sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue
 	-- cable 660 / up trunk 604):
@@ -455,6 +465,7 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		shiftX = 0,
 		shiftZ = 0,
 		trickPop = 0,
+		burstWait = 0,
 		footAgo = 10, -- (a new body has stood a while: no landing's roll)
 		airDist = 0,
 		railLeapWait = 0,
@@ -575,8 +586,8 @@ local SCALARS = {
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
 -- (numbers a snapshot from before the air trick lacks: 0 when absent; the wire always carries them)
--- (aimYaw, aimReach, trickTurn on the wire too; trickReach, shiftX, shiftZ, trickPop, footAgo, airDist, railLeapWait,
--- chainWait, leapScale the client's own: a handover or clone keeps them)
+-- (aimYaw, aimReach, trickTurn on the wire too; trickReach, shiftX, shiftZ, trickPop, burstWait, footAgo, airDist,
+-- railLeapWait, chainWait, leapScale the client's own: a handover or clone keeps them)
 local LATER_SCALARS = {
 	"trickKind",
 	"trickTime",
@@ -587,6 +598,7 @@ local LATER_SCALARS = {
 	"shiftX",
 	"shiftZ",
 	"trickPop",
+	"burstWait",
 	"footAgo",
 	"airDist",
 	"railLeapWait",
@@ -1366,7 +1378,8 @@ end
 -- barrel roll; in the air further from it, once a flight, the wiggle and the re-aim from then on (its reach fixed now,
 -- a trickCost of the meter when there is any). Not on a rail or a transfer, nor in a pounce's window, nor in a roll.
 -- The wiggle's press is also the burst (owner D20): the flight's line turned to the steered one and popped, the shift
--- and the pop fixed for the substeps to run (a winded body's smaller, judged before the press's own cost).
+-- and the pop fixed for the substeps to run (a winded body's smaller, judged before the press's own cost). No burst in
+-- a chained leap's flight, nor within trickBurstRest of the last one: the wiggle and its re-aim alone.
 local function doTrick(state: State, world: World, input: Input, events: { Event })
 	if state.routeId ~= nil or state.bridge ~= nil or state.attackWindow > 0 or state.trickKind == 1 then
 		return
@@ -1382,23 +1395,31 @@ local function doTrick(state: State, world: World, input: Input, events: { Event
 			state.trickKind, state.trickTime = 2, P.trickWiggle
 			state.aimYaw, state.aimReach = 0, 0
 			local across = math.sqrt(state.vx * state.vx + state.vz * state.vz)
-			local shift, pop = SquirrelMotor.burstOf(state.winded and not state.tireless)
+			local shift, pop = 0, 0
+			local bursts = state.burstWait <= 0 and state.leapScale == 1
+			if bursts then
+				shift, pop = SquirrelMotor.burstOf(state.winded and not state.tireless)
+			end
 			state.trickReach = SquirrelMotor.trickReachAt(
 				state.footAgo,
 				state.airDist,
 				across * landIn,
-				SquirrelMotor.burstCarry(shift, pop, across)
+				if bursts then SquirrelMotor.burstCarry(shift, pop, across) else 0
 			)
-			-- the burst: the line turned (a body hardly moving across has none to turn: its heading's), the speed popped
-			local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, input.fw, input.side)
-			local line = if across > 1e-3 then math.atan2(state.vx, state.vz) else state.yaw
-			local turn = math.atan2(fx, fz) - line
-			turn = math.atan2(math.sin(turn), math.cos(turn))
-			local snap = math.clamp(turn, -P.trickSnapYaw, P.trickSnapYaw)
-			local c, s = math.cos(snap) * (1 + pop), math.sin(snap) * (1 + pop)
-			state.vx, state.vz = state.vx * c + state.vz * s, state.vz * c - state.vx * s
-			state.trickTurn, state.trickPop = turn, pop
-			state.shiftX, state.shiftZ = fx * shift, fz * shift
+			state.trickTurn, state.shiftX, state.shiftZ, state.trickPop = 0, 0, 0, 0
+			if bursts then
+				-- the burst: the line turned (a body hardly moving across has none to turn: its heading's), the speed popped
+				local fx, fz = SquirrelMotor.burstFacing(input.cameraYaw, input.fw, input.side)
+				local line = if across > 1e-3 then math.atan2(state.vx, state.vz) else state.yaw
+				local turn = math.atan2(fx, fz) - line
+				turn = math.atan2(math.sin(turn), math.cos(turn))
+				local snap = math.clamp(turn, -P.trickSnapYaw, P.trickSnapYaw)
+				local c, s = math.cos(snap) * (1 + pop), math.sin(snap) * (1 + pop)
+				state.vx, state.vz = state.vx * c + state.vz * s, state.vz * c - state.vx * s
+				state.trickTurn, state.trickPop = turn, pop
+				state.shiftX, state.shiftZ = fx * shift, fz * shift
+				state.burstWait = P.trickBurstRest
+			end
 			if not state.tireless and state.stamina > 0 then
 				state.stamina = math.max(0, state.stamina - P.trickCost)
 				if state.stamina == 0 and not state.winded then
@@ -1913,6 +1934,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 		end
 	end
 	state.trickTime = math.max(0, state.trickTime - dt)
+	state.burstWait = math.max(0, state.burstWait - dt)
 	if foot and state.trickTime <= 0 then
 		state.trickKind = 0
 	end
@@ -4536,7 +4558,12 @@ function SquirrelMotor.envelope(
 		if fresh then
 			snap = math.clamp(next.trickTurn or 0, -P.trickSnapYaw, P.trickSnapYaw)
 		elseif inFlight and next.trickKind == 2 and (next.trickTurn or 0) ~= (prev.trickTurn or 0) then
-			add(trick, "trick", 1, `the burst's turn changed from {prev.trickTurn} to {next.trickTurn} with no new wiggle`)
+			add(
+				trick,
+				"trick",
+				1,
+				`the burst's turn changed from {prev.trickTurn} to {next.trickTurn} with no new wiggle`
+			)
 		end
 		if pPop > 0 then
 			judgedPrev = table.clone(prev)

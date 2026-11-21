@@ -187,8 +187,10 @@ type Marks = {
 	rollArmed: boolean?,
 	footClock: number?,
 	trickReach: number?,
-	-- (owner D20) the flight's wiggle was its first by the server's count: its burst is the motor's (_stamina)
+	-- (owner D20) the flight's wiggle was its first by the server's count, pressed no sooner than trickBurstRest after
+	-- the last burst (burstAt: that press's client clock): its burst is the motor's (_stamina)
 	trickBurst: boolean?,
+	burstAt: number?,
 	trickHidden: boolean?, -- (this packet's move needed a wiggle the gap hid: SquirrelMotor.Judged.trickHidden)
 	gov: Gov?, -- the displacement governor's history (_govern); kept across a snap-back, cleared by a move (anchor)
 	-- the governor's closest call per window (studs over its allowance, below 0 within it): across and up, for windows
@@ -1555,7 +1557,9 @@ function MoveValidator._stamina(
 	-- The wiggle's burst (owner D20): the first wiggle of a flight also moves the body across by the motor's own burst,
 	-- the shift's part and the pop's carry over the move's time since the press, as the packets date it (burstFrom,
 	-- burstTo: seconds after the press; a wiggle's time only runs down, so the parts add up to one burst at most); the
-	-- move's distance is judged less that. A later wiggle of the same flight earns none.
+	-- move's distance is judged less that. A later wiggle of the same flight earns none, nor one pressed sooner than the
+	-- motor's trickBurstRest after the last burst granted (the motor gives none in a chained leap's flight either: the
+	-- server, which does not date the chain, allows that one).
 	local trickScale, trickOut = 1, 1
 	local burstFrom, burstTo = 0, 0
 	if not exempt then
@@ -1583,7 +1587,15 @@ function MoveValidator._stamina(
 			marks.trickReach = if marks.trickArmed
 				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0, 0)
 				else 0
-			marks.trickBurst = marks.trickArmed
+			-- (the burst: the flight's first wiggle, pressed no sooner than the motor's trickBurstRest after the last burst
+			-- the server granted, by the packets' own dating of the press)
+			local press = next.clock - (P.trickWiggle - next.trickTime)
+			local earned = marks.trickArmed == true
+				and press - (marks.burstAt or -math.huge) >= P.trickBurstRest - E.gravityEps
+			if earned then
+				marks.burstAt = press
+			end
+			marks.trickBurst = if earned then true else nil
 			marks.trickArmed = nil
 		end
 		if marks.trickBurst and (freshWiggle or prev.trickKind == 2) then

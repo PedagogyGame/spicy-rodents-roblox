@@ -3,12 +3,18 @@
 -- packet says it applied (aimYaw, aimReach), each at the motor's rate; the envelope undoes it before judging the move
 -- (SquirrelMotor.envelope 0c), the server's air bound scales by its own reach (MoveValidator._stamina: the motor's
 -- trickReachAt on the server's own footing), a fresh wiggle pays trickCost from the server's meter, and a roll after a
--- flight the server saw holds the speed for its length. Here:
+-- flight the server saw holds the speed for its length. The wiggle's burst (owner D20: the flight turned, popped and
+-- shifted at the press) is the motor's own, once a flight by the server's count: the envelope takes the turn back, the
+-- pop off the speed and the shift's part off the distance (0c), and the server's air bound takes the same off the move
+-- (_stamina). Here:
 --   honest            the client's motor, the link and MovementService (tests/lib/LiveRig) with a trick every flight:
 --                     the wiggle pressed at a random moment mid-jump and the aim swung to and fro (either side, out and
 --                     in), the button held on the way down for the roll as it lands; the S3 driver in town (leaps,
 --                     pounces, grabs, transfers) and hopping on open ground, on a clean link and through loss bursts:
---                     0 snaps;
+--                     0 snaps (the camera swung round on half the presses, so the burst turns the flight);
+--   the burst         an honest press, 20 packets a second: clean; the same flight with the claim left out, with a
+--                     burst twice the motor's, or with a second wiggle claimed later in the flight and its burst
+--                     taken again: flagged;
 --   crafted claims    a stream that claims a wiggle and its full re-aim out every flight (and a roll every landing) gains
 --                     no pace past an honest player's: the greedy grab-leap chain along the river bridge's parapet
 --                     (validator_r15rv's) at 20 and 4 packets a second, and a greedy stream over open ground, each with
@@ -101,6 +107,10 @@ return function(t)
 				if s.trickKind == 0 and now - airFrom >= pressAfter then
 					inp.trick = true
 					aimedAt = now
+					-- (owner D20: the burst goes the way the camera faces at the press: half the time swung round, any way)
+					if rng.next() < 0.5 then
+						inp.cameraYaw += (rng.next() * 2 - 1) * math.pi
+					end
 				elseif s.trickKind == 2 then
 					local a = now - aimedAt
 					inp.aimYaw = yawTo * math.sin(sweep * a)
@@ -186,6 +196,93 @@ return function(t)
 			end
 		)
 	end
+
+	-- the burst, by the server's count ------------------------------------------------------------------------------
+	t.test(
+		"the burst: an honest press clean; left unclaimed, doubled, or taken a second time in the flight: flagged",
+		function()
+			-- a sprint leap north on the open ground, the wiggle pressed 16 frames in, a packet every three frames; `edit`
+			-- changes each packet before it is sent (the frames since the press, or nil before it)
+			local function flight(edit: ((State, number?) -> ())?): ({ string }, number)
+				local v = MoveValidator.new(town.vworld)
+				local seq = 0
+				local flags: { string } = {}
+				local s = town.openStart()
+				local z0 = s.z
+				local pressed: number? = nil
+				local function feed()
+					local c = SquirrelMotor.clone(s)
+					if edit then
+						edit(c, pressed)
+					end
+					seq += 1
+					local r = v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(c) }, s.clock + 1)
+					for _, x in r.violations do
+						table.insert(flags, `{x.code}: {x.detail}`)
+					end
+				end
+				feed()
+				local frame, air = 0, 0
+				local leapt = false
+				while frame < 200 and not (leapt and s.grounded and s.footAgo > 0.3) do
+					frame += 1
+					local i = SquirrelMotor.idleInput(math.pi)
+					i.fw, i.sprint = 1, true
+					i.leap = frame == 60
+					leapt = leapt or frame == 60
+					if not s.grounded then
+						air += 1
+						i.trick = air == 16
+					end
+					SquirrelMotor.step(s, i, 1 / 60, town.world)
+					if pressed then
+						pressed += 1
+					elseif s.trickKind == 2 then
+						pressed = 0
+					end
+					if frame % 3 == 0 then
+						feed()
+					end
+				end
+				return flags, s.z - z0
+			end
+			local honest, far = flight(nil)
+			t.eq(#honest, 0, `an honest press: {honest[1]}`)
+			-- the claim left out: the burst's move with nothing to explain it
+			local bare = flight(function(c: State, pressed: number?)
+				if pressed then
+					c.trickKind, c.trickTime, c.trickTurn, c.aimYaw, c.aimReach = 0, 0, 0, 0, 0
+				end
+			end)
+			t.truthy(#bare > 0, "the burst with no wiggle claimed is no honest move")
+			-- twice the motor's shift, claimed as one burst
+			local double = flight(function(c: State, pressed: number?)
+				if pressed then
+					c.z += P.trickShift * SquirrelMotor.shiftDone(pressed / 60)
+				end
+			end)
+			t.truthy(#double > 0, "a burst twice the motor's is flagged")
+			-- a second wiggle claimed 0.3 s after the first, its shift taken again
+			local again = flight(function(c: State, pressed: number?)
+				if pressed and pressed >= 18 and c.trickKind == 2 then
+					local since = (pressed - 18) / 60
+					c.trickTime = math.max(0, P.trickWiggle - since)
+					c.z += P.trickShift * SquirrelMotor.shiftDone(since)
+				end
+			end)
+			t.truthy(#again > 0, "a second burst in the same flight is flagged (once a flight, the server's count)")
+			print(
+				string.format(
+					"      a sprint leap with the press, 20 packets a second: %d flags honest (%.1f st); unclaimed %d, doubled %d, a second burst %d",
+					#honest,
+					far,
+					#bare,
+					#double,
+					#again
+				)
+			)
+		end
+	)
 
 	-- crafted streams ---------------------------------------------------------------------------------------------
 	local function flat(): (any, any)
@@ -310,6 +407,92 @@ return function(t)
 	end
 
 	t.test(
+		"the burst: two short hops, each with a wiggle: the second's burst only when trickBurstRest after the first",
+		function()
+			local _, vworld = flat()
+			-- two hops north over flat ground, 20 packets a second, a wiggle claimed a packet into each; the first takes the
+			-- motor's shift; the second takes it too when `second`, after `wait` s on the ground between the hops
+			local function hops(second: boolean, wait: number): ({ string }, number)
+				local v = MoveValidator.new(vworld)
+				local seq = 0
+				local flags: { string } = {}
+				local s = SquirrelMotor.new(-1400, 0, -1360)
+				s.clock = 0
+				local function feed()
+					seq += 1
+					local r = v:accept("a", { seq = seq, snapshot = SquirrelMotor.serialize(s) }, s.clock + 1)
+					for _, x in r.violations do
+						table.insert(flags, `{x.code}: {x.detail}`)
+					end
+				end
+				local dt, pace = 0.05, 15
+				feed()
+				local firstPress, secondPress = 0, 0
+				local function stand(secs: number)
+					for _ = 1, math.floor(secs / dt + 0.5) do
+						s.clock += dt
+						feed()
+					end
+				end
+				local function hop(shifted: boolean): number
+					local press = 0
+					local k = 0
+					s.vx, s.vz = 0, pace
+					repeat
+						k += 1
+						local vy = if k == 1 then 10 else s.vy - P.gravity * dt
+						local y = if k == 1 then 0.5 else math.max(0, s.y + (s.vy + vy) / 2 * dt)
+						s.clock += dt
+						s.z += pace * dt
+						s.grounded, s.y, s.vy = y <= 0, y, if y <= 0 then 0 else vy
+						if s.grounded then
+							s.trickKind, s.trickTime, s.vz = 0, 0, 0
+						elseif k >= 2 then
+							-- (pressed at the start of the second packet's gap)
+							local since = (k - 1) * dt
+							if k == 2 then
+								press = s.clock - dt
+							end
+							s.trickKind, s.trickTime = 2, math.max(0, P.trickWiggle - since)
+							if shifted then
+								s.z += P.trickShift * (SquirrelMotor.shiftDone(since) - SquirrelMotor.shiftDone(
+									since - dt
+								))
+							end
+						end
+						feed()
+					until s.grounded
+					return press
+				end
+				stand(0.2)
+				firstPress = hop(true)
+				stand(wait)
+				secondPress = hop(second)
+				stand(0.2)
+				return flags, secondPress - firstPress
+			end
+			local plain, gap = hops(false, 0)
+			t.truthy(gap < P.trickBurstRest, `the hops' presses {gap} s apart: inside the rest`)
+			t.eq(#plain, 0, `the first hop's burst and a second wiggle with none: clean ({plain[1]})`)
+			local both = hops(true, 0)
+			t.truthy(#both > 0, "a second burst inside trickBurstRest is flagged")
+			local rested, gap2 = hops(true, 0.2)
+			t.truthy(gap2 >= P.trickBurstRest, `after {gap2} s`)
+			t.eq(#rested, 0, `a second burst after the rest: clean ({rested[1]})`)
+			print(
+				string.format(
+					"      two hops, a burst claimed in each: presses %.2f s apart %d flags; %.2f s apart %d flags (the rest: %.1f s)",
+					gap,
+					#both,
+					gap2,
+					#rested,
+					P.trickBurstRest
+				)
+			)
+		end
+	)
+
+	t.test(
 		"crafted claims: a move claimed in every packet buys the greedy grab-leap chain along a rail no pace",
 		function()
 			local tw, vworld = flat()
@@ -343,7 +526,8 @@ return function(t)
 			local dt = 0.05
 			while s.clock < 12 do
 				local best: State? = nil
-				local D = 4
+				-- (a claimed burst's packet may reach further: the flight's own and the shift's part)
+				local D = if claimed then 8 else 4
 				while D >= 0 and best == nil do
 					for _, vy in { 0, 10, 20, 32 } do
 						local c = SquirrelMotor.clone(s)
@@ -394,7 +578,9 @@ return function(t)
 				claimed
 			)
 		)
-		t.truthy(claimed <= plain + 0.1, `claimed {claimed} st/s against {plain}`)
+		-- (owner D20: a claimed wiggle now carries the motor's burst, once a flight, and pays the motor's cost: no more
+		-- than the honest trick's own hopping, below)
+		t.truthy(claimed <= math.max(plain + 0.1, 24.4), `claimed {claimed} st/s against {plain}`)
 	end)
 
 	-- the honest trick's own pace, for the crafted streams above (the motor alone, 60 fps, flat open ground and the parapet)
@@ -443,9 +629,14 @@ return function(t)
 					)
 				)
 			end
+			-- (owner D20: the burst and farther out together add about a fifth to a jump at most, so to a hop's pace)
 			t.truthy(
-				hops(15, false, 6, false) <= hops(nil, false, 6, false) * 1.09,
-				"the trick's hop no more than 9 % on"
+				hops(15, false, 6, false) <= hops(nil, false, 6, false) * (1 + P.trickTotal + 0.03),
+				"the trick's hop no more than about a fifth on"
+			)
+			t.truthy(
+				hops(15, false, 30, true) <= hops(nil, false, 30, true) * (1 + P.trickTotal + 0.03),
+				"nor from an empty meter"
 			)
 		end
 	)
