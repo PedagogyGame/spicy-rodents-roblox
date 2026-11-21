@@ -235,7 +235,8 @@ export type State = {
 	shiftX: number,
 	shiftZ: number,
 	trickPop: number,
-	-- seconds before a wiggle's press bursts again (trickBurstRest after the last burst; it runs down everywhere)
+	-- seconds before a wiggle's press bursts again (trickBurstRest after the last burst; it runs down everywhere). On
+	-- the wire: it dates the burst's press for the server (trickBurstRest less this, ago), whatever the gap hid
 	burstWait: number,
 	-- seconds since the body last left or touched its footing (the ground or a rail): its time in the air, or on the
 	-- ground since its landing
@@ -586,7 +587,7 @@ local SCALARS = {
 local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction", "emergedFrom" }
 -- (numbers a snapshot from before the air trick lacks: 0 when absent; the wire always carries them)
--- (aimYaw, aimReach, trickTurn on the wire too; trickReach, shiftX, shiftZ, trickPop, burstWait, footAgo, airDist,
+-- (aimYaw, aimReach, trickTurn, burstWait on the wire too; trickReach, shiftX, shiftZ, trickPop, footAgo, airDist,
 -- railLeapWait, chainWait, leapScale the client's own: a handover or clone keeps them)
 local LATER_SCALARS = {
 	"trickKind",
@@ -1355,6 +1356,14 @@ function SquirrelMotor.freshMove(prev: State, next: State, kind: number): boolea
 		return true
 	end
 	return nt > (prev.trickTime or 0) - (next.clock - prev.clock) + 1e-4
+end
+
+-- SquirrelMotor.freshBurst(prev, next): `next` claims a burst pressed after `prev`: its rest (burstWait, which only
+-- runs down with the clock) has more left than `prev`'s less the gap. Pure; dated as freshMove dates a move: the press
+-- was trickBurstRest - next.burstWait seconds before `next`.
+function SquirrelMotor.freshBurst(prev: State, next: State): boolean
+	local nw = next.burstWait or 0
+	return nw > 0 and nw > (prev.burstWait or 0) - (next.clock - prev.clock) + 1e-4
 end
 
 -- SquirrelMotor.unaim(s, toYaw, toReach, turned?, scaled?): a copy of `s` with its velocity as a re-aim at (toYaw,
@@ -2296,7 +2305,8 @@ SquirrelMotor.FIELD_BOUNDS = table.freeze({
 	trickKind = "enum 0, 1 or 2; never on a rail, a wiggle (2) only in the air (fieldCheck); a fresh one dates the server's meter charge and the roll's carry (MoveValidator._stamina, once a flight by the server's own footing); a wiggle's flight may be re-aimed (envelope 0c, 5)",
 	trickTime = "[0, the move's own length] (trickRoll, trickWiggle), 0 with no move (fieldCheck); dates a roll's carry (MoveValidator._stamina)",
 	aimYaw = "[-trickAimYaw, trickAimYaw], 0 on the ground, a rail or with no move (fieldCheck); moves at most trickYawRate x dt and only in a wiggle's flight, undone before the move is judged (envelope 0c)",
-	trickTurn = "[-pi, pi], 0 unless a wiggle's flight (fieldCheck); new only with a fresh wiggle, whose flight it turns by at most trickSnapYaw, undone before the move is judged (envelope 0c); else the pose's only (AirTrick)",
+	trickTurn = "[-pi, pi], 0 unless a wiggle's flight (fieldCheck); new only with a fresh wiggle; a fresh burst's flight it turns by at most trickSnapYaw, undone before the move is judged (envelope 0c); else the pose's only (AirTrick)",
+	burstWait = "[0, trickBurstRest] (fieldCheck); it only runs down, but for a new burst, which it dates (freshBurst): the envelope takes that burst's turn, pop and shift from the motor's own numbers (0c), and the server grants it once a flight and no sooner than trickBurstRest after the last (MoveValidator._stamina)",
 	aimReach = "[-1, 1], 0 on the ground, a rail or with no move (fieldCheck); moves at most trickReachRate x dt, only in a wiggle's flight, undone at the most a press reaches (envelope 0c); the server's air bound scales by its own reach (MoveValidator._stamina)",
 })
 
@@ -2472,6 +2482,9 @@ function SquirrelMotor.fieldCheck(s: { [string]: any }, world: World): { Violati
 		if tk ~= 2 and s.trickTurn ~= 0 then
 			add(out, "field", 1, "a burst's turn with no wiggle")
 		end
+	end
+	if s.burstWait ~= nil then
+		range("burstWait", 0, P.trickBurstRest)
 	end
 	local seq = s.clickSeq
 	if seq ~= nil then
@@ -4512,12 +4525,14 @@ end
 -- worth nothing to the envelope, and what it may carry further is the server's air bound's (MoveValidator._stamina, by the
 -- server's own reach). The judged vertical speed and cap are handed back re-aimed, for the next packet's baseline.
 -- The wiggle's burst (owner D20) is undone the same way, from the motor's own numbers and the packets' own dating of the
--- press (trickTime): a fresh wiggle may turn the flight by its trickTurn, held to trickSnapYaw (the turn back); the pop
--- on the speed is what popAt says at each packet's time since the press, so both ends are judged as the flight without
--- it (scaled back; a winded press's smaller pop is judged a little slow, which no cap minds); and the body may lie
--- further across by the shift's part of the gap and the pop's carry over it (gapAim.shift: section 5's distance and
--- the grab search's arc; the walls are tested on the packets' own line). trickTurn changes only with a fresh wiggle.
--- A wiggle is once a flight by the server's count (MoveValidator._stamina), so the burst is.
+-- press (burstWait: freshBurst; a wiggle with no burst, in a chained leap or inside the rest, claims none): a fresh
+-- burst may turn the flight by its trickTurn, held to trickSnapYaw (the turn back); the pop on the speed is what popAt
+-- says at each packet's time since the press, so both ends are judged as the flight without it (scaled back; a winded
+-- press's smaller pop is judged a little slow, which no cap minds); and the body may lie further across by the
+-- shift's part of the gap and the pop's carry over it (gapAim.shift: section 5's distance and the grab search's arc;
+-- the walls are tested on the packets' own line). trickTurn changes only with a fresh wiggle. The envelope keeps no
+-- count: that a burst is the flight's first and no sooner than trickBurstRest after the last is the server's
+-- (MoveValidator._stamina, whose air bound takes the burst only then).
 function SquirrelMotor.envelope(
 	prev: State,
 	next: State,
@@ -4541,29 +4556,27 @@ function SquirrelMotor.envelope(
 	local judgedPrev = prev
 	-- (on its footing, or with no move, a body has no re-aim (fieldCheck): the flight ended in the gap)
 	local inFlight = not next.grounded and next.routeId == nil and next.trickKind ~= 0
-	-- the burst in the gap: the seconds since the press at each end (`prev`'s wiggle, or a fresh one's from none; a
-	-- flight that ended in the gap ran on for the gap), the pop on each end's speed and the turn a fresh press made
+	-- the burst in the gap: the seconds since its press at each end (`prev`'s, still inside its rest, or a fresh one's
+	-- from none), the pop on each end's speed (in a wiggle's flight) and the turn a fresh press made
 	local pAt, nAt, pPop, nPop, snap = 0, 0, 0, 0, 0
-	if fresh or prev.trickKind == 2 then
-		if not fresh then
-			pAt = P.trickWiggle - (prev.trickTime or 0)
-			pPop = P.trickPop * SquirrelMotor.popAt(pAt)
+	local freshBurst = SquirrelMotor.freshBurst(prev, next)
+	if inFlight and next.trickKind == 2 and not fresh and (next.trickTurn or 0) ~= (prev.trickTurn or 0) then
+		add(trick, "trick", 1, `the burst's turn changed from {prev.trickTurn} to {next.trickTurn} with no new wiggle`)
+	end
+	if freshBurst or (prev.burstWait or 0) > 0 then
+		local nw = next.burstWait or 0
+		if not freshBurst then
+			pAt = P.trickBurstRest - prev.burstWait
+			if prev.trickKind == 2 and not prev.grounded and prev.routeId == nil then
+				pPop = P.trickPop * SquirrelMotor.popAt(pAt)
+			end
 		end
+		nAt = if nw > 0 then math.max(pAt, P.trickBurstRest - nw) else P.trickBurstRest
 		if inFlight and next.trickKind == 2 then
-			nAt = math.max(pAt, P.trickWiggle - (next.trickTime or 0))
 			nPop = P.trickPop * SquirrelMotor.popAt(nAt)
-		else
-			nAt = pAt + math.max(dt, 0)
-		end
-		if fresh then
-			snap = math.clamp(next.trickTurn or 0, -P.trickSnapYaw, P.trickSnapYaw)
-		elseif inFlight and next.trickKind == 2 and (next.trickTurn or 0) ~= (prev.trickTurn or 0) then
-			add(
-				trick,
-				"trick",
-				1,
-				`the burst's turn changed from {prev.trickTurn} to {next.trickTurn} with no new wiggle`
-			)
+			if freshBurst then
+				snap = math.clamp(next.trickTurn or 0, -P.trickSnapYaw, P.trickSnapYaw)
+			end
 		end
 		if pPop > 0 then
 			judgedPrev = table.clone(prev)

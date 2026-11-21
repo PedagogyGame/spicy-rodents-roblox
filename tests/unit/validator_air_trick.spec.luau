@@ -251,7 +251,7 @@ return function(t)
 			-- the claim left out: the burst's move with nothing to explain it
 			local bare = flight(function(c: State, pressed: number?)
 				if pressed then
-					c.trickKind, c.trickTime, c.trickTurn, c.aimYaw, c.aimReach = 0, 0, 0, 0, 0
+					c.trickKind, c.trickTime, c.trickTurn, c.aimYaw, c.aimReach, c.burstWait = 0, 0, 0, 0, 0, 0
 				end
 			end)
 			t.truthy(#bare > 0, "the burst with no wiggle claimed is no honest move")
@@ -262,11 +262,13 @@ return function(t)
 				end
 			end)
 			t.truthy(#double > 0, "a burst twice the motor's is flagged")
-			-- a second wiggle claimed 0.3 s after the first, its shift taken again
+			-- a second wiggle and burst claimed in the same flight, once the first's rest is over, its shift taken again
+			local later = math.ceil(P.trickBurstRest * 60) + 1
 			local again = flight(function(c: State, pressed: number?)
-				if pressed and pressed >= 18 and c.trickKind == 2 then
-					local since = (pressed - 18) / 60
+				if pressed and pressed >= later and c.trickKind == 2 then
+					local since = (pressed - later) / 60
 					c.trickTime = math.max(0, P.trickWiggle - since)
+					c.burstWait = math.max(0, P.trickBurstRest - since)
 					c.z += P.trickShift * SquirrelMotor.shiftDone(since)
 				end
 			end)
@@ -428,9 +430,15 @@ return function(t)
 				local dt, pace = 0.05, 15
 				feed()
 				local firstPress, secondPress = 0, 0
+				-- (the motor's rest: it runs down from a burst's press, on the ground too)
+				local burstAt = -math.huge
+				local function rest()
+					s.burstWait = math.max(0, P.trickBurstRest - (s.clock - burstAt))
+				end
 				local function stand(secs: number)
 					for _ = 1, math.floor(secs / dt + 0.5) do
 						s.clock += dt
+						rest()
 						feed()
 					end
 				end
@@ -455,11 +463,15 @@ return function(t)
 							end
 							s.trickKind, s.trickTime = 2, math.max(0, P.trickWiggle - since)
 							if shifted then
+								if k == 2 then
+									burstAt = press
+								end
 								s.z += P.trickShift * (SquirrelMotor.shiftDone(since) - SquirrelMotor.shiftDone(
 									since - dt
 								))
 							end
 						end
+						rest()
 						feed()
 					until s.grounded
 					return press

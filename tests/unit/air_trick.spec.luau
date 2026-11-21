@@ -753,9 +753,14 @@ return function(t)
 			step(q, { fw = 1, trick = true, cameraYaw = math.pi + 2 })
 			local _, _, turned = SquirrelWire.decode(SquirrelWire.encode(1, 1, SquirrelMotor.serialize(q)))
 			t.near(turned.trickTurn :: number, 2, 1e-5, "the turn asked, whole")
+			t.near(turned.burstWait :: number, q.burstWait, 1e-6, "the burst's rest, which dates its press")
+			t.truthy(SquirrelMotor.freshBurst(SquirrelMotor.new(0, 0, 0), q), "a burst pressed since")
+			local q2 = SquirrelMotor.clone(q)
+			step(q2, { fw = 1 })
+			t.falsy(SquirrelMotor.freshBurst(q, q2), "the same burst a frame on: not a new one")
 			t.eq(#SquirrelMotor.fieldCheck(turned, world), 0, "an honest packet with a turn")
 			back.trickTurn = 0
-			for _, k in { "trickKind", "trickTime", "aimYaw", "aimReach", "trickTurn" } do
+			for _, k in { "trickKind", "trickTime", "aimYaw", "aimReach", "trickTurn", "burstWait" } do
 				t.truthy(SquirrelMotor.FIELD_BOUNDS[k] ~= nil, k)
 			end
 			local function bad(edit: { [string]: any }): boolean
@@ -779,6 +784,8 @@ return function(t)
 				"no burst's turn with no wiggle"
 			)
 			t.falsy(bad({ trickTurn = -3 }), "a wiggle's turn")
+			t.truthy(bad({ burstWait = P.trickBurstRest + 0.01 }), "a rest no longer than the motor's")
+			t.truthy(bad({ burstWait = -0.01 }))
 			t.truthy(bad({ trickKind = 0, trickTime = 0 }), "no re-aim with no move")
 			t.truthy(bad({ grounded = true, vy = 0, trickKind = 1, trickTime = 0.2 }), "no re-aim on the ground")
 			t.falsy(
@@ -788,7 +795,7 @@ return function(t)
 			t.truthy(bad({ routeId = 220, railT = 0, trickKind = 1, trickTime = 0.2, aimYaw = 0, aimReach = 0 }))
 			local old = table.clone(snap)
 			old.trickKind, old.trickTime, old.aimYaw, old.aimReach, old.trickTurn = nil, nil, nil, nil, nil
-			old.shiftX, old.shiftZ, old.trickPop = nil, nil, nil
+			old.shiftX, old.shiftZ, old.trickPop, old.burstWait = nil, nil, nil, nil
 			local st = SquirrelMotor.deserialize(old)
 			t.eq(st.trickKind, 0)
 			t.eq(st.aimYaw, 0)

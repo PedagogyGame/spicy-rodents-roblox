@@ -183,12 +183,13 @@ type Marks = {
 	-- the air trick (owner D18; _stamina): a flight began since the last wiggle charged (the server saw the body on the
 	-- ground or a rail, or a gap long enough to hide a landing), and since the last roll's carry (the server saw it in the
 	-- air); the client clock of the last packet on its footing; the flight's reach out (SquirrelMotor.trickReachAt)
+	-- (trickArmed nil: not yet known, a body the server has only just taken on, perhaps in a flight already: armed)
 	trickArmed: boolean?,
 	rollArmed: boolean?,
 	footClock: number?,
 	trickReach: number?,
-	-- (owner D20) the flight's wiggle was its first by the server's count, pressed no sooner than trickBurstRest after
-	-- the last burst (burstAt: that press's client clock): its burst is the motor's (_stamina)
+	-- (owner D20) the burst the packets last dated was the flight's first by the server's count and pressed no sooner
+	-- than trickBurstRest after the one before (burstAt: its press's client clock): it is the motor's (_stamina)
 	trickBurst: boolean?,
 	burstAt: number?,
 	trickHidden: boolean?, -- (this packet's move needed a wiggle the gap hid: SquirrelMotor.Judged.trickHidden)
@@ -1554,12 +1555,13 @@ function MoveValidator._stamina(
 	-- scales as the re-aim's reach changed, at that reach (the motor's aimScale; it telescopes, so a re-aim to and fro
 	-- buys nothing). A fresh roll after a flight the server saw holds the speed (neither steered nor dragged) for the
 	-- roll's length from its press, dated within the packet: the motor's carry along the ground
-	-- The wiggle's burst (owner D20): the first wiggle of a flight also moves the body across by the motor's own burst,
-	-- the shift's part and the pop's carry over the move's time since the press, as the packets date it (burstFrom,
-	-- burstTo: seconds after the press; a wiggle's time only runs down, so the parts add up to one burst at most); the
-	-- move's distance is judged less that. A later wiggle of the same flight earns none, nor one pressed sooner than the
-	-- motor's trickBurstRest after the last burst granted (the motor gives none in a chained leap's flight either: the
-	-- server, which does not date the chain, allows that one).
+	-- The wiggle's burst (owner D20): a burst moves the body across by the motor's own numbers, the shift's part and the
+	-- pop's carry over the move's time since the press, as the packets date it (SquirrelMotor.freshBurst: the packet's
+	-- burstWait, the motor's rest, which only runs down; burstFrom, burstTo: seconds after the press, so the parts add
+	-- up to one burst at most, whatever a gap hid of the flight it was pressed in); the move's distance is judged less
+	-- that. Granted to the first burst of a flight (the wiggle's count) pressed no sooner than the motor's
+	-- trickBurstRest after the last one granted; any other claimed earns nothing. (The motor gives none in a chained
+	-- leap's flight either: the server, which does not date the chain, allows that one.)
 	local trickScale, trickOut = 1, 1
 	local burstFrom, burstTo = 0, 0
 	if not exempt then
@@ -1584,25 +1586,30 @@ function MoveValidator._stamina(
 			if marks.stamina > 0 then
 				spend(math.min(P.trickCost, marks.stamina)) -- (the motor empties a meter, no further)
 			end
-			marks.trickReach = if marks.trickArmed
+			marks.trickReach = if marks.trickArmed ~= false
 				then SquirrelMotor.trickReachAt(next.clock - (marks.footClock or -math.huge), 0, 0)
 				else 0
-			-- (the burst: the flight's first wiggle, pressed no sooner than the motor's trickBurstRest after the last burst
-			-- the server granted, by the packets' own dating of the press)
-			local press = next.clock - (P.trickWiggle - next.trickTime)
-			local earned = marks.trickArmed == true
-				and press - (marks.burstAt or -math.huge) >= P.trickBurstRest - E.gravityEps
+		end
+		-- (the burst: the flight's first, pressed no sooner than the motor's trickBurstRest after the last the server
+		-- granted, by the packets' own dating of the press)
+		local freshBurst = SquirrelMotor.freshBurst(prev, next)
+		local rested = P.trickBurstRest
+		if freshBurst then
+			local press = next.clock - (rested - next.burstWait)
+			local earned = marks.trickArmed ~= false and press - (marks.burstAt or -math.huge) >= rested - E.gravityEps
 			if earned then
 				marks.burstAt = press
 			end
 			marks.trickBurst = if earned then true else nil
-			marks.trickArmed = nil
 		end
-		if marks.trickBurst and (freshWiggle or prev.trickKind == 2) then
-			burstFrom = if freshWiggle then 0 else P.trickWiggle - prev.trickTime
-			burstTo = if next.trickKind == 2
-				then math.max(burstFrom, P.trickWiggle - next.trickTime)
-				else burstFrom + math.max(dt, 0)
+		if freshWiggle or (freshBurst and not (launched or grabFrom or unjudged)) then
+			-- (the flight has had its wiggle; a burst whose flight ended in the gap before a new launch, or in a gap too
+			-- long to judge, leaves the new flight its own: the honest lossy runs')
+			marks.trickArmed = false
+		end
+		if marks.trickBurst and (freshBurst or prev.burstWait > 0) then
+			burstFrom = if freshBurst then 0 else rested - prev.burstWait
+			burstTo = if next.burstWait > 0 then math.max(burstFrom, rested - next.burstWait) else rested
 		end
 		if not footB and next.trickKind ~= 0 and (freshWiggle or prev.trickKind ~= 0) then
 			local R = marks.trickReach or 0
