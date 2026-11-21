@@ -815,7 +815,9 @@ function MovementService.new(deps: Deps): Movement
 		if sq == nil then
 			return nil, nil, nil, nil
 		end
-		return sq.shot, sq.lastAt, sq.pounceAt, sq.cleanAt
+		-- (log-only, Flags "moveValidatorEnforce" off: nothing is judged against the body, so the newest packet counts
+		-- as its clean one: a bite must not wait on a verdict nobody enforces)
+		return sq.shot, sq.lastAt, sq.pounceAt, if enforcing() then sq.cleanAt else sq.lastAt
 	end
 
 	-- paceOf(actorId): the body's flat pace by its accepted packets (where each put it, at the server time it came in:
@@ -939,6 +941,22 @@ function MovementService.new(deps: Deps): Movement
 	function m.heldPlace(self: Movement, actorId: any, current: boolean?): (number?, number?, number?)
 		local sq = self.squirrels[actorId]
 		if sq == nil then
+			return nil, nil, nil
+		end
+		if not enforcing() then
+			-- log-only (Flags "moveValidatorEnforce" off): nothing is snapped or pinned, so the body is where its
+			-- client has it: the newest packet's place, whatever the validator made of it (a stale "last clean" place
+			-- would leave bites, nuts and hollows behind the body)
+			if sq.placed and sq.lastX and sq.lastY and sq.lastZ then
+				return sq.lastX :: number, sq.lastY :: number, sq.lastZ :: number
+			end
+			if current then
+				return nil, nil, nil
+			end
+			local g0 = sq.gate or sq.pinAt or sq.base
+			if g0 then
+				return g0.x, g0.y, g0.z
+			end
 			return nil, nil, nil
 		end
 		local good = sq.good
@@ -1425,7 +1443,7 @@ function MovementService.new(deps: Deps): Movement
 		return nil
 	end
 
-	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
+	(m :: any)._judge = function(self: Movement, actorId: any, kind: string, packet: any, now: number): any
 		self._stats.packets += 1
 		local enforce = enforcing()
 		local validator = self.deps.validator
@@ -1748,6 +1766,42 @@ function MovementService.new(deps: Deps): Movement
 			PoseHistory.push(history(self, actorId), now, p.x, p.y, p.z)
 		end
 		return { ok = not over, accepted = true, flagged = over }
+	end
+
+	-- packet(actorId, kind, packet, now): a motor packet from a body's driver, judged (_judge). Log-only (Flags
+	-- "moveValidatorEnforce" off) the validator must never break play: a failure in judging a packet is counted and
+	-- logged, and the packet's place is still taken as the body's
+	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
+		if enforcing() then
+			return (self :: any):_judge(actorId, kind, packet, now)
+		end
+		local ok, result = pcall((m :: any)._judge, self, actorId, kind, packet, now)
+		if not ok then
+			local stats = self._stats :: any
+			stats.judgeErrors = (stats.judgeErrors or 0) + 1
+			self.log:every(
+				`judgeerr:{actorId}`,
+				5,
+				"warn",
+				`{actorId}: the validator failed on a packet (log-only, the packet taken): {tostring(result)}`
+			)
+			result = { ok = true, accepted = true, violations = {}, flagged = false }
+		end
+		-- whatever was made of it, the body is where its client has it: the newest packet's place is the held place
+		-- (heldPlace), unless the server itself has the body elsewhere (riding, or a move the client has not heard of)
+		local sq = if RAIL_KINDS[kind] then self.squirrels[actorId] else nil
+		local shot = if type(packet) == "table" then packet.snapshot else nil
+		if
+			sq
+			and not sq.suspended
+			and (packet.epoch == nil or packet.epoch == sq.epoch)
+			and type(shot) == "table"
+			and SquirrelWire.sane(shot)
+		then
+			sq.lastAt, sq.lastX, sq.lastY, sq.lastZ, sq.placed = now, shot.x, shot.y, shot.z, true
+			sq.shot = shot
+		end
+		return result
 	end
 
 	function m.pose(self: Movement, actorId: any, t: number): (number?, number?, number?)
