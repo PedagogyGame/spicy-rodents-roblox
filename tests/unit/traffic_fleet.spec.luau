@@ -148,6 +148,9 @@ return function(t)
 	end)
 
 	t.test("fleet: 25 vehicles, 5 simulated minutes at 30 Hz, everyone moves, nobody stuck > 60 s, no NaN", function()
+		-- (the event cars are hidden in the live game until the town's events are built: AICarMotor.EVENT_CARS; their
+		-- cycle is still the fleet's, shown here)
+		AICarMotor.EVENT_CARS = true
 		local svc = service(nil, 77)
 		t.eq(#svc.vehicles, Fleet.count())
 		-- a few pedestrians crossing the residential street and the boulevard
@@ -211,6 +214,7 @@ return function(t)
 				return table.concat(parts, " ")
 			end)()}`
 		)
+		AICarMotor.EVENT_CARS = false
 	end)
 
 	local function sedanNB()

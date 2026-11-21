@@ -137,7 +137,10 @@ function AICarMotor.new(
 		speed = 0,
 		cruise = o.cruise or 0,
 		box = Boxes.get(e.kind),
-		visible = true,
+		-- (the event cars are the guests' at the town's barbecue and softball game, parked on the grass beside them
+		-- (traffic §5.11). Neither event is built yet, so they stood in an empty field: hidden until the events exist
+		-- (owner, 2026-11-21: "i fail to understand why there are these cars in the field"))
+		visible = e.class ~= "event" or AICarMotor.EVENT_CARS,
 		phase = if parked or e.class == "motorcycle" or e.class == "event" then "idle" else "drive",
 		home = lane,
 		timer = o.wait or 0,
@@ -357,6 +360,9 @@ end
 -- of "should cars stop for squirrels?": after the playtest "I don't know why a car stopped for me"). The v5.4 rule
 -- (squirrels in every yielding class's hazard set, traffic.md §13) is kept behind this switch, off.
 AICarMotor.BRAKE_FOR_SQUIRRELS = false
+-- The guests' cars at the town's barbecue and softball game (class "event", traffic §5.11) show only when this is on.
+-- Off while neither event is built: they stood parked in an empty field (owner, 2026-11-21).
+AICarMotor.EVENT_CARS = false
 
 -- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels only with
 -- BRAKE_FOR_SQUIRRELS, visible relative to the vehicle base; none on its own roof: onRoof) and the vehicles it
@@ -1299,7 +1305,8 @@ stepClass.event = function(v, ctx, dt, events)
 	if phase < dt then
 		table.insert(events, "event")
 	end
-	v.visible = true
+	-- (shown only once the town's events are built: AICarMotor.EVENT_CARS; they run their cycle unseen meanwhile)
+	v.visible = AICarMotor.EVENT_CARS
 	local lane = v.lane
 	local s = t * lane.length
 	v.speed = math.abs(s - v.s) / math.max(dt, 1e-6)

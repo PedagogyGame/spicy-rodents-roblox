@@ -565,6 +565,9 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 
 	local device: string? = nil
 	local isOpen = false
+	-- the keys panel starts collapsed to one small line (owner, 2026-11-21: "collapse the black box with the text
+	-- explaining the keys"); K or a click on it opens and closes it
+	local keysOpen = false
 	local toastToken, bannerToken = 0, 0
 	local way: Way? = nil -- to the hospital door, while this player is infected
 
@@ -581,7 +584,13 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 			then "Driving the patrol car"
 			elseif device == "drone" then "Flying the police drone"
 			else PlayMenu.statusLine(a)
-		helpText.Text = `<b>{title}</b>\n` .. table.concat(lines, "\n")
+		if keysOpen then
+			helpText.Text = `<b>{title}</b>\n` .. table.concat(lines, "\n") .. "\n<i>K  hide these keys</i>"
+			help.Size = UDim2.fromOffset(340, 40)
+		else
+			helpText.Text = "<b>Keys</b>  (K)"
+			help.Size = UDim2.fromOffset(96, 34)
+		end
 		status.Text = PlayMenu.statusLine(a)
 		local sickText = PlayMenu.sickLine(a, way)
 		sick.Text = sickText or ""
@@ -656,12 +665,27 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	menuButton.Activated:Connect(function()
 		setOpen(true)
 	end)
+	-- (a click or a tap on the keys panel toggles it: touch has no K)
+	local helpTap = Instance.new("TextButton")
+	helpTap.Name = "Toggle"
+	helpTap.Text = ""
+	helpTap.BackgroundTransparency = 1
+	helpTap.Size = UDim2.fromScale(1, 1)
+	helpTap.ZIndex = 5
+	helpTap.Parent = help
+	helpTap.Activated:Connect(function()
+		keysOpen = not keysOpen
+		refresh()
+	end)
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		if InputMap.ignore(io, processed) then
 			return
 		end
 		if io.KeyCode == Enum.KeyCode.M and not loading.Visible then
 			setOpen(not isOpen)
+		elseif io.KeyCode == Enum.KeyCode.K and not loading.Visible and not isOpen then
+			keysOpen = not keysOpen
+			refresh()
 		end
 	end)
 
