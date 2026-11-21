@@ -369,16 +369,18 @@ SquirrelMotor.params = {
 	-- or if the w button is being held, gives you that ... forward burst"): the press throws the flight toward the
 	-- camera's facing, at most trickSnapYaw (30 degrees) either side of the jump's own line. W held: the whole burst
 	-- (trickShift, trickPop); no key: trickPlain of it; S held: no burst, the flight's speed across cut by trickBack.
-	trickShift = 4.5,
+	-- (owner, later that day: "slightly big more of a lunge in the direction you are turning or looking": 4.5 -> 5.5,
+	-- 0.45 -> 0.55)
+	trickShift = 5.5,
 	trickShiftTime = 0.12,
-	trickPop = 0.45,
+	trickPop = 0.55,
 	trickPopTime = 0.3,
 	trickPlain = 0.7,
 	trickBack = 0.3,
 	trickWinded = 2 / 3,
 	trickSnapYaw = math.rad(30),
 	trickTurnRate = 40,
-	trickTotal = 0.3,
+	trickTotal = 0.45,
 	trickBurstRest = 0.5,
 	-- owner D18 ("go ahead with grab and jump cooldowns"): seconds after a leap off a rail before E grabs in the air again.
 	-- Measured at 60 fps, W and sprint held, E+Space every n frames in the air (st/s along the parapet 1075 / the avenue

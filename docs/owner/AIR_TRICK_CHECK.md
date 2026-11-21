@@ -187,3 +187,7 @@ What the owner asked: "a bit more, a little bit further propellant by the g butt
 - **No extra height** in any case. Once per jump. On an empty meter, about two thirds.
 
 The numbers you can ask to change: how strong the burst is (W), how much of it you get with no key (now 70 %), how far S pulls the jump back (now 30 % of its speed), and the 30 degrees.
+
+## 1.2: a bigger lunge (21 November)
+
+The G press's burst is a step bigger. Holding W, a sprint leap of 30 studs now lands about 8 to 9 studs farther (1.1: about 7); with no key held, about 5 to 6 studs farther. Direction (toward the camera, 30 degrees either side), S pulling the jump back, and no extra height are unchanged.

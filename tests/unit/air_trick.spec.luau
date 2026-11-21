@@ -249,10 +249,10 @@ return function(t)
 		"the burst: the press pops the speed and shifts the body along its line at once; no lift; once a flight",
 		function()
 			t.truthy(
-				P.trickShift >= 4 and P.trickShift <= 5,
-				"the shift (W held): 4 to 5 studs (owner 1.1: more propellant)"
+				P.trickShift >= 5 and P.trickShift <= 6,
+				"the shift (W held): 5 to 6 studs (owner 1.1: more of a lunge)"
 			)
-			t.truthy(P.trickPop >= 0.4 and P.trickPop <= 0.5, "the pop (W held): four to five tenths of the speed")
+			t.truthy(P.trickPop >= 0.5 and P.trickPop <= 0.6, "the pop (W held): five to six tenths of the speed")
 			t.truthy(P.trickPopTime >= 0.3 and P.trickPopTime <= 0.4, "easing back over 0.3 to 0.4 s")
 			t.truthy(
 				P.trickShiftTime >= 0.08 and P.trickShiftTime <= 0.15,
@@ -654,10 +654,10 @@ return function(t)
 				)
 				local shift = SquirrelMotor.burstOf(winded) * (if (o :: any).fw == 1 then 1 else P.trickPlain)
 				t.truthy(least * plain > shift, `{name}: the burst carries more than its shift`)
-				t.truthy(most <= 0.32, `{name}: the burst alone {most}`)
-				t.truthy(mostAll <= 0.36, `{name}: the whole trick {mostAll}`)
+				t.truthy(most <= 0.42, `{name}: the burst alone {most}`)
+				t.truthy(mostAll <= 0.52, `{name}: the whole trick {mostAll}`)
 			end
-			t.truthy(P.trickTotal <= 0.3)
+			t.truthy(P.trickTotal <= 0.45)
 		end
 	)
 
@@ -726,8 +726,8 @@ return function(t)
 			"9 % of the whole carry: half of it left, twice that"
 		)
 		t.near(
-			SquirrelMotor.trickReachAt(1, 10, 10, 5),
-			(P.trickTotal * 20 - 5) / 10,
+			SquirrelMotor.trickReachAt(1, 10, 10, 8),
+			(P.trickTotal * 20 - 8) / 10,
 			1e-12,
 			"with a burst: what it leaves of trickTotal of the whole carry"
 		)
