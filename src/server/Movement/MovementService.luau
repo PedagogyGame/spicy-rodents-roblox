@@ -65,8 +65,29 @@
 -- by its own arrival offset when that is later than the spread explains (a clock slowed while a lunge is held), a click
 -- dated at most C.CLICK_EARLY before it arrived and on its arrival when it came long after the launch it says it
 -- preceded, the spread never above the round trip the engine measures, and the pace by the validator's kept speeds.
+-- SAFE MODE (Flags "moveValidatorEnforce" off, the default since 2026-11-21: versions 50 and 51 enforced, were never
+-- played in the real engine first, and the owner could not play them): log-only. The client is believed, as in version
+-- 47, and the validator only counts:
+--   * no pin, no snap, no hold, no "ignored" telling: nothing here moves a body or corrects its driver. (A move the
+--     game itself makes, teleported(): the Reset button, a minigame's knock, the lift's end, still tells the driver
+--     where the body now is: msg.snap false.)
+--   * the place every server system reads (heldPlace, strict or not, and through it ActorsRuntime.placeOf/heldPoseOf,
+--     the nuts and hollows, safeTarget, a release) and the duel's pose (motorOf) are the NEWEST packet's, whatever the
+--     validator says of it; when no packet has come for C.SAFE_SILENT while the server still sees the root, the root
+--     itself (a client whose packets never arrive plays as before the live validator; silent() tells the duel to
+--     believe its click alone, as it did then);
+--   * a packet under an old epoch is dropped only for the round trips after the move the server made (it was sent
+--     before the client knew); a client still on an old epoch after that is believed all the same;
+--   * a pounce is dated by the packet's own attack window; a place a Reset may use is any grounded packet off the rails;
+--   * the validator still judges every packet, for the numbers only, inside pcall: an error anywhere in it is caught,
+--     counted, logged at most once per C.FAULT_LOG seconds per body, and the packet stands unjudged; a packet whose
+--     judging took longer than C.JUDGE_BUDGET benches that body's judging for C.JUDGE_BENCH seconds (counted);
+--   * watch() only remembers the root. Every other call into the validator here (a teleport's rebase, a hand-off, the
+--     meter, a re-seat's reach, a Reset's floor) is caught the same way.
+-- stats() carries what the owner's panel shows (Shared/Movement/MoveDiag): accepted, codes, errors, firstError, judged,
+-- judgeMs, judgeMaxMs, benched, unjudged, believed.
 -- Pure over injected collaborators; no side effects on require.
--- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
+-- Interface: new(deps) -> Movement; M:silent(actorId, now) -> boolean; M:fault(what, actorId, err); M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
 --   M:epochOf(actorId) -> number; M:meterOf(actorId, now) -> (stamina, winded) (the grant's sprint meter); M:railReach(x0, y0, z0, x1, y1, z1) (a release's re-seat); M:safeTarget(actorId) -> (x, y, z)? (where a Reset puts the body); M:heldPlace(actorId)
 --   -> (x, y, z)? (THE place the server holds for a held squirrel: invariant D); M:motorOf(actorId) -> (snapshot?, at?, pounceAt?, cleanAt?);
@@ -124,6 +145,7 @@ export type Deps = {
 	engine: Engine?, -- the game's hands (Boot/Game); nil: nothing is sent or moved (the decisions are still made)
 	-- where a body stands when it changes hands (feet), for the first packet's gate; nil: no gate at a hand-off
 	poseOf: ((actor: any) -> (number?, number?, number?))?,
+	clock: (() -> number)?, -- seconds, for the cost of judging a packet in safe mode (default os.clock)
 }
 
 -- Generic packets: position (studs) and the client clock.
@@ -141,6 +163,17 @@ export type Stats = {
 	holds: number,
 	pins: number, -- new bodies the server kept until a first packet (engine.pin)
 	reasons: { [string]: number },
+	accepted: number, -- squirrel packets taken as the body's place
+	codes: { [string]: number }, -- violations by code, every packet judged (flagged or not)
+	errors: number, -- errors caught in the validator's code (safe mode) or reported by the game (fault)
+	firstError: string?, -- the first of them (truncated)
+	lastError: string?,
+	judged: number, -- packets judged in safe mode, and what judging them cost:
+	judgeMs: number, -- ... in all (milliseconds)
+	judgeMaxMs: number, -- ... the worst one
+	benched: number, -- times a body's judging was stopped for C.JUDGE_BENCH after a packet over C.JUDGE_BUDGET
+	unjudged: number, -- packets taken with no verdict (the validator failed on them, or was benched)
+	believed: number, -- packets under an old epoch taken all the same (safe mode: long after the server's move)
 }
 
 type Gate = { x: number, y: number, z: number, at: number, snapshot: { [string]: number | boolean }? }
@@ -209,6 +242,8 @@ type Squirrel = {
 	click: { at: number, clock: number, spread: number }?,
 	-- the newest click number taken (clickNew: the remote's and the packets' copies of one click count once)
 	clickSeq: number?,
+	seq: number?, -- safe mode: the newest packet number taken (an older one overtaken on the way is dropped)
+	benchUntil: number?, -- safe mode: no packet of this body is judged before this server time (C.JUDGE_BENCH)
 }
 
 -- a crossing of a wall by the root's line, from (fx, fy, fz) to (x, y, z), at server time `at`
@@ -240,6 +275,8 @@ export type Movement = {
 	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?, number?, number?),
 	paceOf: (self: Movement, actorId: any) -> number?,
 	isPinned: (self: Movement, actorId: any) -> boolean,
+	silent: (self: Movement, actorId: any, now: number) -> boolean,
+	fault: (self: Movement, what: string, actorId: any, err: any) -> (),
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
 }
@@ -325,6 +362,14 @@ MovementService.C = table.freeze({
 	RAILS_TRIED = 8, -- rail packets a new crossing is tried against (the newest)
 	RIVER_ROOT_RISE = 1, -- studs: the root on the quay ahead of the packet, this near the quay's height (a step on)
 	FLOOR_SEARCH = 200, -- studs: how far under a held place with no floor a Reset looks for one (safeTarget)
+	-- safe mode (log-only):
+	JUDGE_BUDGET = 0.002, -- seconds: judging one packet longer than this ...
+	JUDGE_BENCH = 5, -- ... stops that body's judging for this many seconds
+	FAULT_LOG = 5, -- seconds between two log lines of one body's validator errors
+	FAULT_TEXT = 160, -- characters of an error kept for the owner's panel
+	-- seconds with no packet taken after which the root the server sees is the body's place, and the duel believes a
+	-- click alone (a client whose packets do not arrive)
+	SAFE_SILENT = 0.5,
 })
 local C = MovementService.C
 
@@ -388,6 +433,17 @@ function MovementService.new(deps: Deps): Movement
 			holds = 0,
 			pins = 0,
 			reasons = {},
+			accepted = 0,
+			codes = {},
+			errors = 0,
+			firstError = nil,
+			lastError = nil,
+			judged = 0,
+			judgeMs = 0,
+			judgeMaxMs = 0,
+			benched = 0,
+			unjudged = 0,
+			believed = 0,
 		},
 		_epoch = 0,
 	} :: Movement
@@ -397,6 +453,33 @@ function MovementService.new(deps: Deps): Movement
 			return deps.enforce
 		end
 		return Flags.enabled("moveValidatorEnforce")
+	end
+
+	-- fault(self, what, id, err): an error caught in the validator's code (safe mode), or one the game caught round a
+	-- call into this service: counted, the first kept for the owner's panel, logged at most once per C.FAULT_LOG
+	-- seconds per body
+	local function fault(self: Movement, what: string, id: any, err: any)
+		local st = self._stats
+		st.errors += 1
+		local text = string.sub(`{what}: {tostring(err)}`, 1, C.FAULT_TEXT)
+		st.firstError = st.firstError or text
+		st.lastError = text
+		self.log:every(`fault:{id}`, C.FAULT_LOG, "warn", `{id}: the movement validator failed ({text}); not judged`)
+	end
+	m.fault = fault
+
+	-- guarded(self, what, id, fn) -> done: fn, a call into the validator. Enforcing: run as it always was. Safe mode:
+	-- its errors are caught (fault), and the caller goes on without it
+	local function guarded(self: Movement, what: string, id: any, fn: () -> ()): boolean
+		if enforcing() then
+			fn()
+			return true
+		end
+		local ok, err = pcall(fn)
+		if not ok then
+			fault(self, what, id, err)
+		end
+		return ok
 	end
 
 	local function history(self: Movement, id: any): PoseHistory.History
@@ -462,12 +545,28 @@ function MovementService.new(deps: Deps): Movement
 		return if v then v:fastest(id) else 60
 	end
 
+	-- count(self, v): a verdict's violations by code, for the owner's panel (numbers only)
+	local function count(self: Movement, violations: any)
+		local codes = self._stats.codes
+		if type(violations) == "table" then
+			for _, x in violations do
+				local code = if type(x) == "table" then tostring(x.code) else "?"
+				codes[code] = (codes[code] or 0) + 1
+			end
+		end
+	end
+
 	local tell: (self: Movement, id: any, sq: Squirrel, t: Gate, why: string, now: number, noHold: boolean?) -> ()
 
 	-- pingOf(self, id): the driver's round trip as the engine measures it, never above C.PING_MAX (0: unknown)
 	local function pingOf(self: Movement, id: any): number
 		local v = self.deps.validator
-		local ping = if v then v.pingOf(id) else nil
+		local ping: any = nil
+		if v then
+			-- (the engine's own measure, through the game's hands: a failure there is "unknown")
+			local ok, got = pcall(v.pingOf, id)
+			ping = if ok then got else nil
+		end
 		return if type(ping) == "number" and ping >= 0 then math.min(ping, C.PING_MAX) else 0
 	end
 
@@ -523,12 +622,14 @@ function MovementService.new(deps: Deps): Movement
 		sq.pounceClock = nil
 		local validator = self.deps.validator
 		if validator then
-			validator:reset(id, nil)
-			if keepUntil then
-				validator:anchor(id, target.x, target.y, target.z, now, keepUntil)
-			else
-				validator:relocate(id, target.x, target.y, target.z, now)
-			end
+			guarded(self, "rebase", id, function()
+				validator:reset(id, nil)
+				if keepUntil then
+					validator:anchor(id, target.x, target.y, target.z, now, keepUntil)
+				else
+					validator:relocate(id, target.x, target.y, target.z, now)
+				end
+			end)
 		end
 		if self.deps.swept then
 			self.deps.swept:markTeleported(id)
@@ -638,8 +739,11 @@ function MovementService.new(deps: Deps): Movement
 		if self.deps.swept then
 			self.deps.swept:markTeleported(id)
 		end
-		if self.deps.validator then
-			self.deps.validator:forget(id) -- a new start: the next packet is the new baseline
+		local known = self.deps.validator
+		if known then
+			guarded(self, "handoff", id, function()
+				known:forget(id) -- a new start: the next packet is the new baseline
+			end)
 		end
 		self.histories[id] = nil
 		self.last[id] = nil
@@ -908,23 +1012,29 @@ function MovementService.new(deps: Deps): Movement
 		if not (px and py and pz) then
 			return nil, nil, nil
 		end
-		local qx, qy, qz = Recovery.riverFall(px, py, pz)
-		if qx and qy and qz then
-			return qx, qy, qz
-		end
-		local s = Recovery.unstick(sq.safe, px, py, pz) or Recovery.safePos(sq.safe)
-		if s then
-			return s.x, s.y, s.z
-		end
-		local validator = self.deps.validator
-		local world = if validator then validator.world else nil
-		if world and world.floorNear and not world.floorNear(px, py, pz) and world.floorUnder then
-			local fy = world.floorUnder(px, py, pz, C.FLOOR_SEARCH)
-			if fy then
-				return px, fy, pz
+		-- (safe mode: a failure in the rays or the history leaves the held place itself)
+		local tx: number, ty: number, tz: number = px, py, pz
+		guarded(self, "reset", actorId, function()
+			local qx, qy, qz = Recovery.riverFall(px, py, pz)
+			if qx and qy and qz then
+				tx, ty, tz = qx, qy, qz
+				return
 			end
-		end
-		return px, py, pz
+			local s = Recovery.unstick(sq.safe, px, py, pz) or Recovery.safePos(sq.safe)
+			if s then
+				tx, ty, tz = s.x, s.y, s.z
+				return
+			end
+			local validator = self.deps.validator
+			local world = if validator then validator.world else nil
+			if world and world.floorNear and not world.floorNear(px, py, pz) and world.floorUnder then
+				local fy = world.floorUnder(px, py, pz, C.FLOOR_SEARCH)
+				if fy then
+					ty = fy
+				end
+			end
+		end)
+		return tx, ty, tz
 	end
 
 	-- heldPlace(actorId, current?) -> (x, y, z)? (feet): THE place the server holds for a player-held squirrel-family body,
@@ -942,6 +1052,26 @@ function MovementService.new(deps: Deps): Movement
 			return nil, nil, nil
 		end
 		local good = sq.good
+		if not enforcing() then
+			-- safe mode, strict or not: the newest word there is. The root the server sees once it is newer than the
+			-- last packet (or the server's last move) by C.SAFE_SILENT (the packets stopped or never came: the place a
+			-- body had before the live validator), else the newest packet, else where the server put the body
+			local g = sq.gate or sq.base
+			local heldAt = sq.lastAt or (if g then g.at else nil) or -math.huge
+			if sq.rootX and not sq.suspended and sq.rootAt - heldAt > C.SAFE_SILENT then
+				return sq.rootX, sq.rootY, sq.rootZ
+			end
+			if good then
+				return good.x :: number, good.y :: number, good.z :: number
+			end
+			if g then
+				return g.x, g.y, g.z
+			end
+			if sq.rootX then
+				return sq.rootX, sq.rootY, sq.rootZ
+			end
+			return nil, nil, nil
+		end
 		if current then
 			if good == nil or sq.doubtAt ~= nil or sq.cleanAt == nil or sq.cleanAt ~= sq.lastAt then
 				return nil, nil, nil
@@ -965,7 +1095,11 @@ function MovementService.new(deps: Deps): Movement
 		if validator == nil then
 			return 1, false
 		end
-		return validator:meterOf(actorId, now)
+		local stamina, winded = 1, false
+		guarded(self, "meter", actorId, function()
+			stamina, winded = validator:meterOf(actorId, now)
+		end)
+		return stamina, winded
 	end
 
 	-- railReach(x0, y0, z0, x1, y1, z1) -> boolean: could a body standing at the first place get onto a rail at the second
@@ -982,7 +1116,14 @@ function MovementService.new(deps: Deps): Movement
 	): boolean
 		local validator = self.deps.validator
 		local f = if validator then validator.world.railReach else nil
-		return f == nil or f(x0, y0, z0, x1, y1, z1)
+		if f == nil then
+			return true
+		end
+		local reach = true -- (safe mode: a failure in the rays is "within reach")
+		guarded(self, "reach", "release", function()
+			reach = f(x0, y0, z0, x1, y1, z1)
+		end)
+		return reach
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number
@@ -994,6 +1135,17 @@ function MovementService.new(deps: Deps): Movement
 	function m.isPinned(self: Movement, actorId: any): boolean
 		local sq = self.squirrels[actorId]
 		return sq ~= nil and sq.pinned
+	end
+
+	-- silent(actorId, now): safe mode only: no packet of this held squirrel has been taken for C.SAFE_SILENT (none yet,
+	-- or they stopped coming). The duel then believes its click alone and judges the body where its root is, as before
+	-- the live validator (Boot/Game: Combat/CombatService's motorOf). Never true while enforcing
+	function m.silent(self: Movement, actorId: any, now: number): boolean
+		if enforcing() then
+			return false
+		end
+		local sq = self.squirrels[actorId]
+		return sq == nil or sq.lastAt == nil or now - (sq.lastAt :: number) > C.SAFE_SILENT
 	end
 
 	function m.teleported(self: Movement, actorId: any, x: number, y: number, z: number, why: string, now: number)
@@ -1015,15 +1167,27 @@ function MovementService.new(deps: Deps): Movement
 		if on then
 			sq.gate = nil
 			sq.lastAt = nil
-			if self.deps.validator then
-				self.deps.validator:reset(actorId, nil)
+			local validator = self.deps.validator
+			if validator then
+				guarded(self, "ride", actorId, function()
+					validator:reset(actorId, nil)
+				end)
 			end
 		end
 	end
 
 	function m.watch(self: Movement, actorId: any, x: number, y: number, z: number, now: number)
 		local sq = self.squirrels[actorId]
-		if sq == nil or sq.suspended or not enforcing() or not finite3(x, y, z) then
+		if sq == nil or sq.suspended or not finite3(x, y, z) then
+			return
+		end
+		if not enforcing() then
+			-- safe mode: nothing is judged and nothing moved; the root is remembered (heldPlace, once the packets stop)
+			local g = sq.gate
+			if g and g.at == 0 then
+				g.at = now
+			end
+			sq.rootX, sq.rootY, sq.rootZ, sq.rootAt = x, y, z, now
 			return
 		end
 		if sq.heldUntil then
@@ -1425,10 +1589,182 @@ function MovementService.new(deps: Deps): Movement
 		return nil
 	end
 
+	-- judge(self, actorId, sq, packet, now) -> verdict?: safe mode: the validator's word on a packet already taken, for
+	-- the numbers only. Inside pcall: an error anywhere in MoveValidator, ValidatorWorld or the envelope is caught
+	-- (fault), the validator starts afresh from the next packet, and this one stands unjudged (nil). A packet that
+	-- took longer than C.JUDGE_BUDGET to judge benches this body's judging for C.JUDGE_BENCH (nil until then)
+	local function judge(self: Movement, actorId: any, sq: Squirrel, packet: any, now: number): any
+		local st = self._stats
+		local validator = self.deps.validator :: any
+		local bench = sq.benchUntil
+		if bench then
+			if now < bench then
+				st.unjudged += 1
+				return nil
+			end
+			sq.benchUntil = nil
+		end
+		local clock = self.deps.clock or os.clock
+		local t0 = clock()
+		local ok, v = pcall(function(): any
+			if validator:last(actorId) == nil and not validator:hasAnchor(actorId) then
+				-- (a body taken: the governor judges from where the first packet has it)
+				local shot = packet.snapshot
+				validator:takeOver(actorId, shot.x, shot.y, shot.z, now)
+			end
+			return validator:accept(actorId, packet, now)
+		end)
+		local ms = (clock() - t0) * 1000
+		st.judged += 1
+		st.judgeMs += ms
+		st.judgeMaxMs = math.max(st.judgeMaxMs, ms)
+		local good = ok and type(v) == "table" and type(v.violations) == "table"
+		if not good then
+			fault(self, "packet", actorId, if ok then "the validator gave no verdict" else v)
+		end
+		if ms > C.JUDGE_BUDGET * 1000 then
+			sq.benchUntil = now + C.JUDGE_BENCH
+			st.benched += 1
+			self.log:every(
+				`bench:{actorId}`,
+				C.FAULT_LOG,
+				"warn",
+				`{actorId}: judging a packet took {ms} ms; not judged for {C.JUDGE_BENCH} s`
+			)
+		end
+		if not good or sq.benchUntil then
+			-- (whatever it left half done, or the gap the bench makes: the next packet judged is its new baseline)
+			pcall(function()
+				validator:reset(actorId, nil)
+			end)
+		end
+		if not good then
+			st.unjudged += 1
+			return nil
+		end
+		return v
+	end
+
+	-- believe(self, actorId, sq, packet, now) -> verdict: SAFE MODE's packet (see the head of this file). The packet is
+	-- the body's place whatever the validator says of it: no gate, no doubt, no snap. Dropped only when its numbers
+	-- are not finite, while the body rides, when a newer packet was already taken, or when it was sent before the
+	-- client knew of the last move the server made (an old epoch, within ignoredFor of that move). The verdict:
+	-- accepted true, the validator's violations and flag for the numbers (unjudged true when it gave none), never
+	-- snapped, never a correction
+	local function believe(self: Movement, actorId: any, sq: Squirrel, packet: any, now: number): any
+		local st = self._stats
+		local snapshot = packet.snapshot
+		local seq = packet.seq
+		if
+			not SquirrelWire.sane(snapshot)
+			or type(seq) ~= "number"
+			or not (math.abs(seq) < SquirrelWire.MAX_MAGNITUDE)
+		then
+			-- NaN, infinite or out of the world: no place at all (the last good one stands)
+			local violations = { { code = "malformed", severity = 1, detail = "a number in the packet is not finite" } }
+			count(self, violations)
+			st.flagged += 1
+			return { ok = false, accepted = false, violations = violations, flagged = true, logOnly = true }
+		end
+		local gate = sq.gate
+		if gate and gate.at == 0 then
+			gate.at = now
+		end
+		local stale = sq.suspended or (sq.seq ~= nil and seq <= (sq.seq :: number))
+		if not stale and packet.epoch ~= nil and packet.epoch ~= sq.epoch then
+			if gate and now - gate.at <= ignoredFor(self, actorId) then
+				stale = true -- (sent before the client knew of the move the server made)
+			else
+				-- (long after it, or no move at all: the word was lost, or the client never had this epoch. Believed:
+				-- dropping it for good would leave the body where the server last put it for every system)
+				st.believed += 1
+				self.log:every(
+					`epoch:{actorId}`,
+					30,
+					"warn",
+					`{actorId}: packets under epoch {tostring(packet.epoch)}, the server's is {sq.epoch}; taken all the same (safe mode)`
+				)
+			end
+		end
+		if stale then
+			st.stale += 1
+			return { ok = true, accepted = false, violations = {}, flagged = false, stale = true, logOnly = true }
+		end
+		sq.seq = seq
+		if sq.possessedAt == 0 then
+			sq.possessedAt = now
+		end
+		local px, py, pz = snapshot.x :: number, snapshot.y :: number, snapshot.z :: number
+		-- (the link's spread and latency floor as the packets before this one showed them)
+		local spread0 = spreadOf(self, actorId, sq)
+		local floor0 = if #sq.offsets > 0 then offsetFloor(sq, now) else math.huge
+		local before = sq.shot
+		sq.gate, sq.base, sq.doubtAt, sq.chain = nil, nil, nil, nil
+		PoseHistory.push(history(self, actorId), now, px, py, pz)
+		if type(snapshot.vx) == "number" and type(snapshot.vy) == "number" and type(snapshot.vz) == "number" then
+			pace(self, actorId, sq, snapshot, now)
+		end
+		sq.lastAt, sq.lastX, sq.lastY, sq.lastZ, sq.placed = now, px, py, pz, true
+		sq.shot, sq.good, sq.cleanAt = snapshot, snapshot, now
+		sq.since = sq.since or now
+		st.accepted += 1
+		-- a pounce, by the packet's own word: the attack window is fuller than in the packet before (the motor sets it
+		-- whole at the launch and runs it down), so it launched that long before this packet's clock; on the server's
+		-- clock by the packets' own mapping, never later than this packet arrived (as the enforcing path dates one)
+		local window, was = snapshot.attackWindow, if before then before.attackWindow else nil
+		local whole = SquirrelMotor.params.pounceWindow
+		if
+			type(window) == "number"
+			and window > 0
+			and window <= whole + 1e-3
+			and (type(was) ~= "number" or window > was + 1e-3)
+		then
+			local clock = snapshot.clock :: number
+			local launch = clock - (whole - window)
+			local off = now - clock
+			sq.pounceClock = launch
+			sq.pounceAt = math.min(now, launch + math.max(math.min(floor0, off), off - spread0))
+		end
+		-- a place a Reset may put the body back on: grounded and off the rails, by the packet's own word
+		local rid = snapshot.routeId
+		local onRail = type(rid) == "number" and rid >= 0
+		if snapshot.grounded == true and not onRail then
+			Recovery.record(sq.safe, now, px, py, pz, true)
+		end
+		if onRail then
+			sq.railAt = now
+		end
+		local v = judge(self, actorId, sq, packet, now)
+		local out: any = v or { ok = true, violations = {}, flagged = false, unjudged = true }
+		out.accepted, out.correction, out.snapped, out.logOnly = true, nil, nil, true
+		if v then
+			count(self, v.violations)
+			sq.lastRiver = v.river == true
+			if v.flagged then
+				st.flagged += 1
+				self.log:every(`flag:{actorId}`, 5, "warn", `{actorId} flagged (bucket {tostring(v.bucket)}); log-only`)
+			end
+		end
+		-- (a click's copy riding in the packet, newer than the last click taken: the caller takes it as the Duel remote's)
+		local cs = snapshot.clickSeq
+		out.click = nil
+		if type(cs) == "number" and cs ~= 0 then
+			local last = sq.clickSeq
+			local d = if last then (cs - last) % 256 else 1
+			if d >= 1 and d < 128 then
+				out.click = { seq = cs, clock = (snapshot.clock :: number) - ((snapshot.clickAgo :: number?) or 0) }
+			end
+		end
+		return out
+	end
+
 	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
 		self._stats.packets += 1
 		local enforce = enforcing()
 		local validator = self.deps.validator
+		if RAIL_KINDS[kind] and validator and not enforce then
+			return believe(self, actorId, squirrel(self, actorId), packet, now)
+		end
 		if RAIL_KINDS[kind] and validator then
 			local sq = squirrel(self, actorId)
 			if sq.suspended or sq.heldUntil ~= nil or (packet.epoch ~= nil and packet.epoch ~= sq.epoch) then
@@ -1519,6 +1855,7 @@ function MovementService.new(deps: Deps): Movement
 					end
 				end
 				if #violations > 0 then
+					count(self, violations)
 					if enforce then
 						local codes = {}
 						-- (a wall or slab at the gate in the old grace window: not counted toward a hold, validator round 9)
@@ -1544,6 +1881,10 @@ function MovementService.new(deps: Deps): Movement
 			local spread0 = spreadOf(self, actorId, sq)
 			local floor0 = if #sq.offsets > 0 then offsetFloor(sq, now) else math.huge
 			local v = validator:accept(actorId, packet, now)
+			count(self, v.violations)
+			if v.accepted then
+				self._stats.accepted += 1
+			end
 			-- the stream grace (validator round 9): a flagged packet whose only violations are walls, in the first
 			-- C.STREAM_GRACE after the hand-off's first packet, further than C.STREAMED from where the body was handed over
 			-- (a house its client may not have streamed in yet); never a slab, never within the streamed radius
