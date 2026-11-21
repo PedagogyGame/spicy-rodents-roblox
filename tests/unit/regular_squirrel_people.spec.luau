@@ -18,6 +18,9 @@ local TownSquirrels = require("@server/Wildlife/TownSquirrels")
 local JumpedAt = require("@shared/Wildlife/JumpedAt")
 local Species = require("@shared/Actors/Species")
 local Rng = require("@shared/Util/Rng")
+local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local MovementService = require("@server/Movement/MovementService")
+local ActorsRuntime = require("@server/Actors/ActorsRuntime")
 
 local DT = 0.05
 
@@ -501,6 +504,64 @@ return function(t)
 		x0, z0 = ahead(p, 12)
 		leap(T, x0, z0, p.x, p.z)
 		t.eq(T.svc:stats().starts, 2, "after 20 s they start again")
+	end)
+
+	t.test("with enforcement off (the live game): the leap is read off the newest packets, and they start", function()
+		-- Movement/MovementService in log-only mode with a validator that throws on every packet (the live game's worst
+		-- case): the held place is the newest packet's (heldPlace -> ActorsRuntime.feedHeld -> the AI world's record)
+		-- and the leap is that packet's own word (motorOf -> TownSquirrels.airborne), as Boot/Game wires it
+		local T = town("normal")
+		local world = T.world
+		local p = walker(world)
+		T.step(1)
+		local m = MovementService.new({
+			validator = {
+				world = {},
+				accept = function(): any
+					error("engine-only failure")
+				end,
+				last = function(): any
+					return nil
+				end,
+				clearFlag = function() end,
+				forget = function() end,
+				meterOf = function(): (number, boolean)
+					return 1, false
+				end,
+			} :: any,
+			enforce = false,
+		})
+		local held = { id = "sq", species = "squirrel", mode = "player" }
+		local seq, clock = 0, 100
+		local function packet(x: number, feet: number, z: number, grounded: boolean)
+			seq += 1
+			clock += DT
+			local shot = SquirrelMotor.serialize(SquirrelMotor.new(x, feet, z))
+			shot.clock = clock
+			shot.grounded = grounded
+			m:packet("sq", "squirrel", { seq = seq, snapshot = shot }, clock)
+			t.truthy(ActorsRuntime.feedHeld(m, T.sq, held, T.sq.hip, T.sq.hip, clock) ~= nil, "a place is held")
+			local snap, at = m:motorOf("sq")
+			T.air[T.id] = TownSquirrels.airborne(snap, if at then clock - at else nil)
+			T.step(DT)
+		end
+		local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
+		local x0, z0 = p.x + fx * 12, p.z + fz * 12
+		local ground = world.ctx.groundAt(x0, z0)
+		packet(x0, ground, z0, true)
+		t.eq(T.air[T.id], false, "on its feet")
+		t.near(T.sq.x, x0, 1e-6, "the record is the newest packet's place")
+		for i = 1, 9 do
+			local u = i / 10
+			packet(x0 + (p.x - x0) * u, ground + 20 * u * (1 - u), z0 + (p.z - z0) * u, false)
+			t.eq(T.air[T.id], true, "in the air")
+		end
+		packet(p.x, world.ctx.groundAt(p.x, p.z), p.z, true)
+		t.eq(T.svc:stats().leaps, 1, "one leap followed")
+		t.eq(T.svc:stats().starts, 1, "and the person it landed on starts")
+		t.eq(world.brains[p.id].duelSource, "startle")
+		t.eq(T.rig.attrs[p.id].Gesture, "flinch")
+		t.truthy(((m:stats() :: any).judgeErrors or 0) >= 1, "(the validator did throw)")
 	end)
 
 	t.test(
