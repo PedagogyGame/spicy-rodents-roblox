@@ -436,7 +436,7 @@ return function(t)
 		"the real motor, every post: walk in and up, down and let go; E from the sidewalk; leap off the top",
 		function()
 			Height.configure(d:module("TerrainExtensions"))
-			local total, bad, steps, worstStep, noRoom = 0, 0, 0, 0, {}
+			local total, bad, steps, worstStep, noRoom, caught = 0, 0, 0, 0, {}, 0
 			for _, p in compiled.posts do
 				local post = postOf[p.id]
 				local w = worldFor(post.source)
@@ -539,6 +539,9 @@ return function(t)
 					return inp
 				end)
 				t.truthy(airborne and (s3.grounded or s3.routeId ~= nil), `{p.id}: off the top ({describe(r3)})`)
+				if s3.routeId ~= nil then
+					caught += 1
+				end
 				for _, r in { r1, r2, r3 } do
 					bad += r.violations + r.rejected
 					steps += 1
@@ -549,11 +552,12 @@ return function(t)
 			Height.configure(nil)
 			print(
 				string.format(
-					"      %d posts, %d drives: %d violations; the largest step on a post %.3f studs a frame%s",
+					"      %d posts, %d drives: %d violations; the largest step on a post %.3f studs a frame; %d leaps off the top caught on a route%s",
 					total,
 					steps,
 					bad,
 					worstStep,
+					caught,
 					if #noRoom > 0 then "; no room beside " .. table.concat(noRoom, ", ") else ""
 				)
 			)
@@ -642,6 +646,71 @@ return function(t)
 			t.truthy(n >= 140, `{n} arms driven`)
 		end
 	)
+
+	t.test("off a post onto its neighbours: E on the post takes a wire, bough or roof within a transfer", function()
+		Height.configure(d:module("TerrainExtensions"))
+		local own: { [number]: boolean } = {}
+		for _, p in compiled.posts do
+			own[p.climb] = true
+			if p.arm then
+				own[p.arm] = true
+			end
+		end
+		local near, bad = 0, 0
+		local names = {}
+		for _, p in compiled.posts do
+			local post = postOf[p.id]
+			local w = worldFor(post.source)
+			if not w then
+				continue
+			end
+			local reg2 = w.motor.registry
+			-- the nearest other route (not a lamp post's) to any sample of this post's routes
+			local best: { route: number, t: number, other: number, d: number }? = nil
+			for _, id in { p.climb, p.arm } do
+				local r = reg2:get(id) :: Registry.Route
+				local samples = reg2:samples(r)
+				for i, s in samples do
+					w.motor.index:forEachNear(
+						s.x,
+						s.y,
+						s.z,
+						1,
+						function(oid: number, _ot: number, sx: number, sy: number, sz: number)
+							if not own[oid] then
+								local dd = math.sqrt((sx - s.x) ^ 2 + (sy - s.y) ^ 2 + (sz - s.z) ^ 2)
+								if dd <= Motion.C.explicitGap and (best == nil or dd < (best :: any).d) then
+									best = { route = id, t = (i - 1) / (#samples - 1), other = oid, d = dd }
+								end
+							end
+							return nil
+						end
+					)
+				end
+			end
+			if not best then
+				continue
+			end
+			local b = best :: any
+			near += 1
+			local r = reg2:get(b.route) :: Registry.Route
+			local q = reg2:pointAt(r, b.t)
+			local s = SquirrelMotor.new(q.x, q.y, q.z)
+			s.grounded, s.routeId, s.railT = false, r.id, b.t
+			local res = drive(w, s, 30, function(f: number, _st)
+				local inp = SquirrelMotor.idleInput(0)
+				inp.grab = f == 2
+				return inp
+			end)
+			local other = reg2:get(b.other) :: Registry.Route
+			table.insert(names, `{p.id} -> {other.kind} {other.id}`)
+			t.truthy(s.routeId ~= nil and not own[s.routeId], `{p.id}: E onto route {b.other} ({describe(res)})`)
+			bad += res.violations + res.rejected
+			t.eq(res.violations + res.rejected, 0, `{p.id}: {describe(res)}`)
+		end
+		Height.configure(nil)
+		print(`      {near} posts within a transfer of another route: {table.concat(names, ", ")}; {bad} violations`)
+	end)
 
 	t.test("nothing drawn: the bake never sees the climbs; what the routes cost", function()
 		local data = Bake.data()
