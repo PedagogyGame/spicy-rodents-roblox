@@ -15,7 +15,8 @@ by dump_woods.luau), so the squirrel runs on its bark exactly as on the route-tr
     each ring is hung under that line (centre = feet - radius x the ring's up), so nothing of the bough stands over
     the feet and the feet stand on its bark; past the route's end the bough carries on as twigs;
   * nothing else (side branches, twigs, leaves, needles, nuts, cones) comes into a walk's tunnel (the body over the
-    feet line) or within 2.2 studs of the trunk's climbing surface, so a climbing squirrel stays seen;
+    feet line) or within 2.2 studs of the trunk's climbing surface (a pine's needles: 1 stud), so a climbing squirrel
+    stays seen;
   * pines grow in whorls: branches round the trunk every few studs, shorter toward the top (a cone; the white pine in
     tiers, the red pine's crown high on a bare trunk), their needles in layered alpha cards; a pine's bough routes are
     short level boughs among the whorls (the ladder's rungs);
@@ -52,7 +53,9 @@ import treegen as tg  # noqa: E402
 
 Y = np.array([0.0, 1.0, 0.0])
 MIN_R = 0.8  # the squirrel's trunk radius never goes under 0.32 u
-TRUNK_CLEAR = 2.2  # leaves and needles stay this far off the trunk's climbing surface
+# leaves stay this far off the trunk's climbing surface (as on the town's trees); a pine's needles crowd its trunk (a
+# squirrel climbing a pine goes up through its whorls), so only its body's width is kept clear there
+TRUNK_CLEAR = {"broad": 2.2, "shrub": 1.4, "pine": 1.0}
 TUNNEL_R = 1.6  # a walk's tunnel: round the line 0.9 over the feet
 TUNNEL_UP = 0.9
 
@@ -78,16 +81,16 @@ SPECIES = {
     "hazel": dict(style="shrub", bark=("maple", "#9a7a5a"), leaf="apple", pal=["#6c9a44", "#80ab50", "#5d8a3c"],
                   fruit="hazelnut", bark_tris=1600, leaf_tris=2000, sides=7, card=(4.6, 4.0), boughR=(0.6, 0.3)),
     "white_pine": dict(style="pine", bark=("apple", "#7a6a5a"), leaf="longneedle", pal=["#4e7d5a", "#5f8f68", "#3f6a4c"],
-                       fruit="pinecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(4.6, 3.4), boughR=(0.55, 0.25),
+                       fruit="pinecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(7.0, 5.4), boughR=(0.55, 0.25),
                        whorl=6.5, per=5, base=0.16, shape="tiers", tilt=0.10),
     "spruce": dict(style="pine", bark=("apple", "#8a7060"), leaf="needle", pal=["#2e5639", "#3b6644", "#24482f"],
-                   fruit="sprucecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(3.8, 3.0), boughR=(0.5, 0.22),
+                   fruit="sprucecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(6.2, 5.0), boughR=(0.5, 0.22),
                    whorl=4.2, per=5, base=0.10, shape="cone", tilt=-0.28),
     "fir": dict(style="pine", bark=("maple", "#8f8a80"), leaf="needle", pal=["#305c3f", "#3e6b4a", "#284e35"],
-                fruit="fircone", bark_tris=2400, leaf_tris=2600, sides=7, card=(3.2, 2.6), boughR=(0.45, 0.2),
+                fruit="fircone", bark_tris=2400, leaf_tris=2600, sides=7, card=(5.2, 4.2), boughR=(0.45, 0.2),
                 whorl=3.6, per=5, base=0.10, shape="spire", tilt=-0.05),
     "red_pine": dict(style="pine", bark=("apple", "#b0603a"), leaf="longneedle", pal=["#3f6b3a", "#4f7c45", "#355c31"],
-                     fruit="pinecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(4.6, 3.4), boughR=(0.55, 0.25),
+                     fruit="pinecone", bark_tris=2600, leaf_tris=2800, sides=8, card=(7.0, 5.4), boughR=(0.55, 0.25),
                      whorl=5.0, per=4, base=0.52, shape="round", tilt=0.18),
 }
 # fruit: (colour A, colour B (a cap or husk, the upper part), length, width, how many)
@@ -101,7 +104,7 @@ FRUIT = {
     "sprucecone": ("#6e4a2a", "#553820", 1.2, 0.36, 30),
     "fircone": ("#5a4a5a", "#463a48", 0.9, 0.36, 24),
 }
-SWATCH = 40  # px of the leaf atlas (512) given to the fruit's two colours
+CARD_U = 0.035  # a card's uv keeps this far in from its cell's sides (the fruit swatch lies between the cells)
 
 
 # ---- textures -----------------------------------------------------------------------------------
@@ -138,31 +141,26 @@ class Tex:
         nrm, rough = tx.spray_normal_rough(lay)
         nrm, rough = tx.down(nrm, normal=True), tx.down(rough)
         n = col.shape[0]
-        # the emptiest SWATCH square (lowest alpha), on an 8 px grid away from the edges
-        a = col[..., 3]
-        best, at = 1e9, (8, 8)
-        for y in range(8, n - SWATCH - 8, 8):
-            for x in range(8, n - SWATCH - 8, 8):
-                s = float(a[y : y + SWATCH, x : x + SWATCH].sum())
-                if s < best:
-                    best, at = s, (x, y)
-        x0, y0 = at
+        # the fruit's two colours in the strip between the atlas's left and right sprays (no card maps it: a card's uv
+        # keeps CARD_U in from its cell's sides), colour A a quarter of the way down, colour B three quarters
+        mean = col[..., :3][col[..., 3] > 0.5].mean(0) if (col[..., 3] > 0.5).any() else np.array([0.4, 0.55, 0.3])
+        half = max(4, n // 80)
+        xs = slice(n // 2 - half, n // 2 + half)
+        rows = ((int(n * 0.22), int(n * 0.42)), (int(n * 0.58), int(n * 0.78)))
         fr = S.get("fruit")
         if fr:
-            ca, cb = (tx.srgb_to_lin(tx.hex_rgb(h)) for h in FRUIT[fr][:2])
             rng = np.random.default_rng(7)
-            for half, c in ((0, ca), (1, cb)):
-                xs = slice(x0 + half * SWATCH // 2, x0 + (half + 1) * SWATCH // 2)
-                patch = c[None, None, :] * (0.85 + 0.3 * rng.random((SWATCH, SWATCH // 2, 1)))
-                col[y0 : y0 + SWATCH, xs, :3] = tx.lin_to_srgb(np.clip(patch, 0, 1))
-                col[y0 : y0 + SWATCH, xs, 3] = 1.0
-            nrm[y0 : y0 + SWATCH, x0 : x0 + SWATCH] = np.array([0.5, 0.5, 1.0])
-            rough[y0 : y0 + SWATCH, x0 : x0 + SWATCH] = 0.6
+            for (r0, r1), h in zip(rows, FRUIT[fr][:2]):
+                c = tx.srgb_to_lin(tx.hex_rgb(h))
+                patch = c[None, None, :] * (0.85 + 0.3 * rng.random((r1 - r0, 2 * half, 1)))
+                col[r0:r1, xs, :3] = tx.lin_to_srgb(np.clip(patch, 0, 1))
+                col[r0:r1, xs, 3] = 1.0
+                nrm[r0:r1, xs] = np.array([0.5, 0.5, 1.0])
+                rough[r0:r1, xs] = 0.6
         for p, arr in zip(names, (col, nrm, rough)):
             tx.write_png(p, arr)
-        # uv: rows are top-down in the image; v up
-        sw = ((x0 + 4) / n, 1 - (y0 + SWATCH - 4) / n, (x0 + SWATCH - 4) / n, 1 - (y0 + 4) / n)
-        mean = col[..., :3][col[..., 3] > 0.5].mean(0) if (col[..., 3] > 0.5).any() else np.array([0.4, 0.55, 0.3])
+        # uv of the two colours' middles (rows are top-down in the image; v up)
+        sw = (0.5, 1 - (rows[0][0] + rows[0][1]) / 2 / n, 0.5, 1 - (rows[1][0] + rows[1][1]) / 2 / n)
         with open(meta, "w") as fh:
             json.dump({"swatch": sw, "mean": [float(x) for x in mean]}, fh)
         return names, sw
@@ -241,19 +239,21 @@ class Tree:
         R = np.array([t[2] for t in self.tunnels]) if self.tunnels else np.zeros(0)
         self._tun = (A, B, R)
 
-    def clearance(self, P):
-        """Distance past the walks' tunnels and the trunk's column (negative: inside)."""
+    def clearance(self, P, column=True):
+        """Distance past the walks' tunnels and (column) the trunk's climbing column (negative: inside)."""
         P = np.atleast_2d(np.asarray(P, float))
         A, B, R = self._tun
         out = np.full(len(P), 1e9)
         if len(A):
             out = (tg.seg_dist(P, A, B) - R[None]).min(1)
+        if not column:
+            return out
         # the trunk's column, up to the trunk route's top
         top = self.trunkP[-1][1]
         ys = np.clip(P[:, 1], self.trunkP[0][1], top)
         ax = np.stack([np.interp(ys, self.trunkP[:, 1], self.trunkP[:, 0]), ys, np.interp(ys, self.trunkP[:, 1], self.trunkP[:, 2])], 1)
         t = np.interp(ys, self.trunkP[:, 1], self.trunkS / self.trunkL)
-        d = np.hypot(P[:, 0] - ax[:, 0], P[:, 2] - ax[:, 2]) - self.r_at(t) - TRUNK_CLEAR
+        d = np.hypot(P[:, 0] - ax[:, 0], P[:, 2] - ax[:, 2]) - self.r_at(t) - TRUNK_CLEAR[self.S["style"]]
         d = np.where(P[:, 1] <= top + 1.0, d, 1e9)
         return np.minimum(out, d)
 
@@ -333,7 +333,7 @@ class Tree:
             b["_r"] = rb
 
     # -- side wood (not walked on) --
-    def grow(self, origin, d, length, r0, nodes, kink, up):
+    def grow(self, origin, d, length, r0, nodes, kink, up, strict=False):
         """A branch as nodes: kinks and turns up (or droops), stops before a tunnel. Returns points, radii."""
         pts = [np.asarray(origin, float)]
         dd = tg.norm(d)
@@ -341,7 +341,9 @@ class Tree:
         for i in range(nodes):
             dd = tg.norm(dd + self.rng.normal(0, kink, 3) * np.array([1, 0.5, 1]) + Y * up)
             q = pts[-1] + dd * seg
-            if i >= 1 and self.clearance([q])[0] < 0.25:
+            # (wood keeps out of the walks' tunnels: a pine's whorl branch from its first node, it leaves the trunk;
+            # a side branch from its second, the first lies beside its own bough)
+            if (i >= 1 or strict) and self.clearance([q, (q + pts[-1]) / 2], column=not strict).min() < 0.25:
                 break
             pts.append(q)
         if len(pts) < 2:
@@ -371,7 +373,8 @@ class Tree:
         v = int(self.rng.integers(0, 4))
         u0, v0 = (v % 2) * 0.5, (v // 2) * 0.5
         V = np.array([base - side * width / 2, base + side * width / 2, tip + side * width / 2, tip - side * width / 2])
-        UV = np.array([[u0 + 0.02, v0 + 0.01], [u0 + 0.48, v0 + 0.01], [u0 + 0.48, v0 + 0.49], [u0 + 0.02, v0 + 0.49]])
+        a, b = u0 + CARD_U, u0 + 0.5 - CARD_U
+        UV = np.array([[a, v0 + 0.01], [b, v0 + 0.01], [b, v0 + 0.49], [a, v0 + 0.49]])
         n = np.cross(V[1] - V[0], V[3] - V[0])
         n = tg.norm(n)
         F = np.array([[0, 1, 2], [0, 2, 3]])
@@ -481,7 +484,7 @@ class Tree:
                 for _ in range(1 if pass_ else 2):
                     az = rng.uniform(-1.2, 1.2)
                     dd = tg.norm(rot_y(d, az) + Y * rng.uniform(-0.1, 0.5))
-                    up = tg.norm(out * 0.6 + Y * 0.8 + rng.normal(0, 0.25, 3))
+                    up = tg.norm(out * 0.8 + Y * 0.55 + rng.normal(0, 0.4, 3))
                     s = rng.uniform(0.75, 1.15)
                     base = p + rng.normal(0, 0.6, 3)
                     self.card(base, dd, up, cl * s, cw * s)
@@ -553,7 +556,8 @@ class Tree:
                 az = k * 2.39996 + q * 2 * math.pi / S["per"] + rng.uniform(-0.25, 0.25)
                 d = dir_of(az, S["tilt"] + rng.uniform(-0.06, 0.06))
                 start = ax + np.array([math.sin(az), 0, math.cos(az)]) * tr * 0.7
-                pts, radii = self.grow(start, d, ln, max(0.14, 0.05 * ln + 0.1), 3, 0.06, -0.06 if S["tilt"] < 0 else 0.02)
+                pts, radii = self.grow(start, d, ln, max(0.14, 0.05 * ln + 0.1), 3, 0.06, -0.06 if S["tilt"] < 0 else 0.02,
+                                       strict=True)
                 if pts is not None:
                     branches.append((pts, ln, y))
                     self.whorl_heights.append(y)
@@ -587,7 +591,9 @@ class Tree:
                     for side in (-1, 1):
                         a = side * rng.uniform(0.35, 0.9)
                         dd = tg.norm(rot_y(d, a) + Y * (S["tilt"] * 0.6 + rng.uniform(-0.1, 0.1)))
-                        up = tg.norm(Y + rng.normal(0, 0.2, 3))
+                        lat = tg.norm(np.cross(dd, Y))
+                        # (lying, or standing up along the branch: a pine's layers read from below and from the side)
+                        up = tg.norm(Y + rng.normal(0, 0.25, 3)) if side < 0 else tg.norm(lat + Y * rng.uniform(0.2, 0.6))
                         sc = rng.uniform(0.8, 1.15) * (0.75 + 0.25 * min(1.0, ln / 8))
                         self.card(p + Y * rng.uniform(-0.3, 0.3), dd, up, cl * sc, cw * sc)
         # a tuft at the spire
@@ -604,8 +610,7 @@ class Tree:
         rng = self.rng
         spots = list(self.fruit_spots)
         rng.shuffle(spots)
-        u0, v0, u1, v1 = swatch
-        um = (u0 + u1) / 2
+        ua, va, ub, vb = swatch
         put = 0
         cone = fr.endswith("cone")
         for p in spots:
@@ -621,20 +626,24 @@ class Tree:
             side = tg.norm(np.cross(axis, [0.3, 0.2, 0.9]))
             side2 = np.cross(axis, side)
             half = ln / 2
-            ring = [p + (side * math.cos(a) + side2 * math.sin(a)) * wd / 2 for a in np.linspace(0, 2 * math.pi, k, endpoint=False)]
+            angs = np.linspace(0, 2 * math.pi, k, endpoint=False)
+
+            def ring(at, r):
+                return [p + axis * at + (side * math.cos(a) + side2 * math.sin(a)) * r for a in angs]
+
             top = p - axis * half  # (the stalk end: the cap or husk colour)
-            bot = p + axis * half * (1.2 if cone else 1.0)
-            V = np.array([top, bot] + ring)
+            bot = p + axis * half * (1.15 if cone else 1.0)
+            V = np.array([top, bot] + ring(-half * 0.45, wd * 0.42) + ring(half * 0.25, wd * 0.5))
             F = []
             for j in range(k):
-                a, b = 2 + j, 2 + (j + 1) % k
-                F.append((0, b, a))
-                F.append((1, a, b))
+                a1, b1 = 2 + j, 2 + (j + 1) % k
+                a2, b2 = 2 + k + j, 2 + k + (j + 1) % k
+                F += [(0, b1, a1), (a1, b1, b2), (a1, b2, a2), (1, a2, b2)]
             F = np.array(F, np.int64)
             UV = np.zeros((len(V), 2))
-            UV[0] = [(um + u1) / 2, (v0 + v1) / 2]
-            UV[1] = [(u0 + um) / 2, (v0 + v1) / 2]
-            UV[2:] = [(u0 + um) / 2, (v0 + v1) / 2]
+            UV[:] = [ua, va]
+            UV[0] = [ub, vb]
+            UV[2 : 2 + k] = [ub, vb] if fr in ("acorn", "hazelnut") else [ua, va]
             N = tg.norm(V - p[None])
             self.leaf.add(V, F, UV, N)
             put += 1
@@ -642,7 +651,7 @@ class Tree:
 
     def build(self, swatch):
         S = self.S
-        self.max_cards = S["leaf_tris"] // 4 - FRUIT.get(S.get("fruit") or "", (0, 0, 0, 0, 0))[4] * 3
+        self.max_cards = S["leaf_tris"] // 4 - FRUIT.get(S.get("fruit") or "", (0, 0, 0, 0, 0))[4] * 6
         self.trunk_line()
         self.add_tunnels()
         self.build_trunk()

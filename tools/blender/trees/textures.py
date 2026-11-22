@@ -420,8 +420,8 @@ SPRAY_PLAN = {
     # D34 (tools/blender/trees/grove.py): the walnut's and hickory's compound leaves (long leaflets in pairs along a
     # rachis), and the conifers' needles: short and bristling (spruce, fir), long and soft (white and red pine)
     "pinnate": dict(L=96, wr=0.30, main=13, twigs=4, per=7, ang=(62, 82), petiole=3, step=30),
-    "needle": dict(L=46, wr=0.09, main=44, twigs=5, per=22, ang=(50, 72), petiole=1, step=10),
-    "longneedle": dict(L=92, wr=0.06, main=34, twigs=5, per=18, ang=(24, 42), petiole=1, step=12),
+    "needle": dict(L=42, wr=0.13, main=56, twigs=7, per=26, ang=(50, 75), petiole=1, step=8),
+    "longneedle": dict(L=80, wr=0.09, main=40, twigs=7, per=22, ang=(22, 40), petiole=1, step=10),
 }
 
 
