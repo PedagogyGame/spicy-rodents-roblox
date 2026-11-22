@@ -52,7 +52,9 @@
 --   hollow(id) -> Hollow?            "H1" ... "H12", "LOG"
 --   spaceOf(routeId) -> string?      the space (= the routes' enclosure id, "hollow.H1") of a hollow route, else nil
 --   hollowOfRoute(routeId) -> Hollow?
---   contains(x, y, z) -> string?     the space whose cavity holds the point (the server's refuge test)
+--   hollowOfSpace(space?) -> Hollow?  the hollow of a space ("hollow.H1", "hollow.LOG": what contains() gives), else nil
+--   contains(x, y, z) -> string?     the space whose cavity holds the point (the server's refuge test); a space, not
+--                                    an id: hollowOfSpace turns it into its Hollow (hollow() takes the id, "H1")
 --   within(hollow, x, y, z) -> boolean   that hollow's cavity holds the point (its Combat/Cover shape)
 --   keepCamera(x, y, z, hx, hy, hz) -> (x, y, z)   a camera point held inside the cavity round a head inside a
 --                                    hollow (C.cameraIn inside its wall, floor and roof) and inside its staves (its
@@ -255,6 +257,7 @@ export type Layout = {
 	hollow: (id: string) -> Hollow?,
 	spaceOf: (routeId: number) -> string?,
 	hollowOfRoute: (routeId: number) -> Hollow?,
+	hollowOfSpace: (space: string?) -> Hollow?,
 	contains: (x: number, y: number, z: number) -> string?,
 	within: (h: Hollow, x: number, y: number, z: number) -> boolean,
 	keepCamera: (x: number, y: number, z: number, hx: number, hy: number, hz: number) -> (number, number, number),
@@ -2325,8 +2328,10 @@ end
 function HollowLayout.new(compiled: Compiled): Layout
 	local byId: { [string]: Hollow } = {}
 	local byRoute: { [number]: Hollow } = {}
+	local bySpace: { [string]: Hollow } = {}
 	for _, h in compiled.hollows do
 		byId[h.id] = h
+		bySpace[h.space] = h
 		for _, rid in h.routes do
 			byRoute[rid] = h
 		end
@@ -2339,6 +2344,9 @@ function HollowLayout.new(compiled: Compiled): Layout
 	end
 	function layout.hollowOfRoute(routeId: number): Hollow?
 		return byRoute[routeId]
+	end
+	function layout.hollowOfSpace(space: string?): Hollow?
+		return if space then bySpace[space] else nil
 	end
 	function layout.spaceOf(routeId: number): string?
 		local h = byRoute[routeId]

@@ -12,6 +12,10 @@
 --   the view rests up the hollow: along every run, the eye at rest is below the head looking up (or out of the eyes in
 --   a shaft too narrow to stand behind), and neither at rest nor turned any way is the wall ever between the eye and
 --   the middle line (the camera never looks through it); the wall, floor and roof are never faded;
+--   the camera knows which hollow it is in: a head in every hollow (H1 and the shaft, each one-chamber tree, the log)
+--   is turned by the camera's own lookup (CameraRig.hollowAt over the real contains(), which gives a space, not an id)
+--   into that Hollow: its rest (up a climbing tree, nearly level in a chamber or the log), its middle line, its ground
+--   hole, and its shell model (named by its id) whose knothole ovals the look hides;
 --   a hint at every hole up a trunk: Space out onto the branch;
 --   the cost: the baked town's parts and the shell's together within the 27,000 part budget.
 local fs = require("@lune/fs")
@@ -359,6 +363,73 @@ return function(t)
 		for _, name in { "tread12", "root40", "burl7", "rim3", "shelf2" } do
 			t.truthy(CameraRig.fades(name), name)
 		end
+	end)
+
+	t.test("the camera knows which hollow it is in: the rest, the middle line, the ground hole, the ovals", function()
+		local H = CameraRig.HOLLOW
+		local shell = HollowShell.build(roblox, layout)
+		local kinds: { [string]: number } = {}
+		for _, h in layout.hollows do
+			-- a head in the hollow's first cavity (the log's: on its axis half way along)
+			local c = h.cavities[1]
+			local a, b = c.a, c.b
+			local hx, hy, hz
+			if a and b then
+				hx, hy, hz = (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2
+			else
+				hx, hy, hz = c.x, (c.bottom + c.top) / 2, c.z
+			end
+			local space = layout.contains(hx, hy, hz)
+			t.eq(space, h.space, `{h.id}: contains() gives the space`)
+			-- (by its id the space is no hollow: the camera turned contains() into a Hollow that way and found none)
+			t.eq(layout.hollow(space :: string), nil, `{h.id}: a space is not an id`)
+			local here = CameraRig.hollowAt(layout, hx, hy, hz)
+			t.truthy(here == h, `{h.id}: the camera's lookup finds the hollow`)
+			if here == nil then
+				continue
+			end
+			-- the rest: up a climbing tree; nearly level in a one-chamber tree and in the log (not the tall rest at
+			-- their roof)
+			local kind = if h.trunk == nil then "log" elseif h.variant == "knothole" then "chamber" else "climb"
+			kinds[kind] = (kinds[kind] or 0) + 1
+			t.eq(CameraRig.hollowRest(here), if kind == "climb" then H.rest else H.restLow, `{h.id} ({kind}): the rest`)
+			-- the middle line the eye is drawn to (a tree's upright cavity round the head; none along the log)
+			local mx = nil :: number?
+			for _, cc in here.cavities do
+				if cc.a == nil and hy >= cc.bottom - 0.5 and hy <= cc.top then
+					mx = cc.x
+				end
+			end
+			t.truthy((mx ~= nil) == (kind ~= "log"), `{h.id}: the middle line`)
+			-- the ground hole the eye comes in through (every tree is entered on foot at the ground)
+			local ground = 0
+			for _, m in here.mouths do
+				ground += if m.opens == "ground" then 1 else 0
+			end
+			t.truthy(kind == "log" or ground > 0, `{h.id}: a ground hole to come in through`)
+			-- the ovals: the shell's model of the hollow is found by its id and holds every knothole oval it has
+			local model = shell:FindFirstChild(here.id)
+			t.truthy(model ~= nil, `{h.id}: the shell's model by the hollow's id`)
+			local ovals, want = 0, 0
+			for _, p in (if model then model:GetChildren() else {}) :: { any } do
+				ovals += if p:IsA("BasePart") and string.find(p.Name, "^knothole") then 1 else 0
+			end
+			for _, pc in h.parts do
+				want += if pc.role == "knothole" then 1 else 0
+			end
+			t.eq(ovals, want, `{h.id}: the ovals the look hides`)
+			t.truthy(kind == "log" or ovals > 0, `{h.id}: a tree has ovals to hide`)
+		end
+		t.eq(CameraRig.hollowAt(layout, 0, -500, 0), nil, "out of every hollow: none")
+		t.truthy(kinds.climb and kinds.chamber and kinds.log, "a climbing tree, a one-chamber tree and the log")
+		print(
+			string.format(
+				"      found: %d climbing, %d one-chamber, %d log",
+				kinds.climb or 0,
+				kinds.chamber or 0,
+				kinds.log or 0
+			)
+		)
 	end)
 
 	t.test("a hint at every hole up a trunk: Space out onto the branch", function()
