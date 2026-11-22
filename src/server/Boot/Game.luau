@@ -129,6 +129,7 @@ local YardHazards = require("../Wildlife/YardHazards")
 local TownSquirrels = require("../Wildlife/TownSquirrels")
 local RoadSquirrels = require("../Wildlife/RoadSquirrels")
 local RideBumps = require("../Vehicles/RideBumps")
+local ReputationService = require("../Reputation/ReputationService")
 local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
@@ -410,6 +411,16 @@ function Game.start(opts: Opts?): any
 		end,
 	})
 	local wallet = money.wallet
+	-- every player's reputation, in the background (Reputation/ReputationService, owner D30): the Player attribute
+	-- Reputation, a brief notice through the wallet's channel when it drops, Shared/Reputation/Reputation.report bound
+	local reputation = ReputationService.start({
+		fire = function(player: any, payload: { [string]: any })
+			if fireLater then
+				fireLater(player, payload)
+			end
+		end,
+		players = o.players ~= false,
+	})
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
 	if town then
@@ -564,6 +575,7 @@ function Game.start(opts: Opts?): any
 		engine = o.engine,
 		players = o.players,
 		purse = money.purse, -- RoleService: a joining player's purse is the wallet's (pocket money comes with it)
+		reputation = reputation, -- RoleService: the human queue's reputation term
 	})
 	if o.heartbeat == false then
 		rt.stop() -- the smoke steps frames by hand
@@ -2718,6 +2730,7 @@ function Game.start(opts: Opts?): any
 		rideBumps = rideBumps,
 		lounge = lounge,
 		cornerStore = cornerStore,
+		reputation = reputation,
 		dogs = dogs,
 		clothes = { saves = saves, wardrobe = wardrobe, giftShop = giftShop },
 		townIdOf = function(actorId: string): number?
