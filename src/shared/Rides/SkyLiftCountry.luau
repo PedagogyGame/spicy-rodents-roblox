@@ -36,6 +36,19 @@ SkyLiftCountry.SILO = table.freeze({ u = 372, v = -128, r = 3.5 })
 SkyLiftCountry.FARMHOUSE = table.freeze({ u = 436, v = -150, yaw = math.pi / 2, w = 14, d = 11 })
 SkyLiftCountry.HAY = table.freeze({ u0 = 420, du = 9, n = 4, v = -128, dv = -4, r = 1.4 })
 SkyLiftCountry.HUT = table.freeze({ du = 27, v = -18, w = 8, d = 6 }) -- du: along the line past tower 3
+-- the trees (owner D35: every tree climbable; Shared/World/TreeShapes grows a trunk route in each): the hedgerow oaks
+-- (18-24 tall, crowns 12-16 across) and the orchard's apples, three rows of four beyond the trail (9-11 tall, crowns
+-- 7-8.5 across): (u, v) as the bake stands them (its heights and crowns are seeded there)
+SkyLiftCountry.OAKS = table.freeze({ { 108, -32 }, { 193, -32 }, { 265, -32 }, { 340, -96 }, { 108, -150 } })
+SkyLiftCountry.ORCHARD = table.freeze((function()
+	local out = {}
+	for i = 0, 3 do
+		for j = 0, 2 do
+			table.insert(out, table.freeze({ 205 + i * 22 + (j % 2) * 8, 112 + j * 20 }))
+		end
+	end
+	return out
+end)())
 -- the roofed bench with the map board on Lift Road's east verge (world studs; tools/bake/skylift/Signs builds it):
 -- a box `half` studs each way round its spot
 SkyLiftCountry.SHELTER = table.freeze({ x = -690.6, z = -712, half = 4.5 })

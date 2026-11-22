@@ -1,0 +1,204 @@
+{
+  "$schema": "woods v1 (Shared/World/TreeShapes WOODS AND CLIMBS: a kind's `climb` is a ClimbSpec; WorldGen/WoodsPlan: where a tree may stand)",
+  "src": "BRIEF_ADDENDUM D34 (owner, 2026-11-22): 'add even more of the tall tree models, even taller before, with a large scattered introduction of pine trees and other nut trees, making the map have more trees!'; D35: 'make all trees climbable'. Kinds: the model each tree wears (tools/blender/trees/grove.py and build_trees.py build them round `climb`), its family, its crown's reach and model height at scale 1 (studs). Groves: where tools/blender/trees/place_woods.luau scatters them (data/woods_placed.json): `rect` [x0, x1, z0, z1] or `disc` [x, z, r], how many (a `clump` [radius, trees] grove in copses), the crown-share between neighbours (smaller: denser), the kinds' weights and the scale range; a `lone` grove is one tree near `at`. Owner sheet: docs/owner/MORE_TREES_CHECK.md.",
+  "idBase": 10001,
+  "climbBase": 20001,
+  "seed": 20261122,
+  "kinds": {
+    "king_oak": {
+      "label": "KING OAK", "family": "giant", "species": "oak", "height": 232, "crown": 52,
+      "climb": {
+        "trunk": { "height": 150, "radius": 5.2, "lean": 4, "leanBearing": 30 },
+        "boughs": [
+          { "tier": "low", "at": 14, "bearing": 20, "reach": 40, "rise": 2, "arch": 5, "curl": 10 },
+          { "tier": "low", "at": 22, "bearing": 160, "reach": 36, "rise": 4, "arch": 5, "curl": -12 },
+          { "tier": "low", "at": 30, "bearing": 265, "reach": 38, "rise": 6, "arch": 4, "curl": 8 },
+          { "tier": "mid", "at": 44, "bearing": 95, "reach": 36, "rise": 12, "arch": 4, "curl": -8 },
+          { "tier": "mid", "at": 58, "bearing": 330, "reach": 34, "rise": 14, "arch": 3, "curl": 10 },
+          { "tier": "mid", "at": 72, "bearing": 205, "reach": 34, "rise": 16, "arch": 3, "curl": -10 },
+          { "tier": "high", "at": 90, "bearing": 50, "reach": 30, "rise": 18, "arch": 2, "curl": 8 },
+          { "tier": "high", "at": 106, "bearing": 240, "reach": 28, "rise": 18, "arch": 2, "curl": -8 },
+          { "tier": "high", "at": 122, "bearing": 130, "reach": 26, "rise": 18, "arch": 2, "curl": 10 },
+          { "tier": "high", "at": 138, "bearing": 310, "reach": 22, "rise": 16, "arch": 1.5, "curl": -6 }
+        ]
+      }
+    },
+    "great_elm": {
+      "label": "GREAT ELM", "family": "giant", "species": "elm", "height": 245, "crown": 48,
+      "climb": {
+        "trunk": { "height": 170, "radius": 4.8, "lean": 3, "leanBearing": 200 },
+        "boughs": [
+          { "tier": "low", "at": 16, "bearing": 70, "reach": 30, "rise": 6, "arch": 4, "curl": 8 },
+          { "tier": "low", "at": 26, "bearing": 250, "reach": 32, "rise": 10, "arch": 4, "curl": -10 },
+          { "tier": "mid", "at": 46, "bearing": 145, "reach": 30, "rise": 20, "arch": 3, "curl": 8 },
+          { "tier": "mid", "at": 64, "bearing": 330, "reach": 30, "rise": 22, "arch": 3, "curl": -8 },
+          { "tier": "mid", "at": 82, "bearing": 20, "reach": 28, "rise": 22, "arch": 3, "curl": 10 },
+          { "tier": "high", "at": 102, "bearing": 200, "reach": 26, "rise": 22, "arch": 2, "curl": -10 },
+          { "tier": "high", "at": 122, "bearing": 95, "reach": 24, "rise": 20, "arch": 2, "curl": 8 },
+          { "tier": "high", "at": 142, "bearing": 285, "reach": 22, "rise": 18, "arch": 2, "curl": -8 },
+          { "tier": "high", "at": 158, "bearing": 170, "reach": 18, "rise": 14, "arch": 1.5, "curl": 6 }
+        ]
+      }
+    },
+    "old_beech": {
+      "label": "OLD BEECH", "family": "giant", "species": "beech", "height": 228, "crown": 54,
+      "climb": {
+        "trunk": { "height": 148, "radius": 5.0, "lean": 2.5, "leanBearing": 110 },
+        "boughs": [
+          { "tier": "low", "at": 12, "bearing": 300, "reach": 42, "rise": 1, "arch": 5, "curl": -10 },
+          { "tier": "low", "at": 20, "bearing": 120, "reach": 40, "rise": 3, "arch": 5, "curl": 10 },
+          { "tier": "low", "at": 28, "bearing": 210, "reach": 38, "rise": 5, "arch": 4, "curl": -8 },
+          { "tier": "mid", "at": 42, "bearing": 30, "reach": 36, "rise": 10, "arch": 4, "curl": 8 },
+          { "tier": "mid", "at": 56, "bearing": 250, "reach": 34, "rise": 12, "arch": 3, "curl": -10 },
+          { "tier": "mid", "at": 70, "bearing": 80, "reach": 32, "rise": 14, "arch": 3, "curl": 10 },
+          { "tier": "high", "at": 88, "bearing": 170, "reach": 30, "rise": 16, "arch": 2, "curl": -8 },
+          { "tier": "high", "at": 106, "bearing": 340, "reach": 26, "rise": 16, "arch": 2, "curl": 8 },
+          { "tier": "high", "at": 124, "bearing": 225, "reach": 22, "rise": 14, "arch": 2, "curl": -6 }
+        ]
+      }
+    },
+    "white_pine": {
+      "label": "WHITE PINE", "family": "pine", "species": "white_pine", "height": 96, "crown": 15,
+      "climb": {
+        "trunk": { "height": 84, "radius": 1.6, "lean": 0.8, "leanBearing": 60 },
+        "boughs": [
+          { "tier": "low", "at": 14, "bearing": 0, "reach": 11, "rise": 0.5, "arch": 0.6 },
+          { "tier": "low", "at": 26, "bearing": 137, "reach": 11, "rise": 0.5, "arch": 0.6 },
+          { "tier": "mid", "at": 38, "bearing": 275, "reach": 10, "rise": 0.5, "arch": 0.5 },
+          { "tier": "mid", "at": 50, "bearing": 52, "reach": 9, "rise": 0.5, "arch": 0.5 },
+          { "tier": "high", "at": 62, "bearing": 190, "reach": 8, "rise": 0.5, "arch": 0.5 },
+          { "tier": "high", "at": 74, "bearing": 327, "reach": 6.5, "rise": 0.5, "arch": 0.4 }
+        ]
+      }
+    },
+    "norway_spruce": {
+      "label": "NORWAY SPRUCE", "family": "pine", "species": "spruce", "height": 78, "crown": 12,
+      "climb": {
+        "trunk": { "height": 68, "radius": 1.4 },
+        "boughs": [
+          { "tier": "low", "at": 10, "bearing": 30, "reach": 9.5, "rise": -0.8, "arch": 0.5 },
+          { "tier": "mid", "at": 21, "bearing": 167, "reach": 8.5, "rise": -0.8, "arch": 0.5 },
+          { "tier": "mid", "at": 32, "bearing": 305, "reach": 7.5, "rise": -0.6, "arch": 0.4 },
+          { "tier": "high", "at": 43, "bearing": 82, "reach": 6, "rise": -0.5, "arch": 0.4 },
+          { "tier": "high", "at": 54, "bearing": 220, "reach": 4.5, "rise": -0.3, "arch": 0.3 }
+        ]
+      }
+    },
+    "balsam_fir": {
+      "label": "BALSAM FIR", "family": "pine", "species": "fir", "height": 58, "crown": 8,
+      "climb": {
+        "trunk": { "height": 50, "radius": 1.1 },
+        "boughs": [
+          { "tier": "low", "at": 9, "bearing": 90, "reach": 6.5, "rise": 0.3, "arch": 0.4 },
+          { "tier": "mid", "at": 19, "bearing": 227, "reach": 6, "rise": 0.3, "arch": 0.4 },
+          { "tier": "mid", "at": 29, "bearing": 5, "reach": 5, "rise": 0.3, "arch": 0.3 },
+          { "tier": "high", "at": 39, "bearing": 142, "reach": 4, "rise": 0.3, "arch": 0.3 }
+        ]
+      }
+    },
+    "red_pine": {
+      "label": "RED PINE", "family": "pine", "species": "red_pine", "height": 105, "crown": 14,
+      "climb": {
+        "trunk": { "height": 92, "radius": 1.8, "lean": 1.2, "leanBearing": 250 },
+        "boughs": [
+          { "tier": "low", "at": 16, "bearing": 200, "reach": 5, "rise": 1, "arch": 0.3 },
+          { "tier": "mid", "at": 34, "bearing": 20, "reach": 5, "rise": 1, "arch": 0.3 },
+          { "tier": "mid", "at": 52, "bearing": 110, "reach": 12, "rise": 2, "arch": 0.8 },
+          { "tier": "high", "at": 66, "bearing": 247, "reach": 11, "rise": 2, "arch": 0.7 },
+          { "tier": "high", "at": 80, "bearing": 25, "reach": 8, "rise": 1.5, "arch": 0.5 }
+        ]
+      }
+    },
+    "black_walnut": {
+      "label": "BLACK WALNUT", "family": "nut", "species": "walnut", "height": 68, "crown": 22,
+      "climb": {
+        "trunk": { "height": 42, "radius": 2.0, "lean": 1.5, "leanBearing": 140 },
+        "boughs": [
+          { "tier": "low", "at": 14, "bearing": 40, "reach": 18, "rise": 5, "arch": 2.5, "curl": 8 },
+          { "tier": "mid", "at": 21, "bearing": 200, "reach": 18, "rise": 7, "arch": 2, "curl": -8 },
+          { "tier": "mid", "at": 28, "bearing": 300, "reach": 16, "rise": 9, "arch": 2, "curl": 10 },
+          { "tier": "high", "at": 36, "bearing": 115, "reach": 14, "rise": 10, "arch": 1.5, "curl": -6 }
+        ]
+      }
+    },
+    "hazel": {
+      "label": "HAZEL", "family": "nut", "species": "hazel", "height": 22, "crown": 10,
+      "climb": {
+        "trunk": { "height": 15, "radius": 0.9, "lean": 1.2, "leanBearing": 0 },
+        "boughs": [
+          { "tier": "low", "at": 7, "bearing": 120, "reach": 7, "rise": 4, "arch": 1 },
+          { "tier": "mid", "at": 10, "bearing": 260, "reach": 7, "rise": 4, "arch": 1 }
+        ]
+      }
+    },
+    "sweet_chestnut": {
+      "label": "SWEET CHESTNUT", "family": "nut", "species": "chestnut", "height": 72, "crown": 23,
+      "climb": {
+        "trunk": { "height": 40, "radius": 2.4, "lean": 2, "leanBearing": 320 },
+        "boughs": [
+          { "tier": "low", "at": 13, "bearing": 80, "reach": 20, "rise": 4, "arch": 3, "curl": -10 },
+          { "tier": "mid", "at": 19, "bearing": 230, "reach": 20, "rise": 6, "arch": 2.5, "curl": 10 },
+          { "tier": "mid", "at": 26, "bearing": 350, "reach": 18, "rise": 8, "arch": 2, "curl": -8 },
+          { "tier": "high", "at": 34, "bearing": 150, "reach": 15, "rise": 10, "arch": 1.5, "curl": 8 }
+        ]
+      }
+    },
+    "shagbark_hickory": {
+      "label": "SHAGBARK HICKORY", "family": "nut", "species": "hickory", "height": 84, "crown": 17,
+      "climb": {
+        "trunk": { "height": 62, "radius": 1.8, "lean": 1, "leanBearing": 15 },
+        "boughs": [
+          { "tier": "low", "at": 28, "bearing": 60, "reach": 14, "rise": 7, "arch": 1.5, "curl": 8 },
+          { "tier": "mid", "at": 36, "bearing": 220, "reach": 14, "rise": 8, "arch": 1.5, "curl": -8 },
+          { "tier": "mid", "at": 44, "bearing": 330, "reach": 12, "rise": 8, "arch": 1.2, "curl": 6 },
+          { "tier": "high", "at": 53, "bearing": 140, "reach": 11, "rise": 8, "arch": 1, "curl": -6 }
+        ]
+      }
+    },
+    "white_oak": {
+      "label": "WHITE OAK", "family": "nut", "species": "white_oak", "height": 64, "crown": 25,
+      "climb": {
+        "trunk": { "height": 36, "radius": 2.4, "lean": 1.5, "leanBearing": 220 },
+        "boughs": [
+          { "tier": "low", "at": 12, "bearing": 10, "reach": 23, "rise": 3, "arch": 3, "curl": 10 },
+          { "tier": "mid", "at": 17, "bearing": 140, "reach": 22, "rise": 5, "arch": 3, "curl": -10 },
+          { "tier": "mid", "at": 23, "bearing": 260, "reach": 21, "rise": 7, "arch": 2.5, "curl": 8 },
+          { "tier": "high", "at": 30, "bearing": 75, "reach": 17, "rise": 9, "arch": 2, "curl": -6 }
+        ]
+      }
+    },
+    "pin_oak": {
+      "label": "PIN OAK", "family": "nut", "species": "pin_oak", "height": 74, "crown": 17,
+      "climb": {
+        "trunk": { "height": 62, "radius": 1.8 },
+        "boughs": [
+          { "tier": "low", "at": 16, "bearing": 100, "reach": 12, "rise": 0, "arch": 1.2, "curl": 6 },
+          { "tier": "mid", "at": 27, "bearing": 240, "reach": 13, "rise": 4, "arch": 1.5, "curl": -6 },
+          { "tier": "mid", "at": 38, "bearing": 0, "reach": 13, "rise": 6, "arch": 1.5, "curl": 6 },
+          { "tier": "high", "at": 50, "bearing": 160, "reach": 11, "rise": 7, "arch": 1.2, "curl": -6 }
+        ]
+      }
+    }
+  },
+  "groves": [
+    { "id": "king_oak", "label": "the KING OAK, a lone giant", "lone": true, "at": [-640, 30], "search": 260, "mix": { "king_oak": 1 } },
+    { "id": "great_elm", "label": "the GREAT ELM, a lone giant", "lone": true, "at": [-760, -640], "search": 260, "mix": { "great_elm": 1 } },
+    { "id": "old_beech", "label": "the OLD BEECH, a lone giant", "lone": true, "at": [450, 1000], "search": 300, "mix": { "old_beech": 1 } },
+    { "id": "town", "label": "the town's parks, yards and verges", "rect": [-1150, 1750, -1350, 1080], "count": 90, "share": 0.8, "scale": [0.85, 1.12],
+      "mix": { "white_oak": 2, "pin_oak": 2, "black_walnut": 2, "sweet_chestnut": 1.5, "shagbark_hickory": 1.5, "hazel": 2.5, "white_pine": 1, "norway_spruce": 1, "balsam_fir": 1 } },
+    { "id": "west_woods", "label": "the west edge: mixed woods", "rect": [-2220, -1200, -1700, 1080], "count": 55, "share": 0.5, "clump": [75, 9], "scale": [0.85, 1.18],
+      "mix": { "white_pine": 3, "norway_spruce": 2, "red_pine": 2, "balsam_fir": 1, "white_oak": 1.5, "black_walnut": 1, "shagbark_hickory": 1, "hazel": 1 } },
+    { "id": "south_woods", "label": "the south edge: mixed woods", "rect": [-1700, 1700, -2220, -1450], "count": 55, "share": 0.5, "clump": [75, 9], "scale": [0.85, 1.18],
+      "mix": { "white_pine": 2, "red_pine": 2, "norway_spruce": 2, "balsam_fir": 1, "sweet_chestnut": 1.5, "white_oak": 1.5, "pin_oak": 1, "hazel": 1 } },
+    { "id": "lookout_hill", "label": "Lookout Hill: pines among its conifers", "disc": [-1050, -1710, 360], "count": 12, "share": 0.6, "scale": [0.85, 1.1],
+      "mix": { "white_pine": 2, "red_pine": 2, "norway_spruce": 1 } },
+    { "id": "ridge", "label": "the ridge between the Quay and the off-road field: a pine grove", "rect": [2930, 3065, -820, 1080], "count": 22, "share": 0.5, "scale": [0.85, 1.15],
+      "mix": { "white_pine": 3, "red_pine": 2, "norway_spruce": 2, "balsam_fir": 1 } },
+    { "id": "back_field", "label": "the off-road back field: copses on its hills", "rect": [3100, 4250, -800, 1080], "count": 14, "share": 0.7, "clump": [50, 5], "scale": [0.9, 1.15],
+      "mix": { "white_oak": 2, "black_walnut": 1, "hazel": 1, "norway_spruce": 1 } },
+    { "id": "north_meadow", "label": "the north meadow behind the beach", "rect": [-1250, 1800, 880, 1080], "count": 14, "share": 0.6, "clump": [55, 5], "scale": [0.85, 1.1],
+      "mix": { "white_pine": 2, "red_pine": 1, "white_oak": 1, "black_walnut": 1 } },
+    { "id": "southeast", "label": "the south-east edge", "rect": [1750, 4250, -2220, -900], "count": 30, "share": 0.5, "clump": [70, 8], "scale": [0.85, 1.18],
+      "mix": { "white_pine": 2, "norway_spruce": 2, "red_pine": 1, "sweet_chestnut": 1, "white_oak": 1, "shagbark_hickory": 1 } }
+  ]
+}
