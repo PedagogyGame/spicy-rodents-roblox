@@ -41,6 +41,10 @@ return {
 			count = 1,
 			chunks = { "Interiors" },
 		},
+		LampPosts = {
+			count = 1,
+			chunks = { "LampPosts" },
+		},
 		Lanes = {
 			count = 25,
 			chunks = { "Lanes" },

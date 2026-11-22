@@ -176,6 +176,13 @@ function Data.new(loader: Loader): Data
 					return if s and s.routes then s.routes else {}
 				end)
 			end
+			-- the D35 lamp-post climbs (data/lamp_posts.json, Shared/World/LampPosts): a climb per post, an arm where it has one
+			if self:index().modules.LampPosts then
+				table.insert(loaders, function()
+					local l = loadName(self, "LampPosts")
+					return if l and l.routes then l.routes else {}
+				end)
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry
@@ -200,6 +207,13 @@ function Data.new(loader: Loader): Data
 			local s = loadName(self, "TreeShapes")
 			if s and s.forks and #s.forks > 0 then
 				merged = TreeShapes.mergeForks(merged :: any, s.forks) :: any
+			end
+		end
+		-- and each lamp post's arm, a fork on its climb (Shared/World/LampPosts)
+		if self:index().modules.LampPosts then
+			local l = loadName(self, "LampPosts")
+			if l and l.forks and #l.forks > 0 then
+				merged = TreeShapes.mergeForks(merged :: any, l.forks) :: any
 			end
 		end
 		self._cache["forks:merged"] = merged

@@ -25,6 +25,7 @@ local Expansion = require("./lib/Expansion")
 local Sewers = require("./lib/Sewers")
 local HollowTrees = require("./lib/HollowTrees")
 local TreeShapes = require("./lib/TreeShapes")
+local LampPosts = require("./lib/LampPosts")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -545,6 +546,22 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 				m.records = #m.value
 			end
 		end
+	end
+	-- data/lamp_posts.json: the D35 lamp-post climbs (Shared/World/LampPosts; the posts found in the bakes by
+	-- tools/bake/lamp_posts.luau)
+	local lampOtherIds = table.clone(shapeOtherIds)
+	for _, r in (if treeShapesModule then treeShapesModule.value.routes else {}) :: { any } do
+		lampOtherIds[r.id] = true
+	end
+	local lampPostsModule = LampPosts.compile({
+		repo = repo,
+		routeIds = routeIds,
+		otherIds = lampOtherIds,
+		invariant = invariant,
+		compare = compare,
+	})
+	if lampPostsModule then
+		table.insert(w1.modules, lampPostsModule)
 	end
 	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
 	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })
