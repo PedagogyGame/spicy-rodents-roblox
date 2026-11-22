@@ -9,8 +9,9 @@
 -- Dollars per 1 Robux" (owner 2026-11-19, BRIEF_ADDENDUM D15). The key cannot read the product's price, so the grant
 -- is worked out from what each purchase actually cost: right whatever price the product has on the Creator Hub, and
 -- still right if it is changed there.
--- NOT LIVE: no ProcessReceipt is hooked in Boot/Game, and nothing sells it until money is saved between visits
--- (Persistence/ProfileStore wired in): Robux must never buy money that is gone when the player leaves.
+-- LIVE through Server/Economy/StockOptions (owner D30, 2026-11-22): the product sells SPICY STOCK OPTIONS, saved in
+-- the player's profile (1 option = S$1.00 = 100 cents, so 4 options per Robux), withdrawn at the player's home
+-- computer into the per-server wallet. The fixed default tiers below are not on sale (no product ids).
 -- Interface: defaults() -> { Tier }, spicyBuck() -> Tier, catalog(tiers) -> Catalog, lookup(catalog, productId) -> Tier?,
 --   grantFor(tier, receipt) -> cents? (nil: the receipt cannot be priced; answer NotProcessedYet)
 
@@ -34,7 +35,7 @@ Products.MAX_ROBUX = 100000 -- a receipt claiming more is not believed (the Crea
 
 -- The owner's product as a rate tier.
 function Products.spicyBuck(): Tier
-	return { productId = Products.SPICY_BUCK_ID, perRobux = Products.PER_ROBUX, label = "Spicy Dollars" }
+	return { productId = Products.SPICY_BUCK_ID, perRobux = Products.PER_ROBUX, label = "Spicy Stock Options" }
 end
 
 local function whole(v: any): boolean

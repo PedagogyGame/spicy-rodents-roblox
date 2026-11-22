@@ -8,7 +8,10 @@
 -- and the server's DataStore budget honest.
 -- MONEY AND RECEIPTS: when they are saved, they go into the profile this module holds (data(player), dirty), never
 -- through Persistence/Profiles.new or Economy/Receipts' own ProfileStore: those would take a second session lock
--- on the same key from the same server, and the two would lock each other out.
+-- on the same key from the same server, and the two would lock each other out. Real money (Economy/StockOptions:
+-- a Robux receipt, a withdrawal) does not wait for step(): saveNow(player) puts one write in that player's queue at
+-- once (whatever the bucket holds: it may run into debt, which later saves pay back) and yields until it is done,
+-- for at most SAVE_NOW_WAIT seconds; true only when a write holding every change made before the call has landed.
 -- A player's session is in one of these states (status(player); Boot/Game shows it as the player attribute
 -- ClothesSaved):
 --   loading   the profile is on its way (play goes on meanwhile; nothing waits on it)
@@ -42,7 +45,8 @@
 -- Shutdown (closeAll): every session is left, so queued loads and saves do nothing (each release writes the latest
 -- data), and the store is told it is closing (one retry per call, no lock waits): the releases fit in CLOSE_SECONDS.
 -- Interface: new(deps) -> Saves; Saves:join(player); Saves:leave(player); Saves:dirty(player, purchase?);
---   Saves:data(player) -> ProfileSchema.Data? (only while `saved`); Saves:status(player) -> State?;
+--   Saves:data(player) -> ProfileSchema.Data? (only while `saved`); Saves:profileOf(userId) -> Profile? (the same,
+--   by UserId: Economy/Receipts); Saves:saveNow(player) -> (ok, err?) (yields); Saves:status(player) -> State?;
 --   Saves:step(now); Saves:closeAll(timeoutSeconds?) (yields until every release is done or the time is up);
 --   Saves:busy() -> boolean; STORE; WORDS; WRITE_GAP; BUDGET_SHARE; BURST; budgetPerMinute(players) (pure);
 --   offError(err) -> boolean (pure)
@@ -110,6 +114,8 @@ export type Saves = {
 	leave: (self: Saves, player: any) -> (),
 	dirty: (self: Saves, player: any, purchase: boolean?) -> (),
 	data: (self: Saves, player: any) -> ProfileSchema.Data?,
+	profileOf: (self: Saves, userId: number) -> ProfileStore.Profile?,
+	saveNow: (self: Saves, player: any) -> (boolean, string?),
 	status: (self: Saves, player: any) -> State?,
 	step: (self: Saves, now: number) -> (),
 	closeAll: (self: Saves, timeoutSeconds: number?) -> (),
@@ -126,6 +132,7 @@ PlayerSaves.CLOSE_SECONDS = 25 -- BindToClose: Roblox gives a closing server 30 
 PlayerSaves.WRITE_GAP = 6 -- seconds: at most one write of a player's profile this often (changes, purchases)
 PlayerSaves.BUDGET_SHARE = 0.5 -- of the server's UpdateAsync allowance, for saves (loads and releases: the rest)
 PlayerSaves.BURST = 10 -- saves the bucket can hold in hand
+PlayerSaves.SAVE_NOW_WAIT = 20 -- seconds saveNow waits for its write before it answers (false, "slow")
 
 PlayerSaves.WORDS = table.freeze({
 	unsaved = "Your saved clothes have not loaded yet. Play on: we keep trying, and nothing you buy is lost.",
@@ -523,6 +530,60 @@ function PlayerSaves.new(deps: Deps): Saves
 			return (s.profile :: ProfileStore.Profile).data
 		end
 		return nil
+	end
+
+	function self.profileOf(me: Saves, userId: number): ProfileStore.Profile?
+		local s = me.sessions[userId]
+		if s and s.state == "saved" and s.profile then
+			return s.profile
+		end
+		return nil
+	end
+
+	-- one write now, in the player's queue, and wait for it: true once every change made before the call is durable
+	function self.saveNow(me: Saves, player: any): (boolean, string?)
+		local s = me.sessions[keyOf(player)]
+		if s == nil or s.state ~= "saved" or s.profile == nil then
+			return false, if s then s.state else "absent"
+		end
+		if me.closing then
+			return false, "closing"
+		end
+		local p = s.profile :: ProfileStore.Profile
+		local want = p:markDirty()
+		local now = me.deps.now()
+		refill(me, now)
+		me.tokens -= 1 -- (real money is not made to wait: the bucket may go into debt)
+		s.lastWriteAt = now
+		local done, ok, why = false, false, nil :: string?
+		enqueue(me, s.id, function()
+			if p.savedRevision < want then
+				if s.state == "saved" and s.profile == p and p:isActive() then
+					local wrote, err = p:save()
+					if not wrote and err == "lost" then
+						setState(me, s, "lost")
+						shout(me, `{s.id}: the lock was taken by another server; nothing more is written here`)
+						tellOnce(me, s, "lost")
+					elseif not wrote then
+						shout(me, `{s.id}: an immediate save failed ({err})`)
+					end
+					why = err
+				else
+					why = s.state
+				end
+			end
+			ok = p.savedRevision >= want
+			done = true
+		end)
+		local waited = 0
+		while not done and waited < PlayerSaves.SAVE_NOW_WAIT do
+			me.deps.sleep(0.1)
+			waited += 0.1
+		end
+		if not done then
+			return false, "slow"
+		end
+		return ok, if ok then nil else why or "failed"
 	end
 
 	function self.status(me: Saves, player: any): State?

@@ -228,7 +228,8 @@ local function text(parent: Instance, props: { [string]: any }): TextLabel
 	return l
 end
 
-function PlayMenu.start(onPick: (choice: string) -> ()): Menu
+-- extras.onOptions: the menu's "Stock options" button (bottom right of the panel; Client/UI/StockOptionsUI)
+function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (() -> ())? }?): Menu
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local UIS = game:GetService("UserInputService")
@@ -540,6 +541,25 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	back.ZIndex = 23
 	back.Parent = panel
 	corner(back, 10)
+	-- Spicy Stock Options (owner D30): what they are, buying, and where home is
+	local optionsButton: TextButton? = nil
+	if extras and extras.onOptions then
+		local ob = Instance.new("TextButton")
+		ob.Name = "StockOptions"
+		ob.AnchorPoint = Vector2.new(1, 1)
+		ob.Position = UDim2.new(1, -16, 1, -14)
+		ob.Size = UDim2.fromOffset(150, 44)
+		ob.BackgroundColor3 = Color3.fromRGB(120, 92, 40)
+		ob.TextColor3 = Color3.new(1, 1, 1)
+		ob.Font = Enum.Font.GothamBold
+		ob.TextSize = 16
+		ob.Text = "Stock options"
+		ob.Modal = true
+		ob.ZIndex = 23
+		ob.Parent = panel
+		corner(ob, 10)
+		optionsButton = ob
+	end
 
 	-- scale the fixed-size pieces down on small screens (a laptop browser window)
 	local scales: { UIScale } = {}
@@ -676,6 +696,13 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	back.Activated:Connect(function()
 		setOpen(false)
 	end)
+	if optionsButton and extras and extras.onOptions then
+		local onOptions = extras.onOptions
+		optionsButton.Activated:Connect(function()
+			setOpen(false)
+			onOptions()
+		end)
+	end
 	menuButton.Activated:Connect(function()
 		setOpen(true)
 	end)

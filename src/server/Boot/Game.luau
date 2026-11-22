@@ -65,7 +65,8 @@
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
---   saved between servers (D16 #25; section 6e),
+--   saved between servers (D16 #25; section 6e), stockOptions (Economy/StockOptions: Spicy Stock Options, owner D30;
+--   promptBuy(player) opens the purchase window, e.g. from a bank's counter; nil when it could not start),
 --   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
@@ -124,6 +125,7 @@ local ShopArt = require("../Assets/ShopArt")
 local CornerStore = require("../Items/CornerStore")
 local PlayerSaves = require("../Persistence/PlayerSaves")
 local Wardrobe = require("../Cosmetics/Wardrobe")
+local StockOptions = require("../Economy/StockOptions")
 local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
 local TownSquirrels = require("../Wildlife/TownSquirrels")
@@ -2529,7 +2531,9 @@ function Game.start(opts: Opts?): any
 	-- other item stay on this server. A DataStore failure never blocks play and never takes back a purchase
 	-- (PlayerSaves: retry, a notice). The player attributes Clothes (what is worn) and ClothesSaved (the save's state)
 	-- are for the Studio check (docs/owner/CLOTHING_SAVE_CHECK.md).
-	local saves: any, wardrobe: any, giftShop: any = nil, nil, nil
+	-- Spicy Stock Options (owner D30; Economy/StockOptions) live in the same profile: bought with Robux (the one
+	-- ProcessReceipt), saved, withdrawn at the player's home computer into this server's wallet (S$100 per server).
+	local saves: any, wardrobe: any, giftShop: any, stockOptions: any = nil, nil, nil, nil
 	local clothesConns: { RBXScriptConnection } = {}
 	local clothesRunning = true
 	local okClothes, errClothes = pcall(function()
@@ -2559,7 +2563,11 @@ function Game.start(opts: Opts?): any
 				fire(player, { kind = "notice", text = words })
 			end,
 			loaded = function(player: any, profileData: any): boolean
-				return wardrobe ~= nil and wardrobe:loaded(player, profileData)
+				local changed = wardrobe ~= nil and wardrobe:loaded(player, profileData)
+				if stockOptions then
+					stockOptions.loaded(player, profileData)
+				end
+				return changed
 			end,
 			pending = function(player: any): boolean
 				return wardrobe ~= nil and wardrobe:pending(player)
@@ -2588,6 +2596,23 @@ function Game.start(opts: Opts?): any
 				fire(player, { kind = "notice", text = words })
 			end,
 		})
+		local okSo, errSo = pcall(function()
+			stockOptions = StockOptions.start({
+				saves = saves,
+				wallet = wallet,
+				possession = possession,
+				town = workspace:FindFirstChild("Town"),
+				playNet = playNet,
+				tell = function(player: any, words: string)
+					fire(player, { kind = "notice", text = words })
+				end,
+				setAttr = setAttr,
+				heartbeat = o.heartbeat ~= false,
+			})
+		end)
+		if not okSo then
+			warn(`[SpicyRodents] stock options failed to start (nothing is sold): {errSo}`)
+		end
 		if o.players ~= false then
 			for _, player in Players:GetPlayers() do
 				saves:join(player)
@@ -2720,6 +2745,7 @@ function Game.start(opts: Opts?): any
 		cornerStore = cornerStore,
 		dogs = dogs,
 		clothes = { saves = saves, wardrobe = wardrobe, giftShop = giftShop },
+		stockOptions = stockOptions,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -2770,6 +2796,9 @@ function Game.start(opts: Opts?): any
 			end
 			if giftShop then
 				giftShop.stop()
+			end
+			if stockOptions and stockOptions.stop then
+				stockOptions.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

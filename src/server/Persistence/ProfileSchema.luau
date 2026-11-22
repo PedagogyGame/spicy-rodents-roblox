@@ -3,14 +3,21 @@
 -- The versioned DataStore profile (BUILD_PLAN D26, risk 24; spike S15): the wallet in integer cents,
 -- the receipt ledger, the wardrobe (clothing owned) and what is worn (slot -> id), the item inventory,
 -- reputation and lifetime stats. Pure: a template, forward migrations and a validator so a corrupt or
--- future record is never written over. What the live game writes today is only `wardrobe` and `worn`
--- (owner D16 #25: clothing carries over, nothing else; Server/Cosmetics/Wardrobe); the other fields keep
--- whatever the record holds.
--- v2 (19 November): adds `worn`. There is no v0: nothing wrote the "Profiles" store before v1, so a record without a
--- numeric `schema` is broken, never a player to start afresh (ProfileStore: only an absent key is a new player).
+-- future record is never written over. What the live game writes is `wardrobe` and `worn` (owner D16 #25:
+-- clothing carries over; Server/Cosmetics/Wardrobe) and, with owner D30, `options` and the `receipts` ledger
+-- (Server/Economy/StockOptions); the other fields keep whatever the record holds.
+-- v2 (19 November): adds `worn`. v3 (22 November, owner D30): adds `options`, the player's Spicy Stock Options
+-- (bought with Robux, 1 option = S$1.00, withdrawn at their home computer): `held` now, `bought` and
+-- `withdrawn` over the profile's life (whole options; held never exceeds bought).
+-- There is no v0: nothing wrote the "Profiles" store before v1, so a record without a numeric `schema` is
+-- broken, never a player to start afresh (ProfileStore: only an absent key is a new player).
+-- An older server (v2) reads a v3 record as newer than it knows and never writes it (PlayerSaves "corrupt"):
+-- publish with "Migrate to Latest Update" so no old server keeps running beside new ones.
 -- Interface: VERSION, template() -> Data, migrate(raw) -> (Data?, err?), validate(data) -> (ok, err?)
 
-export type ReceiptEntry = { productId: number, cents: number, at: number, playerId: number }
+-- (`options`: a stock options receipt, the options it granted; `cents` is then their worth in Spicy cents)
+export type ReceiptEntry = { productId: number, cents: number, at: number, playerId: number, options: number? }
+export type Options = { held: number, bought: number, withdrawn: number }
 export type Data = {
 	schema: number,
 	wallet: { cents: number },
@@ -20,11 +27,12 @@ export type Data = {
 	inventory: { [string]: number },
 	reputation: number,
 	stats: { [string]: number },
+	options: Options,
 }
 
 local ProfileSchema = {}
 
-ProfileSchema.VERSION = 2
+ProfileSchema.VERSION = 3
 
 function ProfileSchema.template(): Data
 	return {
@@ -36,6 +44,7 @@ function ProfileSchema.template(): Data
 		inventory = {},
 		reputation = 0,
 		stats = {},
+		options = { held = 0, bought = 0, withdrawn = 0 },
 	}
 end
 
@@ -83,10 +92,20 @@ function ProfileSchema.validate(data: any): (boolean, string?)
 	if type(data.reputation) ~= "number" then
 		return false, "reputation"
 	end
+	local o = data.options
+	if
+		type(o) ~= "table"
+		or not isWhole(o.held)
+		or not isWhole(o.bought)
+		or not isWhole(o.withdrawn)
+		or o.held > o.bought
+	then
+		return false, "options"
+	end
 	return true, nil
 end
 
--- A stored profile's data -> the present shape: v1 -> v2 (nothing worn); v2 as it is. Anything else is refused
+-- A stored profile's data -> the present shape: v1 -> v2 (nothing worn) -> v3 (no stock options); v3 as it is. Anything else is refused
 -- (nil, why), so it is never written over: no data or no numeric schema (broken), an unknown older schema, and a
 -- newer schema than this build knows (an old server never truncates a newer record). A new player is
 -- template(), not migrate(nil).
@@ -109,6 +128,11 @@ function ProfileSchema.migrate(raw: any): (Data?, string?)
 		data = table.clone(data)
 		data.worn = {}
 		data.schema = 2
+	end
+	if data.schema == 2 then
+		data = if data == raw then table.clone(data) else data
+		data.options = { held = 0, bought = 0, withdrawn = 0 }
+		data.schema = 3
 	end
 	-- fill fields added after a record was written (none yet; kept for the pattern)
 	local template = ProfileSchema.template() :: any

@@ -17,6 +17,10 @@ Flags.defaults = {
 	-- 2026-11-18: BUILD_PLAN §1.4 had it log-only until W7)
 	moveValidatorEnforce = true,
 	persistence = false, -- DataStore binding lands in W4 #11; W1 uses the in-memory store
+	-- Spicy Stock Options (owner D30; Server/Economy/StockOptions): Robux receipts granted, the buy button, the home
+	-- computers' withdrawals. Off: nothing is sold or withdrawn and every receipt is answered NotProcessedYet, so
+	-- Roblox keeps it and offers it again once this is back on (nothing bought is lost)
+	stockOptions = true,
 } :: { [string]: boolean }
 
 local state = {
