@@ -66,7 +66,7 @@ NutSpots.SPOTS = table.freeze({
 	{ id = "tree_white_oak_2", kind = "tree", x = 162, z = 667, near = "WHITE OAK woods 29" },
 	{ id = "tree_shagbark_hickory_2", kind = "tree", x = -649.75, z = -380.25, near = "SHAGBARK HICKORY woods 78" },
 	{ id = "tree_sweet_chestnut_2", kind = "tree", x = -524, z = -627.25, near = "SWEET CHESTNUT woods 35" },
-	{ id = "tree_black_walnut_2", kind = "tree", x = -256.25, z = -1018.75, near = "BLACK WALNUT woods 74" },
+	{ id = "tree_black_walnut_2", kind = "tree", x = -1112.25, z = -493.75, near = "BLACK WALNUT woods 53" },
 	{ id = "yard_garden_1", kind = "yard", x = 180, z = 155, near = "a garden" },
 	{ id = "yard_garden_2", kind = "yard", x = -279, z = 180, near = "a garden" },
 	{ id = "yard_garden_3", kind = "yard", x = 267.5, z = 660, near = "a garden" },

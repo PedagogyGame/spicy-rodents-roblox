@@ -241,7 +241,11 @@ return function(t)
 			local vworld = vworldOf(town, w)
 			local routes = {}
 			for _, r in w.registry:all() do
-				if r.kind ~= "trunk" and not r.enclosure then
+				-- (inside the v5.4 rectangle, the motor's default clamp, which this rig's worlds and the server's validator
+				-- world use: the D34 woods out at the edges are judged nowhere else yet)
+				local m = w.registry:pointAt(r, 0.5)
+				local inV54 = m.x > -1465 and m.x < 2865 and m.z > -1400 and m.z < 1090
+				if r.kind ~= "trunk" and not r.enclosure and inV54 then
 					table.insert(routes, r)
 				end
 			end

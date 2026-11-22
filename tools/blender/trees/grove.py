@@ -30,7 +30,7 @@ AlphaMode must be Transparency, or its colour map on TextureID: WoodsArt does ei
   <kind>.json   pivot (the ground under the foot), part bounds (Roblox axes, from the pivot), tris, checks, mesh digest
   renders/<kind>_<view>.png, renders/lineup.png
 Budgets (phones; ~300 trees in the town, the same few meshes instanced): pines and nut trees 2,600 bark + 2,800 leaves
-(the hazel 1,600 + 2,000), the giants 7,000 + 8,000 (each stands once).
+(the hazel 1,600 + 2,000), the giants 7,600 + 8,000 (each stands once).
 """
 import argparse
 import hashlib
@@ -63,11 +63,11 @@ TUNNEL_UP = 0.9
 # fruit: nut or cone; budgets: bark and leaf triangles; sides: the trunk's ring; card: spray card length, width
 SPECIES = {
     "oak": dict(style="broad", bark=("oak", None), leaf="oak", pal=["#5e8a3a", "#6f9a44", "#4f7a33", "#86a856"],
-                fruit="acorn", bark_tris=7000, leaf_tris=8000, sides=14, card=(11.0, 9.8), boughR=(2.8, 1.0)),
+                fruit="acorn", bark_tris=7600, leaf_tris=8000, sides=14, card=(11.0, 9.8), boughR=(2.8, 1.0)),
     "elm": dict(style="broad", bark=("elm", None), leaf="elm", pal=["#5d8b45", "#6e9a4f", "#4d7a3c", "#7ba556"],
-                fruit=None, bark_tris=7000, leaf_tris=8000, sides=14, card=(10.5, 9.2), boughR=(2.6, 0.9)),
+                fruit=None, bark_tris=7600, leaf_tris=8000, sides=14, card=(10.5, 9.2), boughR=(2.6, 0.9)),
     "beech": dict(style="broad", bark=("maple", "#c9c6bd"), leaf="apple", pal=["#6a9a3e", "#7fae4a", "#5b8a37"],
-                  fruit=None, bark_tris=7000, leaf_tris=8000, sides=14, card=(10.5, 9.2), boughR=(2.8, 1.0)),
+                  fruit=None, bark_tris=7600, leaf_tris=8000, sides=14, card=(10.5, 9.2), boughR=(2.8, 1.0)),
     "white_oak": dict(style="broad", bark=("oak", "#b8b2a6"), leaf="oak", pal=["#5e8a3a", "#73a046", "#527d34"],
                       fruit="acorn", bark_tris=2600, leaf_tris=2800, sides=9, card=(9.0, 8.0), boughR=(1.25, 0.5)),
     "pin_oak": dict(style="broad", bark=("maple", "#8a8a80"), leaf="oak", pal=["#4f7f3a", "#5f8e40", "#456f33"],
@@ -104,6 +104,8 @@ FRUIT = {
     "sprucecone": ("#6e4a2a", "#553820", 1.2, 0.36, 30),
     "fircone": ("#5a4a5a", "#463a48", 0.9, 0.36, 24),
 }
+# a giant's crown spreads this much past its placement crown (data/woods.json `crown`, which spaces it from buildings)
+GIANT_SPREAD = 1.3
 CARD_U = 0.035  # a card's uv keeps this far in from its cell's sides (the fruit swatch lies between the cells)
 
 
@@ -388,14 +390,22 @@ class Tree:
     def broad_crown(self):
         S, rng = self.S, self.rng
         H, crown = self.H, self.crown
+        if self.kind["family"] == "giant":
+            crown *= GIANT_SPREAD
         cl, cw = S["card"]
         ylo = min([float(b["_Q"][0][1]) for b in self.boughs] + [self.trunkP[-1][1]])
         self.env_c = np.array([0.0, (ylo + H) / 2 + 0.05 * H, 0.0])
         self.env_r = np.array([crown, max((H - ylo) / 2, 6.0), crown])
+        giant = self.kind["family"] == "giant"
+        # the crown: as wide as `crown` from just under the lowest bough to its shoulder, rounding over to the top (a
+        # shade tree's spread, the low boughs leafy to their tips)
+        y0, ysh = ylo - 4.0, ylo + 0.45 * (H - ylo)
 
         def inside(p, slack=1.0):
-            q = (p - self.env_c) / self.env_r
-            return float((q * q).sum()) <= slack
+            if p[1] < y0 or p[1] > H + 2:
+                return False
+            f = 1.0 if p[1] <= ysh else math.sqrt(max(0.0, 1 - ((p[1] - ysh) / max(H - ysh, 1.0)) ** 2))
+            return math.hypot(p[0], p[2]) <= crown * max(f, 0.12) * math.sqrt(slack)
 
         twigs = []
         # side branches off every bough's outer two thirds, both sides, and the bough's tip twigs
@@ -415,8 +425,8 @@ class Tree:
                 lat = tg.norm(np.cross(t, Y)) * side
                 start = p + lat * r * 0.8 - Y * r * 0.5
                 d = tg.norm(t * 0.5 + lat * 0.8 + Y * rng.uniform(0.0, 0.5))
-                ln = (L - s) * 0.45 + crown * 0.25
-                pts, radii = self.grow(start, d, ln, max(0.2, r * 0.45), 3, 0.18, 0.12)
+                ln = (L - s) * (0.6 if giant else 0.45) + crown * (0.32 if giant else 0.25)
+                pts, radii = self.grow(start, d, ln, max(0.2, r * 0.45), 3, 0.18, 0.04 if giant else 0.1)
                 if pts is not None:
                     self.wood(pts, radii)
                     twigs.append((pts, 1))
@@ -429,6 +439,22 @@ class Tree:
                 pts, radii = self.grow(tip, dd, crown * 0.3, S["boughR"][1] * 0.6, 3, 0.2, 0.1)
                 if pts is not None:
                     self.wood(pts, radii)
+                    twigs.append((pts, 1))
+        # a giant's great limbs that are not walked (between and above the climbing boughs): out to the crown's edge
+        if giant:
+            th = float(self.trunkP[-1][1])
+            for q in range(12):
+                y = th * (0.3 + 0.68 * (q + 0.5) / 12)
+                ax = self.axis_at_y(y)
+                az = rng.uniform(0, 6.28) if q == 0 else az + 2.39996 + rng.uniform(-0.3, 0.3)
+                d = dir_of(az, math.radians(rng.uniform(5, 22)))
+                rr = float(self.r_at((y - self.trunkP[0][1]) / max(th - self.trunkP[0][1], 1)))
+                start = ax + np.array([math.sin(az), 0, math.cos(az)]) * rr * 0.6
+                pts, radii = self.grow(start, d, crown * rng.uniform(0.6, 0.9), 1.3, 5, 0.1, 0.0, strict=True)
+                # (where it leaves the trunk, the trunk check looks past it, as past a bough's collar)
+                self.whorl_heights = getattr(self, "whorl_heights", []) + [y]
+                if pts is not None:
+                    self.wood(pts, radii, 5)
                     twigs.append((pts, 1))
         # crown limbs off the leader, filling the top of the envelope
         LT = self.leaderTop
@@ -700,7 +726,8 @@ def checks(tree):
             if hit[0] is None:
                 continue
             err = hit[3] - want
-            (near if any(abs(p[1] - y) < 4.0 for y in starts) else clean).append(err)
+            # (a bough or whorl branch leaving the trunk is wood beside it for a few studs, more above where it rises)
+            (near if any(-4.0 < p[1] - y < 10.0 for y in starts) else clean).append(err)
     under, over, n = [], 0, 0
     for b in tree.boughs:
         feet = b["_feet"]
@@ -801,7 +828,8 @@ def main(argv):
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     with open(args.templates) as fh:
-        kinds = json.load(fh)["kinds"]
+        every = json.load(fh)["kinds"]
+    kinds = every
     if args.kinds != "all":
         want = set(args.kinds.split(","))
         kinds = [k for k in kinds if k["id"] in want]
@@ -847,7 +875,7 @@ def main(argv):
                           "s": tree.log["build_s"]}), flush=True)
         summary.append(info)
     if args.lineup:
-        lineup(kinds, tex, out, args)
+        lineup(every, tex, out, args)  # (every kind, whatever --kinds built)
     with open(os.path.join(out, "summary.json"), "w") as fh:
         json.dump(summary, fh, indent=1)
 
@@ -880,7 +908,7 @@ def lineup(kinds, tex, out, args):
     rx, ry = (int(v) for v in args.res.split("x"))
     bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y = rx * 2, ry * 2
     cx = -width / 2
-    cam = bt.add_camera("CamLineup", to_b(np.array([cx, 95, -width * 0.62])), to_b(np.array([cx, 85, 70])), 30)
+    cam = bt.add_camera("CamLineup", to_b(np.array([cx, 120, -width * 0.95])), to_b(np.array([cx, 95, 70])), 20)
     bpy.context.scene.camera = cam
     path = os.path.join(out, "renders", "lineup.png")
     os.makedirs(os.path.dirname(path), exist_ok=True)

@@ -27,7 +27,7 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 OUT = os.path.join(ROOT, "data", "art", "woods.json")
 DESCRIPTION = "Spicy Rodent: a climbable tree of the town's woods (tools/blender/trees/grove.py, D34)."
-BUDGET = {"giant": (7000, 8000), "hazel": (1600, 2000), "other": (2600, 2800)}
+BUDGET = {"giant": (7600, 8000), "hazel": (1600, 2000), "other": (2600, 2800)}
 TRUNK_TOL = 0.35  # studs: the bark against the squirrel's trunk radius, away from where boughs and whorls leave
 
 

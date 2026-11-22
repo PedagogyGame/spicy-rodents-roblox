@@ -3720,6 +3720,10 @@ return {
 		idBase = 10001,
 		kinds = {
 			balsam_fir = {
+				art = {
+					leaf = { 60, 90, 56 },
+					tris = 3658,
+				},
 				climb = {
 					boughs = {
 						{ arch = 0.4, at = 9, bearing = 90, reach = 6.5, rise = 0.3, tier = "low" },
@@ -3736,6 +3740,10 @@ return {
 				species = "fir",
 			},
 			black_walnut = {
+				art = {
+					leaf = { 107, 143, 59 },
+					tris = 5008,
+				},
 				climb = {
 					boughs = {
 						{ arch = 2.5, at = 14, bearing = 40, curl = 8, reach = 18, rise = 5, tier = "low" },
@@ -3760,6 +3768,10 @@ return {
 				species = "walnut",
 			},
 			great_elm = {
+				art = {
+					leaf = { 103, 143, 68 },
+					tris = 15206,
+				},
 				climb = {
 					boughs = {
 						{ arch = 4, at = 16, bearing = 70, curl = 8, reach = 30, rise = 6, tier = "low" },
@@ -3797,6 +3809,10 @@ return {
 				species = "elm",
 			},
 			hazel = {
+				art = {
+					leaf = { 108, 149, 63 },
+					tris = 1932,
+				},
 				climb = {
 					boughs = {
 						{ arch = 1, at = 7, bearing = 120, reach = 7, rise = 4, tier = "low" },
@@ -3811,6 +3827,10 @@ return {
 				species = "hazel",
 			},
 			king_oak = {
+				art = {
+					leaf = { 105, 142, 62 },
+					tris = 15234,
+				},
 				climb = {
 					boughs = {
 						{ arch = 5, at = 14, bearing = 20, curl = 10, reach = 40, rise = 2, tier = "low" },
@@ -3841,6 +3861,10 @@ return {
 				species = "oak",
 			},
 			norway_spruce = {
+				art = {
+					leaf = { 58, 86, 52 },
+					tris = 4832,
+				},
 				climb = {
 					boughs = {
 						{ arch = 0.5, at = 10, bearing = 30, reach = 9.5, rise = -0.8, tier = "low" },
@@ -3858,6 +3882,10 @@ return {
 				species = "spruce",
 			},
 			old_beech = {
+				art = {
+					leaf = { 107, 150, 59 },
+					tris = 15207,
+				},
 				climb = {
 					boughs = {
 						{ arch = 5, at = 12, bearing = 300, curl = -10, reach = 42, rise = 1, tier = "low" },
@@ -3879,6 +3907,10 @@ return {
 				species = "beech",
 			},
 			pin_oak = {
+				art = {
+					leaf = { 83, 123, 54 },
+					tris = 5000,
+				},
 				climb = {
 					boughs = {
 						{ arch = 1.2, at = 16, bearing = 100, curl = 6, reach = 12, rise = 0, tier = "low" },
@@ -3895,6 +3927,10 @@ return {
 				species = "pin_oak",
 			},
 			red_pine = {
+				art = {
+					leaf = { 68, 102, 52 },
+					tris = 4382,
+				},
 				climb = {
 					boughs = {
 						{ arch = 0.3, at = 16, bearing = 200, reach = 5, rise = 1, tier = "low" },
@@ -3912,6 +3948,10 @@ return {
 				species = "red_pine",
 			},
 			shagbark_hickory = {
+				art = {
+					leaf = { 98, 136, 57 },
+					tris = 5012,
+				},
 				climb = {
 					boughs = {
 						{ arch = 1.5, at = 28, bearing = 60, curl = 8, reach = 14, rise = 7, tier = "low" },
@@ -3928,6 +3968,10 @@ return {
 				species = "hickory",
 			},
 			sweet_chestnut = {
+				art = {
+					leaf = { 91, 132, 54 },
+					tris = 5011,
+				},
 				climb = {
 					boughs = {
 						{ arch = 3, at = 13, bearing = 80, curl = -10, reach = 20, rise = 4, tier = "low" },
@@ -3944,6 +3988,10 @@ return {
 				species = "chestnut",
 			},
 			white_oak = {
+				art = {
+					leaf = { 96, 136, 55 },
+					tris = 5000,
+				},
 				climb = {
 					boughs = {
 						{ arch = 3, at = 12, bearing = 10, curl = 10, reach = 23, rise = 3, tier = "low" },
@@ -3960,6 +4008,10 @@ return {
 				species = "white_oak",
 			},
 			white_pine = {
+				art = {
+					leaf = { 78, 116, 76 },
+					tris = 4896,
+				},
 				climb = {
 					boughs = {
 						{ arch = 0.6, at = 14, bearing = 0, reach = 11, rise = 0.5, tier = "low" },
