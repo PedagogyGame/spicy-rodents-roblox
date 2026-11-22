@@ -95,6 +95,7 @@ local REASONS: { [string]: string } = {
 	["only people drive"] = "Only people can drive. Pick Townsperson or Police from the menu (M)",
 	["the drone is in use"] = "Someone else is flying the drone",
 	["no body"] = "Pick a body from the menu first (M)",
+	["doctors only"] = "Only doctors drive the ambulances. Pick Doctor from the menu (M)",
 	["cannot"] = "You cannot get in right now",
 	ride_end = "", -- the sky lift: the arrival words come as their own notice
 	ride_left = "",
@@ -112,6 +113,9 @@ function PossessionClient.reasonText(why: string?): string?
 	end
 	if string.find(why, "key", 1, true) then
 		return "That car is locked: police cars are for officers (pick Police)"
+	end
+	if string.match(why, "^%u") and string.sub(why, -1) == "." then
+		return why -- (a whole sentence from the server: D30's ambulances say why not themselves)
 	end
 	return `Cannot do that: {why}`
 end

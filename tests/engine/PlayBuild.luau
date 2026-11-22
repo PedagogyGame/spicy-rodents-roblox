@@ -132,7 +132,9 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		return ok
 	end
 	local picks: { [string]: string } = {}
-	for _, choice in { "townsperson", "squirrel", "police", "drone", "rodent" } do
+	-- a real join first (the Ladder's townsperson): the Doctor pick puts a member of the Ladder on the hospital rung (D30)
+	rt.roles:onJoin(player)
+	for _, choice in { "townsperson", "squirrel", "police", "doctor", "rodent" } do
 		if pick(choice) then
 			local a = possession:actorOf(player)
 			picks[choice] = if a then `{a.species}/{a.variant or "-"}` else "none"

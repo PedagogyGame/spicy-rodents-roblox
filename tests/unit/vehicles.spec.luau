@@ -5,9 +5,9 @@ local VehicleKinds = require("@shared/Vehicles/VehicleKinds")
 local PlayerVehicles = require("@shared/Vehicles/PlayerVehicles")
 
 return function(t)
-	t.test("VehicleKinds: the eight kinds, interiors with an eye socket, fleet membership", function()
+	t.test("VehicleKinds: the nine kinds, interiors with an eye socket, fleet membership", function()
 		local ids = VehicleKinds.list()
-		t.eq(table.concat(ids, ","), "car,cart,bike,pickup,suv,jetski,moped,escooter")
+		t.eq(table.concat(ids, ","), "car,cart,bike,pickup,suv,jetski,moped,escooter,ambulance")
 		for _, id in ids do
 			local k = VehicleKinds.kind(id)
 			t.truthy(k.maxSpeed > 0 and k.wheelbase > 0 and #k.size == 3, id)
@@ -58,6 +58,16 @@ return function(t)
 		t.truthy(not (VehicleKinds.mayDrive("jetski", {})), "jet ski: rent first")
 		t.truthy((VehicleKinds.mayDrive("jetski", { paidRental = true })))
 		t.truthy(not (VehicleKinds.mayDrive("cart", { human = false })), "squirrels do not drive")
+		-- D30: the ambulance is a doctor's alone
+		t.deepEq(
+			{ VehicleKinds.mayDrive("ambulance", { human = true, keyHolder = true, officer = true }) },
+			{ false, "doctors only" }
+		)
+		t.truthy((VehicleKinds.mayDrive("ambulance", { human = true, doctor = true })))
+		t.truthy(
+			not (VehicleKinds.mayDrive("ambulance", { human = false, doctor = true })),
+			"a doctor in a person's body"
+		)
 	end)
 
 	t.test("PlayerVehicles: enter, occupied, one seat per driver, exit, invariants", function()

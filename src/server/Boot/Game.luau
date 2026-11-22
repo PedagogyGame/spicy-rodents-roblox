@@ -32,9 +32,18 @@
 -- "treating"; UI/PlayMenu draws a line under the status), refreshed once a second.
 -- Knocking the rodent out cures nobody (the old brief v2 §8 instant cure is off: Tunables
 -- infection.recentBiteSecs = 0).
--- A patient (on the ground, in the ambulance, in a bed) is not possessable: Police and Drone picks
--- skip such an officer (pickOfficer), and an officer who is moved to the patrol car for a pick that
+-- A patient (on the ground, in the ambulance, in a bed) is not possessable: Police and Doctor picks
+-- skip such a person (pickOfficer), and an officer who is moved to the patrol car for a pick that
 -- is then refused is put back where they were.
+-- THE DOCTORS (owner D30): the menu's Doctor took the place of the Police drone (the drone stays in the fleet and on
+-- the Ladder for the police later; it is no longer a pick). Picking it puts the player on the hospital rung as a doctor
+-- (Roles/RoleService take: 5 slots, else the refusal), in one of the hospital's own people where one is free, beside
+-- the ambulances on the hospital road. Hospital/DoctorService does the rest: the calls (the sequence asks it first:
+-- InfectionService opts.doctorCall), the ambulances at E (DeviceService borrow / isDoctor), loading, unloading, the
+-- pay, the warning and the demotion (out of the ambulance, a townsperson again). The call is on the doctor's screen
+-- through the player attributes DoctorJob ("called" | "enroute" | "loaded") and DoctorCall (where the patient is, or
+-- the hospital doors once they are aboard), which Client/UI/PlayMenu draws as a marker and a line. A doctor who picks
+-- anything else resigns (RoleService resign); one who leaves is let go by the service.
 -- Streaming and input (W1 client review): the device fleet (patrol cars, carts, bikes, the drone) is
 -- ModelStreamingMode Persistent, so a DeviceGranted model is never nil on the driver's client; the body a
 -- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
@@ -115,6 +124,8 @@ local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../..
 local AreaPace = Import.shared("Speech/AreaPace") :: typeof(require("../../shared/Speech/AreaPace"))
 local LoungeService = require("../Attractions/LoungeService")
 local HospitalProps = require("../Hospital/HospitalProps")
+local DoctorService = require("../Hospital/DoctorService")
+local DoctorRules = Import.shared("Hospital/DoctorRules") :: typeof(require("../../shared/Hospital/DoctorRules"))
 local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
 local TreeArt = require("../Assets/TreeArt")
@@ -150,7 +161,7 @@ export type Opts = {
 
 local Game = {}
 
-Game.CHOICES = table.freeze({ "rodent", "squirrel", "townsperson", "police", "drone" })
+Game.CHOICES = table.freeze({ "rodent", "squirrel", "townsperson", "police", "doctor" })
 Game.PICK_COOLDOWN = 0.75
 Game.FAULT_LIMIT = 60 -- contained faults of the infection service within FAULT_WINDOW that switch it off
 Game.FAULT_WINDOW = 60 -- seconds
@@ -213,10 +224,10 @@ end
 
 export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
 
--- pickOfficer(people): the body for a player who picks Police or the drone: the first police officer
--- who is free (the AI has the body) and possessable (not a patient on the ground, in the ambulance or
--- in a bed: Infection/InfectionService), else the first such person of any post. `people` are the
--- town's humans in their fixed order.
+-- pickOfficer(people): the body for a player who picks Police: the first police officer who is free (the AI has the
+-- body) and possessable (not a patient on the ground, in the ambulance or in a bed: Infection/InfectionService), else
+-- the first such person of any post. `people` are the town's humans in their fixed order. The Doctor pick (D30) asks
+-- the same of the hospital's own staff (`police` then marks the hospital staff).
 function Game.pickOfficer(people: { OfficerCandidate }): any?
 	local fallback = nil
 	for _, p in people do
@@ -256,6 +267,21 @@ function Game.animals(
 		end
 	end
 	return out
+end
+
+-- reportReputation(player, kind, severity): the reputation in the background hears of an extreme act (owner D30; its
+-- module is the reputation work's, Shared/Reputation/Reputation with report(player, kind, severity)). Until that module
+-- is in the game nothing is reported; a fault in it is warned, never fatal.
+function Game.reportReputation(player: any, kind: string, severity: number)
+	local okR, Reputation = pcall(function(): any
+		return Import.shared("Reputation/Reputation") :: any
+	end)
+	if okR and type(Reputation) == "table" and type(Reputation.report) == "function" then
+		local ok, err = pcall(Reputation.report, player, kind, severity)
+		if not ok then
+			warn(`[SpicyRodents] reputation report failed: {err}`)
+		end
+	end
 end
 
 function Game.gameSeconds(serverTime: number, epoch: number, base: number, rate: number): number
@@ -673,6 +699,8 @@ function Game.start(opts: Opts?): any
 			return world.now
 		end,
 	})
+	-- the doctors (D30, Hospital/DoctorService): built below once the players' helpers are; the sequence asks them first
+	local doctors: any = nil
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
 	local infectionFault: (where: string, err: any) -> ()
@@ -713,6 +741,9 @@ function Game.start(opts: Opts?): any
 			end,
 			onFault = function(where: string, err: any)
 				infectionFault(where, err)
+			end,
+			doctorCall = function(id: number, x: number, z: number): boolean
+				return doctors ~= nil and doctors:call(id, x, z)
 			end,
 		})
 	end)
@@ -1197,14 +1228,15 @@ function Game.start(opts: Opts?): any
 		body:PivotTo(Units.yawCFrame(yaw, Vector3.new(x, gy + size.Y * 0.5 + 0.1, z)))
 	end
 
-	local function freeOfficer(): any?
+	-- a free person of this post first (police: the Police pick; hospital_staff: the Doctor pick), else anyone free
+	local function freeOfficer(post: string?): any?
 		local people: { OfficerCandidate } = {}
 		for _, a in world.actors do
 			if a.species == "human" then
 				local actor = rt.byTownId[a.id]
 				table.insert(people, {
 					actor = actor,
-					police = a.post == "police",
+					police = a.post == (post or "police"),
 					free = possession:controllerOf(actor) == "ai",
 					possessable = actor.possessable ~= false,
 				})
@@ -1283,13 +1315,85 @@ function Game.start(opts: Opts?): any
 					why = "Every townsperson is taken. Pick another body."
 				end
 			end
-		else -- police, drone
+		elseif choice == "doctor" then
+			-- D30: the hospital rung as a doctor (5 slots), in one of the hospital's own people, by the ambulances
+			if doctors == nil or rt.roles == nil then
+				fire(
+					player,
+					{
+						kind = "refused",
+						text = "The hospital has no doctors' places in this server. Pick another body.",
+					}
+				)
+				return false, "no doctors"
+			end
+			local wasDoctor = rt.roles:roleOf(player) == "hospital"
+			local person = if current
+					and current.species == "human"
+					and s.role == "doctor"
+				then current
+				else freeOfficer("hospital_staff")
+			if person == nil then
+				fire(player, { kind = "refused", text = "Every townsperson is taken. Pick another body." })
+				return false, "no free person"
+			end
+			if not wasDoctor then
+				local took, refusal = rt.roles:take(player, "hospital")
+				if not took then
+					fire(player, {
+						kind = "refused",
+						text = if refusal == "full"
+							then DoctorRules.WORDS.full
+							else "You cannot be a doctor just now. Pick another body.",
+					})
+					return false, refusal
+				end
+			end
+			-- on the pavement beside the first ambulance parked on the hospital road
+			local parked = traffic:parkedResponders()[1]
+			local spot: Vector3?, spotYaw = nil, 0
+			if parked then
+				spot = Vector3.new(parked.x - math.cos(parked.yaw) * 6, 0, parked.z + math.sin(parked.yaw) * 6)
+				spotYaw = parked.yaw
+			end
+			if person ~= current then
+				local at = world.actorsById[townIdOf[person.id]]
+				local bx, bz, byaw = if at then at.x else nil, if at then at.z else nil, if at then at.yaw else 0
+				if spot then
+					placeAI(person, spot.X, spot.Z, spotYaw)
+				end
+				ok, why = takeBody(player, person)
+				if
+					not ok
+					and spot
+					and bx
+					and bz
+					and Game.putBack(possession:controllerOf(person) == "ai", person.possessable ~= false)
+				then
+					placeAI(person, bx, bz, byaw)
+				end
+			else
+				if devices and typeof(player) == "Instance" then
+					devices:exitAll(player)
+				end
+				ok = true
+			end
+			if ok and spot and person ~= current then
+				local body = person.body :: Model
+				body:PivotTo(CFrame.new(spot.X, groundY(spot.X, spot.Z) + 3.5, spot.Z))
+			end
+			if ok then
+				doctors:joined(player)
+			elseif not wasDoctor then
+				rt.roles:resign(player)
+			end
+		else -- police
 			local officer = if current
 					and current.species == "human"
-					and (s.role == "police" or s.role == "drone")
+					and s.role == "police"
 				then current
 				else freeOfficer()
-			local target = deviceModel(if choice == "drone" then "drone_" else "car_")
+			local target = deviceModel("car_")
 			noDevice = target == nil
 			if officer == nil then
 				fire(player, { kind = "refused", text = "Every police officer is taken. Pick another body." })
@@ -1300,9 +1404,7 @@ function Game.start(opts: Opts?): any
 			local yaw = 0
 			if root then
 				local width = (target :: Model):GetExtentsSize().X
-				spot = if choice == "drone"
-					then root.Position + Vector3.new(0, 0, -3)
-					else root.Position - root.CFrame.RightVector * (width * 0.5 + 3)
+				spot = root.Position - root.CFrame.RightVector * (width * 0.5 + 3)
 				yaw = math.atan2(root.CFrame.LookVector.X, root.CFrame.LookVector.Z)
 			end
 			if officer ~= current then
@@ -1334,19 +1436,16 @@ function Game.start(opts: Opts?): any
 				local body = officer.body :: Model
 				body:PivotTo(CFrame.new(spot.X, groundY(spot.X, spot.Z) + 3.5, spot.Z))
 			end
-			if ok and choice == "drone" and devices and typeof(player) == "Instance" then
-				local held = officer
-				task.delay(1.0, function()
-					if possession:actorOf(player) == held then
-						local launched, reason = devices:interact(player :: Player)
-						if not launched then
-							fire(player, { kind = "refused", text = `The drone did not launch: {reason}` })
-						end
-					end
-				end)
-			end
 		end
 		persist(player)
+		if ok and choice ~= "doctor" and rt.roles and rt.roles:roleOf(player) == "hospital" then
+			-- (D30: a doctor who picked something else is a townsperson on the Ladder again; their call goes to the
+			-- computer's ambulances)
+			if doctors then
+				doctors:left(player)
+			end
+			rt.roles:resign(player)
+		end
 		if ok then
 			s.role = choice
 			local actor = possession:actorOf(player)
@@ -1357,8 +1456,8 @@ function Game.start(opts: Opts?): any
 			local note = nil
 			if choice == "police" and noDevice then
 				note = "Every patrol car is in use: you are an officer on foot"
-			elseif choice == "drone" and noDevice then
-				note = "Someone else is flying the drone: you are an officer on foot"
+			elseif choice == "doctor" then
+				note = DoctorRules.WORDS.picked
 			end
 			fire(player, { kind = "picked", role = choice, note = note })
 		else
@@ -1573,6 +1672,81 @@ function Game.start(opts: Opts?): any
 		end
 		return best
 	end
+
+	-- the doctors (owner D30, Hospital/DoctorService; see the header): the ambulances, the calls, the job on screen
+	if infection and infection.layout and devices and rt.roles then
+		local okD, errD = pcall(function()
+			local door = infection.layout.entrance
+			local drops = { { door[1], door[2] } }
+			local home = traffic:responderHome()
+			if home then
+				table.insert(drops, home)
+			end
+			doctors = DoctorService.new({
+				infection = infection,
+				traffic = traffic,
+				roles = rt.roles,
+				now = os.clock,
+				drops = drops,
+				bodyAt = function(player: any): (number?, number?)
+					local actor = possession:actorOf(player)
+					local tid = if actor then townIdOf[actor.id] else nil
+					local a = if tid then world.actorsById[tid] else nil
+					if a then
+						return a.x, a.z
+					end
+					return nil, nil
+				end,
+				spawn = function(x: number, z: number, yaw: number): any
+					local id = devices:spawn("ambulance", x, 0, z, yaw)
+					pcall(function()
+						devices.models[id].ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+					end)
+					return id
+				end,
+				despawn = function(id: any)
+					devices:remove(id)
+				end,
+				poseOf = function(id: any): any
+					return devices:poseOf(id)
+				end,
+				tell = function(player: any, payload: { [string]: any })
+					fire(player, payload)
+				end,
+				show = function(player: any, job: { phase: string, x: number, z: number }?)
+					setAttr(player, "DoctorJob", if job then job.phase else nil)
+					setAttr(
+						player,
+						"DoctorCall",
+						if job then Vector3.new(job.x, Height.at(job.x, job.z), job.z) else nil
+					)
+				end,
+				onDemoted = function(player: any, _words: string)
+					if typeof(player) == "Instance" then
+						devices:exitAll(player)
+					end
+					local s = stateOf(player)
+					if s.role == "doctor" then
+						s.role = "townsperson"
+					end
+					publish(player)
+				end,
+				reputation = Game.reportReputation,
+				nearestPlayer = nearestPlayer,
+			})
+			devices.borrow = function(player: Player, x: number, z: number, reach: number): (string?, string?)
+				return doctors:borrow(player, x, z, reach)
+			end
+			devices.isDoctor = function(player: Player): boolean
+				return doctors:isDoctor(player)
+			end
+		end)
+		if not okD then
+			doctors = nil
+			warn(`[SpicyRodents] the doctors did not start (the computer's ambulances answer every call): {errD}`)
+		end
+	end
+	local doctorAcc = 0
 
 	-- A bite landed (Combat/CombatService decided it): Power, the bite count and the Bite clip on the rodent, the
 	-- victim's shout, the bite-to-hospital sequence, and the news on both players' screens. Ids are town ids.
@@ -1974,6 +2148,18 @@ function Game.start(opts: Opts?): any
 				rideBumps = nil
 			end
 		end
+		if doctors then
+			-- (D30: five times a second, as the sequence's own tick; a fault is warned and the computer's ambulances
+			-- carry on: a call that is a doctor's is given back by the sequence itself after a while)
+			doctorAcc += dt
+			if doctorAcc >= 0.2 then
+				doctorAcc = 0
+				local okDS, errDS = pcall(doctors.step, doctors)
+				if not okDS then
+					warn(`[SpicyRodents] the doctors' step failed: {errDS}`)
+				end
+			end
+		end
 		if devices then
 			tidyAcc += dt
 			if tidyAcc >= 2 then
@@ -2022,6 +2208,9 @@ function Game.start(opts: Opts?): any
 			states[player] = nil
 			persisted[player] = nil
 			sickShown[player] = nil
+			if doctors then
+				pcall(doctors.left, doctors, player)
+			end
 			money.leave(player)
 		end)
 	)

@@ -5,7 +5,7 @@
 -- is parked. Keys only change hands while the vehicle is parked: a driver who drops out of the top
 -- two keeps driving until they exit, then the key passes (§1.5). The engine side (prompts, seat
 -- weld, network ownership, the camera switch) lives in Server/Actors/DeviceService and reads this.
--- Interface: new() -> Fleet; add(f, id, kind, x, z, yaw); get(f, id); enter(f, id, driver, ctx)
+-- Interface: new() -> Fleet; add(f, id, kind, x, z, yaw); remove(f, id) (empty only); get(f, id); enter(f, id, driver, ctx)
 --   -> (ok, reason); exit(f, driver) -> vehicleId?; vehicleOf(f, driver); setMotion(f, id, speed);
 --   grantKeys(f, group, holders) (group "humanDriver" | "police"); keyHolder(f, id) -> driver?;
 --   check(f) -> (ok, errors)
@@ -36,6 +36,7 @@ export type EnterCtx = {
 	human: boolean?,
 	officer: boolean?,
 	paidRental: boolean?,
+	doctor: boolean?, -- D30: the ambulance
 }
 
 local PlayerVehicles = {}
@@ -75,6 +76,21 @@ function PlayerVehicles.add(f: Fleet, id: string, kind: string, x: number, z: nu
 	return v
 end
 
+-- remove(f, id): the vehicle is gone (D30: a doctor's ambulance back in the traffic's bay). Only an empty one: false
+-- while someone sits in it.
+function PlayerVehicles.remove(f: Fleet, id: string): boolean
+	local v = f.vehicles[id]
+	if v == nil or v.driver ~= nil then
+		return false
+	end
+	f.vehicles[id] = nil
+	local i = table.find(f.order, id)
+	if i then
+		table.remove(f.order, i)
+	end
+	return true
+end
+
 function PlayerVehicles.get(f: Fleet, id: string): Vehicle?
 	return f.vehicles[id]
 end
@@ -112,6 +128,7 @@ function PlayerVehicles.enter(f: Fleet, id: string, driver: number, ctx: EnterCt
 		officer = ctx.officer,
 		paidRental = ctx.paidRental,
 		human = ctx.human,
+		doctor = ctx.doctor,
 	})
 	if not ok then
 		return false, reason

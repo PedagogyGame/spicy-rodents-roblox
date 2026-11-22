@@ -76,7 +76,7 @@ end
 
 -- The traffic kind (or VehiclePuppet player kind) that draws each player kind.
 local DRAWN: { [string]: string } =
-	{ car = "patrol_car", cart = "cart", pickup = "pickup", suv = "suv", jetski = "jetski" }
+	{ car = "patrol_car", cart = "cart", pickup = "pickup", suv = "suv", jetski = "jetski", ambulance = "ambulance" }
 Placeholder.BIKE_SCALE = 0.88 -- the adult bicycle (5 studs long) shrunk into the bike's 4.5-stud box
 
 -- A seated R15 at scale 1 in the sit clip, from the top of what it sits on (studs; approximate, not measured in the
@@ -111,6 +111,7 @@ local DRIVERS: { [string]: Driver } = {
 	car = { under = "Roof", left = 0.22, front = 0.8 }, -- VehiclePuppet's driver's side (local -X)
 	pickup = { under = "Roof", left = 0.22, front = 0.8 },
 	suv = { under = "Roof", left = 0.22, front = 0.8 },
+	ambulance = { under = "Roof", left = 0.22, front = 0.8 }, -- (D30: the doctor's)
 }
 
 -- A drawn vehicle's driver: the top centre of the Seat and the eye over it, in the root's frame (Roblox axes, -Z front).
@@ -166,9 +167,24 @@ function Placeholder.look(kindId: string, name: string?): PartBuilder.ModelSpec?
 		if drawn == nil then
 			return nil
 		end
-		-- the patrol car keeps the traffic's white and its bar; the rest wear their VehicleKinds colour
-		local color = if kindId == "car" then nil else toHex(k.color)
+		-- the patrol car and the ambulance keep the traffic's paint and their bars; the rest wear their VehicleKinds colour
+		local color = if kindId == "car" or kindId == "ambulance" then nil else toHex(k.color)
 		spec = VehiclePuppet.spec(drawn, { color = color, name = name, box = box })
+		if kindId == "ambulance" then
+			-- the van's mirror bar spans the cab at a seated driver's chin, an arm's length ahead: in first person it was a
+			-- grey band across the view (the cockpit hides only the parts round the eye). The doctor's goes without it.
+			for i = #spec.parts, 1, -1 do
+				if spec.parts[i].name == "Mirrors" then
+					table.remove(spec.parts, i)
+				end
+			end
+			for i = #(spec.joints or {}), 1, -1 do
+				local j = (spec.joints :: { PartBuilder.JointSpec })[i]
+				if j.part1 == "Mirrors" then
+					table.remove(spec.joints :: { PartBuilder.JointSpec }, i)
+				end
+			end
+		end
 	end
 	spec.attachments = {}
 	bigShadows(spec, kindId)
