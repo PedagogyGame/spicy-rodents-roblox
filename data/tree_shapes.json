@@ -105,7 +105,7 @@
       "why": "Sycamore Park, between the playground and the gazebo: nine boughs from one point 28 studs up; made bigger",
       "big": true,
       "boughs": [
-        { "tier": "low", "at": 7.5, "bearing": 180, "reach": 33, "rise": 1.5, "arch": 4.5, "curl": 10 },
+        { "tier": "low", "at": 7.5, "bearing": 180, "reach": 34, "rise": 1.5, "arch": 4.5, "curl": 10 },
         { "tier": "low", "at": 10, "bearing": 20, "reach": 19, "rise": 1.5, "arch": 3, "curl": -12 },
         { "tier": "mid", "at": 15, "bearing": 240, "reach": 20, "rise": 6, "arch": 2.5, "curl": 8 },
         { "tier": "mid", "at": 19, "bearing": 95, "reach": 19, "rise": 7, "arch": 2.5, "curl": -8 },
