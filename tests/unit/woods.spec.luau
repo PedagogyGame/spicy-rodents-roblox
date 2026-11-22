@@ -147,6 +147,8 @@ return function(t)
 				t.near(foot.y - Height.at(foot.x, foot.z), TreeShapes.WOODS.footLift, 0.05)
 				local samples = reg:samples(trunk)
 				for _, id in tree.routes do
+					-- (clear of the lamp posts' 20001- and the branch nooks' 30001-)
+					t.truthy(id >= 10001 and id < 20000, `woods route id {id}`)
 					local r = reg:get(id) :: Registry.Route
 					if r.kind == "branch" then
 						boughs += 1

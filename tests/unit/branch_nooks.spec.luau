@@ -84,6 +84,10 @@ return function(t)
 					table.insert(recs, r)
 				end
 			end
+			-- (and the D34/D35 woods and climbs, TreeShapes' compact `woods` as Shared/Data expands it)
+			for _, r in d:woods().routes do
+				table.insert(recs, r)
+			end
 			local clear = TreeClear.new(d)
 			local again = BranchNooks.plan(
 				Registry.fromRecords(recs) :: any,
@@ -377,10 +381,19 @@ return function(t)
 		local wall, down, cover = BakedWorld.validatorRays(town)
 		local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
 		local link = { latency = 0.3, jitter = 0.15, loss = 0.02 }
-		local every = math.max(1, math.floor(#nooks.places / 30))
+		-- (inside the v5.4 rectangle, the motor's default clamp, which this rig's worlds and the server's validator world
+		-- use: the D34 woods out at the edges are judged nowhere else yet)
+		local places: { any } = {}
+		for _, p in nooks.places do
+			local a = p.at
+			if a[1] > -1465 and a[1] < 2865 and a[3] > -1400 and a[3] < 1090 then
+				table.insert(places, p)
+			end
+		end
+		local every = math.max(1, math.floor(#places / 30))
 		local runs, drops = 0, 0
-		for k = 1, #nooks.places, every do
-			local p = nooks.places[k]
+		for k = 1, #places, every do
+			local p = places[k]
 			local r = reg:get(p.route) :: Registry.Route
 			local bough = reg:get(p.parent) :: Registry.Route
 			-- in with E, W out, S back, E onto the bough

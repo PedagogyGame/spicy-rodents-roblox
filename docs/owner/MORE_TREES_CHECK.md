@@ -24,9 +24,9 @@ olive, the three giants dark green; a red ring marks a tree that has been given 
 
 | Kind | How many | Height (studs) | Climbing |
 |---|---|---|---|
-| KING OAK (giant) | 1 | see below | trunk to 150 studs, ten big limbs from 14 to 138 studs up |
-| GREAT ELM (giant) | 1 | see below | trunk to 170 studs, nine limbs rising like a vase |
-| OLD BEECH (giant) | 1 | see below | trunk to 148 studs, nine wide spreading limbs, the lowest 12 up |
+| KING OAK (giant) | 1 | 249 | trunk to 150 studs, ten big limbs from 14 to 138 studs up |
+| GREAT ELM (giant) | 1 | 255 | trunk to 170 studs, nine limbs rising like a vase |
+| OLD BEECH (giant) | 1 | 244 | trunk to 148 studs, nine wide spreading limbs, the lowest 12 up |
 | WHITE PINE | 54 | about 96 | the trunk to near the top; six branches as ladder rungs, every 12 studs |
 | NORWAY SPRUCE | 45 | about 78 | five drooping rungs |
 | BALSAM FIR | 18 | about 58 | four short rungs on a narrow spire |
@@ -39,7 +39,7 @@ olive, the three giants dark green; a red ring marks a tree that has been given 
 | PIN OAK (acorns) | 17 | about 74 | four limbs |
 
 The three **giants** stand alone, each in open ground: the KING OAK west of the old town, the GREAT ELM south-west
-toward Lookout Hill, the OLD BEECH in the north meadow. They are about 1.3 to 1.4 times the HIGHLAND ELM, the tallest tree
+toward Lookout Hill, the OLD BEECH in the north meadow. They are about 1.4 times the HIGHLAND ELM, the tallest tree
 until now (175 studs).
 
 **Where the woods grow:** in the town's parks, yards and verges (90 trees, spread out); copses along the west and south
@@ -74,10 +74,13 @@ of its frames.
 - **Parts:** the town bake is unchanged (26,367 of its 27,000). The woods are not in the bake: the server stands them at
   start-up, 3 parts a tree (the bark, the leaves and an invisible trunk that stops you walking through it): 885 parts.
   Each tree streams in and out as a whole.
-- **Triangles:** see the table in the next section. The same 13 meshes are used over and over, which the engine draws
-  cheaply; far trees are dropped by streaming and simplified by the engine's level of detail.
-- **Climbing routes are data, not parts:** 1,693 more routes (3,172 in all, was 1,479). The squirrel's route world builds
-  in about 1.4 s instead of 0.8 s (off the start-up path).
+- **Triangles per model:** pines 3,700 to 5,100, nut trees 5,000 (the hazel 1,900), giants about 15,200 each (they
+  stand once). All 295 woods trees together are about 1.38 million triangles, against 1.32 million for the town's 95
+  route trees; at most a part of them is near you at once (streaming drops what is far, and the engine simplifies far
+  meshes), and the same 13 meshes repeat, which the engine draws cheaply.
+- **Climbing routes are data, not parts:** the woods add 1,693 routes (344 trunks, 1,349 branches), and the branch
+  nooks (stashes, hangouts) now grow on the woods too: about 1,100 more nook routes. The squirrel's route world builds
+  in about 2 s instead of about 1 s, once, off the start-up path.
 
 ## What to look at in Studio (after the upload)
 
@@ -97,3 +100,11 @@ of its frames.
    so it is not climbable. (Default: leave it as backdrop.)
 4. **The town's squirrels** (computer-run) climb the new trees but cross roads only from the town's original trees, so
    road crossings stay as careful as you asked in D21. (Default: as is.)
+
+## Pictures
+
+- `docs/renders/trees/woods_lineup.jpg`: every new kind side by side, the giants at the back, and a red pole as tall as
+  the HIGHLAND ELM (175 studs) for scale.
+- `docs/renders/trees/woods_giants.jpg`, `woods_pines.jpg`, `woods_nut_trees.jpg`: each kind from the street, and close
+  on a low branch or rung with an orange squirrel-sized marker standing where the squirrel's feet go.
+- `docs/renders/trees/cover_before.jpg`, `cover_after.jpg`: the whole map from above.
