@@ -5,7 +5,7 @@
 -- height so a roof overhead never counts (the pure World/Ground answer is the fallback where nothing
 -- is hit, e.g. before the town streams in); walls from a small overlap query that respects
 -- CanCollide; water from World/Height's river; the rail world (Movement/RailWorld) built once, in
--- the background, from Shared.Generated.
+-- the background, from Shared.Generated, a frame given back every RailWorld.BUDGET of work.
 -- The ground is what the player SEES as ground (squirrel motor work, 2026-11-09): the baked town lays thin
 -- non-colliding plates over the terrain (lot ground, banks, court tiles, pads, a few road segments), up to
 -- 0.3 st above the colliding surface. A second ray, limited to Town.Lots and Town.Roads, finds the topmost
@@ -292,9 +292,19 @@ function ClientWorld.get(): ClientWorld
 	local withCars = Solid.squirrelWorld(self, self.cars)
 	self.groundAt, self.blocked, self.blockedCore, self.blockedHalf, self.wallsFrom =
 		withCars.groundAt, withCars.blocked, withCars.blockedCore, withCars.blockedHalf, withCars.wallsFrom
-	task.spawn(function()
+	-- The rail world: 5,103 routes, about 2 s of work in Lune and several on a phone (2026-11-22). Deferred, so get()
+	-- returns at once, and built in steps of RailWorld.BUDGET with a frame given back between them, so the loading
+	-- screen (UI/PlayMenu.loading, waiting on railReady) keeps drawing; published whole, only once it is complete
+	-- (until then rail() is nil and the squirrel runs on RailWorld.empty(), Controllers/Squirrel).
+	task.defer(function()
 		local ok, result = pcall(function()
-			return RailWorld.get(Data.default(), Height.at)
+			return RailWorld.get(
+				Data.default(),
+				Height.at,
+				RailWorld.yielder(RailWorld.BUDGET, function()
+					task.wait()
+				end)
+			)
 		end)
 		if ok then
 			rail = result

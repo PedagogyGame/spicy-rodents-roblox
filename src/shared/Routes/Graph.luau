@@ -14,6 +14,8 @@
 --   trunk and by branch.
 -- Built once from a Registry and a SpatialIndex; pure, unit-agnostic (constants scale with
 -- studsPerUnit). Matches data/harvest/graph.json exactly (tests/unit/routes_graph.spec.luau).
+-- build's `opts.yield` (Registry.Yield), when given, is called between small steps of the build (the client's
+-- background rail build gives frames back, Movement/RailWorld); the graph is the same without it.
 
 local Registry = require("./Registry")
 local SpatialIndex = require("./SpatialIndex")
@@ -53,6 +55,8 @@ export type ForkRecord = {
 export type Options = {
 	forks: { ForkRecord }?,
 	studsPerUnit: number?,
+	-- called often while building (Registry.Yield: the client's background build gives frames back, Movement/RailWorld)
+	yield: Registry.Yield?,
 }
 
 export type Graph = typeof(setmetatable(
@@ -91,18 +95,37 @@ local function union(parent: { number }, a: number, b: number)
 	end
 end
 
+-- The fine hash's cell key: the three cell coordinates packed into one number, as SpatialIndex does (2026-11-22: the
+-- string key it had built 27 strings per sample, 5 million for the 5,103 routes, most of the build's time and garbage).
+-- 8192 cells per axis (wrapped) is 35,000 studs at the 4.25-stud cell; a cell further off shares a key with another, which
+-- only adds candidates the distance test then refuses, so the links are the same either way.
+local AXIS = 8192
+local function fineKey(ix: number, iy: number, iz: number): number
+	return (ix % AXIS) + (iy % AXIS) * AXIS + (iz % AXIS) * AXIS * AXIS
+end
+
 -- Transfer adjacency (any sample pair within link) with a temporary fine hash of cell = link, as
 -- tools/harvest/src/analyze.js does; returns adjacency sets and the union-find parents.
 local function buildTransfers(
 	registry: Registry.Registry,
-	link: number
+	link: number,
+	yield: Registry.Yield?
 ): ({ [number]: { [number]: boolean } }, { number }, { Registry.Route })
 	local routes = registry:all()
-	local ids: { number } = {}
-	local xs: { number } = {}
-	local ys: { number } = {}
-	local zs: { number } = {}
-	local cells: { [string]: { number } } = {}
+	-- sized up front, one array a step: grown by doubling, the four arrays of 184,586 samples were copied in one long
+	-- step (7 ms in Lune)
+	local total = 0
+	for _, route in routes do
+		total += #registry:samples(route)
+	end
+	local function sized(): { number }
+		if yield then
+			yield()
+		end
+		return table.create(total)
+	end
+	local ids, xs, ys, zs = sized(), sized(), sized(), sized()
+	local cells: { [number]: { number } } = {}
 	local n = 0
 	for _, route in routes do
 		for _, p in registry:samples(route) do
@@ -111,13 +134,16 @@ local function buildTransfers(
 			xs[n] = p.x
 			ys[n] = p.y
 			zs[n] = p.z
-			local key = `{math.floor(p.x / link)},{math.floor(p.y / link)},{math.floor(p.z / link)}`
+			local key = fineKey(math.floor(p.x / link), math.floor(p.y / link), math.floor(p.z / link))
 			local cell = cells[key]
 			if not cell then
 				cell = {}
 				cells[key] = cell
 			end
 			table.insert(cell, n)
+		end
+		if yield then
+			yield()
 		end
 	end
 
@@ -130,13 +156,17 @@ local function buildTransfers(
 	-- Every route id must be a union-find node even when there are gaps in the id sequence.
 	local link2 = link * link
 	for e = 1, n do
+		-- a sample's neighbourhood is a few microseconds: yield every 64 (a clock read on each would cost more)
+		if yield and e % 64 == 0 then
+			yield()
+		end
 		local id, x, y, z = ids[e], xs[e], ys[e], zs[e]
 		local cx, cy, cz = math.floor(x / link), math.floor(y / link), math.floor(z / link)
 		local adj = adjacent[id]
 		for i = -1, 1 do
 			for j = -1, 1 do
 				for k = -1, 1 do
-					local cell = cells[`{cx + i},{cy + j},{cz + k}`]
+					local cell = cells[fineKey(cx + i, cy + j, cz + k)]
 					if cell then
 						for _, f in cell do
 							local other = ids[f]
@@ -163,7 +193,8 @@ function Graph.build(registry: Registry.Registry, index: SpatialIndex.SpatialInd
 	local link = Graph.LINK_UNITS * studsPerUnit
 	local endGap = Graph.END_GAP_UNITS * studsPerUnit
 
-	local adjacent, parent, routes = buildTransfers(registry, link)
+	local yield = options.yield
+	local adjacent, parent, routes = buildTransfers(registry, link, yield)
 
 	-- Islands: groups sorted by size desc, then by first id (harvest order).
 	local groups: { [number]: { number } } = {}
@@ -192,6 +223,9 @@ function Graph.build(registry: Registry.Registry, index: SpatialIndex.SpatialInd
 		for _, id in island do
 			islandOf[id] = i
 		end
+	end
+	if yield then
+		yield()
 	end
 
 	-- End links (switchRoute candidates).
@@ -245,6 +279,9 @@ function Graph.build(registry: Registry.Registry, index: SpatialIndex.SpatialInd
 			end
 		end
 		endLinks[route.id] = perEnd
+		if yield then
+			yield()
+		end
 	end
 
 	-- Forks from the compiled canopyForks (sorted by height, as in the game).
@@ -270,6 +307,9 @@ function Graph.build(registry: Registry.Registry, index: SpatialIndex.SpatialInd
 				return a.height < b.height
 			end)
 			forksByTrunk[rec.trunk] = list
+			if yield then
+				yield()
+			end
 		end
 	end
 

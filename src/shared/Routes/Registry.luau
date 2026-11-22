@@ -1,7 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Routes.Registry
 -- Registry of harvested plus template routes.
--- Interface (BUILD_PLAN D8): get(id), all()
+-- Interface (BUILD_PLAN D8): get(id), all(); loadAll(yield?) (all(), giving frames back: Movement/RailWorld)
 --
 -- Routes come from the compiled chunks `Shared.Generated.Routes_01..04` (tools/compile over
 -- data/harvest/routes.json; studs). Chunks load lazily: requiring this module loads nothing, `get(id)`
@@ -14,6 +14,9 @@
 --
 -- Name-based behaviour (routes_movement §4) becomes explicit flags here (`Registry.deriveFlags`); the
 -- compiler will emit them as route attributes in W1 (D8), at which point the record's own flags win.
+-- loadAll(yield?) loads every chunk like all(), calling `yield` (a Yield: Movement/RailWorld.yielder) between records
+-- and handing it to each chunk's loader, so the client's background build gives frames back; a chunk joins the
+-- registry in one stretch, so a reader in between sees whole chunks only.
 -- Pure: no engine calls except inside `fromGenerated`, which is the engine-side constructor.
 
 local Curve = require("./Curve")
@@ -82,7 +85,11 @@ export type Route = {
 	_samples: { Vec3 }?,
 }
 
-export type Loader = () -> { RouteRecord }
+-- Called often during a long build; it gives the frame back when the build has worked long enough (a no-op is fine).
+export type Yield = () -> ()
+
+-- One chunk's records; a loader that expands its records itself may call `yield` while it does (Shared/Data's woods).
+export type Loader = (yield: Yield?) -> { RouteRecord }
 
 export type Options = {
 	loaders: { Loader }, -- one per chunk, in id order (Routes_01, Routes_02, ...)
@@ -222,14 +229,26 @@ function Registry.fromGenerated(generatedFolder: Instance): Registry
 	return Registry.new({ loaders = loaders, studsPerUnit = index.studsPerUnit })
 end
 
-function Registry._loadNext(self: Registry): boolean
-	if self._loaded >= #self._loaders then
+function Registry._loadNext(self: Registry, yield: Yield?): boolean
+	local at = self._loaded + 1
+	if at > #self._loaders then
 		return false
 	end
-	self._loaded += 1
-	local records = self._loaders[self._loaded]()
-	for _, rec in records do
-		local route = toRoute(rec, self._studsPerUnit)
+	local records = self._loaders[at](yield)
+	local routes = table.create(#records)
+	for i, rec in records do
+		routes[i] = toRoute(rec, self._studsPerUnit)
+		if yield then
+			yield()
+		end
+	end
+	-- Joined in one stretch, after any yield: a reader in between never sees half a chunk, and when a get() or all()
+	-- loaded this chunk while this load was yielding, theirs stands and this copy is dropped.
+	if self._loaded >= at then
+		return true
+	end
+	self._loaded = at
+	for _, route in routes do
 		if self._transform then
 			self._transform(route)
 		end
@@ -256,6 +275,16 @@ function Registry.all(self: Registry): { Route }
 	local more = true
 	while more do
 		more = self:_loadNext()
+	end
+	return self._all
+end
+
+-- loadAll(yield?): all(), giving the frame back through `yield` while it loads (Movement/RailWorld's client build).
+function Registry.loadAll(self: Registry, yield: Yield?): { Route }
+	while self:_loadNext(yield) do
+		if yield then
+			yield()
+		end
 	end
 	return self._all
 end
