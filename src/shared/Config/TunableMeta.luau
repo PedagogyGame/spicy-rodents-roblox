@@ -21,6 +21,9 @@ TunableMeta.RANGES = {
 	["rodent.maxHealth"] = { 1, 1000 },
 	["alert.kickMult"] = { 1, 1.82 }, -- D33: must stay below 1.82
 	["ai.budgetMs"] = { 0.5, 16 },
+	["idle.anyone"] = { 120, 1140 }, -- (under Roblox's own 20-minute idle kick, so ours comes first)
+	["idle.spicyRodent"] = { 120, 1140 },
+	["idle.warn"] = { 10, 110 }, -- (less than the shortest limit)
 } :: { [string]: { number } }
 
 function TunableMeta.isLength(unit: string?): boolean

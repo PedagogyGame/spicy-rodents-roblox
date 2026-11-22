@@ -30,7 +30,8 @@
 --   string (BITE VICTIM over the patient, then HOSPITAL over the doors once they are aboard). The call takes the marker
 --   from the sick player's HOSPITAL while there is one.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
---   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
+--   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?), untoast(text) (hides the toast if it
+--   still shows `text`: the idle notice, cleared by any input) }.
 -- No side effects on require.
 
 export type Choice = { id: string, title: string, line: string, color: { number } }
@@ -43,6 +44,7 @@ export type Menu = {
 	setDevice: (device: string?) -> (),
 	banner: (title: string, line: string, seconds: number?) -> (),
 	toast: (text: string, seconds: number?) -> (),
+	untoast: (text: string) -> (),
 }
 
 local PlayMenu = {}
@@ -889,6 +891,12 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 					toast.Visible = false
 				end
 			end)
+		end,
+		untoast = function(t: string)
+			if toast.Visible and toast.Text == t then
+				toastToken += 1
+				toast.Visible = false
+			end
 		end,
 	}
 	refresh()

@@ -8,7 +8,8 @@
 -- Interface: new(transport, opts?) -> Net; Net:on(name, fn(player, payload)); Net:receive(player, name,
 --            payload, now?) -> (ok, reason?) (transport inbound hook); Net:fire(player, name, payload);
 --            Net:fireAll(name, payload); Net:fireNear(x, z, radius, name, payload); Net:stream(player?,
---            name, records) (buffer remotes); Net:stats()
+--            name, records) (buffer remotes); Net:stats(); Net.heard (optional: fn(player, name) after every
+--            accepted inbound packet)
 
 local Log = require("../Util/Log")
 local Schema = require("../Util/Schema")
@@ -31,6 +32,8 @@ export type Net = {
 	buckets: { [any]: { [string]: { tokens: number, at: number } } },
 	log: Log.Logger,
 	_stats: Stats,
+	-- called after each accepted inbound packet, before its handler (Boot/Game: the idle kick's evidence of input)
+	heard: ((player: any, name: string) -> ())?,
 	on: (self: Net, name: string, fn: (player: any, payload: any) -> ()) -> (),
 	receive: (self: Net, player: any, name: string, payload: any, now: number?) -> (boolean, string?),
 	fire: (self: Net, player: any, name: string, payload: any) -> (),
@@ -132,6 +135,9 @@ function Net.new(transport: Transport, opts: { clock: (() -> number)? }?): Net
 			end
 		end
 		self._stats.received += 1
+		if self.heard then
+			pcall(self.heard, player, name)
+		end
 		local handler = self.handlers[name]
 		if handler then
 			local ok, err = pcall(handler :: any, player, value)

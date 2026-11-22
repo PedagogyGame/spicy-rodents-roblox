@@ -24,7 +24,8 @@
 --   stored (taken from the n carried); visit(c, who, day); withdraw(c, who, n) -> taken; update(c, day, capacity,
 --   ownAt, visitDays, decayPerDay, margin) -> changed (decay and lapse up to `day`); owned(c) -> owner?;
 --   heldBy(claims, who) -> key? (the tree `who` holds, keyed as in `claims`); carry(carried, n, max) -> (carried,
---   taken). `day` is fractional game days. No side effects on require.
+--   taken); release(c, who) -> boolean (the owner gone: true when it held this tree). `day` is fractional game days.
+--   No side effects on require.
 
 local HollowClaim = {}
 
@@ -118,6 +119,20 @@ function HollowClaim.withdraw(c: Claim, who: Who, n: number): number
 	local taken = math.max(0, math.min(n, c.stored))
 	c.stored -= taken
 	return taken
+end
+
+-- release: squirrel `who` has left the server (owner D37: "if you leave the server, you lose your stash, and place"):
+-- the tree it holds is freed and the nuts it stored there go with it; what it brought towards a claim elsewhere no
+-- longer counts (the nuts stay in that tree). True when `who` held this tree
+function HollowClaim.release(c: Claim, who: Who): boolean
+	c.brought[who] = nil
+	if c.owner ~= who then
+		return false
+	end
+	c.owner, c.lastVisit, c.since = nil, nil, nil
+	c.stored = 0
+	table.clear(c.brought)
+	return true
 end
 
 -- update: the decay since the last update and the claim's lapse, as of `day`; true when the owner changed
