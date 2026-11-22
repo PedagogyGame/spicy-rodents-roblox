@@ -17,13 +17,15 @@
   },
   "$defs": {
     "inside": { "type": "object", "required": ["trunk", "hole"], "additionalProperties": false,
-      "description": "Studs about the harvested trunk (Shared/World/HollowLayout): the trunk route, the ground hole's bearing (degrees clockwise from +z), and per variant: shaft/escape wall + knot (bough route ids: the top exit and the part-way knothole) and hideout (height); spiral radius, pitch, top (heights) and landings.",
+      "description": "Studs about the harvested trunk (Shared/World/HollowLayout): the trunk route, the ground hole's bearing (degrees clockwise from +z), and per variant: shaft/escape wall + knot (bough route ids: the top exit and the part-way knothole) and hideout (height); spiral (the winding climb) radius (the nearest the axis its lane comes), wander (how far in from the wall it swings), pitch (studs a turn on average), top, landings (chambers), ledges (how many more without one), crossings (where a root crosses the hollow and the climb turns back) and holes (knotholes onto branches), all heights.",
       "properties": {
         "trunk": { "type": "integer" }, "hole": { "type": "number", "minimum": 0, "maximum": 360 },
         "wall": { "type": "integer" }, "knot": { "type": "integer" }, "hideout": { "type": "number", "exclusiveMinimum": 0 },
         "hideoutBearing": { "type": "number" },
         "radius": { "type": "number", "exclusiveMinimum": 0 }, "pitch": { "type": "number", "exclusiveMinimum": 2.4 },
-        "top": { "type": "number", "exclusiveMinimum": 0 }, "landings": { "type": "array", "items": { "type": "number" } } } },
+        "top": { "type": "number", "exclusiveMinimum": 0 }, "landings": { "type": "array", "items": { "type": "number" } },
+        "wander": { "type": "number", "minimum": 0 }, "ledges": { "type": "integer", "minimum": 0 },
+        "crossings": { "type": "array", "items": { "type": "number" } }, "holes": { "type": "array", "items": { "type": "number" } } } },
     "hollow": { "type": "object", "required": ["id", "tier", "variant", "tree", "x", "z", "chambers", "knotholes", "claimable", "inside", "src"], "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "pattern": "^H\\d+$" }, "tier": { "enum": ["premium", "escape", "single"] },

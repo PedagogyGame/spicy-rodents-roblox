@@ -3,15 +3,18 @@
 -- The hollow trees' insides and the fallen log as parts (Shared/World/HollowLayout: each hollow's `parts`, the one
 -- place their geometry is worked out). The trees are the baked Blender meshes; their bark hides everything here
 -- from outside, and its faces are not drawn from within, so the inside of a cavity is lined: rings of boards round
--- its wall, a floor and a roof, the spiral's treads and heartwood post, the shaft's hideout shelf; the dark oval of
--- each knothole sits on the bark outside; the log is boards round its run and a floor. Built at boot by
+-- its wall (each board a shade of its own, so the wall reads as bark), knots (burls) bulging from it, a floor and a
+-- roof, the winding climb's ledges and the gnarled roots across, the shaft's hideout shelf; the dark oval of each
+-- knothole sits on the bark outside, and under a hole up a trunk the short branch its hop lands on (a perch); the log
+-- is boards round its run and a floor. Built at boot by
 -- Foraging/HollowService (no bake: a few hundred plain parts), and by the specs (the same parts the motor is held to).
 -- Nothing in a tree collides or casts a shadow (the squirrel runs these on its rails; the bark collides already);
 -- the log's boards collide (they are the log), and so does an invisible threshold disc just inside each of its ends
 -- (a body walking in off the run is stopped there; the run itself rides past it); a knothole is not queried (sight
 -- and the camera look through it). A dim warm light in each floor's chamber and at each chamber above it, its range
 -- no more than the bark's radius round it (rangeIn), so it lights the inside and never the lawn or a wall outside
--- (no shadows: the bark would not stop it).
+-- (no shadows: the bark would not stop it). Daylight comes in at each hole up a trunk: a dim cool light just inside
+-- it, held to the bark the same way (owner D32: the inside "lit dimly through holes").
 --   rangeIn(hollow, x, y, z) -> studs (pure)
 -- Interface: build(env, layout, parent?) -> (Folder, Report). `env` is anything with Instance, CFrame, Vector3,
 --   Color3 and Enum as the engine has them (the engine's globals, or @lune/roblox in the specs).
@@ -27,6 +30,9 @@ HollowShell.LOOK = {
 	tread = { color = { 132, 100, 68 }, material = "Wood" },
 	post = { color = { 98, 72, 48 }, material = "Wood" },
 	shelf = { color = { 132, 100, 68 }, material = "Wood" },
+	burl = { color = { 92, 66, 44 }, material = "Wood" },
+	root = { color = { 84, 62, 42 }, material = "Wood" },
+	perch = { color = { 96, 74, 56 }, material = "Wood" },
 	knothole = { color = { 30, 22, 16 }, material = "SmoothPlastic" },
 	log = { color = { 104, 80, 58 }, material = "Wood" },
 	threshold = { color = { 104, 80, 58 }, material = "SmoothPlastic" }, -- (never drawn)
@@ -34,6 +40,11 @@ HollowShell.LOOK = {
 -- (range: the most a light reaches; brightness: at that range. A light held to a shorter range is brighter in
 -- proportion, up to maxBrightness, so its chamber's walls read about as lit: the engine's falloff ends at the range)
 HollowShell.LIGHT = { range = 9, brightness = 0.45, maxBrightness = 2, color = { 255, 196, 140 } }
+-- the daylight in at a hole up a trunk: cool, dimmer, `inset` studs in from the hole's point toward the cavity's
+-- middle line and `lift` up (the head)
+HollowShell.HOLE_LIGHT = { brightness = 0.3, color = { 200, 214, 235 }, inset = 1.2, lift = 1.0, minRange = 1.0 }
+-- how far a tone (Shared/World/HollowLayout: a piece's -1..1 shade) moves its role's colour, either way
+HollowShell.TONE = 0.16
 -- (Shared/World/HollowLayout.C: room, a chamber higher than this over the floor gets a light; wall, the bark kept
 -- round a cavity)
 local C = { room = 2.8, wall = 0.45 }
@@ -53,14 +64,21 @@ function HollowShell.rangeIn(h: any, x: number, y: number, z: number): number
 	return math.min(HollowShell.LIGHT.range, r)
 end
 
-local function light(env: any, parent: any, range: number)
+local function light(env: any, parent: any, range: number, kind: any?)
 	local l = env.Instance.new("PointLight")
 	local L = HollowShell.LIGHT
+	local k = kind or L
 	l.Range = range
-	l.Brightness = math.min(L.maxBrightness, L.brightness * L.range / math.max(range, 0.5))
-	l.Color = env.Color3.fromRGB(HollowShell.LIGHT.color[1], HollowShell.LIGHT.color[2], HollowShell.LIGHT.color[3])
+	l.Brightness = math.min(L.maxBrightness, k.brightness * L.range / math.max(range, 0.5))
+	l.Color = env.Color3.fromRGB(k.color[1], k.color[2], k.color[3])
 	l.Shadows = false
 	l.Parent = parent
+end
+
+-- a role's colour with a piece's tone (-1 darker .. 1 lighter), RGB 0-255
+function HollowShell.shade(color: { number }, tone: number?): (number, number, number)
+	local k = 1 + HollowShell.TONE * math.clamp(tone or 0, -1, 1)
+	return math.clamp(color[1] * k, 0, 255), math.clamp(color[2] * k, 0, 255), math.clamp(color[3] * k, 0, 255)
 end
 
 export type Report = { parts: number, lights: number, per: { [string]: number } }
@@ -79,7 +97,10 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 			local look = HollowShell.LOOK[pc.role] or HollowShell.LOOK.liner
 			local p = Instance.new("Part")
 			p.Name = `{pc.role}{i}`
-			p.Shape = if pc.shape == "Cylinder" then Enum.PartType.Cylinder else Enum.PartType.Block
+			p.Shape = if pc.shape == "Cylinder"
+				then Enum.PartType.Cylinder
+				elseif pc.shape == "Ball" then Enum.PartType.Ball
+				else Enum.PartType.Block
 			p.Size = Vector3.new(pc.size[1], pc.size[2], pc.size[3])
 			p.CFrame = CFrame.fromMatrix(
 				Vector3.new(pc.p[1], pc.p[2], pc.p[3]),
@@ -94,7 +115,7 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 			p.CanQuery = pc.role ~= "knothole"
 			p.CastShadow = false
 			p.Material = (Enum.Material :: any)[look.material]
-			p.Color = Color3.fromRGB(look.color[1], look.color[2], look.color[3])
+			p.Color = Color3.fromRGB(HollowShell.shade(look.color, pc.tone))
 			p.TopSurface = Enum.SurfaceType.Smooth
 			p.BottomSurface = Enum.SurfaceType.Smooth
 			if pc.role == "floor" and h.variant ~= "log" then
@@ -139,6 +160,26 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 				a.Parent = anchor
 				light(env, a, HollowShell.rangeIn(h, at.X, at.Y, at.Z))
 				report.lights += 1
+			end
+		end
+		-- daylight in at each hole up the trunk (not the ground hole: that is the floor's), just inside it at a head's
+		-- height
+		for _, m in h.mouths do
+			if anchor and m.opens ~= "ground" and h.variant ~= "log" then
+				-- (in from the hole toward the cavity's middle line, never past it)
+				local L = HollowShell.HOLE_LIGHT
+				local dx, dz = mid.x - m.x, mid.z - m.z
+				local k = math.min(1, L.inset / math.max(1e-6, math.sqrt(dx * dx + dz * dz)))
+				local at = Vector3.new(m.x + dx * k, m.y + L.lift, m.z + dz * k)
+				local range = HollowShell.rangeIn(h, at.X, at.Y, at.Z)
+				if range >= L.minRange then
+					local a = Instance.new("Attachment")
+					a.Name = `daylight_{m.name}`
+					a.CFrame = anchor.CFrame:Inverse() * CFrame.new(at)
+					a.Parent = anchor
+					light(env, a, range, L)
+					report.lights += 1
+				end
 			end
 		end
 		report.per[h.id] = n
