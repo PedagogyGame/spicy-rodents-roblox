@@ -35,7 +35,7 @@ export type Data = {
 	roads: (self: Data) -> { any },
 	cast: (self: Data) -> { any },
 	forks: (self: Data) -> { any },
-	woods: (self: Data) -> { routes: { any }, forks: { any }, trees: { any } },
+	woods: (self: Data, yield: Registry.Yield?) -> { routes: { any }, forks: { any }, trees: { any } },
 	wildlife: (self: Data) -> any,
 	nav: (self: Data) -> any,
 	colliders: (self: Data) -> { any },
@@ -178,8 +178,9 @@ function Data.new(loader: Loader): Data
 					return if s and s.routes then s.routes else {}
 				end)
 				-- and the D34/D35 woods and climbs (every other tree climbable), expanded from their compact form, 10001-
-				table.insert(loaders, function()
-					return (data.woods(self)).routes
+				-- (the longest chunk to load: the client's background build hands its yield on, Movement/RailWorld)
+				table.insert(loaders, function(yield: Registry.Yield?)
+					return (data.woods(self, yield)).routes
 				end)
 			end
 			-- the D35 lamp-post climbs (data/lamp_posts.json, Shared/World/LampPosts): a climb per post, an arm where it has one
@@ -239,8 +240,9 @@ function Data.new(loader: Loader): Data
 		return merged
 	end
 	-- the D34/D35 woods and climbs (generated/TreeShapes `woods`, Shared/World/TreeShapes.expandWoods), expanded once:
-	-- { routes, forks, trees } (empty when the compiled data has none)
-	function data.woods(self: Data): { routes: { any }, forks: { any }, trees: { any } }
+	-- { routes, forks, trees } (empty when the compiled data has none); `yield` (Routes/Registry.Yield) is called between
+	-- trees while it expands
+	function data.woods(self: Data, yield: Registry.Yield?): { routes: { any }, forks: { any }, trees: { any } }
 		local cached = self._cache["woods:expanded"]
 		if cached ~= nil then
 			return cached
@@ -248,7 +250,7 @@ function Data.new(loader: Loader): Data
 		local out = { routes = {}, forks = {}, trees = {} }
 		local s = if self:index().modules.TreeShapes then loadName(self, "TreeShapes") else nil
 		if s and s.woods then
-			local routes, forks, trees = TreeShapes.expandWoods(s.woods)
+			local routes, forks, trees = TreeShapes.expandWoods(s.woods, yield)
 			out = { routes = routes, forks = forks :: { any }, trees = trees :: { any } }
 		end
 		self._cache["woods:expanded"] = out

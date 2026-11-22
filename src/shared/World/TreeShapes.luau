@@ -466,8 +466,9 @@ export type WoodsTreeOut = {
 }
 
 -- expandWoods(woods) -> routes, forks, trees: every woods tree and climb as route records (world studs), their
--- canopy forks (one record per trunk) and a list of the trees (trunk id, kind or "climb", label, route ids).
-function TreeShapes.expandWoods(woods: Woods): ({ any }, { ForkRecord }, { WoodsTreeOut })
+-- canopy forks (one record per trunk) and a list of the trees (trunk id, kind or "climb", label, route ids). `yield`,
+-- when given, is called after each tree (the client's background rail build: Movement/RailWorld.yielder).
+function TreeShapes.expandWoods(woods: Woods, yield: (() -> ())?): ({ any }, { ForkRecord }, { WoodsTreeOut })
 	local W = TreeShapes.WOODS
 	local routes, forks, trees = {}, {}, {}
 	local templates: { [string]: Template } = {}
@@ -491,6 +492,9 @@ function TreeShapes.expandWoods(woods: Woods): ({ any }, { ForkRecord }, { Woods
 			trees,
 			{ trunk = first, kind = t.kind, label = kind.label, routes = ids, index = i, climb = false }
 		)
+		if yield then
+			yield()
+		end
 	end
 	for j, cl in woods.climbs do
 		local first = woods.climbBase + (j - 1) * W.stride
@@ -505,6 +509,9 @@ function TreeShapes.expandWoods(woods: Woods): ({ any }, { ForkRecord }, { Woods
 			table.insert(forks, fr)
 		end
 		table.insert(trees, { trunk = first, kind = "climb", label = cl.label, routes = ids, index = j, climb = true })
+		if yield then
+			yield()
+		end
 	end
 	return routes, forks, trees
 end

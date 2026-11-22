@@ -50,11 +50,15 @@ function SpatialIndex.new(cellSize: number?): SpatialIndex
 	return self
 end
 
--- build(registry, cellSize?): index every route of the registry (loads every chunk).
-function SpatialIndex.build(registry: Registry.Registry, cellSize: number?): SpatialIndex
+-- build(registry, cellSize?, yield?): index every route of the registry (loads every chunk). `yield`
+-- (Registry.Yield), when given, is called after each route: sampling the curves is most of the work.
+function SpatialIndex.build(registry: Registry.Registry, cellSize: number?, yield: Registry.Yield?): SpatialIndex
 	local self = SpatialIndex.new(cellSize)
-	for _, route in registry:all() do
+	for _, route in registry:loadAll(yield) do
 		self:insertRoute(route.id, registry:samples(route))
+		if yield then
+			yield()
+		end
 	end
 	return self
 end
