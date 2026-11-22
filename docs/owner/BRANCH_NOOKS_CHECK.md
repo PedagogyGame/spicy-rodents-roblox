@@ -78,6 +78,6 @@ worked out from each tree's own branches, so any new tree added later gets them 
 
 - `_tree`: the whole tree;
 - `_nook`: a squirrel in a cup with acorns in the stash beside it;
-- `_hangout`: three squirrels on a ledge;
+- `_hangout`: three squirrels on a ledge (not on APPLE 1: its branches are too close together for one);
 - `_spur`: a side branch;
 - `_knots`: a squirrel's view down a branch over its knots.
