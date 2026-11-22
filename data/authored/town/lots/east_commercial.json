@@ -112,11 +112,11 @@
         "w": 36
       },
       "hasInterior": false,
-      "notes": "facing: 3 storefront panes at z=-79.8 and sign at z=-79.4 face the z=0 road. yaw=0 rad (front=(sin yaw,0,cos yaw)). \"One more diner / storefront\". Box 36x9.1x28; roof route at y+10.9 (x 589..621). Sign \"CORNER SHOPS\". Note shopY samples terrain at x=609 not 605. Parked car (586,-33). commercialBounds w36 d28.",
+      "notes": "facing: 3 storefront panes at z=-79.8 and sign at z=-79.4 face the z=0 road. yaw=0 rad (front=(sin yaw,0,cos yaw)). \"One more diner / storefront\". Box 36x9.1x28; roof route at y+10.9 (x 589..621). Sign \"ELM ROW OFFICES\" (owner D32: was \"CORNER SHOPS\"). Note shopY samples terrain at x=609 not 605. Parked car (586,-33). commercialBounds w36 d28.",
       "params": {
         "eaveU": 10.688,
         "roof": "flat",
-        "sign": "CORNER SHOPS"
+        "sign": "ELM ROW OFFICES"
       },
       "routes": {
         "source": "harvest"

@@ -6,7 +6,7 @@
   "families": { "F1": "food_shops", "F2": "civic", "F3": "leisure", "F4": "rides_minigame_props" },
   "foodBaseline": [
     { "lot": "east_chilis_restaurant", "name": "CHILI PEPPER GRILL", "food": "bar_and_grill", "enterable": false },
-    { "lot": "east_corner_shops", "name": "CORNER SHOPS (diner)", "food": "diner", "enterable": false },
+    { "lot": "east_corner_shops", "name": "ELM ROW OFFICES (diner in the food census only)", "food": "diner", "enterable": false },
     { "lot": "outer_icecream_standalone", "name": "ICE CREAM (standalone)", "food": "ice_cream", "enterable": false },
     { "lot": "outer_icecream_strip", "name": "ICE CREAM (strip)", "food": "ice_cream", "enterable": false },
     { "lot": "quay_bldg_w_00", "name": "THE OLD ANCHOR", "food": "bar_and_grill", "enterable": false },
@@ -914,7 +914,7 @@
       "id": "f1_up_corner_shops",
       "family": "F1",
       "type": "upgrade",
-      "name": "CORNER SHOPS",
+      "name": "ELM ROW OFFICES",
       "district": "existing",
       "status": "upgrade",
       "existingLot": "east_corner_shops",
