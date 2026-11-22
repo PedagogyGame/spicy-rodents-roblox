@@ -45,6 +45,9 @@
 -- Inside a hollow tree the camera's look turns freely (Camera/CameraRig, the hollow look), so the keys steer by the
 -- body's own heading there (CameraRig.steerYaw), never by where the player is looking; at each hole up its trunk a
 -- toast says how to get out onto the branch outside (holeHint, once each time the hole is reached).
+-- Branches (owner D34; World/BranchNookClient): running over a branch's nodules the drawn body settles a little (the
+-- root's CFrame only: the motor never sees it); in a nook's cup E goes to the knot-hole stash, and stopped in a cup or
+-- on a hangout's ledge R sits the squirrel down (the motor then gets no keys; SeatGetUp's keys and STAND get it up).
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -82,6 +85,7 @@ local AirTrickButton = require("../UI/AirTrickButton")
 local AimMarker = require("../UI/AimMarker")
 local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
 local HollowLayout = Import.shared("World/HollowLayout") :: typeof(require("../../shared/World/HollowLayout"))
+local BranchNookClient = require("../World/BranchNookClient")
 
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 
@@ -396,6 +400,8 @@ function Squirrel.start(
 		end
 		-- (inside a hollow tree the view looks round freely: the keys steer by the body's heading, CameraRig.steerYaw)
 		local f = input:sample(CameraRig.steerYaw() or BodyDriver.cameraYawHtml())
+		-- a branch nook's own keys first (E at a knot-hole, R to sit); seated, the motor gets none
+		local perched = BranchNookClient.frame(state, f, motorWorld.registry)
 		if f.nightVision then
 			local nowOn = false
 			if spicy then
@@ -457,6 +463,10 @@ function Squirrel.start(
 		-- (the server clock is read only for a body that has ever been stunned)
 		local stunnedUntil = body:GetAttribute(PossessionState.ATTR.StunnedUntil)
 		if stunnedUntil ~= nil and Squirrel.stunned(stunnedUntil, workspace:GetServerTimeNow()) then
+			mi = SquirrelMotor.idleInput(f.cameraYaw)
+			holding = false
+		end
+		if perched then
 			mi = SquirrelMotor.idleInput(f.cameraYaw)
 			holding = false
 		end
@@ -550,8 +560,11 @@ function Squirrel.start(
 		if action or kin.mode ~= "air" then
 			kin.action, kin.airSeconds = action, airSeconds
 		end
-		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
-			* CFrame.Angles(visual.pitch, 0, -visual.lean)
+		-- (a branch's nodules: a little lift and roll; sat in a nook or on a ledge: down on its haunches, facing out)
+		local baseYaw = visual.yaw or state.yaw
+		local lift, roll, drop, sitPitch, turn = BranchNookClient.draw(state, motorWorld.registry, dt, baseYaw)
+		local cf = Units.yawCFrame(baseYaw + turn, Vector3.new(visual.x, visual.y + lift - drop, visual.z))
+			* CFrame.Angles(visual.pitch + sitPitch, 0, -visual.lean + roll)
 			* CFrame.new(0, hip, 0)
 		local p = cf.Position
 		local vel = if snapped or dt <= 0 then Vector3.zero else (p - last) / dt
@@ -560,6 +573,7 @@ function Squirrel.start(
 	end)
 	return function()
 		stopDrive()
+		BranchNookClient.reset()
 		KinematicPose.clear(body)
 		if ctx.meter then
 			ctx.meter(nil)

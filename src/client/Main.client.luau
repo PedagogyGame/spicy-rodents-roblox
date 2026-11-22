@@ -56,6 +56,8 @@ local CameraRig = require("./Camera/CameraRig")
 local SewerAmbience = require("./World/SewerAmbience")
 local LoungeMusic = require("./World/LoungeMusic")
 local SeatGetUp = require("./World/SeatGetUp")
+local BranchNookClient = require("./World/BranchNookClient")
+local BranchNookView = require("./World/BranchNookView")
 local SewerArt = require("./World/SewerArt")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
@@ -252,15 +254,33 @@ end
 
 -- getting up from a seat (THE GILDED ACORN's, a lawn chair; owner D32): R again, Space, a step or the STAND button asks
 -- the server (World/SeatGetUp, PlayNet.StandUp)
+-- (a squirrel sat in a branch nook or on a hangout's ledge gets up the same way: World/BranchNookClient's perch)
 local okSeat, seatErr = pcall(SeatGetUp.start, {
 	current = client.current,
 	toast = function(text: string)
 		menu.toast(text, 4)
 	end,
+	perch = BranchNookClient.perch,
+	perchUp = function(): boolean
+		return BranchNookClient.perchUp()
+	end,
 })
 if not okSeat then
 	warn(`Client: SeatGetUp failed: {seatErr}`)
 end
+
+-- the branch nooks (owner D34): the stash's and the seat's keys and hints for the held squirrel (World/BranchNookClient)
+-- and the nooks, stashes, hangouts, spurs and nodules drawn on the trees near the camera (World/BranchNookView)
+local okNook, nookErr = pcall(BranchNookClient.start, { toast = menu.toast })
+if not okNook then
+	warn(`Client: BranchNookClient failed: {nookErr}`)
+end
+task.spawn(function()
+	local okView, viewErr = pcall(BranchNookView.start)
+	if not okView then
+		warn(`Client: BranchNookView failed: {viewErr}`)
+	end
+end)
 
 -- the corner store's kite in the air: A/D lean it, W/S let out and reel in (UI/KiteSteer; the server flies it)
 local okKite, kiteErr = pcall(KiteSteer.start)

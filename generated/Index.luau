@@ -9,6 +9,14 @@ return {
 			count = 1,
 			chunks = { "Attractions" },
 		},
+		BranchNookRoutes = {
+			count = 524,
+			chunks = { "BranchNookRoutes_01" },
+		},
+		BranchNooks = {
+			count = 1,
+			chunks = { "BranchNooks" },
+		},
 		Buildings = {
 			count = 1,
 			chunks = { "Buildings" },

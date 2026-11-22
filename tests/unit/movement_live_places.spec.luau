@@ -241,7 +241,9 @@ return function(t)
 			local vworld = vworldOf(town, w)
 			local routes = {}
 			for _, r in w.registry:all() do
-				if r.kind ~= "trunk" and not r.enclosure then
+				-- (the D34 branch nooks' routes have their own drops: tests/unit/branch_nooks.spec.luau; the sample here
+				-- stays the town's own routes)
+				if r.kind ~= "trunk" and not r.enclosure and r.origin ~= "branchNook" then
 					table.insert(routes, r)
 				end
 			end

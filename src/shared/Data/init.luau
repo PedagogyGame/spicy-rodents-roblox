@@ -183,6 +183,15 @@ function Data.new(loader: Loader): Data
 					return if l and l.routes then l.routes else {}
 				end)
 			end
+			-- the D34 branch nooks, hangouts and spurs (Shared/World/BranchNooks, planned over every route above): 30001-
+			local nookRoutes = self:index().modules.BranchNookRoutes
+			if nookRoutes then
+				for _, chunk in nookRoutes.chunks do
+					table.insert(loaders, function()
+						return loadName(self, chunk) or {}
+					end)
+				end
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry
