@@ -75,12 +75,23 @@
       "inside": {
         "trunk": 604,
         "hole": 200,
-        "radius": 2.0,
-        "pitch": 6,
+        "radius": 1.7,
+        "wander": 0.8,
+        "pitch": 7,
         "top": 34,
         "landings": [
           12,
           23
+        ],
+        "ledges": 2,
+        "crossings": [
+          7.5,
+          17.5
+        ],
+        "holes": [
+          5,
+          20.5,
+          29.5
         ]
       },
       "note": "Moved from park outer 95 (by the Tabasco garden): that trunk is 4 studs across and the squirrel 1.6 wide, so no ramp fits; the HIGHLAND ELM giant is 9.4 across. Its premium garden and feeder are new sites (not built yet), as H1 and H2 had before. Owner question in docs/owner/HOLLOW_TREES_CHECK.md."

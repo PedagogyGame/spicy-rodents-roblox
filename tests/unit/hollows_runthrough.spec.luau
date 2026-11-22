@@ -121,8 +121,8 @@ return function(t)
 			local tr = HollowLayout.trunk(reg, h.trunk)
 			local pieces = {}
 			for _, pc in h.parts do
-				-- (a knothole's oval lies on the bark outside by design)
-				if pc.role ~= "knothole" then
+				-- (a knothole's oval lies on the bark outside by design, and a perch is a branch outside it)
+				if pc.role ~= "knothole" and pc.role ~= "perch" then
 					table.insert(pieces, pc)
 				end
 			end
@@ -135,17 +135,22 @@ return function(t)
 	end)
 
 	t.test("the lights inside reach nothing outside the bark (no lawn or wall lit through it at night)", function()
-		local n = 0
+		local n, daylight = 0, 0
 		for _, l in model:GetDescendants() do
 			if not l:IsA("PointLight") then
 				continue
 			end
-			n += 1
 			local a = l.Parent
+			if string.find(a.Name, "^daylight_") then
+				daylight += 1
+			else
+				n += 1
+			end
 			local at = (a.Parent.CFrame * a.CFrame).Position
 			local h = layout.hollow(a.Parent.Parent.Name) :: HollowLayout.Hollow
 			local tr = HollowLayout.trunk(reg, h.trunk :: number)
-			t.truthy(l.Range >= 1.3, `{h.id}: a light of range {l.Range} lights its chamber`)
+			local least = if string.find(a.Name, "^daylight_") then HollowShell.HOLE_LIGHT.minRange else 1.3
+			t.truthy(l.Range >= least, `{h.id}: a light of range {l.Range} lights its chamber`)
 			-- its sphere, sampled every 30 degrees: every point inside the bark at its own height
 			for i = -2, 2 do
 				local el = i * math.pi / 6
@@ -165,6 +170,16 @@ return function(t)
 			end
 		end
 		t.eq(n, 17, "a light on each floor and at each chamber above it")
+		-- and daylight in at every hole up a trunk (owner D32: "lit dimly through holes")
+		local holes = 0
+		for _, h in layout.hollows do
+			for _, m in h.mouths do
+				if m.opens ~= "ground" then
+					holes += 1
+				end
+			end
+		end
+		t.eq(daylight, holes, "a dim daylight just inside every hole up a trunk")
 	end)
 
 	t.test("nothing through walls: the body's section along every route meets no part of the shell", function()

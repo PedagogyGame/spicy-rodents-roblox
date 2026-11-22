@@ -9,7 +9,7 @@ the trunk's bark radius, the squirrel's tapered radius r(1 - 0.48 t) (giants r/0
 the old bark's 14 flats, about the trunk route's own centre line (its lean). Here every corner of every piece is
 measured against the new Bark mesh instead: a level ray from the trunk route's axis at the corner's height, out
 through the corner, to the first bark it meets.
-  inside pieces (liner, floor, roof, tread, post, shelf): margin = bark distance - corner distance; < 0 pokes through.
+  inside pieces (liner, floor, roof, tread, post, shelf, burl, root): margin = bark distance - corner distance; < 0 pokes through.
   knotholes (the dark oval on the bark, seen from outside): its centre's distance - the bark's under it; < -0.06
     (half the disc's 0.12 thickness) buries it in the bark. One where HollowLayout opens a shaft onto a walk's bough
     (inside the first quarter of that bough) fails too: the generator opens the bough's collar round it
@@ -28,17 +28,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import check_promises as cp  # noqa: E402
 
-INSIDE = ("liner", "floor", "roof", "tread", "post", "shelf")
+INSIDE = ("liner", "floor", "roof", "tread", "post", "shelf", "burl", "root")
 KNOT_BURY = -0.06
 UNDER_BOUGH = 1.6  # studs from a walk's centre line
 
 
 def corners(pc):
-    """HollowLayout.corners: a block's 8 corners; a cylinder's two end rings (24 points each, axis along xv)."""
+    """HollowLayout.corners: a block's 8 corners; a cylinder's two end rings (24 points each, axis along xv); a ball's
+    26 points round it, 13 % out (a knot on a hollow's wall)."""
     p, xv, yv = (np.asarray(pc[k], float) for k in ("p", "xv", "yv"))
     zv = np.cross(xv, yv)
     hx, hy, hz = (s / 2 for s in pc["size"])
     out = []
+    if pc["shape"] == "Ball":
+        r = min(hx, hy, hz) * 1.13
+        for d in (-1, 0, 1):
+            for e in (-1, 0, 1):
+                for f in (-1, 0, 1):
+                    n = math.sqrt(d * d + e * e + f * f)
+                    if n > 0:
+                        out.append(p + (xv * d + yv * e + zv * f) / n * r)
+        return out
     for sx in (-1, 1):
         if pc["shape"] == "Cylinder":
             for k in range(24):

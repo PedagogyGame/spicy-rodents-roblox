@@ -14,6 +14,7 @@ local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 
+local CameraRig = require("../../src/client/Camera/CameraRig")
 local Data = require("../../src/shared/Data")
 local HollowLayout = require("../../src/shared/World/HollowLayout")
 local HollowShell = require("../../src/server/World/HollowShell")
@@ -71,7 +72,10 @@ local function emit(group: string, p: any)
 	table.insert(parts, {
 		g = group,
 		p = p:GetFullName(),
-		s = if p.Shape == roblox.Enum.PartType.Cylinder then "Cylinder" else "Block",
+		s = if p.Shape == roblox.Enum.PartType.Cylinder
+			then "Cylinder"
+			elseif p.Shape == roblox.Enum.PartType.Ball then "Ball"
+			else "Block",
 		size = { r4(p.Size.X), r4(p.Size.Y), r4(p.Size.Z) },
 		pos = { r4(cf.Position.X), r4(cf.Position.Y), r4(cf.Position.Z) },
 		rot = { r4(x.X), r4(y.X), r4(z.X), r4(x.Y), r4(y.Y), r4(z.Y), r4(x.Z), r4(y.Z), r4(z.Z) },
@@ -87,7 +91,9 @@ for _, d in root:GetDescendants() do
 		local wall = string.match(d.Name, "^liner") ~= nil
 			or string.match(d.Name, "^roof") ~= nil
 			or string.match(d.Name, "^log%d") ~= nil
-		emit(if wall then "liner" else "hollows", d)
+		-- (a knothole's dark oval on its own too: the client hides the one a squirrel peeks out of)
+		local knot = string.match(d.Name, "^knothole") ~= nil
+		emit(if wall then "liner" elseif knot then "knots" else "hollows", d)
 		for _, a in d:GetChildren() do
 			local al = if a:IsA("Attachment") then a:FindFirstChildOfClass("PointLight") else nil
 			if al then
@@ -169,9 +175,10 @@ local function add(name: string, desc: string, pos: { number }, look: { number }
 		groups = groups,
 	})
 end
-local OUTSIDE = { "ground", "bark", "hollows", "liner", "attractions" }
-local CUT = { "ground", "hollows", "liner_cut", "bark_cut", "attractions" }
-local INSIDE = { "ground", "hollows", "liner", "attractions" }
+local OUTSIDE = { "ground", "bark", "hollows", "knots", "liner", "attractions" }
+local CUT = { "ground", "hollows", "knots", "liner_cut", "bark_cut", "attractions" }
+local INSIDE = { "ground", "hollows", "knots", "liner", "attractions" }
+local PEEK = { "ground", "hollows", "liner", "attractions" }
 for _, h in layout.hollows do
 	local hole = h.mouths[1]
 	local ol = math.sqrt(hole.out[1] ^ 2 + hole.out[3] ^ 2)
@@ -216,7 +223,7 @@ for _, h in layout.hollows do
 		end
 	end
 end
--- inside, at a squirrel's eye: the single chamber from just inside its hole; up the shaft; along the spiral
+-- inside, at a squirrel's eye: the single chamber from just inside its hole; up the shaft; along the winding climb
 local h3 = layout.hollow("H3") :: HollowLayout.Hollow
 do
 	local r = reg:get(h3.routes[1]) :: any
@@ -234,7 +241,8 @@ local h2 = layout.hollow("H2") :: HollowLayout.Hollow
 do
 	local r = reg:get(h2.routes[2]) :: any
 	local a, b = reg:pointAt(r, 0.05), reg:pointAt(r, 0.6)
-	local up = (r.enclosure :: any).up
+	local e = r.enclosure :: any
+	local up = e.up or e.upAt[1].up
 	add(
 		"h2_shaft_up",
 		"H2's shaft from its foot, looking up the wall a squirrel climbs (the hideout shelf and the knotholes above)",
@@ -247,15 +255,57 @@ end
 local h1 = layout.hollow("H1") :: HollowLayout.Hollow
 do
 	local r = reg:get(h1.routes[2]) :: any
-	for k, tt in { 0.18, 0.55 } do
+	for k, tt in { 0.12, 0.2, 0.55 } do
 		local a, b = reg:pointAt(r, tt), reg:pointAt(r, tt + 0.03)
 		add(
-			`h1_ramp_{k}`,
-			"H1's spiral ramp at a squirrel's eye, looking along the way up",
+			`h1_climb_{k}`,
+			"H1's winding climb at a squirrel's eye, looking along the way up",
 			{ a.x, a.y + 1.0, a.z },
 			{ b.x, b.y + 0.8, b.z },
 			INSIDE,
 			85
+		)
+	end
+	-- looking up the hollow from the low chamber, as the look turned up shows it
+	local low = h1.chambers[1]
+	local cav = h1.cavities[#h1.cavities]
+	add(
+		"h1_look_up",
+		"H1 from its low chamber, the look turned up the hollow: ledges, knots and the root across, daylight at the holes",
+		{ low.x, low.y + 1.0, low.z },
+		{ cav.x + (cav.x - low.x) * 0.3, low.y + 14, cav.z + (cav.z - low.z) * 0.3 },
+		INSIDE,
+		90
+	)
+end
+-- the peeks: out of every hole up a trunk (the hollow look's eye at the hole's face, CameraRig.peekView, a little down)
+for _, h in layout.hollows do
+	local n = 0
+	for _, m in h.mouths do
+		if m.opens == "ground" then
+			continue
+		end
+		n += 1
+		local ex, ey, ez, vx, vy, vz = CameraRig.peekView(m :: any, 0, -0.35)
+		local id = string.lower(h.id)
+		add(
+			`{id}_peek_{n}`,
+			`{h.id}: peeking out of its {m.name} (the branch a hop lands on below)`,
+			{ ex, ey, ez },
+			{ ex + vx * 4, ey + vy * 4, ez + vz * 4 },
+			PEEK,
+			85
+		)
+		-- and that hole and its branch from outside, level with it
+		local ol = math.sqrt(m.out[1] ^ 2 + m.out[3] ^ 2)
+		local ox, oz = m.out[1] / ol, m.out[3] / ol
+		add(
+			`{id}_hole_{n}`,
+			`{h.id}: its {m.name} and the branch under it, from outside`,
+			{ m.x + ox * 9 - oz * 4, m.y + 2.5, m.z + oz * 9 + ox * 4 },
+			{ m.x + ox * 2, m.y, m.z + oz * 2 },
+			OUTSIDE,
+			60
 		)
 	end
 end

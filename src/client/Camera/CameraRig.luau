@@ -7,9 +7,11 @@
 --                            Player.CameraMode = LockFirstPerson (the V toggle flips it)
 --   lockFirst                LockFirstPerson with the toggle refused (arena, lounges)
 --   chaseLock                scriptable: behind the body along its facing, looking forward
---   tunnelChase              scriptable: low behind a squirrel in an enclosed run (the ball return, the drains, a
---                            hollow tree: there its rays meet only the hollow's own shell, Workspace.HollowTrees,
---                            never the tree's invisible trunk colliders, and the point stays inside the cavity)
+--   tunnelChase              scriptable: low behind a squirrel in an enclosed run (the ball return, the drains);
+--                            inside a hollow tree the hollow look (HOLLOW below: the mouse turns the view about the
+--                            head, the eye kept in the cavity, the shell faded where it would block, a peek out of a
+--                            hole up the trunk; its rays meet only Workspace.HollowTrees, never the tree's invisible
+--                            trunk colliders)
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
 --                            +/-110 degrees of the nose; vehicleThird follows the vehicle root. With
 --                            targets.free (the sky-lift gondola: a seat's EyeSocket) the look is free: no
@@ -41,7 +43,9 @@
 --   (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
 --   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
---   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); notify: ((text) -> ())?;
+--   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); HOLLOW; hollowLook, hollowRecentre,
+--   hollowView, peekView, viewDir (pure: the hollow look); steerYaw() -> number? (the yaw the keys steer by while the
+--   hollow look is on); notify: ((text) -> ())?;
 --   seeOut(eye, cframe, size, glass) -> number? (pure: a vehicle part's LocalTransparencyModifier from the eye);
 --   COCKPIT; RIDE; rollOf(cframe) -> radians (pure); upright(cframe) -> CFrame (pure); rollStep(shown, actual, dt) ->
 --   radians (pure); rideEye(root, eyeRel, shown) -> CFrame (pure); riderHide(radius) -> hideAt (pure); RIDER_PAD;
@@ -275,6 +279,119 @@ function CameraRig.tunnelPoint(
 		wx, wy, wz = keep(wx, wy, wz, hx, hy, hz)
 	end
 	return wx, wy, wz
+end
+
+-- the yaw the keys steer by while the hollow look is on (HTML convention, as BodyDriver.cameraYawHtml): the body's
+-- heading, so turning the view to look round never turns the squirrel; nil otherwise
+local steer: number? = nil
+function CameraRig.steerYaw(): number?
+	return steer
+end
+
+-- THE LOOK INSIDE A HOLLOW TREE (owner D32: "allow the squirrel to actually look around"). Inside a hollow the mouse
+-- (and the right stick) turns the view about the squirrel's head, all the way round and from looking down the hollow
+-- to looking up it, close in: the eye HOLLOW.dist behind the head along the view, held inside the cavity
+-- (HollowLayout.keepCamera); where the cavity is too narrow for that (a shaft), the eye goes to the head itself and
+-- looks out of the squirrel's eyes (first person: the body is hidden on this screen). The pieces of the shell between
+-- the eye and the head, or round the eye, are faded on this screen (the "wall faded where it would block"). A view
+-- left alone while the body moves eases back behind it (HOLLOW.idle s, at HOLLOW.recentre per s), so a climb still
+-- reads. At a hole up the trunk (HollowLayout.peekAt) the eye goes to the hole and looks out of it (a peek), the look
+-- still turning about the hole's way out within HOLLOW.peekYaw / peekPitch; the dark oval on the bark there is hidden.
+-- Going in, the eye comes in through the ground hole (HOLLOW.entry s) rather than through the bark; going out, the
+-- orbit takes over from where the eye is.
+--   hollowLook(yaw, pitch, dx, dy, invert) -> yaw, pitch: one look input (radians, as lookStep has them)
+--   hollowRecentre(yaw, pitch, idle, moving, dt) -> yaw, pitch
+--   hollowView(hx, hy, hz, lx, lz, yaw, pitch, keep?) -> (eye x, y, z, look x, y, z, firstPerson)
+--   peekView(mouth, yaw, pitch) -> (eye x, y, z, look x, y, z)
+--   viewDir(lx, lz, yaw, pitch) -> x, y, z: a level heading (x = sin, z = cos of a bearing) turned `yaw` on round the
+--   bearing (to the left) and pitched up `pitch`
+CameraRig.HOLLOW = {
+	dist = 1.6, -- studs behind the head along the view
+	lift = 0.25, -- studs over the head
+	minHead = 0.7, -- an eye held nearer the head than this goes into the head (first person)
+	pitchMin = -1.3, -- looking down the hollow
+	pitchMax = 1.4, -- looking up it
+	idle = 1.0, -- s without a look input before a moving body's view eases back behind it
+	recentre = 2.5, -- 1/s
+	peekYaw = 1.2, -- radians either side of a hole's way out the peek may turn
+	peekPitch = { -1.0, 0.8 },
+	peekIn = 0.12, -- studs inside the bark's face the peeking eye sits
+	peekEase = 6, -- 1/s into and out of a peek
+	ease = 14, -- 1/s the eye follows its point
+	entry = 0.3, -- s for the eye to come in through the ground hole
+	fade = 0.8, -- a faded piece's LocalTransparencyModifier (a knothole's oval: 1)
+	fadeNear = 0.7, -- studs round the eye a piece is faded within
+}
+
+function CameraRig.viewDir(lx: number, lz: number, yaw: number, pitch: number): (number, number, number)
+	local c, s = math.cos(-yaw), math.sin(-yaw)
+	local x, z = lx * c - lz * s, lx * s + lz * c
+	local cp = math.cos(pitch)
+	return x * cp, math.sin(pitch), z * cp
+end
+
+function CameraRig.hollowLook(yaw: number, pitch: number, dx: number, dy: number, invert: boolean): (number, number)
+	local H = CameraRig.HOLLOW
+	-- (mouse right turns the view right: the bearing, clockwise from +z seen from above, goes down, +x being on the
+	-- left of a view along +z)
+	local y = (yaw - dx + math.pi) % (2 * math.pi) - math.pi
+	return y, math.clamp(pitch - (if invert then -dy else dy), H.pitchMin, H.pitchMax)
+end
+
+function CameraRig.hollowRecentre(
+	yaw: number,
+	pitch: number,
+	idle: number,
+	moving: boolean,
+	dt: number
+): (number, number)
+	local H = CameraRig.HOLLOW
+	if idle < H.idle or not moving then
+		return yaw, pitch
+	end
+	local k = math.exp(-H.recentre * dt)
+	return yaw * k, pitch * k
+end
+
+function CameraRig.hollowView(
+	hx: number,
+	hy: number,
+	hz: number,
+	lx: number,
+	lz: number,
+	yaw: number,
+	pitch: number,
+	keep: ((number, number, number, number, number, number) -> (number, number, number))?
+): (number, number, number, number, number, number, boolean)
+	local H = CameraRig.HOLLOW
+	local vx, vy, vz = CameraRig.viewDir(lx, lz, yaw, pitch)
+	local ex, ey, ez = hx - vx * H.dist, hy + H.lift - vy * H.dist, hz - vz * H.dist
+	if keep then
+		ex, ey, ez = keep(ex, ey, ez, hx, hy, hz)
+	end
+	if (ex - hx) ^ 2 + (ey - hy) ^ 2 + (ez - hz) ^ 2 < H.minHead ^ 2 then
+		-- too narrow to stand behind: out of the squirrel's own eyes
+		return hx + vx * 0.2, hy + vy * 0.2, hz + vz * 0.2, vx, vy, vz, true
+	end
+	return ex, ey, ez, vx, vy, vz, false
+end
+
+function CameraRig.peekView(
+	mouth: { x: number, y: number, z: number, out: { number }, depth: number? },
+	yaw: number,
+	pitch: number
+): (number, number, number, number, number, number)
+	local H = CameraRig.HOLLOW
+	local ol = math.max(1e-6, math.sqrt(mouth.out[1] ^ 2 + mouth.out[3] ^ 2))
+	local ox, oz = mouth.out[1] / ol, mouth.out[3] / ol
+	local d = math.max(0, (mouth.depth or 0) - H.peekIn)
+	local vx, vy, vz = CameraRig.viewDir(
+		ox,
+		oz,
+		math.clamp(yaw, -H.peekYaw, H.peekYaw),
+		math.clamp(pitch, H.peekPitch[1], H.peekPitch[2])
+	)
+	return mouth.x + ox * d, mouth.y + 0.9, mouth.z + oz * d, vx, vy, vz
 end
 
 -- How far out the camera may sit when something solid was hit `hitDistance` from the focus: short of it
@@ -649,13 +766,16 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 		-- an enclosed run (the ball return, a drain, a hollow tree): low behind the squirrel along its heading, pulled
 		-- in front of any wall or ceiling between (raycasts against the run's own parts), smoothed so a climb reads.
 		-- Inside a hollow tree the rays meet only its shell (Workspace.HollowTrees: the tree's invisible trunk
-		-- colliders fill the cavity and its bark mesh is not queryable), the point stays inside the cavity, and on
-		-- going in the camera cuts inside at once rather than sliding through the bark.
+		-- colliders fill the cavity and its bark mesh is not queryable), and the view is the hollow look (HOLLOW):
+		-- the mouse and the right stick turn it about the head, the eye kept in the cavity, the shell faded where it
+		-- would block, a peek out of a hole up the trunk; coming in, the eye comes through the ground hole.
 		local body = targets.body
 		local root = body and body.PrimaryPart
 		if root then
 			setFirstPerson(false)
 			camera.CameraType = Enum.CameraType.Scriptable
+			local GuiService = game:GetService("GuiService")
+			local H = CameraRig.HOLLOW
 			local params = RaycastParams.new()
 			params.FilterType = Enum.RaycastFilterType.Exclude
 			params.FilterDescendantsInstances = { body :: Model }
@@ -666,53 +786,206 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			inShell.FilterDescendantsInstances = if shell then { shell } else {}
 			local current = camera.CFrame
 			local wasIn = false
+			local yaw, pitch, idle = 0, 0, 0
+			local peekK = 0
+			local entering = 0
+			local lastPos = root.Position
+			local faded: { [BasePart]: boolean } = {}
+			local bodyHidden = false
+			local function hideBody(on: boolean)
+				if on == bodyHidden then
+					return
+				end
+				bodyHidden = on
+				for _, d in (body :: Model):GetDescendants() do
+					if d:IsA("BasePart") or d:IsA("Decal") then
+						(d :: any).LocalTransparencyModifier = if on then 1 else 0
+					end
+				end
+			end
+			-- the shell's pieces between the eye and the head, and round the eye, faded on this screen
+			local function fadeBetween(eye: Vector3, head: Vector3)
+				local now: { [BasePart]: boolean } = {}
+				if shell then
+					local near = OverlapParams.new()
+					near.FilterType = Enum.RaycastFilterType.Include
+					near.FilterDescendantsInstances = { shell }
+					for _, p in workspace:GetPartBoundsInRadius(eye, H.fadeNear, near) do
+						now[p] = true
+					end
+					local from, left = head, eye - head
+					for _ = 1, 4 do
+						local hit = workspace:Raycast(from, left, inShell)
+						if hit == nil then
+							break
+						end
+						now[hit.Instance :: BasePart] = true
+						local step = left.Unit * 0.05
+						left -= (hit.Position - from) + step
+						from = hit.Position + step
+						if left.Magnitude < 0.05 then
+							break
+						end
+					end
+				end
+				for p in now do
+					if not faded[p] then
+						p.LocalTransparencyModifier = if string.find(p.Name, "^knothole") then 1 else H.fade
+					end
+				end
+				for p in faded do
+					if not now[p] then
+						p.LocalTransparencyModifier = 0
+					end
+				end
+				faded = now
+			end
 			bind(function(dt: number)
 				local cf = root.CFrame
 				local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
 				look = if look.Magnitude > 0.05 then look.Unit else Vector3.zAxis
 				local head = cf.Position + Vector3.new(0, 0.35, 0)
 				local inHollow = hollows ~= nil and hollows.contains(head.X, head.Y, head.Z) ~= nil
-				local rays = if inHollow then inShell else params
-				local wx, wy, wz = CameraRig.tunnelPoint(
-					head.X,
-					head.Y,
-					head.Z,
-					look.X,
-					look.Z,
-					function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
-						-- (on through anything not drawn: the log's thresholds stop feet, not the view)
-						local from, left = Vector3.new(ox, oy, oz), Vector3.new(dx, dy, dz)
-						for _ = 1, 3 do
-							local hit = workspace:Raycast(from, left, rays)
-							if hit == nil then
-								break
-							end
-							if hit.Instance.Transparency < 1 then
-								return hit.Position.X, hit.Position.Y, hit.Position.Z
-							end
-							local step = left.Unit * 0.05
-							left -= (hit.Position - from) + step
-							from = hit.Position + step
-							if left:Dot(Vector3.new(dx, dy, dz)) <= 0 then
-								break
-							end
+				if not inHollow or hollows == nil then
+					hideBody(false)
+					if next(faded) then
+						for p in faded do
+							p.LocalTransparencyModifier = 0
 						end
-						return nil, nil, nil
-					end,
-					if inHollow and hollows then hollows.keepCamera else nil
-				)
-				local target = CFrame.lookAt(Vector3.new(wx, wy, wz), head + look * 3.5)
-				if inHollow and not wasIn then
-					current = target
-				else
-					current = current:Lerp(target, 1 - math.exp(-dt * 10))
+						faded = {}
+					end
+					local rays = params
+					local wx, wy, wz = CameraRig.tunnelPoint(
+						head.X,
+						head.Y,
+						head.Z,
+						look.X,
+						look.Z,
+						function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
+							-- (on through anything not drawn: the log's thresholds stop feet, not the view)
+							local from, left = Vector3.new(ox, oy, oz), Vector3.new(dx, dy, dz)
+							for _ = 1, 3 do
+								local hit = workspace:Raycast(from, left, rays)
+								if hit == nil then
+									break
+								end
+								if hit.Instance.Transparency < 1 then
+									return hit.Position.X, hit.Position.Y, hit.Position.Z
+								end
+								local step = left.Unit * 0.05
+								left -= (hit.Position - from) + step
+								from = hit.Position + step
+								if left:Dot(Vector3.new(dx, dy, dz)) <= 0 then
+									break
+								end
+							end
+							return nil, nil, nil
+						end,
+						nil
+					)
+					current =
+						current:Lerp(CFrame.lookAt(Vector3.new(wx, wy, wz), head + look * 3.5), 1 - math.exp(-dt * 10))
+					wasIn = false
+					camera.CFrame = current
+					camera.FieldOfView = 75
+					steer = nil
+					return
 				end
-				wasIn = inHollow
+				local layout = assert(hollows, "the hollow trees are loaded")
+				-- the look: the mouse (unless the cursor is out) and the right stick
+				local typing = held or GuiService.MenuIsOpen or UIS:GetFocusedTextBox() ~= nil
+				local free = typing or UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or next(cursorWanted) ~= nil
+				local moved = false
+				if not free then
+					UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+					local d = UIS:GetMouseDelta()
+					if d.Magnitude > 0 then
+						yaw, pitch = CameraRig.hollowLook(
+							yaw,
+							pitch,
+							d.X * CameraRig.LOOK.sens,
+							d.Y * CameraRig.LOOK.sens,
+							invertLook
+						)
+						moved = true
+					end
+				else
+					UIS.MouseBehavior = Enum.MouseBehavior.Default
+				end
+				for _, input in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
+					if input.KeyCode == Enum.KeyCode.Thumbstick2 and input.Position.Magnitude > 0.15 then
+						local k = CameraRig.LOOK.stick * dt
+						yaw, pitch =
+							CameraRig.hollowLook(yaw, pitch, input.Position.X * k, -input.Position.Y * k, invertLook)
+						moved = true
+					end
+				end
+				idle = if moved then 0 else idle + dt
+				local speed = (root.Position - lastPos).Magnitude / math.max(dt, 1e-3)
+				lastPos = root.Position
+				yaw, pitch = CameraRig.hollowRecentre(yaw, pitch, idle, speed > 0.5, dt)
+				-- a peek at a hole up the trunk once the body stands at it
+				local feet = cf.Position
+				local mouth = layout.peekAt(feet.X, feet.Y - 0.35, feet.Z)
+				local wantPeek = mouth ~= nil and speed < 1
+				peekK += ((if wantPeek then 1 else 0) - peekK) * (1 - math.exp(-H.peekEase * dt))
+				local ex, ey, ez, vx, vy, vz, first =
+					CameraRig.hollowView(head.X, head.Y, head.Z, look.X, look.Z, yaw, pitch, layout.keepCamera)
+				local eye, dir = Vector3.new(ex, ey, ez), Vector3.new(vx, vy, vz)
+				if mouth and peekK > 0.01 then
+					local px, py, pz, qx, qy, qz = CameraRig.peekView(mouth :: any, yaw, pitch)
+					eye = eye:Lerp(Vector3.new(px, py, pz), peekK)
+					dir = dir:Lerp(Vector3.new(qx, qy, qz), peekK)
+					first = first and peekK < 0.5
+				end
+				local target = CFrame.lookAt(eye, eye + (if dir.Magnitude > 1e-3 then dir.Unit else look))
+				if not wasIn then
+					-- coming in: from just outside the ground hole the body came through, in through it
+					local m = layout.hollow(layout.contains(head.X, head.Y, head.Z) :: string)
+					local g: any = nil
+					for _, mm in (if m then m.mouths else {}) :: { any } do
+						if
+							mm.opens == "ground"
+							and (
+								g == nil
+								or (mm.x - head.X) ^ 2 + (mm.z - head.Z) ^ 2 < (g.x - head.X) ^ 2 + (g.z - head.Z) ^ 2
+							)
+						then
+							g = mm
+						end
+					end
+					if g then
+						local o = Vector3.new(g.out[1], 0, g.out[3])
+						o = if o.Magnitude > 1e-3 then o.Unit else -look
+						local at = Vector3.new(g.x, g.y + 0.9, g.z) + o * 1.2
+						current = CFrame.lookAt(at, at - o)
+						entering = H.entry
+					else
+						current = target
+					end
+				end
+				wasIn = true
+				if entering > 0 then
+					entering = math.max(0, entering - dt)
+					current = current:Lerp(target, math.clamp(dt / math.max(entering + dt, 1e-3), 0, 1))
+				else
+					current = current:Lerp(target, 1 - math.exp(-dt * H.ease))
+				end
+				hideBody(first)
+				fadeBetween(current.Position, head)
 				camera.CFrame = current
 				camera.FieldOfView = 75
+				-- (the keys steer by the body's heading, not the look: Client/Controllers/Squirrel reads steerYaw)
+				steer = math.atan2(-look.X, -look.Z)
 			end)
 			onUnbind = function()
 				camera.FieldOfView = CameraRig.FOV
+				hideBody(false)
+				for p in faded do
+					p.LocalTransparencyModifier = 0
+				end
+				faded = {}
+				steer = nil
 			end
 		end
 	elseif mode == "vehicleFirst" then

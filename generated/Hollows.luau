@@ -18,12 +18,16 @@ return {
 			claimable = true,
 			girth = 2,
 			inside = {
+				crossings = { 7.5, 17.5 },
 				hole = 200,
+				holes = { 5, 20.5, 29.5 },
 				landings = { 12, 23 },
-				pitch = 6,
-				radius = 2,
+				ledges = 2,
+				pitch = 7,
+				radius = 1.7,
 				top = 34,
 				trunk = 604,
+				wander = 0.8,
 			},
 			interiorRoute = { kind = "ramp", from = "low", to = "crown" },
 			knotholes = {

@@ -42,6 +42,8 @@
 -- the flight thrown onto the line the keys steer from the camera, shifted along it and popped); the marker's spot is
 -- the motor's landingSpot, which counts what is left of it, and the turn asked goes to the pose (KinematicPose
 -- trickTurn).
+-- Inside a hollow tree the camera's look turns freely (Camera/CameraRig, the hollow look), so the keys steer by the
+-- body's own heading there (CameraRig.steerYaw), never by where the player is looking.
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -71,6 +73,7 @@ local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../sha
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local BodyDriver = require("./BodyDriver")
+local CameraRig = require("../Camera/CameraRig")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
 local AirTrickButton = require("../UI/AirTrickButton")
@@ -373,7 +376,8 @@ function Squirrel.start(
 			visual.live = false
 			holding = false
 		end
-		local f = input:sample(BodyDriver.cameraYawHtml())
+		-- (inside a hollow tree the view looks round freely: the keys steer by the body's heading, CameraRig.steerYaw)
+		local f = input:sample(CameraRig.steerYaw() or BodyDriver.cameraYawHtml())
 		if f.nightVision then
 			local nowOn = false
 			if spicy then

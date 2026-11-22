@@ -4,7 +4,11 @@
 -- the town in the way, the ground level with the hole), and no piece of a hollow's shell stands in a part of the town.
 -- The tunnel camera inside (Client/Camera/CameraRig.tunnelPoint, its rays meeting only the shell, the point held by
 -- HollowLayout's keepCamera) along every way in and up, with the town's invisible trunk colliders present: never
--- outside the cavity (the screen showing bark), never in the squirrel's head.
+-- outside the cavity (the screen showing bark), never in the squirrel's head. The hollow look (CameraRig.hollowView,
+-- owner D32 "allow the squirrel to actually look around"): along every run of every tree, turned any way round and up
+-- or down the hollow, the eye stays in the cavity and out of the bark (or goes into the head, first person, where the
+-- cavity is too narrow to stand behind it); the keys turn it, it eases back behind a moving body; at every hole up a
+-- trunk the peek's eye is at the hole's face, looking out of it.
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
@@ -164,6 +168,97 @@ return function(t)
 				t.truthy(frames >= 10, `{h.id}: {frames} frames inside`)
 				t.eq(outside, 0, `{h.id}: frames with the camera outside the cavity`)
 				t.eq(inHead, 0, `{h.id}: frames with the camera in the squirrel's head`)
+			end
+		end
+	)
+	t.test("the hollow look: turned any way round, up or down the hollow, the eye stays in the cavity", function()
+		local data = Data.default()
+		local reg = data:routes()
+		local H = CameraRig.HOLLOW
+		local looks = 0
+		for _, h in layout.hollows do
+			if h.trunk == nil then
+				continue
+			end
+			local tr = HollowLayout.trunk(reg :: any, h.trunk :: number)
+			for _, rid in h.routes do
+				local r = reg:get(rid) :: any
+				for k = 0, 20 do
+					local p = reg:pointAt(r, k / 20)
+					local d = reg:tangentAt(r, math.clamp(k / 20, 0.01, 0.99))
+					local dl = math.sqrt(d.x * d.x + d.z * d.z)
+					local lx, lz = if dl > 0.05 then d.x / dl else 0, if dl > 0.05 then d.z / dl else 1
+					local hx, hy, hz = p.x, p.y + 0.35 + 0.35, p.z -- (the root a hip over the line, the head over it)
+					if layout.contains(hx, hy, hz) ~= h.space then
+						continue
+					end
+					for _, yaw in { 0, math.pi / 2, math.pi, -math.pi / 2, 2.5 } do
+						for _, pitch in { H.pitchMin, -0.5, 0, 0.6, H.pitchMax } do
+							local ex, ey, ez, _, _, _, first =
+								CameraRig.hollowView(hx, hy, hz, lx, lz, yaw, pitch, layout.keepCamera)
+							looks += 1
+							t.truthy(
+								layout.within(h, ex, ey, ez),
+								`{h.id} route {rid} t {k / 20}: yaw {yaw} pitch {pitch}: the eye left the cavity`
+							)
+							local hh = ey - tr.foot.y
+							local ax, _, az = tr.axisAt(math.max(0, hh))
+							t.truthy(
+								math.sqrt((ex - ax) ^ 2 + (ez - az) ^ 2) < tr.bark(math.max(0, hh)),
+								`{h.id}: the eye in the bark`
+							)
+							if not first then
+								t.truthy((ex - hx) ^ 2 + (ey - hy) ^ 2 + (ez - hz) ^ 2 >= (H.minHead - 1e-6) ^ 2)
+							end
+						end
+					end
+				end
+			end
+		end
+		print(`      {looks} looks checked`)
+		t.truthy(looks > 500)
+	end)
+	t.test(
+		"the hollow look: the keys turn it, it eases back behind a moving body, a peek looks out of the hole",
+		function()
+			local H = CameraRig.HOLLOW
+			local y, p = CameraRig.hollowLook(0, 0, 0.3, 0, false)
+			t.near(y, -0.3, 1e-9, "mouse right turns the view right")
+			y, p = CameraRig.hollowLook(y, p, 0, -10, false)
+			t.near(p, H.pitchMax, 1e-9, "looking up stops at the top")
+			y, p = CameraRig.hollowLook(y, p, 0, 10, true)
+			t.near(p, H.pitchMax, 1e-9, "inverted, the mouse down looks up")
+			local y2, p2 = CameraRig.hollowRecentre(1, 0.5, H.idle + 0.1, true, 0.1)
+			t.truthy(y2 < 1 and p2 < 0.5, "a moving body's view eases back")
+			local y3, p3 = CameraRig.hollowRecentre(1, 0.5, H.idle - 0.1, true, 0.1)
+			t.truthy(y3 == 1 and p3 == 0.5, "but not while the player is still looking")
+			local y4 = CameraRig.hollowRecentre(1, 0.5, 5, false, 0.1)
+			t.eq(y4, 1, "nor while the body stands looking round")
+			local data = Data.default()
+			local reg = data:routes()
+			for _, h in layout.hollows do
+				for _, m in h.mouths do
+					if m.opens == "ground" then
+						continue
+					end
+					local tr = HollowLayout.trunk(reg :: any, h.trunk :: number)
+					for _, yaw in { 0, 0.8, -3 } do
+						local ex, ey, ez, vx, _, vz = CameraRig.peekView(m :: any, yaw, 0)
+						local ol = math.sqrt(m.out[1] ^ 2 + m.out[3] ^ 2)
+						local out = (vx * m.out[1] + vz * m.out[3]) / ol
+						t.truthy(out >= math.cos(H.peekYaw) - 1e-6, `{h.id} {m.name}: the peek looks out of the hole`)
+						local hh = ey - tr.foot.y
+						local ax, _, az = tr.axisAt(hh)
+						local dist = math.sqrt((ex - ax) ^ 2 + (ez - az) ^ 2)
+						-- (at the hole's face: no further out than the bark as the motor has it, a giant's surface
+						-- radius, give or take the trunk's lean between the feet and the eye)
+						local face = math.max(tr.bark(hh), tr.route.surfaceRadius)
+						t.truthy(
+							dist <= face + 0.3 and dist >= face - 1.5,
+							`{h.id} {m.name}: the eye at the hole's face ({dist} from the axis, the face {face})`
+						)
+					end
+				end
 			end
 		end
 	)
