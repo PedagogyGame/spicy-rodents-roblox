@@ -235,4 +235,43 @@ return function(t)
 		r3.svc:leave(u)
 		t.eq(r3.wallet.balance(u), 4300)
 	end)
+
+	t.test("stock options: the bank's other counter opens the purchase window (the stock-options work's)", function()
+		local asked: { any } = {}
+		local svc = ErrandService.new({
+			wallet = {},
+			penalties = nil,
+			bodyOf = function(): any?
+				return nil
+			end,
+			isPerson = function(): boolean
+				return true
+			end,
+			notify = function() end,
+			stockOptions = function(): any?
+				return {
+					promptBuy = function(p: any): (boolean, string)
+						table.insert(asked, p)
+						return true, "opened"
+					end,
+				}
+			end,
+		})
+		local p = { UserId = 9 }
+		local ok, words = svc:buyOptions(p)
+		t.truthy(ok)
+		t.eq(words, "opened")
+		t.eq(asked[1], p)
+		local none = ErrandService.new({
+			wallet = {},
+			bodyOf = function(): any?
+				return nil
+			end,
+			isPerson = function(): boolean
+				return true
+			end,
+			notify = function() end,
+		})
+		t.falsy((none:buyOptions(p)), "no stock options: nothing")
+	end)
 end

@@ -68,7 +68,9 @@
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
 --   saved between servers (D16 #25; section 6e), stockOptions (Economy/StockOptions: Spicy Stock Options, owner D30;
---   promptBuy(player) opens the purchase window, e.g. from a bank's counter; nil when it could not start),
+--   promptBuy(player) opens the purchase window, e.g. from a bank's counter; nil when it could not start), errands
+--   (Work/ErrandService: the banks' errand boards and their stock options counter, owner D30; nil when it could not
+--   start), jobs (Jobs/JobService: the alley's and the Lookout's jobs, owner D30; nil when it could not start),
 --   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
@@ -134,6 +136,9 @@ local TownSquirrels = require("../Wildlife/TownSquirrels")
 local RoadSquirrels = require("../Wildlife/RoadSquirrels")
 local RideBumps = require("../Vehicles/RideBumps")
 local ReputationService = require("../Reputation/ReputationService")
+local Penalties = require("../Work/Penalties")
+local ErrandService = require("../Work/ErrandService")
+local JobService = require("../Jobs/JobService")
 local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
@@ -2684,6 +2689,60 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] clothing saving failed to start: {errClothes}`)
 	end
 
+	-- 6f. The town's work (owner D30): the money side of the errand and ambulance penalties (Work/Penalties, through
+	-- the wallet; Penalties.ambulanceIgnored is the doctors' to call), the banks' errand boards on the quay with their
+	-- Spicy Stock Options counter (Work/ErrandService), and the jobs at the bowling alley and the Lookout
+	-- (Jobs/JobService, paid hourly through RoleService's work.completed). A failure leaves the rest running.
+	local errands: any, jobs: any = nil, nil
+	local function personOf(player: any): any?
+		local actor = possession:actorOf(player)
+		return if actor and actor.species == "human" then actor else nil
+	end
+	local okWork, errWork = pcall(function()
+		Penalties.install({ wallet = wallet, roles = rt.roles })
+		errands = ErrandService.start({
+			wallet = wallet,
+			penalties = Penalties,
+			bodyOf = function(player: any): any?
+				local actor = possession:actorOf(player)
+				return if actor then actor.body else nil
+			end,
+			isPerson = function(player: any): boolean
+				return personOf(player) ~= nil
+			end,
+			notify = function(player: any, text: string)
+				fire(player, { kind = "notice", text = text })
+			end,
+			stockOptions = function(): any?
+				return stockOptions
+			end,
+			heartbeat = o.heartbeat ~= false,
+		})
+		jobs = JobService.start({
+			roles = rt.roles,
+			wallet = wallet,
+			bodyOf = function(player: any): any?
+				local actor = personOf(player)
+				return if actor then actor.body else nil
+			end,
+			isPerson = function(player: any): boolean
+				return personOf(player) ~= nil
+			end,
+			notify = function(player: any, text: string)
+				fire(player, { kind = "notice", text = text })
+			end,
+			gameHours = function(): number
+				return Game.gameSeconds(workspace:GetServerTimeNow(), dayClock.epoch, dayClock.base, dayClock.rate)
+					/ DayClock.REAL_SECONDS_PER_DAY
+					* 24
+			end,
+			heartbeat = o.heartbeat ~= false,
+		})
+	end)
+	if not okWork then
+		warn(`[SpicyRodents] the town's work (errands, jobs) failed to start: {errWork}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -2777,6 +2836,8 @@ function Game.start(opts: Opts?): any
 		dogs = dogs,
 		clothes = { saves = saves, wardrobe = wardrobe, giftShop = giftShop },
 		stockOptions = stockOptions,
+		errands = errands,
+		jobs = jobs,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -2830,6 +2891,12 @@ function Game.start(opts: Opts?): any
 			end
 			if stockOptions and stockOptions.stop then
 				stockOptions.stop()
+			end
+			if errands then
+				errands:stop()
+			end
+			if jobs then
+				jobs:stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

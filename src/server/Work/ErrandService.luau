@@ -16,11 +16,14 @@
 --     limit, kept in their own home (World/PlayerHomes.homeOf; Tunables work.errandHomeSecs in all), or taken out
 --     of the server (leave(player), called on PlayerRemoving).
 --   * Presses closer together than PRESS_GAP are ignored (a held key, a macro).
+--   * The banks also sell Spicy Stock Options (owner D30; Economy/StockOptions, the stock-options work's): a second
+--     prompt on each board (R, "Spicy Stock Options") opens its purchase window (stockOptions.promptBuy(player));
+--     buying, saving and withdrawing at home are all StockOptions'. No prompt when deps.stockOptions is not given.
 -- Cost: three boards of three parts each; step() looks at the runs (one per player carrying, at most 49) every
 -- STEP_PERIOD seconds: a pivot read and a few sums each.
 -- Engine only through deps (defaults use the engine); no side effects on require.
 -- Interface: new(deps) -> Service { press(player, bankId) -> (ok, words), step(dt), leave(player), runOf(player) ->
---   Run?, boards() -> { [bankId]: Board }, stop() }; start(deps) -> Service (builds the boards and their prompts and
+--   Run?, buyOptions(player) -> (ok, words), boards() -> { [bankId]: Board }, stop() }; start(deps) -> Service (builds the boards and their prompts and
 --   steps on Heartbeat); constants PRESS_GAP, CONFIRM_SECS, STEP_PERIOD, REMIND_SECS, FOLDER, WORDS
 
 local Import = require("../Import")
@@ -64,6 +67,8 @@ export type Deps = {
 	attach: ((body: any, item: any) -> any?)?, -- put the prop in the hand; returns it (default: engine)
 	detach: ((prop: any) -> ())?,
 	data: any?, -- Shared/Data (default: Data.default())
+	-- Economy/StockOptions (promptBuy(player)), read when the prompt is pressed (nil: the banks sell none)
+	stockOptions: (() -> any?)?,
 }
 
 type Run = {
@@ -294,6 +299,16 @@ function ErrandService.step(self: any, dt: number?)
 	end
 end
 
+-- The bank's other counter: Spicy Stock Options (StockOptions.promptBuy; it rate-limits and says why not itself).
+function ErrandService.buyOptions(self: any, player: any): (boolean, string?)
+	local get = (self.deps :: Deps).stockOptions
+	local so = if get then get() else nil
+	if so == nil or so.promptBuy == nil then
+		return false, nil
+	end
+	return so.promptBuy(player)
+end
+
 -- The player left the server: an errand still in hand is taken with them (kept).
 function ErrandService.leave(self: any, player: any)
 	local r = self.runs[player]
@@ -397,6 +412,30 @@ function ErrandService._build(self: any, parent: Instance)
 				end
 			end)
 		)
+		if (self.deps :: Deps).stockOptions then
+			local att2 = Instance.new("Attachment")
+			att2.Name = "StockPromptPoint"
+			att2.Position = Vector3.new(0, -0.6, -B.d / 2 - 0.2)
+			att2.Parent = board
+			local buy = Instance.new("ProximityPrompt")
+			buy.Name = "StockOptionsPrompt"
+			buy.ActionText = "Spicy Stock Options"
+			buy.ObjectText = bank.short
+			buy.KeyboardKeyCode = Enum.KeyCode.R
+			buy.HoldDuration = 0
+			buy.MaxActivationDistance = ErrandService.PROMPT_DISTANCE
+			buy.RequiresLineOfSight = false
+			buy.Parent = att2
+			table.insert(
+				self.conns,
+				buy.Triggered:Connect(function(player: Player)
+					local ok, err = pcall(self.buyOptions, self, player)
+					if not ok then
+						warn(`[Errands] stock options failed: {err}`)
+					end
+				end)
+			)
+		end
 		m.Parent = folder
 	end
 end
