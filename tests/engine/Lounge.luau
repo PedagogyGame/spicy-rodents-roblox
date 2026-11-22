@@ -6,7 +6,7 @@
 --   pass      a person with the pass presses the door: just inside, facing the room, CameraZone lockFirstPerson,
 --             Lounge = the venue, "Welcome"
 --   no pass   a person without it is told "Members only." and the offer; not moved, no first person
---   buy       with 25c the podium sells the pass (20c gone) and the person is inside; with 7c it is refused with
+--   buy       with S$2.50 the podium sells the pass (S$2.00 gone, owner D31) and the person is inside; with 70c it is refused with
 --             the wallet's words, nothing taken, still outside
 --   squirrel  a squirrel's press is refused with words; on the forecourt, on the steps, on the landing or in the
 --             room the guards knock it out (once per body, the nearest guard steps in and back); on Bowl Lane (its
@@ -201,13 +201,13 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	check(math.abs(d + 30) < 0.01, "no pass: moved")
 
 	-- buy
-	local c = newPlayer("Buyer", "human", 25, false, street)
+	local c = newPlayer("Buyer", "human", 250, false, street) -- owner D31: the pass is S$2.00
 	local okB, words = svc:buyPass(c)
-	check(okB and c.pass and c.cents == 5, `buy: {words}, {c.cents}c left`)
+	check(okB and c.pass and c.cents == 50, `buy: {words}, {c.cents}c left`)
 	check(svc:isInside(c), "buy: not let in after buying")
-	local poor = newPlayer("Poor", "human", 7, false, street)
+	local poor = newPlayer("Poor", "human", 70, false, street)
 	okB, words = svc:buyPass(poor)
-	check(not okB and poor.cents == 7 and not poor.pass, "buy: sold to a person with 7c")
+	check(not okB and poor.cents == 70 and not poor.pass, "buy: sold to a person with 70c")
 	check(string.find(words, "You need", 1, true) ~= nil, `buy: refused with "{words}"`)
 	check(not svc:isInside(poor), "buy: the poor one is inside")
 
@@ -282,7 +282,7 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	numbers.guards = { tried = tried, struck = struck, spared = spared, wrong = wrong, lunge = moved }
 
 	-- drinks: each of the four, sipped to the end
-	local drinker = newPlayer("Drinker", "human", 100, true, street)
+	local drinker = newPlayer("Drinker", "human", 1000, true, street) -- owner D31: the four drinks are S$3.60
 	svc:enter(drinker)
 	local spent = 0
 	for _, dr in LC.DRINKS do
@@ -383,7 +383,7 @@ function LoungeFlow.play(deps: Deps): { [string]: any }
 	check(not svc:inRoom(brain) and math.abs(d - LC.DOOR_OUTSIDE.d) < 0.01, `sweep: a computer's body at {x}, {d}`)
 
 	-- leaver
-	local f = newPlayer("Leaver", "human", 30, true, street)
+	local f = newPlayer("Leaver", "human", 300, true, street) -- owner D31: x10
 	svc:enter(f)
 	svc:order(f, "green_tea")
 	f.gone = true

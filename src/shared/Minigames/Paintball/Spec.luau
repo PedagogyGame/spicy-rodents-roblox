@@ -25,6 +25,7 @@
 -- The arena has no walk-away radius: the service's Table.inPlay says who is still in the match.
 -- Pure. Interface: a GameSpec.Spec.
 
+local Bank = require("../../Economy/Bank")
 local GameSpec = require("../GameSpec")
 local Arena = require("./Arena")
 local Contract = require("./Contract")
@@ -67,7 +68,7 @@ local Spec: GameSpec.Spec = {
 			{
 				id = Contract.DESK,
 				game = Contract.GAME,
-				label = "Pass desk: 20c for five days",
+				label = `Pass desk: {Bank.amount(Contract.Rules.passCents)} for five days`,
 				action = "Buy a pass",
 				site = Contract.SITE,
 				x = dx,

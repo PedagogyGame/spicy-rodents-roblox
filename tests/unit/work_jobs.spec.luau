@@ -56,7 +56,7 @@ return function(t)
 			{ kind = "work.completed", player = 1, pay = EconomyRules.wage("shoe_desk", 1), class = TownJobs.CLASS },
 			{ players = {} }
 		)
-		t.eq(out[1].pay, 3)
+		t.eq(out[1].pay, 500) -- owner D31: S$5.00 an in-game hour
 		t.eq(out[1].rankDelta, 0)
 		t.eq(EconomyRules.payWhy(out[1].rule), "work")
 	end)
@@ -121,7 +121,7 @@ return function(t)
 		t.eq(#reports, 1, "b did nothing and is not paid")
 		t.eq(reports[1].kind, "work.completed")
 		t.eq(reports[1].player, 1)
-		t.eq(reports[1].pay, 3)
+		t.eq(reports[1].pay, 500) -- owner D31: S$5.00 an in-game hour
 		-- a squirrel is off shift
 		person[b] = false
 		svc:step(0.25)

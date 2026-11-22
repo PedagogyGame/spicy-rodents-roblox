@@ -2,7 +2,7 @@
 -- ServerScriptService.Server.Cosmetics.GiftShop
 -- The bowling alley's gift shop sells its shirt (the one piece of clothing on sale today: Shared/Items/Clothing),
 -- at the cash desk (tools/bake/alley/Shops: GiftShop.Desk). One prompt on the desk, E (a click, a tap, gamepad X):
---   not owned   buys it through the town's wallet (Economy/Credits.buy "alley_shirt": 10c, EconomyRules' price and
+--   not owned   buys it through the town's wallet (Economy/Credits.buy "alley_shirt": S$1.00, EconomyRules' price and
 --               name) and hands it over to the Wardrobe, which puts it on and saves it (owner D16 #25: clothing
 --               carries over between servers). Short of money: the wallet's words, nothing taken.
 --   owned       puts it on, or takes it off if it is on (saved too).
@@ -14,6 +14,10 @@
 -- Interface: press(deps, player) -> (ok, words) (pure over deps); start(opts) -> Shop? (nil without the desk);
 --   ITEM; WORDS; COOLDOWN
 -- Engine only inside start; no side effects on require.
+
+local Import = require("../Import")
+local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 
 local GiftShop = {}
 
@@ -105,7 +109,7 @@ function GiftShop.press(d: Deps, player: any): (boolean, string)
 		end
 		return false, words
 	end
-	-- (the wallet's "Paid 10c for an alley shirt. You have S$2.90.", then where it is kept)
+	-- (the wallet's "Paid S$1.00 for an alley shirt. You have S$24.00.", then where it is kept)
 	if extra then
 		return say(true, withNote(words, extra))
 	end
@@ -136,7 +140,7 @@ function GiftShop.start(opts: Opts): Shop?
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "GiftShopPrompt"
 	prompt.ActionText = "Alley shirt"
-	prompt.ObjectText = "Gift shop: buy, put on or take off (10c)"
+	prompt.ObjectText = `Gift shop: buy, put on or take off ({Bank.amount(EconomyRules.price(GiftShop.ITEM) or 0)})`
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
 	prompt.MaxActivationDistance = 8

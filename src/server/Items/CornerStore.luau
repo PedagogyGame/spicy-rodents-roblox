@@ -8,7 +8,7 @@
 --   * Pay: the till's prompt ("Pay", E) charges the whole basket ONCE through the town's wallet (Economy/Credits
 --     .buy with the list: its price and names are the wallet's), and only then hands the things over
 --     (Server/Items/Inventory: the record and a Tool each in the Backpack). Short of money: the wallet's words
---     ("You need 21c; you have 7c.") and nothing is taken; the basket stays. A second press while a purchase is
+--     ("You need S$2.10; you have 70c.") and nothing is taken; the basket stays. A second press while a purchase is
 --     being served is refused with words and charges nothing (a busy flag here, and the wallet's own guard).
 --     "Put back" at the till (R / gamepad Y, a short hold) empties the basket onto the shelves.
 --   * Nothing leaves unpaid: a shopper whose body is outside the store (the baked Zone box), or who has no body,

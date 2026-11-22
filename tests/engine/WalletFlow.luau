@@ -3,7 +3,7 @@
 -- The town's wallet as a running game has it, as plain results (Server/Economy/Credits, wired by
 -- Server/Boot/Game.wallet). One PlayerLike stub { UserId, Name, attrs, events } is taken through what every
 -- shop, door and game will do with money:
---   pocket    arriving gives S$3.00 once, and the balance is on the player for the screen (attrs.Cents)
+--   pocket    arriving gives S$25.00 once (owner D31), and the balance is on the player for the screen (attrs.Cents)
 --   a sale    12c for a coffee: ok and the words, the balance and the note beside it (attrs.CentsNote)
 --   too dear  refused in words, and nothing moves
 --   no price  a price that is nil is the shop's mistake: "That is not for sale yet.", nothing taken
@@ -41,16 +41,17 @@ function WalletFlow.play(wallet: any, opts: Opts): { [string]: any }
 	-- pocket money, once
 	wallet.join(player)
 	numbers.pocket = wallet.balance(player)
-	check(numbers.pocket == 300, `pocket money {tostring(numbers.pocket)} (want 300)`)
-	check(attrs.Cents == 300, `Cents on the player {tostring(attrs.Cents)}`)
+	-- owner D31: S$25.00 of pocket money, and prices x10
+	check(numbers.pocket == 2500, `pocket money {tostring(numbers.pocket)} (want 2500)`)
+	check(attrs.Cents == 2500, `Cents on the player {tostring(attrs.Cents)}`)
 	check(wallet.join(player) == 0, "joining twice gave more pocket money")
 	check(wallet.counted(player) == 0, `pocket money counts toward the queue ({tostring(wallet.counted(player))})`)
 
 	-- a sale
 	local paid, paidWords = wallet.spend(player, 12, "coffee")
-	check(paid and paidWords == "Paid 12c for coffee. You have S$2.88.", `a coffee: {tostring(paidWords)}`)
+	check(paid and paidWords == "Paid 12c for coffee. You have S$24.88.", `a coffee: {tostring(paidWords)}`)
 	check(
-		attrs.Cents == 288 and string.match(tostring(attrs.CentsNote), "^%d+|%-12|coffee$") ~= nil,
+		attrs.Cents == 2488 and string.match(tostring(attrs.CentsNote), "^%d+|%-12|coffee$") ~= nil,
 		`the balance on the player did not follow ({tostring(attrs.Cents)}, {tostring(attrs.CentsNote)})`
 	)
 
@@ -60,20 +61,20 @@ function WalletFlow.play(wallet: any, opts: Opts): { [string]: any }
 		served = true
 		return true
 	end)
-	check(byId and served and byIdWords == "Paid 5c for nachos. You have S$2.83.", `by id: {tostring(byIdWords)}`)
-	wallet.add(player, 5, "nachos handed back")
+	check(byId and served and byIdWords == "Paid 50c for nachos. You have S$24.38.", `by id: {tostring(byIdWords)}`)
+	wallet.add(player, 50, "nachos handed back")
 
 	-- too dear, and a price that is missing
-	local short, shortWords = wallet.spend(player, 1000, "a jet ski")
-	check(not short and shortWords == "You need S$10.00; you have S$2.88.", `too dear: {tostring(shortWords)}`)
+	local short, shortWords = wallet.spend(player, 10000, "a jet ski")
+	check(not short and shortWords == "You need S$100.00; you have S$24.88.", `too dear: {tostring(shortWords)}`)
 	local noPrice: any = nil
 	local sold, soldWords = wallet.spend(player, noPrice, "lane shoes")
 	check(not sold and soldWords == "That is not for sale yet.", `no price: {tostring(soldWords)}`)
-	check(wallet.balance(player) == 288, `a refusal moved the balance to {tostring(wallet.balance(player))}`)
+	check(wallet.balance(player) == 2488, `a refusal moved the balance to {tostring(wallet.balance(player))}`)
 
 	-- the pass, on the day clock
 	local cents, days, offer = wallet.pass.offer()
-	check(cents == 20 and days == 5 and type(offer) == "string", `the pass on offer: {tostring(offer)}`)
+	check(cents == 200 and days == 5 and type(offer) == "string", `the pass on offer: {tostring(offer)}`)
 	check(not wallet.pass.has(player), "a pass before one was bought")
 	local bought, boughtWords = wallet.pass.buy(player)
 	check(bought and wallet.pass.has(player), `the pass: {tostring(boughtWords)}`)
@@ -82,18 +83,18 @@ function WalletFlow.play(wallet: any, opts: Opts): { [string]: any }
 	check(type(attrs.PassUntil) == "number", "no PassUntil on the player")
 	local again, againWords = wallet.pass.buy(player)
 	check(not again and againWords == "You already have a pass.", `a second pass: {tostring(againWords)}`)
-	check(wallet.balance(player) == 268, `after the pass {tostring(wallet.balance(player))}c (want 268)`)
+	check(wallet.balance(player) == 2288, `after the pass {tostring(wallet.balance(player))}c (want 2288)`)
 
 	-- the minigames' town is the same wallet
 	local town = opts.town
 	if town then
-		local okC, wordsC = town.charge(player, 1000, "a game")
+		local okC, wordsC = town.charge(player, 10000, "a game")
 		check(
-			not okC and wordsC == "You need S$10.00; you have S$2.68.",
+			not okC and wordsC == "You need S$100.00; you have S$22.88.",
 			`ctx.town.charge is not the wallet: {tostring(wordsC)}`
 		)
 		local okT, wordsT = town.charge(player, 3, "a token")
-		check(okT and wordsT == "Paid 3c for a token. You have S$2.65.", `ctx.town.charge: {tostring(wordsT)}`)
+		check(okT and wordsT == "Paid 3c for a token. You have S$22.85.", `ctx.town.charge: {tostring(wordsT)}`)
 		check(town.pass == wallet.pass, "ctx.town.pass is not the wallet's pass")
 		check(town.pass.has(player), "the games do not see the pass the wallet sold")
 		wallet.add(player, 3, "a token handed back")
@@ -117,7 +118,7 @@ function WalletFlow.play(wallet: any, opts: Opts): { [string]: any }
 	local gone, goneWords = wallet.spend(player, 1, "bubble gum")
 	check(not gone and goneWords == "You have left the game.", `spent after leaving: {tostring(goneWords)}`)
 	check(wallet.join(player) == 0, "coming back gave more pocket money")
-	check(wallet.balance(player) == 268, `back with {tostring(wallet.balance(player))}c (want 268)`)
+	check(wallet.balance(player) == 2288, `back with {tostring(wallet.balance(player))}c (want 2288)`)
 	check(wallet.pass.has(player), "the pass did not survive leaving and coming back")
 	numbers.cents = wallet.balance(player)
 

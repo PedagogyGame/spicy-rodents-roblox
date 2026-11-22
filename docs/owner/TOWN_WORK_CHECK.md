@@ -19,12 +19,12 @@ ERRANDS, deliveries around town".
 
 Check:
 1. Walk up to a board as a person. Press **E** ("Errands"). A line at the top of the screen tells you the errand,
-   for example "Take this parcel to Pepper's Corner Store. You have 9 minutes; it pays 14c." or "Bring these
+   for example "Take this parcel to Pepper's Corner Store. You have 9 minutes; it pays S$12.00." or "Bring these
    flowers to Mrs. Abbott at the Victorian house south-west of the old town crossroads."
 2. The parcel, letter, flowers, cake box or book is in your person's right hand.
 3. Nothing is marked on the map or the screen. You have to know where the place is. When you come within about
    45 studs of it, you get one quiet line: "You're close to ...".
-4. Walk up to the place's door. The thing leaves your hand and you get paid: "Delivered ... +14c."
+4. Walk up to the place's door. The thing leaves your hand and you get paid: "Delivered ... +S$12.00."
 5. You can only carry one errand at a time. If you press a board while carrying one, it tells you what you carry
    and for whom.
 6. If you can't find the place, go back to any bank's board and press **E** twice. You hand it back with no pay
@@ -37,8 +37,8 @@ the Chili Pepper Grill, the clock tower in the Quay Market, the Bellwether Galle
 foot of Lookout Hill, the West Topeka police station, the Westside fuel station and Westside Storage. The people are
 the residents of the four old-town houses, at their own front doors.
 
-**Pay.** An errand pays 4c, plus 1c for every 100 studs from the bank, up to 30c. Most errands pay 15 to 30c, which
-is about five to ten in-game hours at the minimum wage.
+**Pay.** An errand pays S$2.00, plus S$1.00 for every 100 studs from the bank, up to S$15.00 (your choice, D31:
+"errands about S$2-15"). Most errands pay S$8 to S$15, which is about two to three in-game hours of a job.
 
 **Time.** You get the straight distance at a slow walk plus two minutes. That is usually 5 to 10 minutes, enough to
 walk the long way round. A minute before the end you get a reminder.
@@ -59,10 +59,10 @@ jobs, each with a prompt **E** "Work here":
   telescope.
 
 Check:
-1. As a townsperson, press **E** at the post. You are told the job, the pay (3c an in-game hour) and your first
+1. As a townsperson, press **E** at the post. You are told the job, the pay (S$5.00 an in-game hour) and your first
    duty.
 2. Walk to the named duty and stand there a few seconds. You get "Done. Next: ...".
-3. Each in-game hour (about 30 real seconds) in which you did at least one duty pays 3c ("+3c for an hour as ...").
+3. Each in-game hour (about 30 real seconds) in which you did at least one duty pays S$5.00 ("+S$5.00 for an hour as ...").
    An hour with nothing done pays nothing. After three idle hours you are clocked off.
 4. Press **E** at the post again to clock off.
 5. Two players at most per job, and one job at a time. Police and doctors can't take these jobs: they already have
@@ -83,13 +83,13 @@ reputation mark; this part only takes the money.
 
 What "the lowest townsperson station's money level" means here: the townsperson is the lowest station on the
 ladder. Its money level is the least money any townsperson in the server holds right now. If there is no other
-townsperson, it is what a newcomer starts with (S$3.00 of pocket money). The penalty never raises anyone's money.
+townsperson, it is what a newcomer starts with (S$25.00 of pocket money). The penalty never raises anyone's money.
 
-**Please decide: S$100 is very large in this game's money.** Wages are 2 to 6 cents an in-game hour, and a newcomer
-gets S$3.00. In practice the S$100 penalty takes everything a player has. The wallet never goes below zero: there
-is no debt anywhere in the game, so a player with less than S$100 loses what they have. The amount is one setting
-(`work.penaltyCents`). If you meant something smaller, tell me the amount. Saved stock options are never touched by
-a penalty.
+**Decided (D31): the pay was raised to meet the S$100.** Jobs pay S$3 to S$6 an in-game hour (about S$5; an hour
+is 30 real seconds), errands S$2 to S$15, a doctor S$10 a patient, and a newcomer gets S$25.00. Prices went up ten
+times with it (a coffee is S$1.20, the pass S$2.00). So S$100 is about ten real minutes of steady work. The wallet
+never goes below zero: there is no debt anywhere in the game, so a player with less than S$100 loses what they
+have. The amount is one setting (`work.penaltyCents`). Saved stock options are never touched by a penalty.
 
 ## 4. The people at the top of the sky lift now move
 

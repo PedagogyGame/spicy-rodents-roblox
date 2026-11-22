@@ -61,21 +61,22 @@ export type Effect = { kind: string, [string]: any }
 
 local ItemRules = {}
 
+-- prices in cents (owner D31: ten times the first list, so a soda is 40c and the kite S$6.00)
 -- stylua: ignore
 ItemRules.CATALOG = {
-	{ id = "water_gun", price = 6, effect = "squirt", npcReaction = "wet", rodentStunSecs = 1.3, oncePer = "player", range = 14 },
-	{ id = "frisbee", price = 5, effect = "throw", speed = 38, lift = 0.35 }, { id = "football", price = 6, effect = "throw", speed = 44, lift = 0.5 },
-	{ id = "bubbles", price = 3, effect = "vfx", secs = 4 }, { id = "chalk", price = 2, effect = "write", letters = 20 },
-	{ id = "flashlight", price = 6, effect = "spotlight", nightOnly = true }, { id = "umbrella", price = 5, effect = "cosmetic" },
-	{ id = "peanuts", price = 4, effect = "bait", radius = 40, secs = 45 }, { id = "bird_seed", price = 40, effect = "bait", radius = 60, secs = 90, birds = 3 },
-	{ id = "dog_treats", price = 4, effect = "calm_dog", radius = 12, secs = 120 }, { id = "newspaper", price = 2, effect = "read_and_throw", speed = 30, lift = 0.4 },
-	{ id = "camera", price = 6, effect = "screenshot" }, { id = "duct_tape", price = 4, effect = "patch_bandage", reach = 6 },
-	{ id = "whoopee_cushion", price = 15, effect = "seat_trap" }, { id = "harmonica", price = 5, effect = "sound" },
-	{ id = "air_horn", price = 5, effect = "startle", radius = 12 }, { id = "soda", price = 4, effect = "stamina", scale = 1.15 },
-	{ id = "ice_cream_bar", price = 5, effect = "stamina", scale = 1.15 }, { id = "lawn_chair", price = 6, effect = "place_seat" },
-	{ id = "radio", price = 8, effect = "playlist" }, { id = "bike_horn", price = 3, effect = "sound" },
-	{ id = "kite", price = 60, effect = "ride", ride = "kite" },
-	{ id = "kick_ball", price = 7, effect = "throw", speed = KickBall.C.kickSpeed, lift = KickBall.C.kickLift }, -- D30
+	{ id = "water_gun", price = 60, effect = "squirt", npcReaction = "wet", rodentStunSecs = 1.3, oncePer = "player", range = 14 },
+	{ id = "frisbee", price = 50, effect = "throw", speed = 38, lift = 0.35 }, { id = "football", price = 60, effect = "throw", speed = 44, lift = 0.5 },
+	{ id = "bubbles", price = 30, effect = "vfx", secs = 4 }, { id = "chalk", price = 20, effect = "write", letters = 20 },
+	{ id = "flashlight", price = 60, effect = "spotlight", nightOnly = true }, { id = "umbrella", price = 50, effect = "cosmetic" },
+	{ id = "peanuts", price = 40, effect = "bait", radius = 40, secs = 45 }, { id = "bird_seed", price = 400, effect = "bait", radius = 60, secs = 90, birds = 3 },
+	{ id = "dog_treats", price = 40, effect = "calm_dog", radius = 12, secs = 120 }, { id = "newspaper", price = 20, effect = "read_and_throw", speed = 30, lift = 0.4 },
+	{ id = "camera", price = 60, effect = "screenshot" }, { id = "duct_tape", price = 40, effect = "patch_bandage", reach = 6 },
+	{ id = "whoopee_cushion", price = 150, effect = "seat_trap" }, { id = "harmonica", price = 50, effect = "sound" },
+	{ id = "air_horn", price = 50, effect = "startle", radius = 12 }, { id = "soda", price = 40, effect = "stamina", scale = 1.15 },
+	{ id = "ice_cream_bar", price = 50, effect = "stamina", scale = 1.15 }, { id = "lawn_chair", price = 60, effect = "place_seat" },
+	{ id = "radio", price = 80, effect = "playlist" }, { id = "bike_horn", price = 30, effect = "sound" },
+	{ id = "kite", price = 600, effect = "ride", ride = "kite" },
+	{ id = "kick_ball", price = 70, effect = "throw", speed = KickBall.C.kickSpeed, lift = KickBall.C.kickLift }, -- D30
 } :: { Def }
 
 local byId: { [string]: Def } = {}

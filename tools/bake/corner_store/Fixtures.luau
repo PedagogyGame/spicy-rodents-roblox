@@ -10,13 +10,15 @@
 --   Front     the newspaper rack, the umbrella bin and the lawn chair on show in the window.
 -- Each of the 23 items (SLOTS, the catalogue's ids) has its place; each one on sale (a price in `prices`: not the dog
 -- treats until the town has dogs) is a Model "Item_<id>" with attributes ItemId and Price:
--- "Sample" (the model the server hands a buyer), two more copies under "More", a price tag (its price in
--- cents, "5c"), and an invisible "Grab" part holding the ProximityPrompt (E, a click or a tap, gamepad X).
+-- "Sample" (the model the server hands a buyer), two more copies under "More", a price tag (its price as
+-- Economy/Bank.amount writes it, "50c" or "S$6.00"), and an invisible "Grab" part holding the ProximityPrompt (E,
+-- a click or a tap, gamepad X).
 -- Interface: build(kit, root, prices, names) -> count of items stocked; SLOTS (id -> { x, y, d, yaw, fixture });
 --   COUNTER { x0, x1, d0, d1, top }; STAFF { x, d } (the shopkeeper's post); STAFF_ROUND ({ {x, d} });
 --   GONDOLAS ({ centre X }); GONDOLA_D { d0, d1 }; REACH (the prompts' reach); FAR_REACH (over the counter)
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
+local Bank = require("../../../src/shared/Economy/Bank")
 local Kit = require("../alley/Kit")
 local Stock = require("./Stock")
 
@@ -367,7 +369,7 @@ local function slot(kit: Kit.Kit, parent: any, id: string, s: any, price: number
 		rot = turn,
 	})
 	local gui = kit:gui(tag, "Back", 60)
-	kit:label(gui, { Text = `{price}c`, TextColor = { 200, 30, 30 }, Font = "FredokaOne" })
+	kit:label(gui, { Text = Bank.amount(price), TextColor = { 200, 30, 30 }, Font = "FredokaOne" })
 	-- the prompt's part: an invisible box round the sample, the prompt on it
 	local grab = kit:at(
 		m,
@@ -419,10 +421,10 @@ function Fixtures.build(kit: Kit.Kit, root: any, prices: { [string]: number }, n
 		end
 		local m = slot(kit, items, id, s, prices[id])
 		local prompt = m.Grab.Take
-		-- "Water gun, 6c": the wallet's name for it, capitalised, without its article
+		-- "Water gun, 60c": the wallet's name for it, capitalised, without its article
 		local name = names[id] or id
 		name = string.gsub(name, "^an? ", "")
-		prompt.ObjectText = `{string.upper(string.sub(name, 1, 1))}{string.sub(name, 2)}, {prices[id]}c`
+		prompt.ObjectText = `{string.upper(string.sub(name, 1, 1))}{string.sub(name, 2)}, {Bank.amount(prices[id])}`
 		n += 1
 	end
 	return n

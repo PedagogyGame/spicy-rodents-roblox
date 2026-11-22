@@ -324,7 +324,7 @@ return function(t)
 		end
 	)
 
-	t.test("the counter with a wallet: the one charge, 10 cents as hilltop_lunch; no money, no lunch", function()
+	t.test("the counter with a wallet: the one charge, S$1.00 as hilltop_lunch; no money, no lunch", function()
 		FakeEngine.with(function()
 			local charged: { any } = {}
 			local w0 = world()
@@ -343,7 +343,8 @@ return function(t)
 			broke[poor] = true
 			local ok, text = w.svc:counter(rich)
 			t.eq(ok, true)
-			t.eq(string.find(text :: string, "10 cents", 1, true) ~= nil, true)
+			t.eq(string.find(text :: string, "S$1.00", 1, true) ~= nil, true) -- owner D31: the lunch was 10 cents
+			t.eq(SkyLiftService.LUNCH_CENTS, 100)
 			t.eq(#charged, 1)
 			t.eq(charged[1][2], SkyLiftService.LUNCH_CENTS)
 			t.eq(charged[1][3], "hilltop_lunch")

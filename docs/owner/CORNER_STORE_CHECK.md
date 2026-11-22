@@ -14,16 +14,16 @@ Only people. A squirrel or the Spicy Rodent can run in, but the shelves tell the
 | 1 | Walk in at the front | Brown and gold checked lino, walnut panelled walls, white strip lights, four low shelving units you can see over, a cold-drinks fridge and an ice-cream freezer at the back, a hardware pegboard on the right-hand wall |
 | 2 | The counter (just inside, on your left) | The till, the bell, a gum rack, the cameras on the end of the counter; behind it the shopkeeper walking a few steps up and down, and the back shelf with the bird seed and the kite |
 | 3 | Walk every aisle | Room to walk past the shelves without catching on them; the camera does not get stuck |
-| 4 | The price tags | Each item has a small tag with its price in cents, such as "5c" |
+| 4 | The price tags | Each item has a small tag with its price, such as "50c" or "S$6.00" (D31: ten times the first prices) |
 | 5 | At night | Is it too dark or too bright inside? |
 
 ## Please check: buying
 | # | What to try | What should happen |
 |---|---|---|
-| 1 | Walk up to the frisbee and press **E** (or click it, or tap it, or press X on a gamepad) | "Frisbee, 5c: in your basket (5c in all). Pay at the counter." Nothing is taken yet |
-| 2 | Pick up a soda from the fridge too, then go to the counter and press **E** on **Pay** | "Paid 9c for a frisbee and a soda ..." and both appear in your hotbar at the bottom of the screen. The money in the corner drops once, by 9c |
+| 1 | Walk up to the frisbee and press **E** (or click it, or tap it, or press X on a gamepad) | "Frisbee, 50c: in your basket (50c in all). Pay at the counter." Nothing is taken yet |
+| 2 | Pick up a soda from the fridge too, then go to the counter and press **E** on **Pay** | "Paid 90c for a frisbee and a soda ..." and both appear in your hotbar at the bottom of the screen. The money in the corner drops once, by 90c |
 | 3 | Pick something up and walk out of the door without paying | "You put ... back: pay at the counter before you leave." Nothing is taken |
-| 4 | Pick up the kite (60c) with less money than that, and press Pay | "You need 60c; you have ...c." Nothing is taken. Hold **R** (gamepad Y) at the till to put everything back |
+| 4 | Pick up the kite (S$6.00) with less money than that (spend your S$25.00 pocket money down first), and press Pay | "You need S$6.00; you have ...." Nothing is taken. Hold **R** (gamepad Y) at the till to put everything back |
 | 5 | Press Pay twice very fast | You pay once |
 
 ## Please check: using what you bought
@@ -40,7 +40,7 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 | Newspaper | First use: you read a headline. Second use: you throw it away |
 | Frisbee, football | Thrown ahead; the frisbee glides. Anyone can pick it up with E, or catch it if it hits them, but it stays yours (your D16 #26): they only borrow it to throw back. Left lying for a minute, it comes back to you. See `OWNERSHIP_CHECK.md` |
 | Peanuts, bird seed | A pile at your feet: squirrels nearby come to it and stay. Bird seed reaches further and brings three birds |
-| Dog treats | On the third gondola, 4c for a box of three. Stand within 12 studs of a yard dog and use one: the nearest dog sits down and wags its tail, and leaves squirrels alone for two minutes. With no dog near you read "No dog near enough to give a treat to." and nothing is used |
+| Dog treats | On the third gondola, 40c for a box of three. Stand within 12 studs of a yard dog and use one: the nearest dog sits down and wags its tail, and leaves squirrels alone for two minutes. With no dog near you read "No dog near enough to give a treat to." and nothing is used |
 | Duct tape | A strip of tape on whatever is in front of you (10 strips) |
 | Whoopee cushion | Put down in front of you; the next person who steps on it sets it off. E picks it back up; if someone else presses E, it goes back into your things |
 | Lawn chair | Set down in front of you and you sit in it, anywhere but right by a shelf, the till or a door. E (held) folds it back up; one each (a second folds the first); left empty for 3 minutes it folds itself; nobody bumps into it |

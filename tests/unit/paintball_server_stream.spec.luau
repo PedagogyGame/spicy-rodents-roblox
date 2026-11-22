@@ -686,7 +686,7 @@ return function(t)
 	)
 
 	t.test(
-		"the pass desk: sold once for 20c through the town, good for five game days from the minute of buying, kept by user",
+		"the pass desk: sold once for S$2.00 through the town, good for five game days from the minute of buying, kept by user",
 		function()
 			local day, charged, refuse = 10.5, {} :: { any }, false
 			local desk = PassDesk.new(function(player: any, cents: number, why: string): (boolean, string?)
@@ -716,7 +716,7 @@ return function(t)
 			refuse = true
 			t.deepEq(
 				{ desk.buy(bea) },
-				{ false, "You need 20c; you have 7c" },
+				{ false, "You need S$2.00; you have 7c" }, -- owner D31: the pass is S$2.00
 				"the town's own words for a short purse"
 			)
 			t.falsy(desk.has(bea))
@@ -829,10 +829,11 @@ return function(t)
 	)
 
 	t.test(
-		"the pass desk on the game's own wallet (Shared/Economy/Wallet): 20 spicy cents leave the purse once, a short purse is refused in its own numbers and keeps every cent",
+		"the pass desk on the game's own wallet (Shared/Economy/Wallet): S$2.00 leaves the purse once, a short purse is refused in its own numbers and keeps every cent",
 		function()
 			-- the town's charge as the boot is to wire it (a person's server-life purse; reported to the lead)
-			local purses: { [number]: Wallet.Purse } = { [41] = Wallet.purse(100), [42] = Wallet.purse(7) }
+			-- owner D31: the pass is S$2.00, so the purses are ten times what they were
+			local purses: { [number]: Wallet.Purse } = { [41] = Wallet.purse(1000), [42] = Wallet.purse(70) }
 			local function charge(player: any, cents: number, why: string): (boolean, string?)
 				local purse = purses[player.UserId]
 				if purse == nil then
@@ -850,22 +851,22 @@ return function(t)
 			end)
 			local ada, bea = { UserId = 41 }, { UserId = 42 }
 			t.deepEq({ desk.buy(ada) }, { true, Contract.textFor("bought") })
-			t.eq(purses[41].cents, 100 - Contract.Rules.passCents, "20 spicy cents, once")
-			t.eq(Contract.Rules.passCents, 20)
-			t.deepEq(purses[41].history[1], { delta = -20, why = "a paintball pass", balance = 80 })
+			t.eq(purses[41].cents, 1000 - Contract.Rules.passCents, "S$2.00, once")
+			t.eq(Contract.Rules.passCents, 200)
+			t.deepEq(purses[41].history[1], { delta = -200, why = "a paintball pass", balance = 800 })
 			for _ = 1, 3 do
 				t.deepEq({ desk.buy(ada) }, { false, Contract.textFor("has_pass") })
 			end
-			t.eq(purses[41].cents, 80, "pressing again costs nothing")
-			t.deepEq({ desk.buy(bea) }, { false, "You need 20c; you have 7c" })
-			t.eq(purses[42].cents, 7, "a refusal takes nothing")
+			t.eq(purses[41].cents, 800, "pressing again costs nothing")
+			t.deepEq({ desk.buy(bea) }, { false, "You need S$2.00; you have 70c" })
+			t.eq(purses[42].cents, 70, "a refusal takes nothing")
 			t.eq(#purses[42].history, 0)
 			t.falsy(desk.has(bea))
 			-- five in-game days on, the pass has run out and is sold again, from the same purse
 			day = 3 + Contract.Rules.passDays
 			t.falsy(desk.has(ada))
 			t.deepEq({ desk.buy(ada) }, { true, Contract.textFor("bought") })
-			t.eq(purses[41].cents, 60)
+			t.eq(purses[41].cents, 600)
 		end
 	)
 end

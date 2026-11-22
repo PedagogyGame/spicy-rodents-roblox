@@ -161,8 +161,10 @@ return function(t)
 		end
 		t.truthy(n >= 10, `only {n} places offered`)
 		t.truthy(Errands.pay(2000) > Errands.pay(400), "farther pays more")
-		t.eq(Errands.pay(1e6), 30, "the cap")
-		t.eq(Errands.pay(0), 4, "the base")
+		-- owner D31: errands pay about S$2 to S$15
+		t.eq(Errands.pay(1e6), 1500, "the cap")
+		t.eq(Errands.pay(0), 200, "the base")
+		t.eq(Errands.pay(600), 800, "S$2.00 and S$1.00 for every 100 studs")
 		t.eq(Errands.duration(30), "30 seconds")
 		t.eq(Errands.duration(600), "10 minutes")
 	end)

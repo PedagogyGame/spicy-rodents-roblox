@@ -35,9 +35,9 @@
 --   * STANDING IDLE: the player only trembles the mouse and shuffles a foot (inside the server's bounds), is
 --     tagged and comes back; the HUD says "Still there?" a full Tuning.idleWarn before the real server takes
 --     the player off by its idle rule, and first person is let go.
---   * FROM THE STREET (the join's end-to-end case): no pass and 27c in the purse, the player walks from the
+--   * FROM THE STREET (the join's end-to-end case): no pass and S$2.07 in the purse, the player walks from the
 --     street in front of the station into the lobby (shown the match from the audience's edge), buys the
---     pass at the desk through the town's charge (20c taken once; a second press says so and takes
+--     pass at the desk through the town's charge (S$2.00 taken once; a second press says so and takes
 --     nothing), joins at the arena door, plays a short match among the real bots to the end card, leaves
 --     from it, and walks back out into the street (the show ends).
 -- Interface: return function(t) (the spec shape); real() -> boolean
@@ -1257,7 +1257,7 @@ return function(t)
 	t.test(
 		"from the street: a person walks to the station, buys the pass at the desk, joins, plays a short match against the real bots to the end card, and leaves",
 		function()
-			local purse: Purse = { cents = 27, paid = {} }
+			local purse: Purse = { cents = 207, paid = {} } -- owner D31: the pass is S$2.00
 			local inLobby = false
 			local seated = play(function(v)
 				local w = v.w
@@ -1332,7 +1332,7 @@ return function(t)
 				t.truthy(v.walk(0, 88, 10) and v.walk(0, 106, 10), "out of the front door")
 				v.run(1)
 				t.eq(PaintballClient.show(), nil)
-				t.eq(purse.cents, 7, "20c, once")
+				t.eq(purse.cents, 7, "S$2.00, once")
 			end, {
 				purse = purse,
 				first = function(v)
@@ -1365,11 +1365,11 @@ return function(t)
 					-- the desk's prompt says what it does (the review: it read "Join the match")
 					t.eq(Rig.prompt(w, Contract.DESK).ActionText, "Buy a pass")
 					t.truthy(Rig.prompt(w, Contract.STATION).ActionText ~= "Buy a pass")
-					-- THE DESK: 20c for the pass, once; a second press says so and takes nothing
+					-- THE DESK: S$2.00 for the pass, once; a second press says so and takes nothing
 					local toasts = #w.toasts
 					Rig.press(w, Contract.DESK)
 					v.run(0.5)
-					t.eq(purse.cents, 7, "20c taken")
+					t.eq(purse.cents, 7, "S$2.00 taken")
 					t.deepEq(purse.paid, { "a paintball pass" })
 					t.eq(w.client.active(), nil, "the desk seats nobody")
 					t.truthy(

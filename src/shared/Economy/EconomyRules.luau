@@ -1,21 +1,22 @@
 --!strict
 -- ReplicatedStorage.Shared.Economy.EconomyRules
 -- Spicy Dollars in integer cents (BUILD_PLAN §1.4, §3.14, D26; brief v2 §13a): wages per in-game hour
--- (the minimum is 2 cents), prices, gig pay by quality (Gigs/GigRules), developer-product grants
+-- (the minimum is S$3.00, owner D31), prices, gig pay by quality (Gigs/GigRules), developer-product grants
 -- (Economy/Products), the receipt idempotency key, and the MONEY TERM of the human queue score, which
 -- Roles/Ladder reads (queueMoney). Wallet stays server-life until W4. Pure.
 -- Pocket money and the timed pass (what Server/Economy/Credits hands Economy/Bank): pocketMoney() is the
 -- one amount a player is given, once, until jobs pay (Tunables economy.pocketMoneyCents; 0 switches it
 -- off); pass("paintball") is the one pass the arena and both lounges read (brief v2 §13: "20 spicy cents
--- buys five in-game days of access, which also unlocks five days in the lounges"), with the paintball
--- contract's own words; passLeftWords says how long a pass has left in in-game days AND real minutes (a
+-- buys five in-game days of access, which also unlocks five days in the lounges"; S$2.00 since owner D31), with
+-- the paintball contract's own words; passLeftWords says how long a pass has left in in-game days AND real minutes (a
 -- five-day pass is one real hour at a 12-minute day).
 -- The pass has ONE price and ONE length: Tunables economy.paintballPassCents and economy.paintballPassDays.
 -- pass("paintball") reads them every time, its `offer` is the sentence a door or a desk shows, and
 -- price("paintball_pass") reads the same number: there is no second copy to fall out of step.
 -- PRICES holds what the venues sell that is not a corner-store item (those are Items/ItemRules): the brief's
--- coffee 12 and nachos 5, the lounges' drinks, the hilltop lunch (10), the alley's own ball (25), shoe rental
--- (0: an extra, free while the desk says FREE BOWLING TODAY) and the alley's souvenirs (3 to 10). A venue
+-- coffee and nachos (S$1.20 and 50c since owner D31), the lounges' drinks, the hilltop lunch (S$1.00), the alley's own
+-- ball (S$2.50), shoe rental (0: an extra, free while the desk says FREE BOWLING TODAY) and the alley's souvenirs (30c
+-- to S$1.00). A venue
 -- sells by id through the wallet (Credits.buy(player, id)), which reads item(id): the price and the NAMES row
 -- together; an id with no price or no name is turned away with "That is not for sale yet." and a warning in
 -- the server's log that names the id.
@@ -36,28 +37,30 @@ local Products = require("./Products")
 local EconomyRules = {}
 
 -- economy/wages.json defaults (cents per in-game hour)
+-- (owner D31: jobs pay about S$5 an in-game hour, which is 30 real seconds; the minimum is S$3)
 EconomyRules.WAGES = table.freeze({
-	minimum = 2,
+	minimum = 300,
 	jobs = table.freeze({
-		cashier = 2,
-		barber_cut = 4,
-		restock = 3,
-		hospital_shift = 6,
-		police_shift = 6,
+		cashier = 300,
+		barber_cut = 500,
+		restock = 400,
+		hospital_shift = 600,
+		police_shift = 600,
 		-- D30: the bowling alley's and the Lookout's jobs (Shared/Work/TownJobs)
-		shoe_desk = 3,
-		lane_attendant = 3,
-		lookout_attendant = 3,
+		shoe_desk = 500,
+		lane_attendant = 500,
+		lookout_attendant = 500,
 	}),
 })
 
--- economy/prices.json defaults (cents); items price from Items/ItemRules; the paintball pass from its tunable
+-- economy/prices.json defaults (cents); items price from Items/ItemRules; the paintball pass from its tunable.
+-- (owner D31: ten times the first list, with the pay raised: a coffee is S$1.20)
 -- stylua: ignore
-EconomyRules.PRICES = table.freeze({ coffee = 12, nachos = 5, hot_cocoa = 10, green_tea = 8, snow_cone = 6, jetski_rental = 50,
-	paintball_garb_set = 100, wind_tunnel_balls = 15,
-	hilltop_lunch = 10, -- the Lookout's restaurant, served to the table
-	bowling_ball = 25, lane_shoes = 0, -- the alley: your own ball; shoe rental is a free extra
-	alley_postcard = 3, alley_pin_toy = 5, alley_mug = 8, alley_shirt = 10 }) -- the alley's gift shop
+EconomyRules.PRICES = table.freeze({ coffee = 120, nachos = 50, hot_cocoa = 100, green_tea = 80, snow_cone = 60, jetski_rental = 500,
+	paintball_garb_set = 1000, wind_tunnel_balls = 150,
+	hilltop_lunch = 100, -- the Lookout's restaurant, served to the table
+	bowling_ball = 250, lane_shoes = 0, -- the alley: your own ball; shoe rental is a free extra
+	alley_postcard = 30, alley_pin_toy = 50, alley_mug = 80, alley_shirt = 100 }) -- the alley's gift shop
 
 -- Whole cents for `hours` in-game hours of `job`; never below the minimum wage, rounded down so a
 -- partial cent is never paid (the job service carries the remainder).
@@ -66,11 +69,10 @@ function EconomyRules.wage(job: string, hours: number): number
 	return math.floor(rate * math.max(0, hours) + 1e-9)
 end
 
--- What a player reads for each thing on sale, set into the wallet's words ("Paid 10c for a hot cocoa."):
+-- What a player reads for each thing on sale, set into the wallet's words ("Paid S$1.00 for a hot cocoa."):
 -- every row of PRICES and every corner-store item (Items/ItemRules: its ids are the shelf's). Not the pass:
 -- it has a name of its own (pass().why) and is sold only by wallet.pass.buy, which also grants it. A spec
 -- holds that nothing has a price without a name or a name without a price, so an id never reaches a screen.
--- (The alley's snack-bar board says "ice cream 5": that is the corner store's ice_cream_bar, one price.)
 -- stylua: ignore
 EconomyRules.NAMES = table.freeze({
 	coffee = "coffee", nachos = "nachos", hot_cocoa = "a hot cocoa", green_tea = "a green tea", snow_cone = "a snow cone",
@@ -167,7 +169,7 @@ function EconomyRules.pass(name: string): Bank.PassSpec?
 	}
 end
 
--- A Roles/Ladder pay rule as a player reads it beside the money ("+6c  work"), never the rule's own id.
+-- A Roles/Ladder pay rule as a player reads it beside the money ("+S$5.00  work"), never the rule's own id.
 EconomyRules.PAY_WHY = table.freeze({
 	["work.completed"] = "work",
 	["gig.completed"] = "a gig",

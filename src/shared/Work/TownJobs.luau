@@ -4,7 +4,7 @@
 -- at the bowling alley, or at the top of the sky lift"), pure.
 -- How work paid before this: nothing paid a player for work. Roles/Ladder has the rule ("work.completed": pay from the
 -- job, a rank class) and Roles/RoleService pays it into the town's wallet under "work"; Economy/EconomyRules has the
--- wages per in-game hour (the minimum 2 cents; Tunables economy.minWageCentsPerHour says the same) and wage(job,
+-- wages per in-game hour (the minimum S$3.00; Tunables economy.minWageCentsPerHour says the same) and wage(job,
 -- hours); Server/Jobs/JobService was an empty stub; the alley's employees and the Lookout's host are the computer's
 -- people on their rounds (Attractions/AlleyStaff, Rides/LookoutLife). These jobs use all of it:
 --   * JOBS: the shoe desk and the lanes at the alley (the shoe clerk's and the cleaner's own work stops: on the

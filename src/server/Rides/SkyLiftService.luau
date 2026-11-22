@@ -27,8 +27,8 @@
 --   * The Lookout (f3_hilltop): a free telescope (E: the client takes the camera toward the town, a narrow field of
 --     view; payload kind "telescope") and the counter (E: the hilltop lunch, served to a table as a small prop
 --     that clears itself after LUNCH_SECS; one per player). Until the wallet lands it is free, with the line
---     "On the house today". THE ONE CHARGE GOES HERE when it does: Town.charge (see `counter`), LUNCH_CENTS = 10
---     under the name "hilltop_lunch" (an EconomyRules.PRICES entry of the same name).
+--     "On the house today". THE ONE CHARGE GOES HERE when it does: Town.charge (see `counter`), LUNCH_CENTS (S$1.00,
+--     owner D31) under the name "hilltop_lunch" (the EconomyRules.PRICES entry of the same name, read from there).
 -- The Lookout's people move (owner D30: "the npcs at the top of the skylift dont move!"): the town's brains cannot
 --   walk up there (World/WalkWay keeps every walker out of the Lookout), so this service walks the bodies it holds
 --   along the Lookout's own way on foot (Shared/Rides/LookoutLife): the host walks a round (the lectern, a table,
@@ -59,6 +59,8 @@
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
 local PossessionState =
@@ -88,7 +90,7 @@ SkyLiftService.ROOT_ABOVE_SEAT = 1.35
 -- (Client/Rides/SkyLiftView), so the server's copy is for perception and replication only (review: 60 Hz cost)
 SkyLiftService.PLACE_PERIOD = 0.1
 SkyLiftService.STEP_BACK = 3 -- (no bake) the gate post stands this far back from the board point
-SkyLiftService.LUNCH_CENTS = 10 -- the hilltop lunch, once a wallet exists (EconomyRules.PRICES.hilltop_lunch)
+SkyLiftService.LUNCH_CENTS = EconomyRules.PRICES.hilltop_lunch -- the hilltop lunch, once a wallet exists
 SkyLiftService.LUNCH_SECS = 240 -- a served lunch clears itself after this long
 SkyLiftService.TELESCOPE_FOV = 15 -- degrees
 -- the Lookout's life (review: "the lift and the Lookout are always deserted"): townspeople on outings, a host
@@ -123,7 +125,7 @@ SkyLiftService.WORDS = table.freeze({
 	telescopeObject = "Free telescope",
 	counterAction = "Order the hilltop lunch",
 	counterFree = "Counter: on the house today",
-	counterPaid = "Counter: lunch 10 cents",
+	counterPaid = `Counter: lunch {Bank.amount(SkyLiftService.LUNCH_CENTS)}`,
 	noBody = "Pick a person from the menu first (M)",
 	animal = "Only people ride the sky lift. Animals take the trail up the hill",
 	waiting = "You are already waiting: next cabin in %d s (walk away to give up your place)",
@@ -139,10 +141,10 @@ SkyLiftService.WORDS = table.freeze({
 	telescopeText = "The town through the telescope. Move the mouse to look around; E or Q to step back",
 	counterAnimal = "The counter only serves people",
 	lunchFree = "On the house today: your lunch is on %s",
-	lunchPaid = "Lunch, 10 cents: it is on %s",
+	lunchPaid = `Lunch, {Bank.amount(SkyLiftService.LUNCH_CENTS)}: it is on %s`,
 	lunchAlready = "Your lunch is already on %s",
 	lunchNoRoom = "Every table is taken: try again in a minute",
-	lunchNoMoney = "Lunch is 10 cents: not enough money",
+	lunchNoMoney = `Lunch is {Bank.amount(SkyLiftService.LUNCH_CENTS)}: not enough money`,
 	notNear = "Walk up to the gate first",
 	gaveUp = "Your place on the sky lift is given up: %s",
 })

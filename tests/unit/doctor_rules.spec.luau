@@ -28,6 +28,9 @@ return function(t)
 		)
 		t.truthy(string.find(DoctorRules.callWords(nil), "Bite victim! Take", 1, true) ~= nil)
 		t.eq(DoctorRules.paidWords(25), "Patient brought in: +25c. The nurses take it from here.")
+		-- owner D31: S$10 a patient, written as the wallet writes amounts
+		t.eq(DoctorRules.params().patientCents, 1000)
+		t.eq(DoctorRules.paidWords(1000), "Patient brought in: +S$10.00. The nurses take it from here.")
 		for key, line in DoctorRules.WORDS do
 			local l = string.lower(line)
 			for _, bad in { "damn", "hell", "blood", "kill", "dead" } do

@@ -15,14 +15,15 @@ local GigRules = {}
 GigRules.TIP_AT = 0.9
 GigRules.DING_BELOW = 0.4
 
+-- (owner D31: a few dollars a gig, with the pay raised; mowing a lawn is S$3.00, S$2.00 more as a tip)
 -- stylua: ignore
 GigRules.GIGS = {
-	mow = { id = "mow", baseCents = 3, tipCents = 2, targetSecs = 60, implemented = true },
-	delivery = { id = "delivery", baseCents = 3, tipCents = 2, implemented = false },
-	sign_spin = { id = "sign_spin", baseCents = 2, tipCents = 1, implemented = false },
-	car_wash = { id = "car_wash", baseCents = 3, tipCents = 2, implemented = false },
-	paper_route = { id = "paper_route", baseCents = 4, tipCents = 2, implemented = false },
-	steakhouse_tables = { id = "steakhouse_tables", baseCents = 4, tipCents = 3, implemented = false },
+	mow = { id = "mow", baseCents = 300, tipCents = 200, targetSecs = 60, implemented = true },
+	delivery = { id = "delivery", baseCents = 300, tipCents = 200, implemented = false },
+	sign_spin = { id = "sign_spin", baseCents = 200, tipCents = 100, implemented = false },
+	car_wash = { id = "car_wash", baseCents = 300, tipCents = 200, implemented = false },
+	paper_route = { id = "paper_route", baseCents = 400, tipCents = 200, implemented = false },
+	steakhouse_tables = { id = "steakhouse_tables", baseCents = 400, tipCents = 300, implemented = false },
 } :: { [string]: GigDef }
 
 function GigRules.def(gig: string): GigDef?

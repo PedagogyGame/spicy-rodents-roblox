@@ -307,7 +307,7 @@
 -- the default group does; engine.ghost(body, false) puts the parts back in the group they were in.
 -- First person is the client's own doing (Client/Minigames/Paintball/PaintballClient).
 -- THE PASS (PB-12). `pass` is deps.pass, else THE TOWN'S ONE PASS, ctx.town.pass (in the game the
--- wallet's, Server/Economy/Credits wallet.pass: 20c from the player's pocket money for five in-game days,
+-- wallet's, Server/Economy/Credits wallet.pass: S$2.00 from the player's pocket money for five in-game days,
 -- and the same pass opens both lounges, so a pass bought at this desk lets them into a lounge and one
 -- bought at a lounge door lets them in here). Only where no town pass is handed in (a spec that runs the
 -- service alone), or a spec hands in a day clock of its own (deps.day), is the lane's own desk used: on
@@ -410,10 +410,10 @@ export type Engine = {
 	ping: ((player: any) -> number?)?,
 }
 
--- The access pass (PB-12): 20 spicy cents for five in-game days.
+-- The access pass (PB-12): S$2.00 for five in-game days (owner D31; the brief's 20 spicy cents).
 export type PassDesk = {
 	has: (player: any) -> boolean,
-	-- Sell one: (true, Contract.textFor("bought")) or (false, words such as Contract.passShort(20, 7)
+	-- Sell one: (true, Contract.textFor("bought")) or (false, words such as Contract.passShort(200, 70)
 	-- or Contract.textFor("has_pass")). Never sells a second pass to a holder.
 	buy: (player: any) -> (boolean, string),
 }

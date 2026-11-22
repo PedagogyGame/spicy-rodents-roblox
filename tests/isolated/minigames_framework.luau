@@ -316,13 +316,14 @@ return function(t)
 				town.release(w.body)
 				-- the rig's town has the real wallet (Server/Economy/Credits), as the game's has: money is taken,
 				-- with words to show, and a price above the balance is refused in words
-				t.eq(w.wallet.balance(w.player), 300)
+				-- (owner D31: S$25.00 of pocket money, and the pass is S$2.00)
+				t.eq(w.wallet.balance(w.player), 2500)
 				t.deepEq(
-					{ town.charge(w.player, 20, "a paintball pass") },
-					{ true, "Paid 20c for a paintball pass. You have S$2.80." }
+					{ town.charge(w.player, 200, "a paintball pass") },
+					{ true, "Paid S$2.00 for a paintball pass. You have S$23.00." }
 				)
-				t.deepEq({ town.charge(w.player, 500, "the arena") }, { false, "You need S$5.00; you have S$2.80." })
-				t.eq(w.wallet.balance(w.player), 280)
+				t.deepEq({ town.charge(w.player, 5000, "the arena") }, { false, "You need S$50.00; you have S$23.00." })
+				t.eq(w.wallet.balance(w.player), 2300)
 				-- no profile yet: a best is kept for as long as the server runs, per person and per key
 				t.eq(town.best(w.player, "machine"), nil)
 				t.eq(town.best(w.player, "machine", 50), 50)

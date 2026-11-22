@@ -20,6 +20,7 @@ local Furniture = require("@worldgen/Builders/Furniture")
 local InteriorCheck = require("@worldgen/InteriorCheck")
 
 local ID = Products.SPICY_BUCK_ID
+local POCKET = 2500 -- owner D31: the pocket money a player is given on joining (was S$3.00)
 
 local function clock()
 	local c = { t = 1_700_000_000, os = 0 }
@@ -255,7 +256,7 @@ return function(t)
 		t.truthy(string.find(lastSaid(a, ann) or "", "40 Spicy Stock Options added", 1, true))
 		t.eq(a.stock.processReceipt(receipt("p1", 7, 10)), "PurchaseGranted", "the retry")
 		t.eq(saved(store, 7).held, 40, "granted once")
-		t.eq(a.wallet.balance(ann), 300, "buying puts nothing in the wallet (pocket money only)")
+		t.eq(a.wallet.balance(ann), POCKET, "buying puts nothing in the wallet (pocket money only)")
 	end)
 
 	t.test("receipt: the same purchase offered on another server grants nothing twice", function()
@@ -429,7 +430,7 @@ return function(t)
 			"taken off and saved as pending before the money moved"
 		)
 		t.deepEq(a.saves:profileOf(20).data.options, { held = 170, bought = 200, withdrawn = 30 }, "paid: settled")
-		t.eq(a.wallet.balance(ann), 300 + 3000)
+		t.eq(a.wallet.balance(ann), POCKET + 3000)
 		t.eq(a.stock.withdrawnHere(ann), 30)
 		t.eq(a.attrs[20].StockOptions, 170)
 		local view = a.sent[20][#a.sent[20]]
@@ -485,7 +486,7 @@ return function(t)
 			t.falsy(ok, msg)
 			t.eq(said, words, msg)
 			t.deepEq(saved(store, 21), before, msg)
-			t.eq(a.wallet.balance(ann), 300, msg)
+			t.eq(a.wallet.balance(ann), POCKET, msg)
 			t.eq(lastSaid(a, ann), words, `{msg}: said`)
 		end
 		for _, bad in { 0, -1, 1.5, "10", 0 / 0, math.huge, {} } :: { any } do
@@ -530,7 +531,7 @@ return function(t)
 		local ok, words = a.stock.withdraw(ann, 10)
 		t.falsy(ok)
 		t.eq(words, StockOptions.WORDS.notSaved)
-		t.eq(a.wallet.balance(ann), 300, "no money")
+		t.eq(a.wallet.balance(ann), POCKET, "no money")
 		t.eq(a.stock.withdrawnHere(ann), 0, "nothing counted")
 		local p = a.saves:profileOf(23)
 		t.deepEq(p.data.options, { held = 20, bought = 20, withdrawn = 0 }, "options back")
@@ -584,7 +585,7 @@ return function(t)
 		t.eq(second[2], StockOptions.WORDS.busy)
 		t.deepEq(saved(store, 24), { held = 15, bought = 20, withdrawn = 0, pending = { ["A:1"] = 5 } })
 		t.deepEq(sv.saves:profileOf(24).data.options, { held = 15, bought = 20, withdrawn = 5 })
-		t.eq(sv.wallet.balance(ann), 300 + 500)
+		t.eq(sv.wallet.balance(ann), POCKET + 500)
 	end)
 
 	t.test("promptBuy and the remote: refused until loaded, rate-limited, only known verbs", function()

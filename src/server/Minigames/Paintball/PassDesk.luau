@@ -1,6 +1,6 @@
 --!strict
 -- ServerScriptService.Server.Minigames.Paintball.PassDesk
--- The paintball access pass (brief v2 §13; checklist PB-12): 20 spicy cents at the pass desk buys five
+-- The paintball access pass (brief v2 §13; checklist PB-12): S$2.00 (owner D31) at the pass desk buys five
 -- in-game days of paintball and both lounges. Money is the town's (ServerGame.Town.charge: spicy cents
 -- through the existing economy, never real money; a stand-in that says yes until the town has a
 -- wallet); a refusal is shown in the town's own words. A holder is never sold a second pass, and
