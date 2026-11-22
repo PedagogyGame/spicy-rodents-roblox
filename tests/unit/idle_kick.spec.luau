@@ -270,6 +270,10 @@ return function(t)
 			drop = function(_self: any, id: number)
 				held[id] = nil
 			end,
+			-- (every nut here was picked up by its holder: HollowService:mine keeps them all)
+			mine = function(_self: any, id: number): number
+				return held[id] or 0
+			end,
 		}
 		local clock = 0
 		local stash = BranchStash.new({
