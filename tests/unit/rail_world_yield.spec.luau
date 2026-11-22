@@ -17,6 +17,7 @@ local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")
 local RailWorld = require("@shared/Movement/RailWorld")
 local Registry = require("@shared/Routes/Registry")
+local Trampoline = require("@shared/Movement/Trampoline")
 
 local FRAME = 1 / 60
 
@@ -68,8 +69,10 @@ return function(t)
 			t.deepEq(h:endLinks(r.id, false), g:endLinks(r.id, false), `end links at the end of {r.id}`)
 			t.deepEq(h:forks(r.id), g:forks(r.id), `forks of {r.id}`)
 		end
-		t.eq(#built.trampolines, #ref.trampolines, "trampolines")
-		t.deepEq(built.trampolines, ref.trampolines, "trampoline sites")
+		-- (the shared world caches the ground of whichever spec built it first: the sites are compared on this one's)
+		local sites = Trampoline.sitesFromRegistry(ref.registry, Height.at)
+		t.eq(#built.trampolines, #sites, "trampolines")
+		t.deepEq(built.trampolines, sites, "trampoline sites")
 	end)
 
 	t.test("with a yield the lookups answer the same (a sample of every 25th route)", function()
