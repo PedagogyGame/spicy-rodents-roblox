@@ -361,6 +361,11 @@ return function(t)
 		"nothing in the way: trunks off paving, boughs out of buildings and high over streets, clear of routes",
 		function()
 			local clear = TreeClear.new(d)
+			-- (a D34 nook, hangout or spur leaves a bough from its own line: Shared/World/BranchNooks keeps it clear of the rest)
+			local nookOff: { [number]: number } = {}
+			for _, p in (d:module("BranchNooks") :: any).places or {} do
+				nookOff[p.route] = p.parent
+			end
 			local others: { { x: number, y: number, z: number, id: number } } = {}
 			local mine: { [number]: number } = {} -- route -> its tree's trunk
 			for _, tree in compiled.trees do
@@ -405,7 +410,7 @@ return function(t)
 							-- a grown bough passes no other route (a planted copy is its source's shape)
 							if tree.kind == "reshaped" and out > 4 then
 								for _, o in others do
-									if o.id ~= id and o.id ~= tree.trunk then
+									if o.id ~= id and o.id ~= tree.trunk and nookOff[o.id] ~= id then
 										local dd = (o.x - p.x) ^ 2 + (o.y - p.y) ^ 2 + (o.z - p.z) ^ 2
 										if dd < CLEAR_OF_ROUTES * CLEAR_OF_ROUTES then
 											t.truthy(false, `{r.name} passes route {o.id} at {math.sqrt(dd)} studs`)

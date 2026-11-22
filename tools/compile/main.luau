@@ -25,6 +25,8 @@ local Expansion = require("./lib/Expansion")
 local Sewers = require("./lib/Sewers")
 local HollowTrees = require("./lib/HollowTrees")
 local TreeShapes = require("./lib/TreeShapes")
+local BranchNooks = require("./lib/BranchNooks")
+local SharedTreeShapes = require("../../src/shared/World/TreeShapes")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -546,6 +548,36 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 			end
 		end
 	end
+	-- the D34 branch nooks, stashes, hangouts and spurs (Shared/World/BranchNooks) on every climbable tree, over every
+	-- route and canopy fork compiled so far: the harvest's and each module's `routes` / `forks` (keep this the last step
+	-- that makes routes, so a tree added by any module before it gets them)
+	do
+		local allRoutes: { any } = table.clone(routesConv)
+		local allForks: { any } = forksConv
+		local ids: { [number]: boolean } = table.clone(routeIds)
+		for _, m in w1.modules do
+			local v = m.value
+			if type(v) == "table" and type(v.routes) == "table" then
+				for _, r in v.routes do
+					table.insert(allRoutes, r)
+					ids[r.id] = true
+				end
+			end
+			if type(v) == "table" and type(v.forks) == "table" and #v.forks > 0 then
+				allForks = SharedTreeShapes.mergeForks(allForks :: any, v.forks) :: any
+			end
+		end
+		local nooks, nookRoutes = BranchNooks.compile({
+			routes = allRoutes,
+			forks = allForks,
+			ids = ids,
+			terrainExtensions = terrainExtensions,
+			invariant = invariant,
+			compare = compare,
+		})
+		table.insert(w1.modules, nooks)
+		table.insert(w1.modules, nookRoutes)
+	end
 	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
 	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })
 	if shopArtModule then
@@ -703,9 +735,21 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 		},
 	}
 	for _, m in w1.modules do
-		emitModule(m.name, m.value, m.records, m.source, m.header)
-		generated[#generated].map = m.map
-		index.modules[m.name] = { count = 1, chunks = { m.name } }
+		if m.chunked then
+			-- an array module over the chunk size (the branch nooks' routes): chunks <name>_01.. as the harvest's routes
+			local parts = LuauEmit.chunk(m.value, o.chunkKb * 1024, { keyOrder = Migrate.KEY_ORDER })
+			local names = {}
+			for i, chunk in parts do
+				local cname = string.format("%s_%02d", m.name, i)
+				table.insert(names, cname)
+				emitModule(cname, chunk, #chunk, string.format("%s (chunk %d of %d)", m.source, i, #parts), m.header)
+			end
+			index.modules[m.name] = { count = #m.value, chunks = names }
+		else
+			emitModule(m.name, m.value, m.records, m.source, m.header)
+			generated[#generated].map = m.map
+			index.modules[m.name] = { count = 1, chunks = { m.name } }
+		end
 	end
 	emitModule("Index", index, 1, "tools/compile (module list, counts and the harvest pin)")
 
