@@ -477,6 +477,75 @@ return function(t)
 		t.deepEq(Ladder.keyHolders("humanDriver", c.players), { 4, 6 })
 	end)
 
+	t.test("D30 menu.pick: the hospital as a doctor while one of its 5 slots is free; the body stays", function()
+		local list = { human("h", 1), mk("s", "squirrel") }
+		for i = 1, 4 do
+			table.insert(list, mk(`d{i}`, "hospital", nil, { subrole = "doctor" }))
+		end
+		local c = ctxOf(list)
+		local ts = resolve({ kind = "menu.pick", player = "h", rung = "hospital" }, c)
+		t.eq(#ts, 1)
+		t.eq(ts[1].to, "hospital")
+		t.eq(ts[1].subrole, "doctor")
+		t.eq(ts[1].rank, "keep")
+		t.eq(ts[1].keepBody, true)
+		t.eq(Ladder.subroles.doctor.parent, "hospital")
+		t.eq(Ladder.menuRungs.hospital, "doctor")
+		-- the fifth slot taken: refused, no move
+		c.players.h = mk("h", "hospital", nil, { subrole = "doctor" })
+		c.players.x = human("x", 1)
+		local full = resolve({ kind = "menu.pick", player = "x", rung = "hospital" }, c)
+		t.eq(full[1].refused, "full")
+		t.eq(full[1].to, nil)
+		-- a doctor picking it again is no change (not refused at 5 of 5)
+		t.eq(resolve({ kind = "menu.pick", player = "h", rung = "hospital" }, c)[1].refused, nil)
+		-- not from the menu: the police, a squirrel's player
+		t.eq(#resolve({ kind = "menu.pick", player = "x", rung = "police" }, c), 0)
+		t.eq(#resolve({ kind = "menu.pick", player = "s", rung = "hospital" }, c), 0)
+	end)
+
+	t.test(
+		"D30 role.resign and role.demote: back to the human rung, the body kept; demotion at the lowest rank",
+		function()
+			local c = ctxOf({
+				mk(
+					"d",
+					"hospital",
+					{ activeGameDays = GATE, activeMinutes = 50, questScore = 30 },
+					{ subrole = "doctor" }
+				),
+				human("h", 1),
+			})
+			local r = resolve({ kind = "role.resign", player = "d" }, c)
+			t.eq(r[1].to, "human")
+			t.eq(r[1].rank, "keep")
+			t.eq(r[1].loseSubrole, "doctor")
+			t.eq(r[1].keepBody, true)
+			local d = resolve({ kind = "role.demote", player = "d", why = "ignored a bite victim" }, c)
+			t.eq(d[1].to, "human")
+			t.eq(d[1].rank, "lowest")
+			t.eq(d[1].why, "ignored a bite victim")
+			t.eq(d[1].keepBody, true)
+			t.deepEq(Ladder.vacated(d, c), { "hospital" })
+			-- a townsperson has nothing to lose
+			t.eq(#resolve({ kind = "role.demote", player = "h", why = "x" }, c), 0)
+			t.eq(#resolve({ kind = "role.resign", player = "h" }, c), 0)
+			t.eq(Ladder.applyRank("lowest", c.players.d.stats).questScore, 0)
+		end
+	)
+
+	t.test("D30 doctor.delivered: the pay from the event and the hospital fetch's rank points by speed", function()
+		local c = ctxOf({ mk("d", "hospital", nil, { subrole = "doctor" }), human("h", 1) })
+		local std = Ladder.params.rankClass.standard
+		local fast = resolve({ kind = "doctor.delivered", player = "d", pay = 25, fetchSecs = 12 }, c)
+		t.eq(fast[1].pay, 25)
+		t.eq(fast[1].rankDelta, std + 10)
+		t.eq(resolve({ kind = "doctor.delivered", player = "d", pay = 25, fetchSecs = 40 }, c)[1].rankDelta, std + 3)
+		t.eq(resolve({ kind = "doctor.delivered", player = "d", pay = 25, fetchSecs = 300 }, c)[1].rankDelta, std)
+		-- nobody but a doctor on the hospital rung is paid for it
+		t.eq(#resolve({ kind = "doctor.delivered", player = "h", pay = 25 }, c), 0)
+	end)
+
 	t.test("unknown events error", function()
 		t.fails(function()
 			Ladder.resolve({ kind = "dance" }, ctxOf({}))
