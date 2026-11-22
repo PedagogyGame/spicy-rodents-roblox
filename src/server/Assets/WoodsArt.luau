@@ -190,14 +190,8 @@ end
 -- FBX origin = the ground under the foot, kept as an attribute), the leaves' alpha made to work; nil if it cannot be
 local function prepare(asset: any, leaf: { number }?, e: Env): { any }?
 	local model = asset:FindFirstChildWhichIsA("Model") or asset
-	local pivot = if model:IsA("Model")
-		then (function(): any
-			local ok, cf = pcall(function(): any
-				return model:GetPivot()
-			end)
-			return if ok then cf else e.CFrame.new()
-		end)()
-		else e.CFrame.new()
+	-- (the uploaded Model's own pivot: its WorldPivot, the FBX origin)
+	local pivot = if model:IsA("Model") then model.WorldPivot else e.CFrame.new()
 	local out = {}
 	for _, d in model:GetDescendants() do
 		if d:IsA("MeshPart") and (d.Name == "Bark" or d.Name == "Leaves") then

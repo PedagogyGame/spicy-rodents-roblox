@@ -366,4 +366,11 @@ return function(t)
 		t.truthy(samples < 70000, `{samples} samples`)
 		local _ = Curve
 	end)
+
+	-- (tests/lib/WoodsWorld configured World/Height with the terrain extensions, as the bake does: put it back for the
+	-- specs after this one, which expect the plain ground)
+	t.test("leaves World/Height as the specs after it expect (the plain ground)", function()
+		Height.configure(nil)
+		t.truthy(true)
+	end)
 end
