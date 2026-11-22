@@ -10,7 +10,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9701,
+					branch = 9801,
 					height = 8.515136632824419,
 					origin = { -243.39952116472696, 8.515136632824419, 39.59071892326355 },
 					outward = { -0.31222296029124247, 0, 0.9500088542045138 },
@@ -18,7 +18,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9702,
+					branch = 9802,
 					height = 11.003447135978256,
 					origin = { -243.29291262729774, 11.003447135978256, 39.75979471738258 },
 					outward = { 0.8657217031373889, 0, 0.5005256564022452 },
@@ -26,7 +26,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9703,
+					branch = 9803,
 					height = 15.864266638485402,
 					origin = { -243.93558436445394, 15.864266638485402, 40.609144871444585 },
 					outward = { -0.7660464289548713, 0, -0.642785243052055 },
@@ -34,7 +34,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9704,
+					branch = 9804,
 					height = 18.23542933126683,
 					origin = { -244.4888030586381, 18.23542933126683, 41.16314641203944 },
 					outward = { 0.6545131032458423, 0, -0.7560506581436837 },
@@ -42,7 +42,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9705,
+					branch = 9805,
 					height = 27.47159615626239,
 					origin = { -242.96813946147984, 27.47159615626239, 40.27074970867555 },
 					outward = { -0.7233143910336164, 0, -0.6905188568921697 },
@@ -50,7 +50,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9706,
+					branch = 9806,
 					height = 25.44284793146412,
 					origin = { -244.12737169065505, 25.44284793146412, 41.14535169805673 },
 					outward = { 0.8935756007872054, 0, 0.4489127372639198 },
@@ -63,7 +63,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9707,
+					branch = 9807,
 					height = 8.480415423527047,
 					origin = { 60.967903833979676, 8.480415423527047, 257.789902001704 },
 					outward = { 0.44965249923213735, 0, -0.8932035769824777 },
@@ -71,7 +71,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9708,
+					branch = 9808,
 					height = 11.771795548652904,
 					origin = { 61.089686652182635, 11.771795548652904, 257.81582680922975 },
 					outward = { -0.9273394106945589, 0, 0.3742213480985125 },
@@ -79,7 +79,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9709,
+					branch = 9809,
 					height = 15.867380238698772,
 					origin = { 61.49097232611672, 15.867380238698772, 257.7742094425342 },
 					outward = { 0.36854812965681466, 0, 0.9296086682720119 },
@@ -87,7 +87,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9710,
+					branch = 9810,
 					height = 19.940372109682446,
 					origin = { 62.08492407333395, 19.940372109682446, 257.6781184392633 },
 					outward = { -0.6253277577127508, 0, -0.7803622206603438 },
@@ -95,7 +95,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9711,
+					branch = 9811,
 					height = 30.160751061716322,
 					origin = { 60.52176883712968, 30.160751061716322, 255.92685989688547 },
 					outward = { 0.7474309550105557, 0, -0.6643394971639189 },
@@ -108,7 +108,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9712,
+					branch = 9812,
 					height = 12.46275272511452,
 					origin = { -62.178825326114506, 12.46275272511452, 352.27230531042613 },
 					outward = { 0.14258125932410168, 0, -0.9897830997191017 },
@@ -116,7 +116,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9713,
+					branch = 9813,
 					height = 15.766394470585624,
 					origin = { -62.33540084644505, 15.766394470585624, 352.2504415543594 },
 					outward = { -0.5256593481670812, 0, 0.8506951567303997 },
@@ -124,7 +124,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9714,
+					branch = 9814,
 					height = 21.542335344848713,
 					origin = { -62.081183358193755, 21.542335344848713, 352.35463054739773 },
 					outward = { -0.8321022846501019, 0, -0.5546222028372834 },
@@ -132,7 +132,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9715,
+					branch = 9815,
 					height = 26.431665889313255,
 					origin = { -61.31682920267872, 26.431665889313255, 352.6992881789867 },
 					outward = { 0.747289938605477, 0, 0.6644981171222553 },
@@ -140,7 +140,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9716,
+					branch = 9816,
 					height = 40.156459740438805,
 					origin = { -59.42848132094504, 40.156459740438805, 351.33568954244805 },
 					outward = { -0.36835653141919983, 0, -0.929684605530723 },
@@ -153,7 +153,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9717,
+					branch = 9817,
 					height = 10.10592524483192,
 					origin = { 251.68416931185627, 10.10592524483192, 68.5179082542443 },
 					outward = { 0.8501834520971205, 0, 0.5264865599236349 },
@@ -161,7 +161,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9718,
+					branch = 9818,
 					height = 13.393801844007823,
 					origin = { 251.8873061974668, 13.393801844007823, 68.40214335295785 },
 					outward = { -0.8807357011842951, 0, -0.47360809184325386 },
@@ -169,7 +169,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9719,
+					branch = 9819,
 					height = 19.981270937223176,
 					origin = { 252.0554822996738, 19.981270937223176, 68.463356171715 },
 					outward = { -0.8771571762356667, 0, 0.4802033820979101 },
@@ -177,7 +177,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9720,
+					branch = 9820,
 					height = 26.511694054646387,
 					origin = { 251.72009617657122, 26.511694054646387, 69.25990748196469 },
 					outward = { 0.8512703205994337, 0, -0.5247273970992342 },
@@ -185,7 +185,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9721,
+					branch = 9821,
 					height = 31.3612275818517,
 					origin = { 251.27475441552357, 31.3612275818517, 70.11474621892437 },
 					outward = { 0.028565497856537204, 0, -0.9995919229026454 },
@@ -198,7 +198,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9722,
+					branch = 9822,
 					height = 10.97812271840205,
 					origin = { 395.1083127257335, 10.97812271840205, -75.81117477269088 },
 					outward = { -0.6186640009223748, 0, -0.7856556841025971 },
@@ -206,7 +206,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9723,
+					branch = 9823,
 					height = 13.465901811715526,
 					origin = { 395.2602362283503, 13.465901811715526, -75.9387732102283 },
 					outward = { -0.30766659156605664, 0, 0.9514942293225562 },
@@ -214,7 +214,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9724,
+					branch = 9824,
 					height = 17.582120464387653,
 					origin = { 395.5930813238655, 17.582120464387653, -75.50114408110389 },
 					outward = { 0.7217770579504107, 0, -0.6921256234358396 },
@@ -222,7 +222,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9725,
+					branch = 9825,
 					height = 20.795357762929974,
 					origin = { 395.9083534469612, 20.795357762929974, -74.69393075079901 },
 					outward = { -0.9939270185776325, 0, 0.11004127289966541 },
@@ -235,7 +235,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9726,
+					branch = 9826,
 					height = 8.89833784648632,
 					origin = { -113.68899299193892, 8.89833784648632, -312.88259083336044 },
 					outward = { -0.030801373974696008, 0, -0.9995255251174283 },
@@ -243,7 +243,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9727,
+					branch = 9827,
 					height = 11.368049690123245,
 					origin = { -113.86942322711191, 11.368049690123245, -312.8594603893632 },
 					outward = { -0.8808683741170699, 0, 0.4733612864191048 },
@@ -251,7 +251,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9728,
+					branch = 9828,
 					height = 16.26736357137745,
 					origin = { -114.36857664173499, 16.26736357137745, -312.3816968710277 },
 					outward = { 0.8963691901865378, 0, 0.4433083293649358 },
@@ -259,7 +259,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9729,
+					branch = 9829,
 					height = 19.5068825051001,
 					origin = { -114.76619669102016, 19.5068825051001, -311.8813478637604 },
 					outward = { 0.8026091653329969, 0, -0.5965052621087851 },
@@ -267,7 +267,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9730,
+					branch = 9830,
 					height = 28.958962211026947,
 					origin = { -115.73048083957312, 28.958962211026947, -313.72637871575125 },
 					outward = { 0.2752672878320071, 0, 0.9613677341421496 },
@@ -280,7 +280,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9731,
+					branch = 9831,
 					height = 9.977969788656567,
 					origin = { 231.33046140268607, 9.977969788656567, 291.8727447284777 },
 					outward = { -0.9734005064672074, 0, -0.22911013510838915 },
@@ -288,7 +288,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9732,
+					branch = 9832,
 					height = 12.470765197972195,
 					origin = { 231.27014552836346, 12.470765197972195, 291.8732902273268 },
 					outward = { 0.6653784488620271, 0, -0.7465062088087163 },
@@ -296,7 +296,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9733,
+					branch = 9833,
 					height = 19.067354493554074,
 					origin = { 231.111429944396, 19.067354493554074, 292.5710809868983 },
 					outward = { 0.8771307539134404, 0, 0.4802516429323689 },
@@ -304,7 +304,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9734,
+					branch = 9834,
 					height = 23.108353867501876,
 					origin = { 231.04827496508958, 23.108353867501876, 293.53977119474376 },
 					outward = { -0.8318982747943189, 0, 0.554928157867517 },
@@ -317,7 +317,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9735,
+					branch = 9835,
 					height = 10.868753951767046,
 					origin = { 272.19653325674693, 10.868753951767046, -310.22599185114404 },
 					outward = { 0.8501782247902853, 0, 0.5264950010137222 },
@@ -325,7 +325,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9736,
+					branch = 9836,
 					height = 14.193198186035305,
 					origin = { 272.01555003456104, 14.193198186035305, -310.3458845056907 },
 					outward = { -0.9896037761604844, 0, -0.14382060425721335 },
@@ -333,7 +333,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9737,
+					branch = 9837,
 					height = 20.851990232229213,
 					origin = { 271.8409168498382, 20.851990232229213, -310.4594595762193 },
 					outward = { 0.6600123089517584, 0, -0.7512547850311294 },
@@ -341,7 +341,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9738,
+					branch = 9838,
 					height = 26.676138108447784,
 					origin = { 271.9836497770781, 26.676138108447784, -310.25843314619465 },
 					outward = { -0.6207503053225077, 0, 0.7840083280437865 },
@@ -349,7 +349,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9739,
+					branch = 9839,
 					height = 31.661182951074093,
 					origin = { 272.2269952885493, 31.661182951074093, -310.00657788533664 },
 					outward = { -0.23694943885539183, 0, -0.9715219829865483 },
@@ -362,7 +362,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9740,
+					branch = 9840,
 					height = 9.47324893975151,
 					origin = { 35.87203735921699, 9.47324893975151, 988.0773881425134 },
 					outward = { -0.03186855749868042, 0, -0.9994920685242846 },
@@ -370,7 +370,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9741,
+					branch = 9841,
 					height = 11.922247312498145,
 					origin = { 36.11453683503839, 11.922247312498145, 988.2511096810207 },
 					outward = { 0.3069202432431449, 0, 0.9517352385446116 },
@@ -378,7 +378,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9742,
+					branch = 9842,
 					height = 16.84750146541862,
 					origin = { 36.16286766874821, 16.84750146541862, 988.4272658107446 },
 					outward = { -0.8775457390222212, 0, -0.4794929362607375 },
@@ -386,7 +386,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9743,
+					branch = 9843,
 					height = 20.898219025540033,
 					origin = { 35.49260540895542, 20.898219025540033, 988.2810919613386 },
 					outward = { 0.9979324769008014, 0, -0.0642710786173007 },
@@ -394,7 +394,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9744,
+					branch = 9844,
 					height = 24.887378497122548,
 					origin = { 34.52989057741903, 24.887378497122548, 988.017800723434 },
 					outward = { -0.6947600981587011, 0, 0.719241549138057 },
@@ -402,7 +402,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9745,
+					branch = 9845,
 					height = 33.0190144302546,
 					origin = { 33.78633901590159, 33.0190144302546, 988.0680874596172 },
 					outward = { 0.2304816759003599, 0, -0.9730766655686289 },
@@ -415,7 +415,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9746,
+					branch = 9846,
 					height = 9.189588565935106,
 					origin = { -36.372584085164284, 9.189588565935106, 1064.5040194978462 },
 					outward = { -0.8502105477487156, 0, 0.5264428026830921 },
@@ -423,7 +423,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9747,
+					branch = 9847,
 					height = 11.679177317834444,
 					origin = { -36.204245032414924, 11.679177317834444, 1064.377623175362 },
 					outward = { 0.7279181251900643, 0, -0.6856640598863134 },
@@ -431,7 +431,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9748,
+					branch = 9848,
 					height = 16.612326509342694,
 					origin = { -36.816977602101005, 16.612326509342694, 1064.1829124195142 },
 					outward = { 0.9317009787825072, 0, 0.36322621895413615 },
@@ -439,7 +439,7 @@ return {
 					trunkClearance = 2.025,
 				},
 				{
-					branch = 9749,
+					branch = 9849,
 					height = 20.538714184223736,
 					origin = { -38.195349509140165, 20.538714184223736, 1064.025287570596 },
 					outward = { -0.28604365417529903, 0, -0.9582165871586872 },
@@ -452,7 +452,7 @@ return {
 		{
 			forks = {
 				{
-					branch = 9751,
+					branch = 9851,
 					height = 28.8281,
 					origin = { 59.7203, 28.6821, 845.1109 },
 					outward = { 0.5350744223973928, 0, 0.8448049257053941 },
@@ -460,7 +460,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9752,
+					branch = 9852,
 					height = 36.2122,
 					origin = { 60.3742, 36.0893, 844.3157 },
 					outward = { 0.99991821511492, 0, -0.012789178292297532 },
@@ -468,7 +468,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9753,
+					branch = 9853,
 					height = 36.2122,
 					origin = { 60.3742, 36.0893, 844.3157 },
 					outward = { 0.05845357783888911, 0, 0.998290127787425 },
@@ -476,7 +476,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9754,
+					branch = 9854,
 					height = 36.2122,
 					origin = { 60.3742, 36.0893, 844.3157 },
 					outward = { -0.8898192475523228, 0, 0.4563131673373214 },
@@ -484,7 +484,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9755,
+					branch = 9855,
 					height = 36.2122,
 					origin = { 60.3742, 36.0893, 844.3157 },
 					outward = { -0.6371830750654616, 0, -0.7707124813120145 },
@@ -492,7 +492,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9756,
+					branch = 9856,
 					height = 43.6062,
 					origin = { 59.756, 43.4964, 845.0234 },
 					outward = { -0.9975176695316428, 0, -0.07041661005871104 },
@@ -500,7 +500,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9757,
+					branch = 9857,
 					height = 43.6062,
 					origin = { 59.756, 43.4964, 845.0234 },
 					outward = { 0.4275549893636291, 0, -0.9039893423432972 },
@@ -508,7 +508,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9758,
+					branch = 9858,
 					height = 43.6062,
 					origin = { 59.756, 43.4964, 845.0234 },
 					outward = { 0.8540382151663124, 0, -0.5202102719435089 },
@@ -516,12 +516,12 @@ return {
 					trunkClearance = 2.95,
 				},
 			},
-			trunk = 9750,
+			trunk = 9850,
 		},
 		{
 			forks = {
 				{
-					branch = 9760,
+					branch = 9860,
 					height = 19.0821,
 					origin = { -200.1704, 19.175, -200.0051 },
 					outward = { 0.9262044690626728, 0, 0.377021592867481 },
@@ -529,7 +529,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9761,
+					branch = 9861,
 					height = 19.0821,
 					origin = { -200.1704, 19.175, -200.0051 },
 					outward = { -0.7533632274596921, 0, 0.657604628566068 },
@@ -537,7 +537,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9762,
+					branch = 9862,
 					height = 19.0821,
 					origin = { -200.1704, 19.175, -200.0051 },
 					outward = { 0.8011595077959981, 0, 0.598450869385344 },
@@ -545,7 +545,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9763,
+					branch = 9863,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { 0.4824762480687075, 0, 0.8759090535264167 },
@@ -553,7 +553,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9764,
+					branch = 9864,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { -0.15791770173456623, 0, 0.987452277063997 },
@@ -561,7 +561,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9765,
+					branch = 9865,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { -0.3916878009885688, 0, 0.9200981831069656 },
@@ -569,7 +569,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9766,
+					branch = 9866,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { -0.9692956693069884, 0, 0.24589816075505205 },
@@ -577,7 +577,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9767,
+					branch = 9867,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { -0.3794430827752739, 0, -0.9252150814453882 },
@@ -585,7 +585,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9768,
+					branch = 9868,
 					height = 25.6577,
 					origin = { -199.739, 25.275, -199.3793 },
 					outward = { -0.9998507669175288, 0, 0.01727552877424017 },
@@ -593,7 +593,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9769,
+					branch = 9869,
 					height = 31.4114,
 					origin = { -200.1308, 31.375, -199.947 },
 					outward = { 0.967120122907896, 0, 0.2543200107475155 },
@@ -601,7 +601,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9770,
+					branch = 9870,
 					height = 31.4114,
 					origin = { -200.1308, 31.375, -199.947 },
 					outward = { -0.998457362118009, 0, -0.055523833012022024 },
@@ -609,7 +609,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9771,
+					branch = 9871,
 					height = 31.4114,
 					origin = { -200.1308, 31.375, -199.947 },
 					outward = { -0.4801102780270483, 0, -0.877208140028802 },
@@ -617,7 +617,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9772,
+					branch = 9872,
 					height = 31.4114,
 					origin = { -200.1308, 31.375, -199.947 },
 					outward = { -0.7230027328538426, 0, -0.6908451695466032 },
@@ -625,7 +625,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9773,
+					branch = 9873,
 					height = 31.4114,
 					origin = { -200.1308, 31.375, -199.947 },
 					outward = { 0.8559671761309467, 0, -0.5170301668050065 },
@@ -633,12 +633,12 @@ return {
 					trunkClearance = 2.95,
 				},
 			},
-			trunk = 9759,
+			trunk = 9859,
 		},
 		{
 			forks = {
 				{
-					branch = 9775,
+					branch = 9875,
 					height = 24.992,
 					origin = { -224.6313, 25.0571, 169.7767 },
 					outward = { 0.99208287590005, 0, -0.12558490094707306 },
@@ -646,7 +646,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9776,
+					branch = 9876,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { 0.6994989573856046, 0, 0.7146336184482592 },
@@ -654,7 +654,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9777,
+					branch = 9877,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { -0.30059850877319744, 0, 0.953750772751105 },
@@ -662,7 +662,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9778,
+					branch = 9878,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { -0.9881893879506858, 0, 0.15323750696761151 },
@@ -670,7 +670,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9779,
+					branch = 9879,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { -0.8327673874030264, 0, 0.5536230472785051 },
@@ -678,7 +678,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9780,
+					branch = 9880,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { -0.3495295628371536, 0, -0.936925335714041 },
@@ -686,7 +686,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9781,
+					branch = 9881,
 					height = 33.2783,
 					origin = { -224.8296, 33.1179, 170.4555 },
 					outward = { 0.08205790787046513, 0, -0.99662756321302 },
@@ -694,7 +694,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9782,
+					branch = 9882,
 					height = 41.5665,
 					origin = { -225.2586, 41.1786, 169.9078 },
 					outward = { 0.9419146635700604, 0, 0.33585229871433114 },
@@ -702,7 +702,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9783,
+					branch = 9883,
 					height = 41.5665,
 					origin = { -225.2586, 41.1786, 169.9078 },
 					outward = { 0.6351513447106847, 0, 0.7723877066034963 },
@@ -710,7 +710,7 @@ return {
 					trunkClearance = 2.95,
 				},
 				{
-					branch = 9784,
+					branch = 9884,
 					height = 41.5665,
 					origin = { -225.2586, 41.1786, 169.9078 },
 					outward = { -0.3566037482156743, 0, -0.9342557287801514 },
@@ -718,12 +718,12 @@ return {
 					trunkClearance = 2.95,
 				},
 			},
-			trunk = 9774,
+			trunk = 9874,
 		},
 	},
 	routes = {
 		{
-			id = 9701,
+			id = 9801,
 			name = "outer 30 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -750,7 +750,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9702,
+			id = 9802,
 			name = "outer 30 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -777,7 +777,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9703,
+			id = 9803,
 			name = "outer 30 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -804,7 +804,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9704,
+			id = 9804,
 			name = "outer 30 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -831,7 +831,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9705,
+			id = 9805,
 			name = "outer 30 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -858,7 +858,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9706,
+			id = 9806,
 			name = "outer 30 tree grown bough 6",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -885,7 +885,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9707,
+			id = 9807,
 			name = "outer 23 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -912,7 +912,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9708,
+			id = 9808,
 			name = "outer 23 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -939,7 +939,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9709,
+			id = 9809,
 			name = "outer 23 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -966,7 +966,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9710,
+			id = 9810,
 			name = "outer 23 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -993,7 +993,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9711,
+			id = 9811,
 			name = "outer 23 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1020,7 +1020,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9712,
+			id = 9812,
 			name = "outer 22 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1047,7 +1047,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9713,
+			id = 9813,
 			name = "outer 22 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1074,7 +1074,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9714,
+			id = 9814,
 			name = "outer 22 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1101,7 +1101,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9715,
+			id = 9815,
 			name = "outer 22 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1128,7 +1128,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9716,
+			id = 9816,
 			name = "outer 22 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1155,7 +1155,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9717,
+			id = 9817,
 			name = "outer 11 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1182,7 +1182,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9718,
+			id = 9818,
 			name = "outer 11 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1209,7 +1209,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9719,
+			id = 9819,
 			name = "outer 11 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1236,7 +1236,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9720,
+			id = 9820,
 			name = "outer 11 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1263,7 +1263,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9721,
+			id = 9821,
 			name = "outer 11 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1290,7 +1290,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9722,
+			id = 9822,
 			name = "outer 10 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1317,7 +1317,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9723,
+			id = 9823,
 			name = "outer 10 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1344,7 +1344,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9724,
+			id = 9824,
 			name = "outer 10 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1371,7 +1371,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9725,
+			id = 9825,
 			name = "outer 10 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1398,7 +1398,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9726,
+			id = 9826,
 			name = "outer 26 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1425,7 +1425,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9727,
+			id = 9827,
 			name = "outer 26 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1452,7 +1452,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9728,
+			id = 9828,
 			name = "outer 26 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1479,7 +1479,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9729,
+			id = 9829,
 			name = "outer 26 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1506,7 +1506,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9730,
+			id = 9830,
 			name = "outer 26 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1533,7 +1533,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9731,
+			id = 9831,
 			name = "outer 24 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1560,7 +1560,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9732,
+			id = 9832,
 			name = "outer 24 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1587,7 +1587,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9733,
+			id = 9833,
 			name = "outer 24 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1614,7 +1614,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9734,
+			id = 9834,
 			name = "outer 24 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1641,7 +1641,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9735,
+			id = 9835,
 			name = "outer 6 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1668,7 +1668,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9736,
+			id = 9836,
 			name = "outer 6 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1695,7 +1695,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9737,
+			id = 9837,
 			name = "outer 6 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1722,7 +1722,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9738,
+			id = 9838,
 			name = "outer 6 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1749,7 +1749,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9739,
+			id = 9839,
 			name = "outer 6 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1776,7 +1776,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9740,
+			id = 9840,
 			name = "outer 94 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1803,7 +1803,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9741,
+			id = 9841,
 			name = "outer 94 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1830,7 +1830,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9742,
+			id = 9842,
 			name = "outer 94 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1857,7 +1857,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9743,
+			id = 9843,
 			name = "outer 94 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1884,7 +1884,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9744,
+			id = 9844,
 			name = "outer 94 tree grown bough 5",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1911,7 +1911,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9745,
+			id = 9845,
 			name = "outer 94 tree grown bough 6",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1938,7 +1938,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9746,
+			id = 9846,
 			name = "outer 96 tree grown bough 1",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1965,7 +1965,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9747,
+			id = 9847,
 			name = "outer 96 tree grown bough 2",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -1992,7 +1992,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9748,
+			id = 9848,
 			name = "outer 96 tree grown bough 3",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -2019,7 +2019,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9749,
+			id = 9849,
 			name = "outer 96 tree grown bough 4",
 			generator = "treeShape@bough",
 			kind = "branch",
@@ -2046,7 +2046,7 @@ return {
 			trunkClearance = 2.025,
 		},
 		{
-			id = 9750,
+			id = 9850,
 			name = "planted P1 Westside 0 shade oak trunk",
 			generator = "treeShape@copy",
 			kind = "trunk",
@@ -2076,7 +2076,7 @@ return {
 			surfaceRadius = 2.95,
 		},
 		{
-			id = 9751,
+			id = 9851,
 			name = "planted P1 Westside 0 shade oak bough 2",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2102,7 +2102,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9752,
+			id = 9852,
 			name = "planted P1 Westside 0 shade oak bough 1",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2128,7 +2128,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9753,
+			id = 9853,
 			name = "planted P1 Westside 0 shade oak bough 3",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2154,7 +2154,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9754,
+			id = 9854,
 			name = "planted P1 Westside 0 shade oak bough 4",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2180,7 +2180,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9755,
+			id = 9855,
 			name = "planted P1 Westside 0 shade oak bough 6",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2206,7 +2206,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9756,
+			id = 9856,
 			name = "planted P1 Westside 0 shade oak bough 5",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2232,7 +2232,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9757,
+			id = 9857,
 			name = "planted P1 Westside 0 shade oak bough 7",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2258,7 +2258,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9758,
+			id = 9858,
 			name = "planted P1 Westside 0 shade oak bough 8",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2284,7 +2284,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9759,
+			id = 9859,
 			name = "planted P2 Villa Oak South trunk",
 			generator = "treeShape@copy",
 			kind = "trunk",
@@ -2314,7 +2314,7 @@ return {
 			surfaceRadius = 2.95,
 		},
 		{
-			id = 9760,
+			id = 9860,
 			name = "planted P2 Villa Oak South bough 1",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2340,7 +2340,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9761,
+			id = 9861,
 			name = "planted P2 Villa Oak South bough 6",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2366,7 +2366,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9762,
+			id = 9862,
 			name = "planted P2 Villa Oak South bough 14",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2392,7 +2392,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9763,
+			id = 9863,
 			name = "planted P2 Villa Oak South bough 3",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2418,7 +2418,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9764,
+			id = 9864,
 			name = "planted P2 Villa Oak South bough 4",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2444,7 +2444,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9765,
+			id = 9865,
 			name = "planted P2 Villa Oak South bough 5",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2470,7 +2470,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9766,
+			id = 9866,
 			name = "planted P2 Villa Oak South bough 8",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2496,7 +2496,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9767,
+			id = 9867,
 			name = "planted P2 Villa Oak South bough 9",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2522,7 +2522,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9768,
+			id = 9868,
 			name = "planted P2 Villa Oak South bough 10",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2548,7 +2548,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9769,
+			id = 9869,
 			name = "planted P2 Villa Oak South bough 2",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2574,7 +2574,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9770,
+			id = 9870,
 			name = "planted P2 Villa Oak South bough 7",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2600,7 +2600,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9771,
+			id = 9871,
 			name = "planted P2 Villa Oak South bough 11",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2626,7 +2626,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9772,
+			id = 9872,
 			name = "planted P2 Villa Oak South bough 12",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2652,7 +2652,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9773,
+			id = 9873,
 			name = "planted P2 Villa Oak South bough 13",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2678,7 +2678,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9774,
+			id = 9874,
 			name = "planted P3 Westside 1 shade oak trunk",
 			generator = "treeShape@copy",
 			kind = "trunk",
@@ -2708,7 +2708,7 @@ return {
 			surfaceRadius = 2.95,
 		},
 		{
-			id = 9775,
+			id = 9875,
 			name = "planted P3 Westside 1 shade oak bough 10",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2734,7 +2734,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9776,
+			id = 9876,
 			name = "planted P3 Westside 1 shade oak bough 2",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2760,7 +2760,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9777,
+			id = 9877,
 			name = "planted P3 Westside 1 shade oak bough 4",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2786,7 +2786,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9778,
+			id = 9878,
 			name = "planted P3 Westside 1 shade oak bough 5",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2812,7 +2812,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9779,
+			id = 9879,
 			name = "planted P3 Westside 1 shade oak bough 6",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2838,7 +2838,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9780,
+			id = 9880,
 			name = "planted P3 Westside 1 shade oak bough 8",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2864,7 +2864,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9781,
+			id = 9881,
 			name = "planted P3 Westside 1 shade oak bough 9",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2890,7 +2890,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9782,
+			id = 9882,
 			name = "planted P3 Westside 1 shade oak bough 1",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2916,7 +2916,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9783,
+			id = 9883,
 			name = "planted P3 Westside 1 shade oak bough 3",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2942,7 +2942,7 @@ return {
 			trunkClearance = 2.95,
 		},
 		{
-			id = 9784,
+			id = 9884,
 			name = "planted P3 Westside 1 shade oak bough 7",
 			generator = "treeShape@copy",
 			kind = "branch",
@@ -2972,205 +2972,205 @@ return {
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 8.2651, route = 9701, tier = "low" },
-				{ at = 10.7534, route = 9702, tier = "low" },
-				{ at = 15.6143, route = 9703, tier = "mid" },
-				{ at = 17.9854, route = 9704, tier = "mid" },
-				{ at = 27.2216, route = 9705, tier = "high" },
-				{ at = 25.1928, route = 9706, tier = "high" },
+				{ at = 8.2651, route = 9801, tier = "low" },
+				{ at = 10.7534, route = 9802, tier = "low" },
+				{ at = 15.6143, route = 9803, tier = "mid" },
+				{ at = 17.9854, route = 9804, tier = "mid" },
+				{ at = 27.2216, route = 9805, tier = "high" },
+				{ at = 25.1928, route = 9806, tier = "high" },
 			},
 			label = "STREET OAK 30",
-			routes = { 9701, 9702, 9703, 9704, 9705, 9706 },
+			routes = { 9801, 9802, 9803, 9804, 9805, 9806 },
 			trunk = 543,
 			why = "west of the old town core, by the sidewalk south of it: all five boughs left one point 23 studs up; made bigger",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 8.2304, route = 9707, tier = "low" },
-				{ at = 11.5218, route = 9708, tier = "low" },
-				{ at = 15.6174, route = 9709, tier = "mid" },
-				{ at = 19.6904, route = 9710, tier = "mid" },
-				{ at = 29.9108, route = 9711, tier = "high" },
+				{ at = 8.2304, route = 9807, tier = "low" },
+				{ at = 11.5218, route = 9808, tier = "low" },
+				{ at = 15.6174, route = 9809, tier = "mid" },
+				{ at = 19.6904, route = 9810, tier = "mid" },
+				{ at = 29.9108, route = 9811, tier = "high" },
 			},
 			label = "STREET MAPLE 23",
-			routes = { 9707, 9708, 9709, 9710, 9711 },
+			routes = { 9807, 9808, 9809, 9810, 9811 },
 			trunk = 479,
 			why = "north of the centre on the way to the north houses: eight boughs from one point 25 studs up",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 9.0681, route = 9712, tier = "low" },
-				{ at = 12.3717, route = 9713, tier = "low" },
-				{ at = 18.1477, route = 9714, tier = "mid" },
-				{ at = 23.037, route = 9715, tier = "mid" },
-				{ at = 36.7618, route = 9716, tier = "high" },
+				{ at = 9.0681, route = 9812, tier = "low" },
+				{ at = 12.3717, route = 9813, tier = "low" },
+				{ at = 18.1477, route = 9814, tier = "mid" },
+				{ at = 23.037, route = 9815, tier = "mid" },
+				{ at = 36.7618, route = 9816, tier = "high" },
 			},
 			label = "STREET SYCAMORE 22",
-			routes = { 9712, 9713, 9714, 9715, 9716 },
+			routes = { 9812, 9813, 9814, 9815, 9816 },
 			trunk = 470,
 			why = "north, west of the main street: seven boughs from one point 31 studs up",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 9.8559, route = 9717, tier = "low" },
-				{ at = 13.1438, route = 9718, tier = "low" },
-				{ at = 19.7313, route = 9719, tier = "mid" },
-				{ at = 26.2617, route = 9720, tier = "mid" },
-				{ at = 31.1112, route = 9721, tier = "mid" },
+				{ at = 9.8559, route = 9817, tier = "low" },
+				{ at = 13.1438, route = 9818, tier = "low" },
+				{ at = 19.7313, route = 9819, tier = "mid" },
+				{ at = 26.2617, route = 9820, tier = "mid" },
+				{ at = 31.1112, route = 9821, tier = "mid" },
 			},
 			label = "STREET ELM 11",
-			routes = { 9717, 9718, 9719, 9720, 9721 },
+			routes = { 9817, 9818, 9819, 9820, 9821 },
 			trunk = 377,
 			why = "east of the centre: six boughs from one point 39 studs up, nothing below",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 7.4218, route = 9722, tier = "low" },
-				{ at = 9.9096, route = 9723, tier = "low" },
-				{ at = 14.0258, route = 9724, tier = "mid" },
-				{ at = 17.239, route = 9725, tier = "mid" },
+				{ at = 7.4218, route = 9822, tier = "low" },
+				{ at = 9.9096, route = 9823, tier = "low" },
+				{ at = 14.0258, route = 9824, tier = "mid" },
+				{ at = 17.239, route = 9825, tier = "mid" },
 			},
 			label = "STREET OAK 10",
-			routes = { 9722, 9723, 9724, 9725 },
+			routes = { 9822, 9823, 9824, 9825 },
 			trunk = 370,
 			why = "east, by the east commercial street (its sidewalk east of it, a telephone wire west of it): five boughs from one point 23 studs up",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 8.2394, route = 9726, tier = "low" },
-				{ at = 10.7091, route = 9727, tier = "low" },
-				{ at = 15.6084, route = 9728, tier = "mid" },
-				{ at = 18.8479, route = 9729, tier = "mid" },
-				{ at = 28.3, route = 9730, tier = "high" },
+				{ at = 8.2394, route = 9826, tier = "low" },
+				{ at = 10.7091, route = 9827, tier = "low" },
+				{ at = 15.6084, route = 9828, tier = "mid" },
+				{ at = 18.8479, route = 9829, tier = "mid" },
+				{ at = 28.3, route = 9830, tier = "high" },
 			},
 			label = "STREET ELM 26",
-			routes = { 9726, 9727, 9728, 9729, 9730 },
+			routes = { 9826, 9827, 9828, 9829, 9830 },
 			trunk = 506,
 			why = "south of the old town core: six boughs from one point 24 studs up",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 9.1379, route = 9731, tier = "low" },
-				{ at = 11.6307, route = 9732, tier = "low" },
-				{ at = 18.2272, route = 9733, tier = "mid" },
-				{ at = 22.2682, route = 9734, tier = "mid" },
+				{ at = 9.1379, route = 9831, tier = "low" },
+				{ at = 11.6307, route = 9832, tier = "low" },
+				{ at = 18.2272, route = 9833, tier = "mid" },
+				{ at = 22.2682, route = 9834, tier = "mid" },
 			},
 			label = "STREET OAK 24",
-			routes = { 9731, 9732, 9733, 9734 },
+			routes = { 9831, 9832, 9833, 9834 },
 			trunk = 489,
 			why = "north-east, by the north gardens: nine boughs from one point 29 studs up",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 9.1385, route = 9735, tier = "low" },
-				{ at = 12.4629, route = 9736, tier = "low" },
-				{ at = 19.1217, route = 9737, tier = "mid" },
-				{ at = 24.9459, route = 9738, tier = "mid" },
-				{ at = 29.9309, route = 9739, tier = "mid" },
+				{ at = 9.1385, route = 9835, tier = "low" },
+				{ at = 12.4629, route = 9836, tier = "low" },
+				{ at = 19.1217, route = 9837, tier = "mid" },
+				{ at = 24.9459, route = 9838, tier = "mid" },
+				{ at = 29.9309, route = 9839, tier = "mid" },
 			},
 			label = "STREET ELM 6",
-			routes = { 9735, 9736, 9737, 9738, 9739 },
+			routes = { 9835, 9836, 9837, 9838, 9839 },
 			trunk = 333,
 			why = "south-east: six boughs from one point 37 studs up, nothing below",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 7.3269, route = 9740, tier = "low" },
-				{ at = 9.7759, route = 9741, tier = "low" },
-				{ at = 14.7012, route = 9742, tier = "mid" },
-				{ at = 18.7519, route = 9743, tier = "mid" },
-				{ at = 22.7411, route = 9744, tier = "mid" },
-				{ at = 30.8727, route = 9745, tier = "high" },
+				{ at = 7.3269, route = 9840, tier = "low" },
+				{ at = 9.7759, route = 9841, tier = "low" },
+				{ at = 14.7012, route = 9842, tier = "mid" },
+				{ at = 18.7519, route = 9843, tier = "mid" },
+				{ at = 22.7411, route = 9844, tier = "mid" },
+				{ at = 30.8727, route = 9845, tier = "high" },
 			},
 			label = "PARK OAK 94",
-			routes = { 9740, 9741, 9742, 9743, 9744, 9745 },
+			routes = { 9840, 9841, 9842, 9843, 9844, 9845 },
 			trunk = 702,
 			why = "Sycamore Park, between the playground and the gazebo: nine boughs from one point 28 studs up; made bigger",
 		},
 		{
 			kind = "reshaped",
 			boughs = {
-				{ at = 8.238, route = 9746, tier = "low" },
-				{ at = 10.7276, route = 9747, tier = "low" },
-				{ at = 15.6607, route = 9748, tier = "mid" },
-				{ at = 19.5871, route = 9749, tier = "mid" },
+				{ at = 8.238, route = 9846, tier = "low" },
+				{ at = 10.7276, route = 9847, tier = "low" },
+				{ at = 15.6607, route = 9848, tier = "mid" },
+				{ at = 19.5871, route = 9849, tier = "mid" },
 			},
 			label = "PARK ELM 96",
-			routes = { 9746, 9747, 9748, 9749 },
+			routes = { 9846, 9847, 9848, 9849 },
 			trunk = 718,
 			why = "Sycamore Park, north edge: six boughs from one point 25 studs up",
 		},
 		{
 			kind = "planted",
 			boughs = {
-				{ at = 22.3674, route = 9751, tier = "copy" },
-				{ at = 29.7515, route = 9752, tier = "copy" },
-				{ at = 29.7515, route = 9753, tier = "copy" },
-				{ at = 29.7515, route = 9754, tier = "copy" },
-				{ at = 29.7515, route = 9755, tier = "copy" },
-				{ at = 37.1455, route = 9756, tier = "copy" },
-				{ at = 37.1455, route = 9757, tier = "copy" },
-				{ at = 37.1455, route = 9758, tier = "copy" },
+				{ at = 22.3674, route = 9851, tier = "copy" },
+				{ at = 29.7515, route = 9852, tier = "copy" },
+				{ at = 29.7515, route = 9853, tier = "copy" },
+				{ at = 29.7515, route = 9854, tier = "copy" },
+				{ at = 29.7515, route = 9855, tier = "copy" },
+				{ at = 37.1455, route = 9856, tier = "copy" },
+				{ at = 37.1455, route = 9857, tier = "copy" },
+				{ at = 37.1455, route = 9858, tier = "copy" },
 			},
 			label = "PLAYGROUND SHADE OAK",
 			offset = { 1067.5, -0.3285, 1440 },
-			routes = { 9750, 9751, 9752, 9753, 9754, 9755, 9756, 9757, 9758 },
+			routes = { 9850, 9851, 9852, 9853, 9854, 9855, 9856, 9857, 9858 },
 			source = 960,
-			trunk = 9750,
+			trunk = 9850,
 			why = "Sycamore Park, on the lawn just north of the playground: a big shade oak with boughs at three heights (a copy of WESTSIDE 0 SHADE OAK)",
 		},
 		{
 			kind = "planted",
 			boughs = {
-				{ at = 18.2071, route = 9760, tier = "copy" },
-				{ at = 18.2071, route = 9761, tier = "copy" },
-				{ at = 18.2071, route = 9762, tier = "copy" },
-				{ at = 24.7827, route = 9763, tier = "copy" },
-				{ at = 24.7827, route = 9764, tier = "copy" },
-				{ at = 24.7827, route = 9765, tier = "copy" },
-				{ at = 24.7827, route = 9766, tier = "copy" },
-				{ at = 24.7827, route = 9767, tier = "copy" },
-				{ at = 24.7827, route = 9768, tier = "copy" },
-				{ at = 30.5364, route = 9769, tier = "copy" },
-				{ at = 30.5364, route = 9770, tier = "copy" },
-				{ at = 30.5364, route = 9771, tier = "copy" },
-				{ at = 30.5364, route = 9772, tier = "copy" },
-				{ at = 30.5364, route = 9773, tier = "copy" },
+				{ at = 18.2071, route = 9860, tier = "copy" },
+				{ at = 18.2071, route = 9861, tier = "copy" },
+				{ at = 18.2071, route = 9862, tier = "copy" },
+				{ at = 24.7827, route = 9863, tier = "copy" },
+				{ at = 24.7827, route = 9864, tier = "copy" },
+				{ at = 24.7827, route = 9865, tier = "copy" },
+				{ at = 24.7827, route = 9866, tier = "copy" },
+				{ at = 24.7827, route = 9867, tier = "copy" },
+				{ at = 24.7827, route = 9868, tier = "copy" },
+				{ at = 30.5364, route = 9869, tier = "copy" },
+				{ at = 30.5364, route = 9870, tier = "copy" },
+				{ at = 30.5364, route = 9871, tier = "copy" },
+				{ at = 30.5364, route = 9872, tier = "copy" },
+				{ at = 30.5364, route = 9873, tier = "copy" },
 			},
 			label = "BACK LOT OAK",
 			offset = { -1142.5, -0.6587, 685 },
-			routes = { 9759, 9760, 9761, 9762, 9763, 9764, 9765, 9766, 9767, 9768, 9769, 9770, 9771, 9772, 9773 },
+			routes = { 9859, 9860, 9861, 9862, 9863, 9864, 9865, 9866, 9867, 9868, 9869, 9870, 9871, 9872, 9873 },
 			source = 900,
-			trunk = 9759,
+			trunk = 9859,
 			why = "behind the old town core's south-west houses, on the open ground between the yards: an oak with boughs at three heights (a copy of VILLA OAK SOUTH)",
 		},
 		{
 			kind = "planted",
 			boughs = {
-				{ at = 24.117, route = 9775, tier = "copy" },
-				{ at = 32.4033, route = 9776, tier = "copy" },
-				{ at = 32.4033, route = 9777, tier = "copy" },
-				{ at = 32.4033, route = 9778, tier = "copy" },
-				{ at = 32.4033, route = 9779, tier = "copy" },
-				{ at = 32.4033, route = 9780, tier = "copy" },
-				{ at = 32.4033, route = 9781, tier = "copy" },
-				{ at = 40.6915, route = 9782, tier = "copy" },
-				{ at = 40.6915, route = 9783, tier = "copy" },
-				{ at = 40.6915, route = 9784, tier = "copy" },
+				{ at = 24.117, route = 9875, tier = "copy" },
+				{ at = 32.4033, route = 9876, tier = "copy" },
+				{ at = 32.4033, route = 9877, tier = "copy" },
+				{ at = 32.4033, route = 9878, tier = "copy" },
+				{ at = 32.4033, route = 9879, tier = "copy" },
+				{ at = 32.4033, route = 9880, tier = "copy" },
+				{ at = 32.4033, route = 9881, tier = "copy" },
+				{ at = 40.6915, route = 9882, tier = "copy" },
+				{ at = 40.6915, route = 9883, tier = "copy" },
+				{ at = 40.6915, route = 9884, tier = "copy" },
 			},
 			label = "WEST LAWN SHADE OAK",
 			offset = { 777.5, -11.7347, 530 },
-			routes = { 9774, 9775, 9776, 9777, 9778, 9779, 9780, 9781, 9782, 9783, 9784 },
+			routes = { 9874, 9875, 9876, 9877, 9878, 9879, 9880, 9881, 9882, 9883, 9884 },
 			source = 969,
-			trunk = 9774,
+			trunk = 9874,
 			why = "west of the old town core's north-west houses, on the open ground: the tallest shade oak, boughs at three heights (a copy of WESTSIDE 1 SHADE OAK)",
 		},
 	},

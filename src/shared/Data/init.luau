@@ -169,7 +169,7 @@ function Data.new(loader: Loader): Data
 					return if h and h.routes then h.routes else {}
 				end)
 			end
-			-- the D32 tree shapes (data/tree_shapes.json, Shared/World/TreeShapes): grown boughs and planted trees, 9701-
+			-- the D32 tree shapes (data/tree_shapes.json, Shared/World/TreeShapes): grown boughs and planted trees, 9801-
 			if self:index().modules.TreeShapes then
 				table.insert(loaders, function()
 					local s = loadName(self, "TreeShapes")

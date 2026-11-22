@@ -1,7 +1,7 @@
 {
   "$schema": "tree shapes v1 (Shared/World/TreeShapes: its header is the format)",
   "src": "BRIEF_ADDENDUM D32 (owner, 2026-11-22): 'Enhance the branches on some of the trees, to make for more levels, overall bigger trees, not just a single place and point where branches come out of and all split ... edit the branches of about 11% of the other trees, just to polish and shape them up, add a few lower branches, make some trees even bigger, and add a couple trees.' Ten of the 83 trees that are not hollow (12 %), spread over the town, each keeping every harvested route; three trees planted as copies of trees that already have uploaded art. Studs; bearings clockwise from +z; heights above the trunk's foot. Owner sheet: docs/owner/TREE_SHAPES_CHECK.md.",
-  "idBase": 9701,
+  "idBase": 9801,
   "reshaped": [
     {
       "trunk": 543,
