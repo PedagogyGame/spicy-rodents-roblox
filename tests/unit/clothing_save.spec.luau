@@ -171,8 +171,9 @@ return function(t)
 				stats = {},
 			}
 			local d = ProfileSchema.migrate(v1) :: any
-			t.eq(d.schema, 2)
+			t.eq(d.schema, 3, "(and on to v3: D30's stock options)")
 			t.deepEq(d.worn, {})
+			t.deepEq(d.options, { held = 0, bought = 0, withdrawn = 0 })
 			t.deepEq(d.wardrobe, { [SHIRT] = true })
 			t.eq(v1.worn, nil, "the raw record is not changed in place")
 			-- there is no v0: nothing wrote the store before v1, so a table without a numeric schema is broken

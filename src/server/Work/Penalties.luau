@@ -4,17 +4,18 @@
 -- townsperson station's money level" means and why a fine never takes a balance below nothing):
 --   * errandStolen(player, what): an errand runner kept a bank errand's parcel (past the time limit, kept in their
 --     own home, or took it out of the server: Server/Work/ErrandService decides which). The fine through the wallet,
---     a line on their screen, and a reputation report (kind "errand_stolen").
+--     a line on their screen, and a reputation report (kind "errand_theft").
 --   * ambulanceIgnored(player): a doctor driving the ambulance ignored a bite victim who needed picking up (the
 --     doctors' work decides that and demotes: RoleService.demote; this is only the money side). The fine, then the
 --     doctor's money down to the lowest townsperson's (PenaltyRules.ambulance), a line on their screen, and a
---     reputation report (kind "ambulance_ignored").
+--     reputation report (kind "ignored_victim").
 -- Money moves only through the town's wallet (Economy/Credits: wallet.purse(player):debit(cents, why), which takes
 -- earnings before pocket money and is logged and shown like any other change). A saved stock-option balance (the
 -- D30 stock options) is not wallet money and is never touched here.
--- Reputation: the D30 reputation work owns it; this calls report(player, kind, severity) inside a pcall, through
--- deps.report when given, else through the first of REPUTATION_MODULES that loads and has a `report` (none: nothing
--- happens, the money penalty stands).
+-- Reputation: the D30 reputation work owns it (Shared/Reputation/Reputation.report, which never errors and rests each
+-- kind a while, so a doctor reported here and by the doctors' work in the same moment counts once); this calls
+-- report(player, kind, severity) inside a pcall, through deps.report when given, else through REPUTATION_MODULES
+-- (missing: nothing happens, the money penalty stands).
 -- The module-level functions (Penalties.errandStolen, Penalties.ambulanceIgnored) use the instance Boot/Game
 -- installs (Penalties.install(deps)); before that they do nothing and return 0, with a warning.
 -- Interface: new(deps) -> Instance { errandStolen(player, what?) -> cents, ambulanceIgnored(player) -> (fine, down) };
@@ -29,9 +30,9 @@ local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Econo
 local Penalties = {}
 
 -- where the reputation work's report(player, kind, severity) may live (shared first, then the server's)
-Penalties.REPUTATION_MODULES = table.freeze({ "Reputation/Reputation", "Reputation/ReputationService" })
--- how bad each is on the reputation work's scale (0..1: only extreme acts are marked at all)
-Penalties.SEVERITY = table.freeze({ errand_stolen = 0.8, ambulance_ignored = 0.9 })
+Penalties.REPUTATION_MODULES = table.freeze({ "Reputation/Reputation" })
+-- how bad each is on the reputation work's scale (Shared/Reputation/Reputation: 1, 2 or 3; 2 is 10 points)
+Penalties.SEVERITY = table.freeze({ errand_theft = 2, ignored_victim = 2 })
 
 export type Deps = {
 	wallet: any, -- Economy/Credits.Wallet (purse(player), tell(player, words))
@@ -75,7 +76,7 @@ function Penalties.new(deps: Deps): Instance
 
 	local function rep(player: any, kind: string)
 		local ok, err = pcall(function()
-			report(player, kind, Penalties.SEVERITY[kind] or 1)
+			report(player, kind, Penalties.SEVERITY[kind] or 2)
 		end)
 		if not ok then
 			shout(`reputation report {kind} failed: {err}`)
@@ -118,7 +119,7 @@ function Penalties.new(deps: Deps): Instance
 				player,
 				`You kept {what or "the parcel"} instead of delivering it: {Bank.amount(taken)} taken as a penalty.`
 			)
-			rep(player, "errand_stolen")
+			rep(player, "errand_theft")
 			return taken
 		end,
 		ambulanceIgnored = function(player: any): (number, number)
@@ -130,7 +131,7 @@ function Penalties.new(deps: Deps): Instance
 				then `, and your money is down to the lowest townsperson's ({Bank.amount(level)})`
 				else ""
 			wallet.tell(player, `A bite victim was left waiting: {Bank.amount(tookFine)} penalty{rest}.`)
-			rep(player, "ambulance_ignored")
+			rep(player, "ignored_victim")
 			return tookFine, tookDown
 		end,
 	}

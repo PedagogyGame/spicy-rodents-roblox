@@ -1,97 +1,157 @@
 --!strict
 -- ReplicatedStorage.Shared.World.PlayerHomes
--- Which house in town is a player's home (owner D30: "players can access their computers at home" and "places it in
--- their home"). A SHARED SEAM of the D30 work (feat/stock-options puts the home computer in it, feat/town-work asks
--- whether an errand's parcel was taken home): whoever needs it first writes it, the other merges; this is the
--- smallest form that does both jobs, with a hook for a fuller one.
---   * HOMES are the town's houses (the lots of type "house" in Shared/Data's generated/Lots, by id, sorted): the
---     same list on every server.
---   * homeOf(player) -> lot id: a resolver set with setResolver (a claim system, when there is one) decides first;
---     otherwise the player's UserId picks a house from HOMES (UserId mod the count), so a player has the same home
---     on every server, with no saving. Two players can share a house (49 players, 31 houses): each calls it home.
---   * lotOf(id) -> { x, z, hw, hd } the house's footprint (world studs; w along X and d along Z, World/Colliders'
---     convention); inside(id, x, z, pad?) -> boolean: a point within the footprint (grown by pad).
--- Pure over Shared/Data (data defaults to Data.default()); no side effects on require.
+-- Every player who walks the town as a person has a home (owner D30, 2026-11-22: "players can access their computers
+-- at home"): one of the town's four furnished houses, the one nearest to where they first appear as a person on this
+-- server. It is decided once and kept for as long as the server runs (leaving and coming back finds the same home); a
+-- new server decides afresh. Several players may share a house: its one desk computer serves each of them their own
+-- saved Spicy Stock Options (Server/Economy/StockOptions). The server writes the home's lot id to the player
+-- attribute ATTRIBUTE, so the server and the player's own screen read it the same way (homeOf).
+-- The computer is the monitor on the house's desk (WorldGen/Builders/Interior: the study's or the den's desk, or the
+-- one it adds to the bedroom); `computer` is the monitor's centre in world studs, checked against the bake plan by
+-- tests/unit/stock_options.spec.luau, and `desk` the root part's name inside Workspace.Town.Lots.<lot> (its screen is
+-- the part "<desk>_Monitor" beside it).
+-- Other features (D30 errands: "places it in their home") use homeOf and inside(lotId, x, z).
+-- Interface: HOMES; ATTRIBUTE; REACH; lot(id) -> Home?; nearest(x, z) -> Home; homeOf(player) -> lot id?;
+--   inside(lotId, x, z) -> boolean; atComputer(lotId, x, y, z) -> boolean; new() -> Registry
+--   { assign(key, x, z) -> lot id (the first call decides), of(key) -> lot id? }
+-- Pure; no side effects on require.
 
-local Data = require("../Data")
+export type Home = {
+	lot: string, -- the lot id (generated/Lots, Workspace.Town)
+	name: string, -- what a player reads: "the blue cottage"
+	room: string, -- the room the computer stands in
+	desk: string, -- the desk's root part ("<desk>_Monitor" is the screen)
+	computer: { number }, -- the monitor's centre, world studs { x, y, z }
+	x: number, -- the lot's centre and half extents (the house's footprint), world studs
+	z: number,
+	hw: number,
+	hd: number,
+}
+
+export type Registry = {
+	homes: { [any]: string },
+	assign: (self: Registry, key: any, x: number, z: number) -> string,
+	of: (self: Registry, key: any) -> string?,
+}
 
 local PlayerHomes = {}
 
-export type Lot = { id: string, x: number, z: number, hw: number, hd: number }
+PlayerHomes.ATTRIBUTE = "Home" -- the player attribute holding their home's lot id
+PlayerHomes.REACH = 10 -- studs from a body to the monitor's centre: close enough to use the computer
 
-local cache: { ids: { string }, byId: { [string]: Lot } }? = nil
-local resolver: ((player: any) -> string?)? = nil
+PlayerHomes.HOMES = table.freeze({
+	{
+		lot = "core_house_0_victorian",
+		name = "the Victorian house",
+		room = "bedroom",
+		desk = "Furniture_bedroom_desk",
+		computer = { -150.465, 4.075, -135.4275 },
+		x = -140,
+		z = -132.5,
+		hw = 22.55,
+		hd = 19.475,
+	},
+	{
+		lot = "core_house_1_bungalow",
+		name = "the bungalow",
+		room = "den",
+		desk = "Furniture_den_desk",
+		computer = { 119.14, 4.075, -158.14 },
+		x = 127.5,
+		z = -147.5,
+		hw = 24.6,
+		hd = 20.5,
+	},
+	{
+		lot = "core_house_2_brick",
+		name = "the brick house",
+		room = "study",
+		desk = "Furniture_study_desk",
+		computer = { -111.35, 4.075, 141.23 },
+		x = -132.5,
+		z = 127.5,
+		hw = 22.55,
+		hd = 20.5,
+	},
+	{
+		lot = "core_house_3_blue_cottage",
+		name = "the blue cottage",
+		room = "bedroom",
+		desk = "Furniture_bedroom_desk",
+		computer = { 141.775, 4.075, 142.825 },
+		x = 145,
+		z = 140,
+		hw = 21.525,
+		hd = 18.45,
+	},
+} :: { Home })
 
-local function load(data: any?): { ids: { string }, byId: { [string]: Lot } }
-	if data == nil and cache ~= nil then
-		return cache :: any
-	end
-	local d = data or Data.default()
-	local ids: { string } = {}
-	local byId: { [string]: Lot } = {}
-	for _, lot in d:lots() do
-		local fp = lot.footprint
-		if lot.type == "house" and fp then
-			table.insert(ids, lot.id)
-			byId[lot.id] = { id = lot.id, x = lot.x, z = lot.z, hw = fp.w / 2, hd = fp.d / 2 }
+local BY_LOT: { [string]: Home } = {}
+for _, h in PlayerHomes.HOMES do
+	BY_LOT[h.lot] = h
+end
+
+function PlayerHomes.lot(id: string): Home?
+	return BY_LOT[id]
+end
+
+-- The home nearest to (x, z) by its footprint's centre (the first in HOMES on a tie).
+function PlayerHomes.nearest(x: number, z: number): Home
+	local best, bestD = PlayerHomes.HOMES[1], math.huge
+	for _, h in PlayerHomes.HOMES do
+		local dx, dz = h.x - x, h.z - z
+		local d = dx * dx + dz * dz
+		if d < bestD then
+			best, bestD = h, d
 		end
 	end
-	table.sort(ids)
-	local out = { ids = ids, byId = byId }
-	if data == nil then
-		cache = out
-	end
-	return out
+	return best
 end
 
--- The houses that can be a home, in a fixed order.
-function PlayerHomes.homes(data: any?): { string }
-	return load(data).ids
-end
-
--- A claim system (or a spec) decides first; nil from it falls back to the UserId's house. nil clears it.
-function PlayerHomes.setResolver(fn: ((player: any) -> string?)?)
-	resolver = fn
-end
-
-local function userIdOf(player: any): number?
-	if type(player) == "number" then
-		return player
-	end
-	local ok, id = pcall(function()
-		return (player :: any).UserId
+-- The player's home (the attribute the server writes), on the server or on their own screen.
+function PlayerHomes.homeOf(player: any): string?
+	local ok, v = pcall(function(): any
+		return player:GetAttribute(PlayerHomes.ATTRIBUTE)
 	end)
-	return if ok and type(id) == "number" then id else nil
-end
-
--- The lot id of this player's home, or nil (no houses, or nothing that names the player).
-function PlayerHomes.homeOf(player: any, data: any?): string?
-	if resolver then
-		local ok, id = pcall(resolver :: any, player)
-		if ok and type(id) == "string" then
-			return id
-		end
+	if ok and type(v) == "string" and BY_LOT[v] then
+		return v
 	end
-	local ids = load(data).ids
-	local uid = userIdOf(player)
-	if uid == nil or #ids == 0 then
-		return nil
-	end
-	return ids[(math.abs(math.floor(uid)) % #ids) + 1]
+	return nil
 end
 
-function PlayerHomes.lotOf(id: string, data: any?): Lot?
-	return load(data).byId[id]
+-- Is (x, z) inside the house on this lot (its footprint)?
+function PlayerHomes.inside(lotId: string, x: number, z: number): boolean
+	local h = BY_LOT[lotId]
+	return h ~= nil and math.abs(x - h.x) <= h.hw and math.abs(z - h.z) <= h.hd
 end
 
--- Is (x, z) within the house's footprint (grown by pad studs)?
-function PlayerHomes.inside(id: string, x: number, z: number, pad: number?, data: any?): boolean
-	local lot = load(data).byId[id]
-	if lot == nil then
+-- Is a body at (x, y, z) close enough to use this home's computer?
+function PlayerHomes.atComputer(lotId: string, x: number, y: number, z: number): boolean
+	local h = BY_LOT[lotId]
+	if h == nil then
 		return false
 	end
-	local p = pad or 0
-	return math.abs(x - lot.x) <= lot.hw + p and math.abs(z - lot.z) <= lot.hd + p
+	local c = h.computer
+	local dx, dy, dz = x - c[1], y - c[2], z - c[3]
+	return dx * dx + dy * dy + dz * dz <= PlayerHomes.REACH * PlayerHomes.REACH
+end
+
+-- The server's record of who lives where: the first assign for a key decides its home, for as long as it is kept.
+function PlayerHomes.new(): Registry
+	local reg = { homes = {} } :: Registry
+	function reg.assign(self: Registry, key: any, x: number, z: number): string
+		local have = self.homes[key]
+		if have then
+			return have
+		end
+		local lot = PlayerHomes.nearest(x, z).lot
+		self.homes[key] = lot
+		return lot
+	end
+	function reg.of(self: Registry, key: any): string?
+		return self.homes[key]
+	end
+	return reg
 end
 
 return PlayerHomes

@@ -62,10 +62,13 @@
 --   (Wildlife/RoadSquirrels: the computer's squirrels a car knocks flat; nil when it could not start), rideBumps
 --   (Vehicles/RideBumps: the people and squirrels in the way of the town's shared little vehicles, owner D29; nil when
 --   it could not start), cornerStore (Items/CornerStore;
---   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
+--   nil without its bake; F by its kick ball on the ground kicks it, owner D30), reputation (Reputation/
+--   ReputationService: every player's reputation in the background, owner D30: the kick ball's hard hits and the shared
+--   vehicles' knocks are handed to it; the Player attribute Reputation), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
---   saved between servers (D16 #25; section 6e),
+--   saved between servers (D16 #25; section 6e), stockOptions (Economy/StockOptions: Spicy Stock Options, owner D30;
+--   promptBuy(player) opens the purchase window, e.g. from a bank's counter; nil when it could not start),
 --   townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
@@ -124,11 +127,13 @@ local ShopArt = require("../Assets/ShopArt")
 local CornerStore = require("../Items/CornerStore")
 local PlayerSaves = require("../Persistence/PlayerSaves")
 local Wardrobe = require("../Cosmetics/Wardrobe")
+local StockOptions = require("../Economy/StockOptions")
 local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
 local TownSquirrels = require("../Wildlife/TownSquirrels")
 local RoadSquirrels = require("../Wildlife/RoadSquirrels")
 local RideBumps = require("../Vehicles/RideBumps")
+local ReputationService = require("../Reputation/ReputationService")
 local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
@@ -410,6 +415,16 @@ function Game.start(opts: Opts?): any
 		end,
 	})
 	local wallet = money.wallet
+	-- every player's reputation, in the background (Reputation/ReputationService, owner D30): the Player attribute
+	-- Reputation, a brief notice through the wallet's channel when it drops, Shared/Reputation/Reputation.report bound
+	local reputation = ReputationService.start({
+		fire = function(player: any, payload: { [string]: any })
+			if fireLater then
+				fireLater(player, payload)
+			end
+		end,
+		players = o.players ~= false,
+	})
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
 	if town then
@@ -564,6 +579,7 @@ function Game.start(opts: Opts?): any
 		engine = o.engine,
 		players = o.players,
 		purse = money.purse, -- RoleService: a joining player's purse is the wallet's (pocket money comes with it)
+		reputation = reputation, -- RoleService: the human queue's reputation term
 	})
 	if o.heartbeat == false then
 		rt.stop() -- the smoke steps frames by hand
@@ -1418,6 +1434,8 @@ function Game.start(opts: Opts?): any
 	-- alert zones and tells it of the raised leg
 	local combat: any = nil
 	local duelRules = CombatRules.params()
+	-- F by a kick ball lying in front (the corner store's, owner D30: Items/ItemWorld.kickLoose), set once it opens
+	local ballKick: ((player: any) -> boolean)? = nil
 
 	local function kick(player: any): boolean?
 		local s = stateOf(player)
@@ -1430,7 +1448,7 @@ function Game.start(opts: Opts?): any
 		if actor == nil or actor.species ~= "human" then
 			return nil
 		end
-		if devices and type(player.UserId) == "number" and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) then
+		if devices and type(player.UserId) == "number" and PlayerVehicles.aboard(devices.fleet, player.UserId) then
 			return nil
 		end
 		local root = (actor.body :: Model).PrimaryPart
@@ -1439,6 +1457,7 @@ function Game.start(opts: Opts?): any
 		end
 		local p = root.Position
 		local look = root.CFrame.LookVector
+		local kickedBall = ballKick ~= nil and ballKick(player) -- (and a squirrel in front is kicked as well)
 		if combat and townIdOf[actor.id] then
 			-- (a raised leg only when the kick was at the rodent: Combat/CombatService.heldKick)
 			combat:heldKick(townIdOf[actor.id], now, look.X, look.Z)
@@ -1460,7 +1479,9 @@ function Game.start(opts: Opts?): any
 			targets
 		)
 		if hitId == nil then
-			fire(player, { kind = "kick", hit = false })
+			if not kickedBall then
+				fire(player, { kind = "kick", hit = false })
+			end
 			return false
 		end
 		local target = byId[hitId]
@@ -2063,7 +2084,7 @@ function Game.start(opts: Opts?): any
 				if
 					devices
 					and type(player.UserId) == "number"
-					and PlayerVehicles.vehicleOf(devices.fleet, player.UserId)
+					and PlayerVehicles.aboard(devices.fleet, player.UserId)
 				then
 					return false, "Get out of the vehicle first (E)"
 				end
@@ -2396,7 +2417,7 @@ function Game.start(opts: Opts?): any
 					local player = playerOf(id)
 					return player ~= nil
 						and devices ~= nil
-						and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) ~= nil
+						and PlayerVehicles.aboard(devices.fleet, player.UserId) ~= nil -- (a passenger too: D30)
 				end,
 				busy = function(id: number): boolean
 					return (infection ~= nil and infection:engaged(id))
@@ -2442,6 +2463,15 @@ function Game.start(opts: Opts?): any
 						(model :: Model):SetAttribute("BumpAt", workspace:GetServerTimeNow())
 					end
 				end,
+				-- the rider's reputation hears of every person knocked (Reputation/Conduct: only several, or the same
+				-- one again, at speed ever counts; owner D30)
+				struck = function(rideId: string, personId: number, speed: number)
+					local v = if devices then PlayerVehicles.get(devices.fleet, rideId) else nil
+					local rider = if v and v.driver then Players:GetPlayerByUserId(v.driver) else nil
+					if rider then
+						reputation.runOver(rider, { victim = personId, speed = speed })
+					end
+				end,
 				serverTime = function(): number
 					return workspace:GetServerTimeNow()
 				end,
@@ -2484,7 +2514,9 @@ function Game.start(opts: Opts?): any
 			fire = fire,
 			heartbeat = o.heartbeat ~= false,
 			terrain = o.terrain ~= false,
+			reputation = reputation,
 		})
+		ballKick = if cornerStore then cornerStore.kickBall else nil
 	end)
 	if not okC then
 		warn(`[SpicyRodents] the corner store failed to open: {errC}`)
@@ -2529,7 +2561,9 @@ function Game.start(opts: Opts?): any
 	-- other item stay on this server. A DataStore failure never blocks play and never takes back a purchase
 	-- (PlayerSaves: retry, a notice). The player attributes Clothes (what is worn) and ClothesSaved (the save's state)
 	-- are for the Studio check (docs/owner/CLOTHING_SAVE_CHECK.md).
-	local saves: any, wardrobe: any, giftShop: any = nil, nil, nil
+	-- Spicy Stock Options (owner D30; Economy/StockOptions) live in the same profile: bought with Robux (the one
+	-- ProcessReceipt), saved, withdrawn at the player's home computer into this server's wallet (S$100 per server).
+	local saves: any, wardrobe: any, giftShop: any, stockOptions: any = nil, nil, nil, nil
 	local clothesConns: { RBXScriptConnection } = {}
 	local clothesRunning = true
 	local okClothes, errClothes = pcall(function()
@@ -2559,7 +2593,11 @@ function Game.start(opts: Opts?): any
 				fire(player, { kind = "notice", text = words })
 			end,
 			loaded = function(player: any, profileData: any): boolean
-				return wardrobe ~= nil and wardrobe:loaded(player, profileData)
+				local changed = wardrobe ~= nil and wardrobe:loaded(player, profileData)
+				if stockOptions then
+					stockOptions.loaded(player, profileData)
+				end
+				return changed
 			end,
 			pending = function(player: any): boolean
 				return wardrobe ~= nil and wardrobe:pending(player)
@@ -2588,6 +2626,23 @@ function Game.start(opts: Opts?): any
 				fire(player, { kind = "notice", text = words })
 			end,
 		})
+		local okSo, errSo = pcall(function()
+			stockOptions = StockOptions.start({
+				saves = saves,
+				wallet = wallet,
+				possession = possession,
+				town = workspace:FindFirstChild("Town"),
+				playNet = playNet,
+				tell = function(player: any, words: string)
+					fire(player, { kind = "notice", text = words })
+				end,
+				setAttr = setAttr,
+				heartbeat = o.heartbeat ~= false,
+			})
+		end)
+		if not okSo then
+			warn(`[SpicyRodents] stock options failed to start (nothing is sold): {errSo}`)
+		end
 		if o.players ~= false then
 			for _, player in Players:GetPlayers() do
 				saves:join(player)
@@ -2718,8 +2773,10 @@ function Game.start(opts: Opts?): any
 		rideBumps = rideBumps,
 		lounge = lounge,
 		cornerStore = cornerStore,
+		reputation = reputation,
 		dogs = dogs,
 		clothes = { saves = saves, wardrobe = wardrobe, giftShop = giftShop },
+		stockOptions = stockOptions,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -2770,6 +2827,9 @@ function Game.start(opts: Opts?): any
 			end
 			if giftShop then
 				giftShop.stop()
+			end
+			if stockOptions and stockOptions.stop then
+				stockOptions.stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

@@ -7,12 +7,12 @@
 --              money comes down to it after the fine, and a penalty never gives money
 --   wallet     Server/Work/Penalties through the town's wallet (Economy/Credits): logged with its reason, shown, a
 --              reputation report (pcall'd: a failing one leaves the money penalty standing)
---   homes      Shared/World/PlayerHomes: every player has a house, the same one every time; inside its footprint
+--   homes      the errands' doors are outside every player's home (Shared/World/PlayerHomes)
 local Credits = require("@server/Economy/Credits")
 local Penalties = require("@server/Work/Penalties")
 local PenaltyRules = require("@shared/Work/PenaltyRules")
 local PlayerHomes = require("@shared/World/PlayerHomes")
-local Data = require("@shared/Data")
+local Errands = require("@shared/Work/Errands")
 
 local function player(id: number): any
 	return { UserId = id, Name = `P{id}`, events = {} }
@@ -89,8 +89,8 @@ return function(t)
 		t.eq(h[#h].why, PenaltyRules.WHY.errand)
 		t.eq(h[#h].delta, -10000)
 		t.truthy(string.find(lastNotice(players[1]) or "", "S$100.00 taken", 1, true) ~= nil, lastNotice(players[1]))
-		t.eq(reports[1][2], "errand_stolen")
-		t.truthy(reports[1][3] > 0 and reports[1][3] <= 1)
+		t.eq(reports[1][2], "errand_theft")
+		t.eq(reports[1][3], 2, "severity 2 of 3")
 		-- less than the fine: all of it, never below nothing
 		t.eq(pen.errandStolen(players[2]), 4200)
 		t.eq(wallet.balance(players[2]), 0)
@@ -114,7 +114,7 @@ return function(t)
 		t.eq(h[#h - 1].why, PenaltyRules.WHY.ambulance)
 		t.eq(h[#h].why, PenaltyRules.WHY.level)
 		t.truthy(string.find(lastNotice(players[10]) or "", "lowest townsperson", 1, true) ~= nil)
-		t.eq(reports[1][2], "ambulance_ignored")
+		t.eq(reports[1][2], "ignored_victim")
 		t.eq(wallet.balance(players[11]), 2000, "nobody else's money moves")
 		-- alone in town: down to a newcomer's pocket money
 		local w2, p2, pen2 = town({ { id = 20, cents = 40000, rung = "hospital" } })
@@ -145,36 +145,20 @@ return function(t)
 		t.eq(Penalties.errandStolen(p), 300, "the installed instance")
 	end)
 
-	t.test("homes: a house each, the same every time; inside its footprint; a claim system decides first", function()
-		local data = Data.default()
-		local homes = PlayerHomes.homes()
-		t.truthy(#homes >= 20, `{#homes} houses`)
-		for _, id in homes do
-			t.eq(data:lot(id).type, "house")
+	t.test("homes: a door an errand is handed over at is outside every home (delivering is never keeping)", function()
+		-- (Shared/World/PlayerHomes is the stock-options work's: four furnished houses, one per player by where they
+		-- first appear; the errands ask homeOf and inside)
+		for _, d in Errands.DESTINATIONS do
+			for _, h in PlayerHomes.HOMES do
+				t.falsy(PlayerHomes.inside(h.lot, d.x, d.z), `{d.id} is inside {h.lot}`)
+			end
 		end
-		local a = PlayerHomes.homeOf(player(123456))
-		t.eq(PlayerHomes.homeOf(player(123456)), a, "the same house every time")
-		t.eq(PlayerHomes.homeOf(123456), a, "by UserId")
-		local lot = PlayerHomes.lotOf(a :: string) :: PlayerHomes.Lot
-		t.truthy(PlayerHomes.inside(a :: string, lot.x, lot.z))
-		t.truthy(PlayerHomes.inside(a :: string, lot.x + lot.hw - 0.1, lot.z))
-		t.falsy(PlayerHomes.inside(a :: string, lot.x + lot.hw + 3, lot.z))
-		t.truthy(PlayerHomes.inside(a :: string, lot.x + lot.hw + 3, lot.z, 4), "grown")
-		local seen: { [string]: boolean } = {}
-		for id = 1, 200 do
-			seen[PlayerHomes.homeOf(id) :: string] = true
+		local p = { UserId = 7, attrs = {} :: { [string]: any } }
+		function p.GetAttribute(self: any, k: string): any
+			return self.attrs[k]
 		end
-		local n = 0
-		for _ in seen do
-			n += 1
-		end
-		t.eq(n, #homes, "every house is somebody's")
-		PlayerHomes.setResolver(function(p: any): string?
-			return if p.UserId == 7 then "core_house_0_victorian" else nil
-		end)
-		t.eq(PlayerHomes.homeOf(player(7)), "core_house_0_victorian")
-		t.eq(PlayerHomes.homeOf(player(123456)), a, "the resolver's nil falls back")
-		PlayerHomes.setResolver(nil)
-		t.eq(PlayerHomes.homeOf(nil), nil)
+		p.attrs[PlayerHomes.ATTRIBUTE] = "core_house_0_victorian"
+		t.eq(PlayerHomes.homeOf(p), "core_house_0_victorian")
+		t.truthy(PlayerHomes.inside("core_house_0_victorian", -140, -132.5))
 	end)
 end

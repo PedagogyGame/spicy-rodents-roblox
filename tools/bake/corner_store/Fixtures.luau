@@ -1,5 +1,5 @@
 --!strict
--- tools/bake/corner_store/Fixtures: the corner store's furniture and its 22 shelf places, in the venue's local
+-- tools/bake/corner_store/Fixtures: the corner store's furniture and its 23 shelf places, in the venue's local
 -- frame (X across the frontage, Y up from the floor, D into the building; the front door at D -21).
 --   Checkout  the counter by the door (walnut front, cream top) with the till, the bell, the gum rack and the
 --             camera's impulse rack; the shopkeeper's place behind it; the back bar behind him (bird seed and
@@ -8,7 +8,7 @@
 --             walnut end caps; grocery shelving on the east wall and a hardware pegboard on the west.
 --   Back      the cold drinks fridge (glass doors) and the ice cream chest freezer on the back wall.
 --   Front     the newspaper rack, the umbrella bin and the lawn chair on show in the window.
--- Each of the 22 items (SLOTS, the catalogue's ids) has its place; each one on sale (a price in `prices`: not the dog
+-- Each of the 23 items (SLOTS, the catalogue's ids) has its place; each one on sale (a price in `prices`: not the dog
 -- treats until the town has dogs) is a Model "Item_<id>" with attributes ItemId and Price:
 -- "Sample" (the model the server hands a buyer), two more copies under "More", a price tag (its price in
 -- cents, "5c"), and an invisible "Grab" part holding the ProximityPrompt (E, a click or a tap, gamepad X).
@@ -58,6 +58,7 @@ Fixtures.SLOTS = {
 	-- gondola 4: odds and ends
 	duct_tape = { x = G[4] - 0.7, y = MID, d = 1, yaw = FACE_E, fixture = "gondola4" },
 	air_horn = { x = G[4] - 0.7, y = MID, d = 9, yaw = FACE_E, fixture = "gondola4" },
+	kick_ball = { x = G[4] + 0.7, y = MID, d = 1, yaw = FACE_W, fixture = "gondola4" }, -- owner D30
 	-- the checkout and behind it
 	camera = { x = -12.9, y = 3.2, d = -14.2, yaw = FACE_FRONT, fixture = "counter" },
 	bird_seed = { x = -18, y = 0.3, d = -7.0, yaw = FACE_FRONT, fixture = "backbar" },

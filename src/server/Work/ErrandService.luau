@@ -127,11 +127,11 @@ function ErrandService.new(deps: Deps): any
 	self.rand = deps.rand or math.random
 	self.posOf = deps.posOf or enginePos
 	self.homeOf = deps.homeOf or function(player: any): string?
-		return PlayerHomes.homeOf(player, deps.data)
+		return PlayerHomes.homeOf(player)
 	end
 	self.inside = deps.inside
 		or function(lotId: string, x: number, z: number): boolean
-			return PlayerHomes.inside(lotId, x, z, 0, deps.data)
+			return PlayerHomes.inside(lotId, x, z)
 		end
 	self.attach = deps.attach or engineAttach
 	self.detach = deps.detach or engineDetach

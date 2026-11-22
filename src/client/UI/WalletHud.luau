@@ -23,6 +23,10 @@
 --                (the ReplicatedStorage attributes Server/Boot/DayClock publishes): "Pass: 4.2 days (50 min)".
 --                When it runs out while the player watches, the line goes and "Your pass has run out" is said
 --                for PASS_OVER_SECS.
+--   Reputation   the player's reputation (Server/Reputation/ReputationService, owner D30): never a constant meter on
+--                the HUD; while the role menu (M, the pause screen) is open and the stack can be seen beside it, a line
+--                under the balance reads it with the money: "Reputation  Good (0)" (Shared/Reputation/Conduct.standing).
+--                A drop is told by the server's own notice, not here.
 -- While a minigame is open (the Player's InMinigame attribute, set by Minigames/MinigameClient) the stack
 -- stands higher, clear of that game's scorecard, so the balance is on screen then too. The scorecard is
 -- UI/MinigameUI's Frame "Scorecard" in the bottom-right corner, and each game sizes it for itself (bowling
@@ -45,12 +49,14 @@
 --   parseNote(text) -> (seq?, delta?, why?); noteText(moved, seqWas, seq?, delta?, why?) -> string? (what to
 --   say of a balance that moved; nil: nothing); passText(untilSeconds, nowSeconds, daySeconds) -> string?
 --   (nil: no pass to show); bottom(inMinigame, cardTop?) -> pixels from the bottom edge; top(inMinigame) ->
---   pixels from the top edge on a touch device; underMenu(menuOpen, viewportWidth) -> boolean; NOTE_SECS,
+--   pixels from the top edge on a touch device; underMenu(menuOpen, viewportWidth) -> boolean; standingText(rep) ->
+--   "Reputation  Good (0)"; showStanding(menuOpen, stackShown, hasBalance) -> boolean; NOTE_SECS,
 --   POCKET_SECS, PASS_OVER_SECS, PASS_OVER, GAP, CARD_GUI, CARD, MENU_GUI, MENU, MENU_PANEL, WIDTH, MARGIN,
 --   TOUCH_TOP, TOUCH_TOP_GAME
 
 local Import = require("../Import")
 local Wallet = Import.shared("Economy/Wallet") :: typeof(require("../../shared/Economy/Wallet"))
+local Conduct = Import.shared("Reputation/Conduct") :: typeof(require("../../shared/Reputation/Conduct"))
 
 export type Opts = {
 	player: any?, -- default Players.LocalPlayer
@@ -64,6 +70,7 @@ export type WalletHud = {
 	balance: TextLabel,
 	pass: TextLabel,
 	note: TextLabel,
+	standing: TextLabel,
 	refresh: () -> (),
 	stop: () -> (),
 }
@@ -108,6 +115,16 @@ end
 -- margin clear to the right of it.
 function WalletHud.underMenu(menuOpen: boolean, viewportWidth: number): boolean
 	return menuOpen and viewportWidth < WalletHud.MENU_PANEL + 2 * (WalletHud.WIDTH + WalletHud.MARGIN)
+end
+
+-- The reputation line beside the balance (only while the role menu is open: showStanding).
+function WalletHud.standingText(rep: any): string
+	return `Reputation  {Conduct.standing(if type(rep) == "number" then rep else 0)}`
+end
+
+-- Whether the reputation line is drawn: with the menu open (the pause screen), the stack in sight, and money to sit by.
+function WalletHud.showStanding(menuOpen: boolean, stackShown: boolean, hasBalance: boolean): boolean
+	return menuOpen and stackShown and hasBalance
 end
 
 local WHITE = { 255, 255, 255 }
@@ -239,6 +256,7 @@ function WalletHud.start(opts: Opts?): WalletHud
 	end
 	local placedAt: number? = nil
 	local onShown: ((shown: boolean) -> ())? = nil -- (set below, once the lines exist)
+	local onPlaced: ((open: boolean, shown: boolean) -> ())? = nil -- (the same: the reputation line)
 	local function place()
 		local inMinigame = player:GetAttribute("InMinigame") ~= nil
 		if touch then
@@ -254,12 +272,16 @@ function WalletHud.start(opts: Opts?): WalletHud
 				stack.Position = UDim2.new(1, -WalletHud.MARGIN, 1, -at)
 			end
 		end
-		local show = not WalletHud.underMenu(menuOpen(), viewportWidth())
+		local open = menuOpen()
+		local show = not WalletHud.underMenu(open, viewportWidth())
 		if stack.Visible ~= show then
 			stack.Visible = show
 			if onShown then
 				onShown(show)
 			end
+		end
+		if onPlaced then
+			onPlaced(open, show)
 		end
 	end
 	stack.Visible = true
@@ -299,9 +321,10 @@ function WalletHud.start(opts: Opts?): WalletHud
 		return l
 	end
 	-- (the balance is always the line nearest the edge the stack hangs from: the others come and go beyond it)
-	local note = line("Note", if touch then 3 else 1, 15, Enum.Font.GothamMedium)
-	local pass = line("Pass", 2, 15, Enum.Font.GothamMedium)
-	local balance = line("Balance", if touch then 1 else 3, 20, Enum.Font.GothamBold)
+	local note = line("Note", if touch then 4 else 1, 15, Enum.Font.GothamMedium)
+	local pass = line("Pass", if touch then 3 else 2, 15, Enum.Font.GothamMedium)
+	local standing = line("Standing", if touch then 2 else 3, 15, Enum.Font.GothamMedium)
+	local balance = line("Balance", if touch then 1 else 4, 20, Enum.Font.GothamBold)
 	gui.Parent = playerGui
 
 	local function rgb(c: { number }): Color3
@@ -409,7 +432,23 @@ function WalletHud.start(opts: Opts?): WalletHud
 		end
 	end
 
+	-- the reputation line: with the money while the role menu is open, gone with it
+	local function drawStanding()
+		standing.Text = WalletHud.standingText(player:GetAttribute("Reputation"))
+	end
+	onPlaced = function(open: boolean, visible: boolean)
+		local want = WalletHud.showStanding(open, visible, shown ~= nil)
+		if standing.Visible ~= want then
+			standing.Visible = want
+			if want then
+				drawStanding()
+			end
+		end
+	end
+	drawStanding()
+
 	local conns: { RBXScriptConnection } = {}
+	table.insert(conns, player:GetAttributeChangedSignal("Reputation"):Connect(drawStanding))
 	table.insert(conns, player:GetAttributeChangedSignal("Cents"):Connect(drawBalance))
 	table.insert(conns, player:GetAttributeChangedSignal("CentsNote"):Connect(drawNote))
 	table.insert(conns, player:GetAttributeChangedSignal("PassUntil"):Connect(drawPass))
@@ -435,6 +474,7 @@ function WalletHud.start(opts: Opts?): WalletHud
 		balance = balance,
 		pass = pass,
 		note = note,
+		standing = standing,
 		refresh = function()
 			drawBalance()
 			drawPass()

@@ -306,7 +306,10 @@ return function(t)
 			["Actors/ActorsRuntime.luau"] = 3,
 			["Actors/BodyFactory.luau"] = 1,
 			-- (9th, 2026-11-22, owner D29: tidy reads a shared vehicle's root, never a body)
-			["Actors/DeviceService.luau"] = 9,
+			-- (10th to 12th, 2026-11-22, owner D30: the golf cart's passenger: the cart's root twice (its side to get off on,
+			-- its network owner kept the driver's) and a person's body checked before it is put beside the cart; only
+			-- people ride, never a squirrel)
+			["Actors/DeviceService.luau"] = 12,
 			["Actors/Possession.luau"] = 9,
 			["Assets/HeroArt.luau"] = 3,
 			["Assets/PeopleArt.luau"] = 5,
@@ -321,8 +324,13 @@ return function(t)
 			-- (13th and 14th, 2026-11-22, owner D29: the shared vehicles' roots for Vehicles/RideBumps, never a body; a held
 			-- squirrel a shared vehicle bumped is put aside from its held place (ActorsRuntime.placeOf), its rotation kept)
 			["Boot/Game.luau"] = 14,
+			-- (15th, 2026-11-22, owner D30: a held PERSON's place, for their home computer's reach and their home; never a
+			-- squirrel's)
+			["Economy/StockOptions.luau"] = 1,
 			["Items/CornerStore.luau"] = 1,
-			["Items/ItemWorld.luau"] = 13,
+			-- (14th, 2026-11-22, owner D30: F by the kick ball on the ground reads the kicker's root: a person's, checked
+			-- human first, never a held squirrel's)
+			["Items/ItemWorld.luau"] = 14,
 			["Minigames/BowlingLane.luau"] = 2,
 			["Minigames/FortuneCabinet.luau"] = 1,
 			["Minigames/Games/AirHockey.luau"] = 1,

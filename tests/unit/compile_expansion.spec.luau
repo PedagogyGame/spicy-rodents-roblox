@@ -164,10 +164,10 @@ return function(t)
 	end)
 
 	case("places and attractions carry the brief's interactive anchors (brief v2 §13a)", function()
-		-- corner store: one shelf per catalogue item (22), a checkout counter
+		-- corner store: one shelf per catalogue item (23: the kick ball since D30), a checkout counter
 		local store = venue("f1_corner_store")
 		t.eq(#anchorsOf(store, "item_shelf"), #ItemRules.CATALOG)
-		t.eq(#ItemRules.CATALOG, 22)
+		t.eq(#ItemRules.CATALOG, 23)
 		t.truthy(#anchorsOf(store, "counter") >= 1)
 		-- doctor's office: receptionist, two picture books, the bead maze and the tilt labyrinth on the waiting table
 		local doctor = venue("f2_doctor")
