@@ -74,7 +74,9 @@ function Penalties.new(deps: Deps): Instance
 	local pocket = deps.pocket or EconomyRules.pocketMoney
 
 	local function rep(player: any, kind: string)
-		local ok, err = pcall(report, player, kind, Penalties.SEVERITY[kind] or 1)
+		local ok, err = pcall(function()
+			report(player, kind, Penalties.SEVERITY[kind] or 1)
+		end)
 		if not ok then
 			shout(`reputation report {kind} failed: {err}`)
 		end
