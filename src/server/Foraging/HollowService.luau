@@ -40,8 +40,9 @@
 -- Interface: new(opts) -> Service (pure but for the cover); start(opts) -> Service (new, then the shell in the
 --   workspace); treeName(hollow) -> "the Bur Oak"; WORDS; NAMES; Service: :step(day) (once a second is plenty:
 --   deposits, visits, decay, lapses, the tree's attributes); :heldBy(key) -> hollowId? (the one tree it holds);
---   :carry(id, n) -> taken; :carried(id) -> n; :drop(id) (the carried nuts are lost: a knock-out; the body changing
---   hands drops them by itself); :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) -> hollowId?;
+--   :carry(id, n) -> taken; :carried(id) -> n; :mine(id) -> n (carried for its holder now, the rest dropped);
+--   :drop(id) (the carried nuts are lost: a knock-out; the body changing hands drops them by itself);
+--   :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) -> hollowId?;
 --   :mayBite(id); :isRefuge(id); :healRate(id, fed); :heal(id, health, maxHealth, dt, fed); :surface(x, y, z) ->
 --   (x, y, z, yaw)?; :stop(); C; under(layout, world, x, y, z, actor?) -> space? (the cover test)
 -- Studs and the HTML yaw (Brains/Common). Engine calls only in start and the tree's attributes. No side effects on
@@ -301,6 +302,15 @@ function HollowService.carry(self: Service, id: number, n: number): number
 end
 
 function HollowService.carried(self: Service, id: number): number
+	return self.carrying[id] or 0
+end
+
+-- mine(id): what body `id` carries for whoever holds it now (opts.keyOf); nuts it picked up under an earlier holder
+-- are dropped first, the rule carry and step keep (Foraging/BranchStash stores only these)
+function HollowService.mine(self: Service, id: number): number
+	if self.carrying[id] and self.carrier[id] ~= self.keyOf(id) then
+		self:drop(id) -- (the body changed hands since it picked them up)
+	end
 	return self.carrying[id] or 0
 end
 
