@@ -309,6 +309,118 @@ for _, h in layout.hollows do
 		)
 	end
 end
+-- the player's view inside, as the hollow look draws it (CameraRig.hollowView at rest, the eye held in the cavity by
+-- HollowLayout.keepCamera; a peek: CameraRig.peekView), over a stand-in squirrel (group "body": a pale box a body
+-- long on the line). The bark is not drawn (it is not drawn from within in the engine either).
+local PLAYER = { "ground", "hollows", "liner", "attractions", "body" }
+local FILL = { brightness = 0.12, range = 9 }
+local HIP, HEAD = 0.45, 0.35 -- studs: the root over the line (Controllers/Squirrel hipOf) and the rig's head over it
+local function player(name: string, desc: string, routeId: number, tt: number, peek: boolean?)
+	local r = reg:get(routeId) :: any
+	local p = reg:pointAt(r, tt)
+	local q = reg:pointAt(r, math.min(1, tt + 0.004))
+	local o = reg:pointAt(r, math.max(0, tt - 0.004))
+	local fx, fy, fz = q.x - o.x, q.y - o.y, q.z - o.z
+	local fl = math.sqrt(fx * fx + fz * fz)
+	local lx, lz = fx / fl, fz / fl
+	local hx, hy, hz = p.x, p.y + HIP + HEAD, p.z
+	-- (at the rig's rest, drawn towards the middle line of the cavity round the head, as the rig does)
+	local h = layout.hollowOfRoute(routeId) :: HollowLayout.Hollow
+	local mx, mz = nil :: number?, nil :: number?
+	for _, c in h.cavities do
+		if hy >= c.bottom - 0.5 and hy <= c.top then
+			mx, mz = c.x, c.z
+		end
+	end
+	local rig = CameraRig :: any
+	local rest = if rig.hollowRest then rig.hollowRest(h) else 0
+	local ex, ey, ez, vx, vy, vz, first = CameraRig.hollowView(hx, hy, hz, lx, lz, 0, rest, layout.keepCamera, mx, mz)
+	if peek then
+		local m = layout.peekAt(p.x, p.y, p.z)
+		assert(m, name .. ": no hole to peek out of")
+		ex, ey, ez, vx, vy, vz = CameraRig.peekView(m :: any, 0, 0)
+	end
+	add(name, desc, { ex, ey, ez }, { ex + vx * 4, ey + vy * 4, ez + vz * 4 }, PLAYER, 70)
+	-- the engine's Lighting.Ambient (World/LightingPreset: #6b6a5a) lights what the sky does not reach; the renderer has
+	-- none, so a dim fill of that colour at the eye stands in for it
+	table.insert(lights, {
+		kind = "point",
+		pos = { r4(ex), r4(ey), r4(ez) },
+		dir = { 0, 1, 0 },
+		brightness = FILL.brightness,
+		range = FILL.range,
+		color = { 107, 106, 90 },
+	})
+	if first and not peek then
+		return -- (out of the squirrel's own eyes: the body is hidden on the player's screen)
+	end
+	-- the body: along the line (its slope), its middle a little over it
+	local f = { fx, fy, fz }
+	local l = math.sqrt(fx * fx + fy * fy + fz * fz)
+	f = { fx / l, fy / l, fz / l }
+	local sx, sz = f[3], -f[1]
+	local sl = math.sqrt(sx * sx + sz * sz)
+	local side = { sx / sl, 0, sz / sl }
+	local up = { f[2] * side[3] - f[3] * side[2], f[3] * side[1] - f[1] * side[3], f[1] * side[2] - f[2] * side[1] }
+	if up[2] < 0 then
+		up = { -up[1], -up[2], -up[3] }
+		side = { -side[1], -side[2], -side[3] }
+	end
+	table.insert(parts, {
+		g = "body",
+		p = name .. ".body",
+		s = "Block",
+		size = { 0.8, 0.7, 1.5 },
+		pos = { r4(p.x + up[1] * 0.4), r4(p.y + up[2] * 0.4), r4(p.z + up[3] * 0.4) },
+		rot = {
+			r4(side[1]),
+			r4(up[1]),
+			r4(-f[1]),
+			r4(side[2]),
+			r4(up[2]),
+			r4(-f[2]),
+			r4(side[3]),
+			r4(up[3]),
+			r4(-f[3]),
+		},
+		c = { 196, 190, 184 },
+		t = 0,
+		m = "Fabric",
+	})
+end
+do
+	local climb = h1.routes[2]
+	player("player_h1_low", "H1 from the player's camera low on the winding climb", climb, 0.1)
+	player("player_h1_mid", "H1 from the player's camera half way up the climb", climb, 0.45)
+	player("player_h1_high", "H1 from the player's camera high on the climb, under the top", climb, 0.8)
+	-- at a knothole: passing it (the hollow look) and stopped there (the peek out)
+	local ramp = reg:get(climb) :: any
+	local seen = 0
+	for _, m in h1.mouths do
+		if m.opens ~= "ground" and m.route == climb and m.t < 1 then
+			seen += 1
+			if seen == 2 then
+				player(
+					"player_h1_hole",
+					"H1 passing its second knothole, the player's camera",
+					climb,
+					m.t - 1.2 / ramp.length
+				)
+				player(
+					"player_h1_peek",
+					"H1 stopped at its second knothole: the peek out onto the branch",
+					climb,
+					m.t,
+					true
+				)
+			end
+		end
+	end
+	player("player_h2", "H2's shaft from the player's camera, a third of the way up", h2.routes[2], 0.3)
+	local h12 = layout.hollow("H12") :: HollowLayout.Hollow
+	player("player_h12", "H12's shaft from the player's camera, over half way up", h12.routes[2], 0.6)
+	player("player_h3", "H3's chamber from the player's camera, at the back", h3.routes[1], 0.85)
+end
 local log = layout.hollow("LOG") :: HollowLayout.Hollow
 do
 	local m = log.mouths[1]
