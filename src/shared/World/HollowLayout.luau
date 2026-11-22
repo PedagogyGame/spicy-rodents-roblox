@@ -135,7 +135,7 @@ HollowLayout.C = {
 	burlRoom = 0.4, -- studs between the body's side and the wall a knot needs to bulge into
 	burlGap = 0.15, -- studs left between a knot and the body's side
 	burlMax = 1.9, -- studs: a knot's largest diameter
-	burlCrown = 1.0, -- studs: a knot this wide or wider is rounded by a crown
+	burlCrown = 0.8, -- studs: a knot this wide or wider is rounded by a crown
 	-- THE WALL (owner D33): the closed ring of staves round a cavity (HollowLayout.staves)
 	stave = {
 		width = 1.3, -- studs: a stave's share of the ring's inside (at least minN staves round)

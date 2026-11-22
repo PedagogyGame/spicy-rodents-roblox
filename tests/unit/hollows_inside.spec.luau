@@ -276,6 +276,9 @@ return function(t)
 			end
 			local tr = HollowLayout.trunk(reg :: any, h.trunk :: number)
 			local walls = wallOf(h)
+			-- (up a climbing tree; nearly level in a one-chamber tree, whose roof is a body's height over it)
+			local rest = CameraRig.hollowRest(h)
+			t.eq(rest, if h.variant == "knothole" then H.restLow else H.rest, `{h.id}: the rest`)
 			for _, rid in h.routes do
 				local r = reg:get(rid) :: any
 				for k = 0, 40 do
@@ -294,7 +297,7 @@ return function(t)
 						end
 					end
 					for _, yaw in { 0, 1.2, math.pi, -2 } do
-						for _, pitch in { H.rest, H.pitchMin, 0, H.pitchMax } do
+						for _, pitch in { rest, H.pitchMin, 0, H.pitchMax } do
 							local ex, ey, ez, vx, vy, vz, fp =
 								CameraRig.hollowView(hx, hy, hz, lx, lz, yaw, pitch, layout.keepCamera, mx, mz)
 							looks += 1
@@ -304,6 +307,10 @@ return function(t)
 								else
 									rested += 1
 									t.truthy(ey < hy, `{h.id} {rid} t {k / 40}: the eye at rest below the head`)
+									t.truthy(
+										vy >= math.sin(H.rest + H.over) - 1e-6,
+										"looking up the hollow, over the head"
+									)
 								end
 								t.truthy(vy >= math.sin(H.rest) - 1e-6, "looking up the hollow")
 							end

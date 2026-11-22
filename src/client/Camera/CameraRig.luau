@@ -289,11 +289,11 @@ function CameraRig.steerYaw(): number?
 end
 
 -- THE LOOK INSIDE A HOLLOW TREE (owner D32: "allow the squirrel to actually look around"; D33: "the view to be more
--- verticle within the tree trunk"). Inside a hollow the view rests pitched up the hollow (HOLLOW.rest): the eye close
+-- verticle within the tree trunk"). Inside a tall hollow the view rests pitched up it (HOLLOW.rest): the eye close
 -- behind and below the squirrel's head (HOLLOW.dist along the view, drawn HOLLOW.inward towards the hollow's middle
 -- line) looking up the trunk past it, so the climb above and the daylight at the holes are in the picture. The mouse
 -- (and the right stick) turns the view about the head, all the way round and from looking down the hollow to straight
--- up it; held inside the cavity (HollowLayout.keepCamera); where the cavity is too narrow for that (a shaft), the eye
+-- up it, the eye looking HOLLOW.over above the head, so the squirrel sits low in the picture under the hollow; held inside the cavity (HollowLayout.keepCamera); where the cavity is too narrow for that (a shaft), the eye
 -- goes to the head itself and looks out of the squirrel's eyes (first person: the body is hidden on this screen). The
 -- growths of the inside between the eye and the head, or round the eye, are faded on this screen (shelves, roots,
 -- knots, a hole's lining: never the wall, the floor or the roof, so the view never opens onto the town through
@@ -304,7 +304,8 @@ end
 -- from the rest). Going in, the eye comes in through the ground hole (HOLLOW.entry s) rather than through the bark;
 -- going out, the orbit takes over from where the eye is.
 --   hollowLook(yaw, pitch, dx, dy, invert) -> yaw, pitch: one look input (radians, as lookStep has them)
---   hollowRecentre(yaw, pitch, idle, moving, dt) -> yaw, pitch (back towards 0 and HOLLOW.rest)
+--   hollowRecentre(yaw, pitch, idle, moving, dt, rest?) -> yaw, pitch (back towards 0 and the rest, HOLLOW.rest)
+--   hollowRest(hollow?) -> pitch: the rest in that hollow (up a tall one; nearly level in a one-chamber tree)
 --   hollowView(hx, hy, hz, lx, lz, yaw, pitch, keep?, mx?, mz?) -> (eye x, y, z, look x, y, z, firstPerson): (mx, mz)
 --   the hollow's middle line at the head's height
 --   peekView(mouth, yaw, pitch) -> (eye x, y, z, look x, y, z)
@@ -312,10 +313,14 @@ end
 --   bearing (to the left) and pitched up `pitch`
 --   fades(name) -> boolean: whether a shell piece of that name may be faded out of the view
 CameraRig.HOLLOW = {
-	dist = 1.9, -- studs behind the head along the view
+	dist = 2.2, -- studs behind the head along the view
+	over = 0.35, -- radians the eye looks over the head (the squirrel sits low in the picture)
+	lookMax = 1.5, -- radians: the steepest the eye looks up
 	lift = 0.25, -- studs over the head
 	inward = 0.6, -- studs the eye is drawn towards the hollow's middle line (off the shelves along the wall)
-	rest = 0.7, -- radians: the view's pitch at rest, up the hollow (40 degrees)
+	rest = 0.6, -- radians: the view's pitch at rest, up a tall hollow (34 degrees; the eye looks `over` more)
+	restLow = 0.1, -- and in a hollow no taller than a chamber (a one-chamber tree, the log)
+	tall = 4, -- studs: a hollow whose cavities reach this high over its floor is tall
 	minHead = 0.7, -- an eye held nearer the head than this goes into the head (first person)
 	pitchMin = -1.3, -- looking down the hollow
 	pitchMax = 1.45, -- looking up it
@@ -361,14 +366,32 @@ function CameraRig.hollowRecentre(
 	pitch: number,
 	idle: number,
 	moving: boolean,
-	dt: number
+	dt: number,
+	rest: number?
 ): (number, number)
 	local H = CameraRig.HOLLOW
 	if idle < H.idle or not moving then
 		return yaw, pitch
 	end
 	local k = math.exp(-H.recentre * dt)
-	return yaw * k, H.rest + (pitch - H.rest) * k
+	local r = rest or H.rest
+	return yaw * k, r + (pitch - r) * k
+end
+
+-- the view's pitch at rest in a hollow: up a tall one (HOLLOW.rest), nearly level in a chamber (HOLLOW.restLow)
+function CameraRig.hollowRest(h: { cavities: { any } }?): number
+	local H = CameraRig.HOLLOW
+	if h == nil then
+		return H.rest
+	end
+	local lo, hi = math.huge, -math.huge
+	for _, c in h.cavities do
+		if c.a then
+			return H.restLow
+		end
+		lo, hi = math.min(lo, c.bottom), math.max(hi, c.top)
+	end
+	return if hi - lo >= H.tall then H.rest else H.restLow
 end
 
 function CameraRig.hollowView(
@@ -402,8 +425,10 @@ function CameraRig.hollowView(
 		-- too narrow to stand behind: out of the squirrel's own eyes
 		return hx + vx * 0.2, hy + vy * 0.2, hz + vz * 0.2, vx, vy, vz, true
 	end
-	-- (looking along the view from where the eye is: the head lies a little off it, low in the picture)
-	return ex, ey, ez, vx, vy, vz, false
+	-- (looking a little over the view's line from where the eye is: the squirrel low in the picture, the hollow above
+	-- it in the middle, not the squirrel's back)
+	local ox, oy, oz = CameraRig.viewDir(lx, lz, yaw, math.min(pitch + H.over, H.lookMax))
+	return ex, ey, ez, ox, oy, oz, false
 end
 
 function CameraRig.peekView(
@@ -816,7 +841,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			inShell.FilterDescendantsInstances = if shell then { shell } else {}
 			local current = camera.CFrame
 			local wasIn = false
-			local yaw, pitch, idle = 0, H.rest, 0
+			local yaw, pitch, idle, rest = 0, H.rest, 0, H.rest
 			local peekK = 0
 			local entering = 0
 			local lastPos = root.Position
@@ -944,7 +969,9 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				end
 				local layout = assert(hollows, "the hollow trees are loaded")
 				if not wasIn then
-					yaw, pitch, idle = 0, H.rest, 0 -- (in at the rest: up the hollow)
+					-- (in at the rest: up the hollow)
+					rest = CameraRig.hollowRest(layout.hollow(layout.contains(head.X, head.Y, head.Z) :: string))
+					yaw, pitch, idle = 0, rest, 0
 				end
 				-- the look: the mouse (unless the cursor is out) and the right stick
 				local typing = held or GuiService.MenuIsOpen or UIS:GetFocusedTextBox() ~= nil
@@ -977,7 +1004,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				idle = if moved then 0 else idle + dt
 				local speed = (root.Position - lastPos).Magnitude / math.max(dt, 1e-3)
 				lastPos = root.Position
-				yaw, pitch = CameraRig.hollowRecentre(yaw, pitch, idle, speed > 0.5, dt)
+				yaw, pitch = CameraRig.hollowRecentre(yaw, pitch, idle, speed > 0.5, dt, rest)
 				-- a peek at a hole up the trunk once the body stands at it
 				local feet = cf.Position
 				local mouth = layout.peekAt(feet.X, feet.Y - 0.35, feet.Z)
@@ -997,7 +1024,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local eye, dir = Vector3.new(ex, ey, ez), Vector3.new(vx, vy, vz)
 				if mouth and peekK > 0.01 then
 					-- (the peek's pitch counted from the rest: at rest it looks level out of the hole)
-					local px, py, pz, qx, qy, qz = CameraRig.peekView(mouth :: any, yaw, pitch - H.rest)
+					local px, py, pz, qx, qy, qz = CameraRig.peekView(mouth :: any, yaw, pitch - rest)
 					eye = eye:Lerp(Vector3.new(px, py, pz), peekK)
 					dir = dir:Lerp(Vector3.new(qx, qy, qz), peekK)
 					first = first and peekK < 0.5

@@ -313,6 +313,7 @@ end
 -- HollowLayout.keepCamera; a peek: CameraRig.peekView), over a stand-in squirrel (group "body": a pale box a body
 -- long on the line). The bark is not drawn (it is not drawn from within in the engine either).
 local PLAYER = { "ground", "hollows", "liner", "attractions", "body" }
+local FILL = { brightness = 0.12, range = 9 }
 local HIP, HEAD = 0.45, 0.35 -- studs: the root over the line (Controllers/Squirrel hipOf) and the rig's head over it
 local function player(name: string, desc: string, routeId: number, tt: number, peek: boolean?)
 	local r = reg:get(routeId) :: any
@@ -323,13 +324,33 @@ local function player(name: string, desc: string, routeId: number, tt: number, p
 	local fl = math.sqrt(fx * fx + fz * fz)
 	local lx, lz = fx / fl, fz / fl
 	local hx, hy, hz = p.x, p.y + HIP + HEAD, p.z
-	local ex, ey, ez, vx, vy, vz, first = CameraRig.hollowView(hx, hy, hz, lx, lz, 0, 0, layout.keepCamera)
+	-- (at the rig's rest, drawn towards the middle line of the cavity round the head, as the rig does)
+	local h = layout.hollowOfRoute(routeId) :: HollowLayout.Hollow
+	local mx, mz = nil :: number?, nil :: number?
+	for _, c in h.cavities do
+		if hy >= c.bottom - 0.5 and hy <= c.top then
+			mx, mz = c.x, c.z
+		end
+	end
+	local rig = CameraRig :: any
+	local rest = if rig.hollowRest then rig.hollowRest(h) else 0
+	local ex, ey, ez, vx, vy, vz, first = CameraRig.hollowView(hx, hy, hz, lx, lz, 0, rest, layout.keepCamera, mx, mz)
 	if peek then
 		local m = layout.peekAt(p.x, p.y, p.z)
 		assert(m, name .. ": no hole to peek out of")
 		ex, ey, ez, vx, vy, vz = CameraRig.peekView(m :: any, 0, 0)
 	end
 	add(name, desc, { ex, ey, ez }, { ex + vx * 4, ey + vy * 4, ez + vz * 4 }, PLAYER, 70)
+	-- the engine's Lighting.Ambient (World/LightingPreset: #6b6a5a) lights what the sky does not reach; the renderer has
+	-- none, so a dim fill of that colour at the eye stands in for it
+	table.insert(lights, {
+		kind = "point",
+		pos = { r4(ex), r4(ey), r4(ez) },
+		dir = { 0, 1, 0 },
+		brightness = FILL.brightness,
+		range = FILL.range,
+		color = { 107, 106, 90 },
+	})
 	if first and not peek then
 		return -- (out of the squirrel's own eyes: the body is hidden on the player's screen)
 	end
