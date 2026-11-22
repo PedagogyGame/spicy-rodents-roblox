@@ -5,9 +5,9 @@ local VehicleKinds = require("@shared/Vehicles/VehicleKinds")
 local PlayerVehicles = require("@shared/Vehicles/PlayerVehicles")
 
 return function(t)
-	t.test("VehicleKinds: the six kinds, interiors with an eye socket, fleet membership", function()
+	t.test("VehicleKinds: the eight kinds, interiors with an eye socket, fleet membership", function()
 		local ids = VehicleKinds.list()
-		t.eq(table.concat(ids, ","), "car,cart,bike,pickup,suv,jetski")
+		t.eq(table.concat(ids, ","), "car,cart,bike,pickup,suv,jetski,moped,escooter")
 		for _, id in ids do
 			local k = VehicleKinds.kind(id)
 			t.truthy(k.maxSpeed > 0 and k.wheelbase > 0 and #k.size == 3, id)
@@ -15,8 +15,37 @@ return function(t)
 			t.truthy(k.interior.eye[2] > k.interior.seat[2], `{id} eye above the seat`)
 		end
 		t.near(VehicleKinds.kind("car").size[3], 4.45 * 2.5, 1e-9, "sedan logical box (traffic §1)")
-		t.truthy(VehicleKinds.isFleet("cart") and not VehicleKinds.isFleet("bike"), "Q8: carts in the fleet, bikes not")
+		t.truthy(
+			VehicleKinds.isFleet("car") and not VehicleKinds.isFleet("bike"),
+			"Q8: the patrol car in the fleet, bikes not"
+		)
+		-- owner D29: a shared vehicle's bump never kills (Server/Vehicles/RideBumps): no shared kind is in the fatal fleet
+		for _, id in { "cart", "moped", "escooter" } do
+			t.truthy(VehicleKinds.isShared(id) and not VehicleKinds.isFleet(id), `{id}: shared, not in the fatal fleet`)
+		end
 		t.truthy(VehicleKinds.kind("cart").maxSpeed < VehicleKinds.kind("car").maxSpeed, "carts are slow")
+	end)
+
+	t.test("VehicleKinds: the shared three (owner D29): who rides, the police, the feel", function()
+		local shared = {}
+		for _, id in VehicleKinds.list() do
+			if VehicleKinds.isShared(id) then
+				table.insert(shared, id)
+			end
+			-- no police trouble for the shared ones, the old rules for the rest
+			t.eq(VehicleKinds.policeIgnore(id), VehicleKinds.isShared(id), `{id}: police ignore only the shared`)
+		end
+		t.eq(table.concat(shared, ","), "cart,moped,escooter")
+		for _, id in shared do
+			t.truthy((VehicleKinds.mayDrive(id, { human = true })), `{id}: any person, no key, no rental`)
+			t.truthy(not (VehicleKinds.mayDrive(id, { human = false })), `{id}: never a squirrel or the rodent`)
+		end
+		-- the scooter about a brisk run (a person sprints at 28) and quick to turn, the cart in between, the moped quickest
+		local sc, cart, moped = VehicleKinds.kind("escooter"), VehicleKinds.kind("cart"), VehicleKinds.kind("moped")
+		t.truthy(sc.maxSpeed >= 18 and sc.maxSpeed <= 26, `escooter {sc.maxSpeed} st/s`)
+		t.truthy(sc.maxSpeed < cart.maxSpeed and cart.maxSpeed < moped.maxSpeed, "escooter < cart < moped")
+		t.truthy(sc.maxSteer > cart.maxSteer and sc.steerRate > moped.steerRate, "the scooter turns quickest")
+		t.truthy(VehicleKinds.stands("escooter") and not VehicleKinds.stands("moped"), "the scooter's rider stands")
 	end)
 
 	t.test("VehicleKinds.mayDrive: anyone, key holders, officers with keys, rentals; people only", function()

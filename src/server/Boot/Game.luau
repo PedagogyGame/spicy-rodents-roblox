@@ -59,7 +59,9 @@
 --   not start), rafters (Attractions/RafterService; nil when it could not start), overhead (Stealth/OverheadService:
 --   the town's people looking up at a squirrel overhead; nil when it could not start), townSquirrels (Wildlife/
 --   TownSquirrels: the people and the ordinary squirrels, owner D21; nil when it could not start), roadSquirrels
---   (Wildlife/RoadSquirrels: the computer's squirrels a car knocks flat; nil when it could not start), cornerStore (Items/CornerStore;
+--   (Wildlife/RoadSquirrels: the computer's squirrels a car knocks flat; nil when it could not start), rideBumps
+--   (Vehicles/RideBumps: the people and squirrels in the way of the town's shared little vehicles, owner D29; nil when
+--   it could not start), cornerStore (Items/CornerStore;
 --   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
@@ -126,6 +128,8 @@ local GiftShop = require("../Cosmetics/GiftShop")
 local YardHazards = require("../Wildlife/YardHazards")
 local TownSquirrels = require("../Wildlife/TownSquirrels")
 local RoadSquirrels = require("../Wildlife/RoadSquirrels")
+local RideBumps = require("../Vehicles/RideBumps")
+local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
 local PeopleArt = require("../Assets/PeopleArt")
@@ -581,6 +585,8 @@ function Game.start(opts: Opts?): any
 	local overhead: any = nil -- the town's people looking up at a squirrel overhead (section 6b'' below), the same
 	local townSquirrels: any = nil -- the people and the ordinary squirrels (section 6b-3 below), the same
 	local roadSquirrels: any = nil -- the computer's squirrels a car knocks flat (section 6b-4 below), the same
+	local rideBumps: any = nil -- the people in the way of the shared little vehicles (section 6b-5 below), the same
+	local tidyAcc = 0 -- the shared vehicles left far from their spots go back (DeviceService.tidy), every 2 s
 	local lounge: any = nil -- THE GILDED ACORN's door, guards and bar (section 6c below)
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
@@ -1554,6 +1560,20 @@ function Game.start(opts: Opts?): any
 		return { people = people, squirrels = squirrels, cars = cars }
 	end
 
+	-- studs from (x, z) to the nearest body a player holds (its AI world record: DeviceService.tidy, owner D29)
+	local function nearestPlayer(x: number, z: number): number
+		local best = math.huge
+		for _, player in Players:GetPlayers() do
+			local actor = possession:actorOf(player)
+			local tid = if actor then townIdOf[actor.id] else nil
+			local a = if tid then world.actorsById[tid] else nil
+			if a then
+				best = math.min(best, math.sqrt((a.x - x) ^ 2 + (a.z - z) ^ 2))
+			end
+		end
+		return best
+	end
+
 	-- A bite landed (Combat/CombatService decided it): Power, the bite count and the Bite clip on the rodent, the
 	-- victim's shout, the bite-to-hospital sequence, and the news on both players' screens. Ids are town ids.
 	local function landBite(vt: number, rodentTown: number)
@@ -1946,6 +1966,24 @@ function Game.start(opts: Opts?): any
 				townSquirrels = nil
 			end
 		end
+		if rideBumps then
+			local okRB, errRB = pcall(rideBumps.step, rideBumps, dt)
+			if not okRB then
+				warn(`[SpicyRodents] the shared vehicles' bumps stopped: {errRB}`)
+				pcall(rideBumps.stop, rideBumps)
+				rideBumps = nil
+			end
+		end
+		if devices then
+			tidyAcc += dt
+			if tidyAcc >= 2 then
+				tidyAcc = 0
+				local okT, errT = pcall(devices.tidy, devices, os.clock(), nearestPlayer)
+				if not okT then
+					warn(`[SpicyRodents] putting the shared vehicles back failed: {errT}`)
+				end
+			end
+		end
 	end
 
 	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
@@ -2306,6 +2344,115 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- 6b-5. the town's shared little vehicles and whoever is in their way (Vehicles/RideBumps on Shared/Vehicles/
+	-- SharedRides; owner D29): the computer's people hop aside or are knocked over and get up; a player's body is
+	-- knocked on its own client (the body's Knock, KnockFall and KnockAt: Client/Controllers/Human) or, a squirrel, put
+	-- aside as the bowling alley's knock does and dazed (StunnedUntil); the rider feels the bump (the vehicle's BumpAt:
+	-- Client/Controllers/Vehicle). Nobody is killed by one (the fleet's RunOver above is the AI fleet's only).
+	do
+		local okRB, errRB = pcall(function()
+			local rides: { any } = {}
+			local function playerOf(id: number): Player?
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				return if typeof(driver) == "Instance" and (driver :: Instance):IsA("Player")
+					then driver :: Player
+					else nil
+			end
+			rideBumps = RideBumps.new({
+				world = world,
+				speech = townSpeech,
+				-- the shared vehicles being ridden now, where the server has them (their driver's client moves them)
+				rides = function(): { any }
+					table.clear(rides)
+					if devices == nil then
+						return rides
+					end
+					for id, model in devices.models do
+						local v = PlayerVehicles.get(devices.fleet, id)
+						local root = if v
+								and v.driver ~= nil
+								and VehicleKinds.isShared(v.kind)
+							then (model :: Model).PrimaryPart
+							else nil
+						if v and root then
+							local p, look, vel = root.Position, root.CFrame.LookVector, root.AssemblyLinearVelocity
+							table.insert(rides, {
+								id = id,
+								kind = v.kind,
+								x = p.X,
+								z = p.Z,
+								floor = p.Y - VehicleKinds.kind(v.kind).size[2] / 2,
+								yaw = math.atan2(look.X, look.Z),
+								vx = vel.X,
+								vz = vel.Z,
+							})
+						end
+					end
+					return rides
+				end,
+				-- a body aboard any vehicle (its rider among them) is never in a vehicle's way
+				aboard = function(id: number): boolean
+					local player = playerOf(id)
+					return player ~= nil
+						and devices ~= nil
+						and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) ~= nil
+				end,
+				busy = function(id: number): boolean
+					return (infection ~= nil and infection:engaged(id))
+						or (combat ~= nil and combat:guardOf(id) ~= nil)
+						or (overhead ~= nil and overhead:stageOf(id) ~= "none")
+				end,
+				setAttr = setTownAttr,
+				knockHeld = function(id: number, k: any, squirrel: boolean, kind: string)
+					local player = playerOf(id)
+					local actor = rt.byTownId[id]
+					if player == nil or actor == nil then
+						return
+					end
+					local body = actor.body :: Model
+					if body:GetAttribute("Ride") ~= nil then
+						return -- (on the sky lift)
+					end
+					local t = workspace:GetServerTimeNow()
+					local what = SharedRides.NAMES[kind] or "scooter"
+					if squirrel then
+						-- put aside where the server holds it (never its root), as the bowling alley's knock does, and dazed
+						local qx, qy, qz = rt.placeOf(actor)
+						local at = Vector3.new(qx + k.dx, qy + 0.3, qz + k.dz)
+						body:PivotTo(CFrame.new(at) * body:GetPivot().Rotation)
+						movedBody(body, "knocked", at)
+						body:SetAttribute(PossessionState.ATTR.StunnedUntil, t + SharedRides.C.dazeSecs)
+						fire(player, { kind = "notice", text = `A {what} bumped you aside. You're fine!` })
+					else
+						body:SetAttribute("Knock", Vector3.new(k.dx, k.secs, k.dz))
+						body:SetAttribute("KnockFall", k.fall)
+						body:SetAttribute("KnockAt", t)
+						fire(player, {
+							kind = "notice",
+							text = if k.fall
+								then `A {what} knocked you over. Up you get!`
+								else `A {what} bumped into you.`,
+						})
+					end
+				end,
+				bump = function(rideId: string)
+					local model = if devices then devices.models[rideId] else nil
+					if model then
+						(model :: Model):SetAttribute("BumpAt", workspace:GetServerTimeNow())
+					end
+				end,
+				serverTime = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+			})
+		end)
+		if not okRB then
+			rideBumps = nil
+			warn(`[SpicyRodents] the shared vehicles' bumps failed to start: {errRB}`)
+		end
+	end
+
 	-- 6b'. The yard dogs (Wildlife/YardHazards): eight friendly dogs in their yards, on the town's brain scheduler
 	local dogs: any = nil
 	local okD, errD = pcall(function()
@@ -2568,6 +2715,7 @@ function Game.start(opts: Opts?): any
 		overhead = overhead,
 		townSquirrels = townSquirrels,
 		roadSquirrels = roadSquirrels,
+		rideBumps = rideBumps,
 		lounge = lounge,
 		cornerStore = cornerStore,
 		dogs = dogs,
@@ -2603,6 +2751,9 @@ function Game.start(opts: Opts?): any
 			end
 			if roadSquirrels then
 				roadSquirrels:stop()
+			end
+			if rideBumps then
+				rideBumps:stop()
 			end
 			if lounge then
 				lounge:stop()

@@ -305,7 +305,8 @@ return function(t)
 			["Actors/ActorService.luau"] = 12,
 			["Actors/ActorsRuntime.luau"] = 3,
 			["Actors/BodyFactory.luau"] = 1,
-			["Actors/DeviceService.luau"] = 8,
+			-- (9th, 2026-11-22, owner D29: tidy reads a shared vehicle's root, never a body)
+			["Actors/DeviceService.luau"] = 9,
 			["Actors/Possession.luau"] = 9,
 			["Assets/HeroArt.luau"] = 3,
 			["Assets/PeopleArt.luau"] = 5,
@@ -317,7 +318,9 @@ return function(t)
 			["Attractions/RafterService.luau"] = 5,
 			-- (12th, 2026-11-21, owner D21: the road squirrels' cue parents a Sound to a knocked-flat body's PrimaryPart:
 			-- a parent kept, not a place read; the body is the computer's)
-			["Boot/Game.luau"] = 12,
+			-- (13th and 14th, 2026-11-22, owner D29: the shared vehicles' roots for Vehicles/RideBumps, never a body; a held
+			-- squirrel a shared vehicle bumped is put aside from its held place (ActorsRuntime.placeOf), its rotation kept)
+			["Boot/Game.luau"] = 14,
 			["Items/CornerStore.luau"] = 1,
 			["Items/ItemWorld.luau"] = 13,
 			["Minigames/BowlingLane.luau"] = 2,

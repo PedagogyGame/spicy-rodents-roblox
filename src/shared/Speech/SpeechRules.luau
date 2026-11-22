@@ -91,6 +91,10 @@ SpeechRules.CHANCE = table.freeze({
 	-- pacing (so every one it asks for may be said); the yelp of someone jumped at is theirs to make
 	squirrelNear = 1,
 	jumpedAt = 1,
+	-- the shared little vehicles (Server/Vehicles/RideBumps, owner D29): that service throws its own dice for a word at a
+	-- dodge; most people bumped say something
+	rideClose = 1,
+	bumped = 0.8,
 }) :: { [string]: number }
 
 -- How often a spotting line is the owner's own, when it was not the last line said in town.

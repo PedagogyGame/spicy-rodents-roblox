@@ -11,6 +11,7 @@
 --                        recoloured from the townsperson palette by `index`.
 --   bicycle(opts)        a parked bicycle alone (the player's bike in Server/Actors/DeviceService, a kid's bike in a
 --                        yard): drawn into a kit standing on `ground`, `scale` x the adult bike.
+--   sharedRide(kind)     the town's shared moped (the riders' motor scooter) and stand-up electric scooter (owner D29).
 -- The riders are part-built and stay so: they have no Humanoid and no R15 joints (Actors/BodyFactory), so the rounded
 -- townspeople's art (Assets/PeopleArt) cannot be put on them. They are dressed instead in what that art would give them:
 -- Avatar/PeopleLooks' colours, hair style and hat for the role (mime or townsperson), and the same round build (a ball
@@ -23,7 +24,8 @@
 -- Only the big parts (the body, the head, the tyres) cast shadows.
 -- Interface: rider(slot, index?) -> PartBuilder.ModelSpec; RIDERS; ROOT_HEIGHT; drawBicycle(kit, opts) -> Anchors;
 --   drawRider(kit, slot, seat, hands, feet, lean, prefix) -> parts drawn;
---   newKit(ground) -> Kit; bicycle(opts?) -> PartBuilder.ModelSpec (root = the bike's own box, for a parked bike)
+--   newKit(ground) -> Kit; bicycle(opts?) -> PartBuilder.ModelSpec (root = the bike's own box, for a parked bike);
+--   sharedRide(kind, opts) -> PartBuilder.ModelSpec (a shared moped or electric scooter, owner D29); BOARD_TOP
 -- Pure. No side effects on require.
 
 local PartBuilder = require("../Avatar/PartBuilder")
@@ -552,6 +554,77 @@ function RidePuppet.bicycle(opts: BicycleOpts?): PartBuilder.ModelSpec
 		joints = joints(k.parts, "RootPart"),
 		attachments = {},
 		attributes = { RideKind = "bicycle" },
+	}
+end
+
+-- A stand-up electric scooter (owner D29), the front toward -Z, 12 parts: two small solid wheels with hubs, a low
+-- board (the dark grip top `Board` the rider stands on, over a trim in the paint), a rear mudguard, the chrome fork,
+-- the tall stem in the paint, a T bar, a headlamp and a tail light. The board's top is BOARD_TOP over the ground.
+RidePuppet.BOARD_TOP = 0.5
+local function drawEScooter(k: Kit, paint: Rgb): Anchors
+	local R = 0.36
+	local chrome, dark = hex(FIXED.chrome), hex("#2f3236")
+	local rear: V, front: V = { 0, R, 1.2 }, { 0, R, -1.25 }
+	across(k, "WheelF", front, 0.22, R, hex(FIXED.tyre)).castShadow = true
+	across(k, "WheelB", rear, 0.24, R, hex(FIXED.tyre)).castShadow = true
+	across(k, "HubF", front, 0.27, R * 0.5, chrome, "Metal")
+	across(k, "HubB", rear, 0.29, R * 0.5, chrome, "Metal")
+	local top = RidePuppet.BOARD_TOP
+	block(k, "Board", { 0, top - 0.06, -0.02 }, { 0.6, 0.12, 2.1 }, dark)
+	block(k, "Trim", { 0, top - 0.17, -0.02 }, { 0.66, 0.12, 2.2 }, paint)
+	block(k, "Mudguard", { 0, 2 * R + 0.05, 1.25 }, { 0.28, 0.06, 0.72 }, paint)
+	local head: V = { 0, 0.62, -1.18 }
+	seg(k, "Fork", front, head, 0.05, chrome, "Metal")
+	local barAt: V = { 0, 3.0, -1.02 }
+	seg(k, "Stem", head, { 0, barAt[2] - 0.05, barAt[3] }, 0.07, paint)
+	across(k, "Bars", barAt, 1.05, 0.05, hex(FIXED.bar))
+	put(k, {
+		name = "Headlamp",
+		size = { 0.1, 0.22, 0.22 },
+		pos = at(k, { 0, 2.55, -1.12 }),
+		yaw = math.pi / 2,
+		color = hex(FIXED.head),
+		shape = "Cylinder",
+		material = "Neon",
+	})
+	block(k, "TailLight", { 0, 2 * R + 0.1, 1.6 }, { 0.22, 0.08, 0.05 }, hex(FIXED.tail), "Neon")
+	return {
+		seat = { 0, top, 0 },
+		hands = { { -0.45, barAt[2], barAt[3] }, { 0.45, barAt[2], barAt[3] } },
+		feet = { { -0.15, top, 0.1 }, { 0.15, top, -0.2 } },
+	}
+end
+
+-- A parked ride of the town's shared ones (owner D29): the root is the ride's own box (`size`, centred), the ride drawn
+-- standing on the box's floor: "moped" a small motor scooter (the street riders' scooter: 15 parts), "escooter" the
+-- stand-up electric scooter (12 parts). `paint` its colour.
+export type SharedRideOpts = { paint: string?, size: V, name: string? }
+function RidePuppet.sharedRide(kind: "moped" | "escooter", opts: SharedRideOpts): PartBuilder.ModelSpec
+	local size = opts.size
+	local paint = hex(opts.paint or "#405979")
+	local k = RidePuppet.newKit(-size[2] / 2)
+	put(k, {
+		name = "RootPart",
+		size = { size[1], size[2], size[3] },
+		pos = { 0, 0, 0 },
+		color = paint,
+		transparency = 1,
+	})
+	if kind == "moped" then
+		drawScooter(k, paint)
+	else
+		drawEScooter(k, paint)
+	end
+	shadows(k.parts)
+	k.parts[1].castShadow = nil
+	return {
+		name = opts.name or kind,
+		species = "car",
+		primary = "RootPart",
+		parts = k.parts,
+		joints = joints(k.parts, "RootPart"),
+		attachments = {},
+		attributes = { RideKind = kind },
 	}
 end
 
