@@ -10,6 +10,7 @@ local Kit = require("../../tools/bake/alley/Kit")
 local Store = require("../../tools/bake/corner_store/Store")
 local Fixtures = require("../../tools/bake/corner_store/Fixtures")
 local ItemRules = require("@shared/Items/ItemRules")
+local Bank = require("@shared/Economy/Bank")
 local Data = require("@shared/Data")
 local Species = require("@shared/Actors/Species")
 local TownAI = require("@server/AI/TownAI")
@@ -259,13 +260,17 @@ return function(t)
 					t.eq(p.CanCollide, false, `{def.id}: the sample is visual`)
 				end
 				local tag = m:FindFirstChild("PriceTag")
-				t.eq(tag:FindFirstChildWhichIsA("SurfaceGui"):FindFirstChildWhichIsA("TextLabel").Text, `{def.price}c`)
+				-- owner D31: prices are ten times the first list, so a tag reads as the wallet writes it ("S$6.00")
+				t.eq(
+					tag:FindFirstChildWhichIsA("SurfaceGui"):FindFirstChildWhichIsA("TextLabel").Text,
+					Bank.amount(def.price)
+				)
 				local grab = m:FindFirstChild("Grab")
 				local prompt = grab:FindFirstChildWhichIsA("ProximityPrompt")
 				t.truthy(prompt ~= nil, `{def.id}: a prompt`)
 				t.eq(prompt:GetAttribute("StoreItem"), def.id)
 				t.eq(prompt.RequiresLineOfSight, false)
-				t.truthy(string.find(prompt.ObjectText, `{def.price}c`, 1, true) ~= nil, prompt.ObjectText)
+				t.truthy(string.find(prompt.ObjectText, Bank.amount(def.price), 1, true) ~= nil, prompt.ObjectText)
 				t.truthy(not string.find(prompt.ObjectText, "_", 1, true), prompt.ObjectText)
 				-- a place to stand (a body's centre 2.5 above the floor) within the prompt's reach, less a stud
 				local x, y, d =

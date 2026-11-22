@@ -17,8 +17,7 @@
 
 local Import = require("../Import")
 local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
-local EconomyRules =
-	Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 
 local GiftShop = {}
 
@@ -141,8 +140,7 @@ function GiftShop.start(opts: Opts): Shop?
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "GiftShopPrompt"
 	prompt.ActionText = "Alley shirt"
-	prompt.ObjectText =
-		`Gift shop: buy, put on or take off ({Bank.amount(EconomyRules.price(GiftShop.ITEM) or 0)})`
+	prompt.ObjectText = `Gift shop: buy, put on or take off ({Bank.amount(EconomyRules.price(GiftShop.ITEM) or 0)})`
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
 	prompt.MaxActivationDistance = 8

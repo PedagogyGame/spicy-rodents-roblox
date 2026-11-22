@@ -70,7 +70,8 @@ function Basket.take(b: Baskets, key: any, itemId: string): (boolean, string)
 	end
 	table.insert(list, itemId)
 	local bare = string.gsub(nameOf(itemId), "^an? ", "")
-	return true, string.format(Basket.WORDS.took, capital(bare), Bank.amount(def.price), Bank.amount(Basket.total(b, key)))
+	return true,
+		string.format(Basket.WORDS.took, capital(bare), Bank.amount(def.price), Bank.amount(Basket.total(b, key)))
 end
 
 function Basket.clear(b: Baskets, key: any): { string }

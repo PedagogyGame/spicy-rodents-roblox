@@ -61,8 +61,8 @@ local function stubTown(log: { any }): any
 			buy = function(_p: any): (boolean, string)
 				return false, "no"
 			end,
-			offer = function(): (number, number, string)
-				return 20, 5, "A pass is 20c for five in-game days of paintball and both lounges."
+			offer = function(): (number, number, string) -- owner D31: the wallet's S$2.00 pass
+				return 200, 5, "A pass is S$2.00 for five in-game days of paintball and both lounges."
 			end,
 		},
 		buy = function(_p: any, _id: string, _deliver: any): (boolean, string)
@@ -91,7 +91,7 @@ return function(t)
 				t.truthy(g.struck >= 40, `{g.struck} struck`)
 				t.eq(g.wrong, 0)
 				t.eq(g.spared, 8)
-				t.eq(result.numbers.drinks.spent, 10 + 12 + 8 + 6)
+				t.eq(result.numbers.drinks.spent, 100 + 120 + 80 + 60) -- owner D31: prices x10
 			end)
 		end
 	)
@@ -125,11 +125,12 @@ return function(t)
 				-- the podium's too: from just inside the door wall it is within reach (3.9 studs), through the wall
 				t.eq(kinds.pass.RequiresLineOfSight, true)
 				t.eq(kinds.pass.ActionText, "Buy a pass")
-				t.eq(kinds.pass.ObjectText, "20c for 5 in-game days")
-				t.eq(kinds.hot_cocoa.ActionText, "Hot cocoa (10c)")
-				t.eq(kinds.coffee.ActionText, "Coffee (12c)")
-				t.eq(kinds.green_tea.ActionText, "Green tea (8c)")
-				t.eq(kinds.snow_cone.ActionText, "Snow cone (6c)")
+				-- owner D31: prices x10, written as the wallet writes them
+				t.eq(kinds.pass.ObjectText, "S$2.00 for 5 in-game days")
+				t.eq(kinds.hot_cocoa.ActionText, "Hot cocoa (S$1.00)")
+				t.eq(kinds.coffee.ActionText, "Coffee (S$1.20)")
+				t.eq(kinds.green_tea.ActionText, "Green tea (80c)")
+				t.eq(kinds.snow_cone.ActionText, "Snow cone (60c)")
 				-- E at the door: a person with the pass goes in
 				local body = makeModel("Ann", roblox.CFrame.new(svc:world(0, 3, -30)), nil)
 				local ann = { species = "human", pass = true, body = body }

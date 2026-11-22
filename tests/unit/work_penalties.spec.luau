@@ -119,7 +119,7 @@ return function(t)
 		-- alone in town: down to a newcomer's pocket money
 		local w2, p2, pen2 = town({ { id = 20, cents = 40000, rung = "hospital" } })
 		pen2.ambulanceIgnored(p2[20])
-		t.eq(w2.balance(p2[20]), 300)
+		t.eq(w2.balance(p2[20]), 2500) -- owner D31: the pocket money is S$25.00
 	end)
 
 	t.test("wallet: a reputation report that fails leaves the penalty standing; before install nothing", function()
@@ -135,14 +135,14 @@ return function(t)
 			warn = function() end,
 		})
 		t.eq(pen.errandStolen(p), 10000)
-		t.eq(wallet.balance(p), 10300)
+		t.eq(wallet.balance(p), 12500) -- owner D31: S$25.00 of pocket money under the wages
 		-- with no reputation module and no deps.report: the default looks and finds none, quietly
 		local plain = Penalties.new({ wallet = wallet, warn = function() end })
 		t.eq(plain.errandStolen(p), 10000)
-		t.eq(wallet.balance(p), 300)
+		t.eq(wallet.balance(p), 2500)
 		t.eq(Penalties.ambulanceIgnored(player(99)), 0, "nothing installed: nothing taken")
 		Penalties.install({ wallet = wallet, warn = function() end })
-		t.eq(Penalties.errandStolen(p), 300, "the installed instance")
+		t.eq(Penalties.errandStolen(p), 2500, "the installed instance")
 	end)
 
 	t.test("hook: a doctor demoted for an ignored bite victim pays; other demotions and rules do not", function()
@@ -168,13 +168,14 @@ return function(t)
 		Penalties.hook(roles)
 		roles.deps.onTransition({ rule = "role.demote", player = 31, why = "kept missing the station" })
 		roles.deps.onTransition({ rule = "work.completed", player = 30, pay = 3 })
-		t.eq(wallet.balance(doc), 30300, "not an ambulance demotion")
-		t.eq(wallet.balance(cop), 30300)
+		-- owner D31: S$25.00 of pocket money under the wages
+		t.eq(wallet.balance(doc), 32500, "not an ambulance demotion")
+		t.eq(wallet.balance(cop), 32500)
 		roles.deps.onTransition({ rule = "role.demote", player = 30, why = "ignored a bite victim" })
-		t.eq(wallet.balance(doc), 20300, "fined; already at the other townsperson's level or under")
+		t.eq(wallet.balance(doc), 22500, "fined; already at the other townsperson's level or under")
 		t.eq(seen, 3, "the hook already there still runs")
 		roles.deps.onTransition({ rule = "role.demote", player = 31, why = "abandoned a patient" })
-		t.eq(wallet.balance(cop), 20300, "fined, then down to the doctor's 20300")
+		t.eq(wallet.balance(cop), 22500, "fined, then down to the doctor's 22500")
 	end)
 
 	t.test("homes: a door an errand is handed over at is outside every home (delivering is never keeping)", function()

@@ -120,7 +120,7 @@ return function(t)
 			local spec: any = EconomyRules.pass(EconomyRules.PASS)
 			t.truthy(spec ~= nil)
 			t.truthy(string.find(spec.offer, "both lounges", 1, true) ~= nil, spec.offer)
-			t.eq(spec.cents, 20)
+			t.eq(spec.cents, 200) -- owner D31: S$2.00
 			t.eq(spec.days, 5)
 		end
 	)
@@ -131,7 +131,8 @@ return function(t)
 			table.insert(ids, d.id)
 			local item = EconomyRules.item(d.id)
 			t.truthy(item ~= nil, d.id)
-			t.truthy((item :: any).cents > 0 and (item :: any).cents <= 12, `{d.id}: {(item :: any).cents}c`)
+			-- owner D31: prices x10, a coffee is S$1.20
+			t.truthy((item :: any).cents > 0 and (item :: any).cents <= 120, `{d.id}: {(item :: any).cents}c`)
 			t.eq(LoungeClassic.drink(d.id), d)
 		end
 		t.eq(table.concat(ids, ","), "hot_cocoa,coffee,green_tea,snow_cone")

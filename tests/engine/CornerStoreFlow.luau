@@ -6,8 +6,8 @@
 --             back), and the 21 items on sale (the 22 less the dog treats, which wait for dogs), each with a Sample,
 --             a price tag and a "Take" prompt (StoreItem attribute)
 --   buy       Server/Items/CornerStore over the town's real wallet (Economy/Credits) and Items/Inventory, a
---             PlayerLike stub standing inside the Zone: a frisbee and a soda picked up, paid once (9c), both owned
---   short     a kite with 20c: refused with words, nothing taken
+--             PlayerLike stub standing inside the Zone: a frisbee and a soda picked up, paid once (90c), both owned
+--   short     a kite (S$6.00) with S$2.00: refused with words, nothing taken
 --   walk out  a basket carried out of the Zone is put back
 --   tool      CornerStore.makeTool on every Sample: a Tool with a Handle, its other parts welded, nothing anchored,
 --             nothing colliding (what a buyer is handed)
@@ -82,7 +82,7 @@ function CornerStoreFlow.run(): { [string]: any }
 	local poor = stub("Poor", 9102)
 	wallet.join(shopper)
 	wallet.join(poor)
-	wallet.spend(poor, wallet.balance(poor) - 20, "a test")
+	wallet.spend(poor, wallet.balance(poor) - 200, "a test") -- owner D31: prices x10
 	local inventory = Inventory.new()
 	local told: { string } = {}
 	local store = CornerStore.new({
@@ -110,11 +110,11 @@ function CornerStoreFlow.run(): { [string]: any }
 	store:take(shopper, "soda")
 	local ok = store:pay(shopper)
 	check(ok, "the shopper could not pay: " .. (told[#told] or ""))
-	check(wallet.balance(shopper) == before - 9, `paid {before - wallet.balance(shopper)}c (want 9c)`)
+	check(wallet.balance(shopper) == before - 90, `paid {before - wallet.balance(shopper)}c (want 90c)`)
 	check(inventory.count(shopper, "frisbee") == 1 and inventory.count(shopper, "soda") == 1, "not handed over")
 	store:take(poor, "kite")
-	check(not store:pay(poor), "a kite on 20c was sold")
-	check(wallet.balance(poor) == 20, "the poor shopper was charged")
+	check(not store:pay(poor), "a kite on S$2.00 was sold")
+	check(wallet.balance(poor) == 200, "the poor shopper was charged")
 	poor.pos = inside + Vector3.new(0, 0, 200)
 	store:step()
 	check(#store:basket(poor) == 0, "the kite left the store unpaid")

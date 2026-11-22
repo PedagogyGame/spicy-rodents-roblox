@@ -356,9 +356,13 @@ function LoungeService._prompts(self: any)
 		self:leave(player)
 	end)
 	local cents, days = self.town.pass.offer()
-	on(prompt(self.podiumPost, W.buyAction, `{Bank.amount(cents)} for {days} in-game days`, "pass", true), "pass", function(player)
-		self:buyPass(player)
-	end)
+	on(
+		prompt(self.podiumPost, W.buyAction, `{Bank.amount(cents)} for {days} in-game days`, "pass", true),
+		"pass",
+		function(player)
+			self:buyPass(player)
+		end
+	)
 	for i, seat in self.seats do
 		local st = LoungeClassic.SEATS[i]
 		local p =
@@ -373,9 +377,13 @@ function LoungeService._prompts(self: any)
 	end
 	for i, d in LoungeClassic.DRINKS do
 		local price = EconomyRules.price(d.id) or 0
-		on(prompt(self.counterPosts[i], `{d.label} ({Bank.amount(price)})`, W.orderObject, d.id), "order", function(player)
-			self:order(player, d.id)
-		end)
+		on(
+			prompt(self.counterPosts[i], `{d.label} ({Bank.amount(price)})`, W.orderObject, d.id),
+			"order",
+			function(player)
+				self:order(player, d.id)
+			end
+		)
 	end
 end
 

@@ -60,8 +60,7 @@ local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
-local EconomyRules =
-	Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
 local PossessionState =

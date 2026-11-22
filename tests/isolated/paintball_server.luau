@@ -62,11 +62,11 @@ end
 
 return function(t)
 	t.test(
-		"the pass: refused at the door without one, sold once at the desk for 20c through the town, good for five game days",
+		"the pass: refused at the door without one, sold once at the desk for S$2.00 through the town, good for five game days",
 		function()
 			local charged: { any } = {}
 			local day = 3
-			local purse = 100
+			local purse = 1000 -- owner D31: the pass is S$2.00
 			Kit.play(function(kit)
 				-- (the lane's own desk, on this case's charge and day: in the game the pass is the town's one, the
 				-- wallet's, and the framework says once that a charge came without it)

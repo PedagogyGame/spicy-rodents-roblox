@@ -102,9 +102,9 @@ return function(t)
 		local b = Basket.new()
 		local ok, words = Basket.take(b, 1, "frisbee")
 		t.truthy(ok)
-		t.eq(words, "Frisbee, 5c: in your basket (5c in all). Pay at the counter.")
+		t.eq(words, "Frisbee, 50c: in your basket (50c in all). Pay at the counter.") -- owner D31: prices x10
 		t.truthy(Basket.take(b, 1, "kite"))
-		t.eq(Basket.total(b, 1), 65)
+		t.eq(Basket.total(b, 1), 650)
 		t.eq(select(2, Basket.take(b, 1, "lottery_ticket")), Basket.WORDS.unknown)
 		for _ = 3, Basket.MAX do
 			t.truthy(Basket.take(b, 1, "soda"))
@@ -121,18 +121,18 @@ return function(t)
 	end)
 
 	t.test("buy: pick up two things, pay at the till once, the money gone once, the things in hand", function()
-		local r = rig(300)
+		local r = rig(3000) -- owner D31: money and prices x10
 		t.truthy(r.store:take(r.player, "frisbee"))
 		t.truthy(r.store:take(r.player, "soda"))
 		t.eq(r.attrs.StoreBasket, "frisbee,soda")
 		local before = r.wallet.balance(r.player)
 		local ok, words = r.store:pay(r.player)
 		t.truthy(ok, words)
-		t.eq(r.wallet.balance(r.player), before - 9)
+		t.eq(r.wallet.balance(r.player), before - 90)
 		t.eq(r.inventory.count(r.player, "frisbee"), 1)
 		t.eq(r.inventory.count(r.player, "soda"), 1)
 		t.eq(r.attrs.StoreBasket, "")
-		t.truthy(string.find(words, "Paid 9c", 1, true) ~= nil, words)
+		t.truthy(string.find(words, "Paid 90c", 1, true) ~= nil, words)
 		-- one spend for the basket: the account changed once
 		local spends = 0
 		for _, e in r.wallet.log() do
@@ -144,17 +144,17 @@ return function(t)
 		-- paying again with nothing in the basket takes nothing
 		t.eq(r.store:pay(r.player), false)
 		t.eq(last(r.refused), Basket.WORDS.empty)
-		t.eq(r.wallet.balance(r.player), before - 9)
+		t.eq(r.wallet.balance(r.player), before - 90)
 	end)
 
 	t.test("short of money: refused with words, nothing taken, nothing handed over, the basket kept", function()
-		local r = rig(20)
+		local r = rig(200) -- owner D31: money and prices x10
 		t.truthy(r.store:take(r.player, "kite"))
 		local ok, words = r.store:pay(r.player)
 		t.eq(ok, false)
-		t.eq(r.wallet.balance(r.player), 20)
+		t.eq(r.wallet.balance(r.player), 200)
 		t.eq(r.inventory.count(r.player, "kite"), 0)
-		t.truthy(string.find(words, "60c", 1, true) ~= nil, words)
+		t.truthy(string.find(words, "S$6.00", 1, true) ~= nil, words)
 		t.eq(last(r.refused), words)
 		t.eq(#r.store:basket(r.player), 1)
 		-- put it back at the till, and the cheap thing is bought
@@ -162,11 +162,11 @@ return function(t)
 		t.eq(#r.store:basket(r.player), 0)
 		t.truthy(r.store:take(r.player, "bubbles"))
 		t.truthy(r.store:pay(r.player))
-		t.eq(r.wallet.balance(r.player), 17)
+		t.eq(r.wallet.balance(r.player), 170)
 	end)
 
 	t.test("a double press: a second Pay while the first is served is refused and charges nothing", function()
-		local r = rig(300)
+		local r = rig(3000) -- owner D31: money and prices x10
 		t.truthy(r.store:take(r.player, "radio"))
 		local inner: { any } = {}
 		r.onGive = function()
@@ -179,16 +179,16 @@ return function(t)
 		t.truthy(r.store:pay(r.player))
 		t.eq(inner[1][1], false)
 		t.eq(inner[1][2], CornerStore.WORDS.busy)
-		t.eq(r.wallet.balance(r.player), 292)
+		t.eq(r.wallet.balance(r.player), 2920)
 		t.eq(r.inventory.count(r.player, "radio"), 1)
 		-- and a plain second press after the sale finds an empty basket
 		r.onGive = nil
 		t.eq(r.store:pay(r.player), false)
-		t.eq(r.wallet.balance(r.player), 292)
+		t.eq(r.wallet.balance(r.player), 2920)
 	end)
 
 	t.test("walking out unpaid puts it all back; so does losing the body", function()
-		local r = rig(300)
+		local r = rig(3000) -- owner D31: money and prices x10
 		t.truthy(r.store:take(r.player, "football"))
 		t.truthy(r.store:take(r.player, "chalk"))
 		r.store:step()
@@ -199,7 +199,7 @@ return function(t)
 		t.eq(last(r.told), "You put a football and sidewalk chalk back: pay at the counter before you leave.")
 		t.eq(r.attrs.StoreBasket, "")
 		t.eq(r.inventory.count(r.player, "football"), 0)
-		t.eq(r.wallet.balance(r.player), 300)
+		t.eq(r.wallet.balance(r.player), 3000)
 		-- no body: the same
 		r.pos = INSIDE
 		t.truthy(r.store:take(r.player, "peanuts"))
@@ -213,7 +213,7 @@ return function(t)
 	end)
 
 	t.test("only a person shops: the rodent, a squirrel and someone with no body are told why", function()
-		local r = rig(300)
+		local r = rig(3000) -- owner D31: money and prices x10
 		for _, s in { "rodent", "squirrel" } do
 			r.species = s
 			t.eq(r.store:take(r.player, "bird_seed"), false)
@@ -226,7 +226,7 @@ return function(t)
 	end)
 
 	t.test("a leaver: their basket goes back; one who leaves while being served is refunded", function()
-		local r = rig(300)
+		local r = rig(3000) -- owner D31: money and prices x10
 		t.truthy(r.store:take(r.player, "lawn_chair"))
 		r.store:gone(r.player)
 		t.eq(#r.store:basket(r.player), 0)
@@ -242,14 +242,14 @@ return function(t)
 		t.eq(ok, false)
 		t.eq(seen, 0, "nothing handed to nobody")
 		t.eq(real.count(r.player, "lawn_chair"), 0)
-		t.eq(r.wallet.balance(r.player), 300, "the money came back")
+		t.eq(r.wallet.balance(r.player), 3000, "the money came back")
 		r.store:step()
 		t.eq(#r.store:basket(r.player), 0, "the basket put back")
 		t.eq(r.store:busy(r.player), false)
 	end)
 
 	t.test("every one on sale can be bought at its catalogue price, the dog treats too (the town has dogs)", function()
-		local r = rig(1000)
+		local r = rig(10000) -- owner D31: money and prices x10
 		local spent = 0
 		t.truthy(ItemRules.onSale("dog_treats"), "the yard dogs are in the town")
 		for _, def in ItemRules.CATALOG do
@@ -272,10 +272,10 @@ return function(t)
 			spent += def.price
 			t.eq(r.inventory.count(r.player, def.id), 1, def.id)
 		end
-		t.eq(r.wallet.balance(r.player), 1000 - spent)
+		t.eq(r.wallet.balance(r.player), 10000 - spent)
 		-- all cheap but bird seed and the kite (brief v2)
 		for _, def in ItemRules.CATALOG do
-			t.truthy(def.price <= 15 or def.id == "bird_seed" or def.id == "kite", def.id)
+			t.truthy(def.price <= 150 or def.id == "bird_seed" or def.id == "kite", def.id)
 		end
 	end)
 	t.test(

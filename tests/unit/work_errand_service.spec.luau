@@ -185,7 +185,7 @@ return function(t)
 		t.truthy(ok2)
 		t.truthy(has(text :: string, "No pay, no penalty"), text)
 		t.eq(r.svc:runOf(p), nil)
-		t.eq(r.wallet.balance(p), 20300, "nothing taken, nothing paid")
+		t.eq(r.wallet.balance(p), 22500, "nothing taken, nothing paid") -- owner D31: S$25.00 of pocket money
 		t.eq(#r.reports, 0)
 		-- a held key does nothing
 		t.eq(select(2, r.svc:press(p, "market")), nil, "too soon after the hand back")
@@ -205,7 +205,7 @@ return function(t)
 		t.truthy(has(r.last(p), "One minute left"), r.last(p))
 		r.advance(40)
 		t.eq(r.svc:runOf(p), nil)
-		t.eq(r.wallet.balance(p), 25300 - PenaltyRules.penalty())
+		t.eq(r.wallet.balance(p), 27500 - PenaltyRules.penalty()) -- owner D31: S$25.00 of pocket money
 		t.eq(r.reports[1], "errand_theft")
 		t.eq(#r.bodies[p].held, 0)
 		-- at home: a short pass through is not kept; staying is
@@ -221,7 +221,7 @@ return function(t)
 		r2.bodies[q].pos = { 5000, 5000 }
 		r2.advance(11)
 		t.eq(r2.svc:runOf(q), nil, "kept at home")
-		t.eq(r2.wallet.balance(q), 25300 - PenaltyRules.penalty())
+		t.eq(r2.wallet.balance(q), 27500 - PenaltyRules.penalty())
 		-- out of the server with it
 		local r3 = rig()
 		local s = r3.join(3, 4000)
@@ -233,7 +233,7 @@ return function(t)
 		-- a player who leaves with nothing in hand loses nothing
 		local u = r3.join(4, 4000)
 		r3.svc:leave(u)
-		t.eq(r3.wallet.balance(u), 4300)
+		t.eq(r3.wallet.balance(u), 6500) -- owner D31: S$25.00 of pocket money
 	end)
 
 	t.test("stock options: the bank's other counter opens the purchase window (the stock-options work's)", function()

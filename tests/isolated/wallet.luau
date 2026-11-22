@@ -71,23 +71,23 @@ local function watch(player: any, name: string): { any }
 end
 
 return function(t)
-	t.test("joining: an account, S$3.00 of pocket money, and the balance on the Player for the screen", function()
+	t.test("joining: an account, S$25.00 of pocket money, and the balance on the Player for the screen", function()
 		FakeEngine.with(function()
 			local w = town()
 			local ann = person("Ann", 11)
 			t.eq(w.wallet.balance(ann), 0)
 			t.deepEq({ w.wallet.spend(ann, 1, "bubble gum") }, { false, Bank.WORDS.none })
-			t.eq(w.wallet.join(ann), 300)
-			t.eq(w.wallet.balance(ann), 300)
-			t.eq(ann:GetAttribute("Cents"), 300)
-			t.eq(ann:GetAttribute("PocketMoney"), 300)
-			t.eq(ann:GetAttribute("CentsNote"), "1|300|pocket money")
+			t.eq(w.wallet.join(ann), 2500) -- owner D31: S$25.00 of pocket money
+			t.eq(w.wallet.balance(ann), 2500)
+			t.eq(ann:GetAttribute("Cents"), 2500)
+			t.eq(ann:GetAttribute("PocketMoney"), 2500)
+			t.eq(ann:GetAttribute("CentsNote"), "1|2500|pocket money")
 			t.eq(ann:GetAttribute("PassUntil"), nil)
-			t.deepEq(w.lines, { "11 +300c (pocket money) -> 300c" })
+			t.deepEq(w.lines, { "11 +2500c (pocket money) -> 2500c" })
 			-- joined twice (RoleService and the once-a-second sweep both ask): nothing more
 			t.eq(w.wallet.join(ann), 0)
-			t.eq(w.wallet.balance(ann), 300)
-			t.eq(ann:GetAttribute("PocketMoney"), 300, "still what this join gave")
+			t.eq(w.wallet.balance(ann), 2500)
+			t.eq(ann:GetAttribute("PocketMoney"), 2500, "still what this join gave")
 			t.eq(#w.lines, 1)
 			-- the amount is the tunable, read at each join; 0 switches pocket money off
 			Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 0 })
@@ -104,32 +104,32 @@ return function(t)
 		FakeEngine.with(function()
 			local w = town()
 			local ann = person("Ann", 11)
-			w.wallet.join(ann)
+			w.wallet.join(ann) -- owner D31: S$25.00 of pocket money
 			local seen = watch(ann, "Cents")
 			t.deepEq({ w.wallet.can(ann, 12) }, { true, "" })
-			t.deepEq({ w.wallet.spend(ann, 12, "coffee") }, { true, "Paid 12c for coffee. You have S$2.88." })
-			t.deepEq(seen, { { 288, "2|-12|coffee" } }, "the new balance, with the change already beside it")
-			t.deepEq({ w.wallet.add(ann, 5, "mowing a lawn") }, { true, "+5c: mowing a lawn. You have S$2.93." })
-			t.deepEq(seen[2], { 293, "3|5|mowing a lawn" })
+			t.deepEq({ w.wallet.spend(ann, 12, "coffee") }, { true, "Paid 12c for coffee. You have S$24.88." })
+			t.deepEq(seen, { { 2488, "2|-12|coffee" } }, "the new balance, with the change already beside it")
+			t.deepEq({ w.wallet.add(ann, 5, "mowing a lawn") }, { true, "+5c: mowing a lawn. You have S$24.93." })
+			t.deepEq(seen[2], { 2493, "3|5|mowing a lawn" })
 			-- refused: words (in the screen's own form, with a full stop), and nothing on the Player moves
-			t.deepEq({ w.wallet.spend(ann, 294, "a jet ski") }, { false, "You need S$2.94; you have S$2.93." })
-			t.deepEq({ w.wallet.can(ann, 294) }, { false, "You need S$2.94; you have S$2.93." })
+			t.deepEq({ w.wallet.spend(ann, 2494, "a jet ski") }, { false, "You need S$24.94; you have S$24.93." })
+			t.deepEq({ w.wallet.can(ann, 2494) }, { false, "You need S$24.94; you have S$24.93." })
 			t.eq(#seen, 2)
-			t.eq(ann:GetAttribute("Cents"), 293)
+			t.eq(ann:GetAttribute("Cents"), 2493)
 			-- a handing-over that fails is never charged: taken, then straight back, both logged
 			t.deepEq({
 				w.wallet.spend(ann, 30, "a kite", function(): (boolean?, string?)
 					return false, "The shelf is empty."
 				end),
 			}, { false, "The shelf is empty." })
-			t.deepEq(seen[3], { 263, "4|-30|a kite" })
-			t.deepEq(seen[4], { 293, "5|30|refund: a kite" })
+			t.deepEq(seen[3], { 2463, "4|-30|a kite" })
+			t.deepEq(seen[4], { 2493, "5|30|refund: a kite" })
 			-- one that throws is not charged either, and the wallet goes on working
 			local ok, words = w.wallet.spend(ann, 30, "a kite", function(): (boolean?, string?)
 				error("the kite service fell over")
 			end)
 			t.deepEq({ ok, words }, { false, "That did not work, so you were not charged for a kite." })
-			t.eq(w.wallet.balance(ann), 293)
+			t.eq(w.wallet.balance(ann), 2493)
 			-- and the error itself is in the server's log, with what was being bought (the review's broken kitchen)
 			t.eq(#w.warned, 1)
 			t.truthy(string.find(w.warned[1], "the kite service fell over", 1, true), w.warned[1])
@@ -142,7 +142,7 @@ return function(t)
 				table.insert(whys, `{e.delta} {e.why}`)
 			end
 			t.deepEq(whys, {
-				"300 pocket money",
+				"2500 pocket money",
 				"-12 coffee",
 				"5 mowing a lawn",
 				"-30 a kite",
@@ -151,12 +151,12 @@ return function(t)
 				"30 refund: a kite",
 			})
 			t.eq(#w.lines, #log, "and each is a line in the server's output")
-			t.eq(w.lines[2], "11 -12c (coffee) -> 288c")
+			t.eq(w.lines[2], "11 -12c (coffee) -> 2488c")
 			-- two people: one never pays for the other
 			local bob = person("Bob", 12)
 			w.wallet.join(bob)
-			t.truthy(w.wallet.spend(bob, 300, "everything"))
-			t.eq(w.wallet.balance(ann), 293)
+			t.truthy(w.wallet.spend(bob, 2500, "everything"))
+			t.eq(w.wallet.balance(ann), 2493)
 			t.eq(bob:GetAttribute("Cents"), 0)
 			t.eq(#w.warned, 0, "nothing in all that was a shop's mistake")
 		end)
@@ -178,8 +178,8 @@ return function(t)
 		t.deepEq({ w.wallet.spend(ann, 12, why) }, { false, "That is not for sale yet." })
 		t.deepEq({ w.wallet.add(ann, 5, why) }, { false, "That could not be paid." })
 		t.eq(#w.warned, 3)
-		t.eq(w.wallet.balance(ann), 300, "and nothing was taken")
-		t.eq(ann.attrs.Cents, 300)
+		t.eq(w.wallet.balance(ann), 2500, "and nothing was taken") -- owner D31: S$25.00 of pocket money
+		t.eq(ann.attrs.Cents, 2500)
 		-- through the minigames' charge it is the same (ctx.town is `any` to a game: the type check cannot help)
 		local hooks = Game.wallet({
 			clock = { GetAttribute = function() end },
@@ -207,16 +207,20 @@ return function(t)
 			local w = town()
 			local ann: any = { UserId = 7, Name = "Ann", events = {} }
 			w.wallet.join(ann)
+			-- owner D31: S$25.00 of pocket money and every price x10
 			-- the review's caller 3, the lounge bar: names, never ids
-			t.deepEq({ w.wallet.buy(ann, "hot_cocoa") }, { true, "Paid 10c for a hot cocoa. You have S$2.90." })
-			t.deepEq({ w.wallet.buy(ann, "green_tea") }, { true, "Paid 8c for a green tea. You have S$2.82." })
-			t.eq(ann.attrs.CentsNote, "3|-8|a green tea", "the screen's line names it too")
+			t.deepEq({ w.wallet.buy(ann, "hot_cocoa") }, { true, "Paid S$1.00 for a hot cocoa. You have S$24.00." })
+			t.deepEq({ w.wallet.buy(ann, "green_tea") }, { true, "Paid 80c for a green tea. You have S$23.20." })
+			t.eq(ann.attrs.CentsNote, "3|-80|a green tea", "the screen's line names it too")
 			-- caller 4, the alley's counters: the board's ice cream is the corner store's ice cream bar
-			t.deepEq({ w.wallet.buy(ann, "ice_cream_bar") }, { true, "Paid 5c for an ice cream bar. You have S$2.77." })
+			t.deepEq(
+				{ w.wallet.buy(ann, "ice_cream_bar") },
+				{ true, "Paid 50c for an ice cream bar. You have S$22.70." }
+			)
 			t.deepEq({ w.wallet.buy(ann, "lane_shoes") }, { true, "Nothing to pay for lane shoes." })
 			t.deepEq(
 				{ w.wallet.buy(ann, "bowling_ball") },
-				{ true, "Paid 25c for a bowling ball of your own. You have S$2.52." }
+				{ true, "Paid S$2.50 for a bowling ball of your own. You have S$20.20." }
 			)
 			t.eq(#w.warned, 0)
 			-- an id that is not on sale: kind words for the player, and the id itself in the server's log
@@ -230,25 +234,25 @@ return function(t)
 			t.deepEq({ w.wallet.buy(ann, "paintball_pass") }, { false, "That is not for sale yet." })
 			t.truthy(string.find(w.warned[3], "wallet.pass.buy", 1, true), w.warned[3])
 			t.falsy(w.wallet.pass.has(ann))
-			t.eq(w.wallet.balance(ann), 252, "nothing taken by any of those")
+			t.eq(w.wallet.balance(ann), 2020, "nothing taken by any of those")
 			-- caller 1, the corner store's till: a basket is one spend for its total, named
 			t.deepEq(
 				{ w.wallet.buy(ann, { "kite", "soda", "frisbee" }) },
-				{ true, "Paid 69c for a kite, a soda and a frisbee. You have S$1.83." }
+				{ true, "Paid S$6.90 for a kite, a soda and a frisbee. You have S$13.30." }
 			)
 			t.deepEq(
 				{ w.wallet.buy(ann, { "peanuts", "chalk" }) },
-				{ true, "Paid 6c for peanuts and sidewalk chalk. You have S$1.77." }
+				{ true, "Paid 60c for peanuts and sidewalk chalk. You have S$12.70." }
 			)
 			t.deepEq(
 				{ w.wallet.buy(ann, { "bubbles", "chalk", "newspaper", "bike_horn" }) },
-				{ true, "Paid 10c for 4 things. You have S$1.67." }
+				{ true, "Paid S$1.00 for 4 things. You have S$11.70." }
 			)
 			-- one bad id spoils the basket, and nothing of it is charged
 			t.deepEq({ w.wallet.buy(ann, { "kite", "lottery_ticket" }) }, { false, "That is not for sale yet." })
 			t.truthy(string.find(w.warned[4], '"lottery_ticket"', 1, true), w.warned[4])
 			t.deepEq({ w.wallet.buy(ann, {}) }, { false, "That is not for sale yet." })
-			t.eq(w.wallet.balance(ann), 167)
+			t.eq(w.wallet.balance(ann), 1170)
 			-- with a handing-over, as the header writes it
 			local given = 0
 			t.deepEq({
@@ -256,65 +260,71 @@ return function(t)
 					given += 1
 					return true
 				end),
-			}, { true, "Paid 60c for a kite. You have S$1.07." })
+			}, { true, "Paid S$6.00 for a kite. You have S$5.70." })
 			t.eq(given, 1)
 			-- dollars and cents as the list has them; then short of money
-			t.deepEq(
-				{ w.wallet.buy(ann, "paintball_garb_set") },
-				{ true, "Paid S$1.00 for paintball gear. You have S$0.07." }
-			)
-			t.deepEq({ w.wallet.buy(ann, "bird_seed") }, { false, "You need 40c; you have 7c." })
+			t.deepEq({ w.wallet.buy(ann, "bird_seed") }, { true, "Paid S$4.00 for bird seed. You have S$1.70." })
+			t.deepEq({ w.wallet.buy(ann, "paintball_garb_set") }, { false, "You need S$10.00; you have S$1.70." })
 		end
 	)
 
-	t.test("the pass: sold once for 20c, five in-game days on the game clock, in the paintball desk's shape", function()
-		FakeEngine.with(function()
-			local w = town()
-			local ann = person("Ann", 11)
-			w.wallet.join(ann)
-			local desk = w.wallet.pass
-			t.falsy(desk.has(ann))
-			t.eq(desk.left(ann), 0)
-			t.eq(desk.untilDay(ann), nil)
-			t.eq(desk.words(ann), "No pass")
-			-- what a door says is the wallet's own sentence, from the numbers buy() charges by
-			t.deepEq({ desk.offer() }, { 20, 5, "A pass is 20c for five in-game days of paintball and both lounges." })
-			t.deepEq({ desk.buy(ann) }, { true, "Pass bought: five days of paintball and both lounges." })
-			t.truthy(desk.has(ann))
-			t.eq(w.wallet.balance(ann), 280)
-			t.eq(ann:GetAttribute("Cents"), 280)
-			t.eq(ann:GetAttribute("CentsNote"), "2|-20|a paintball pass")
-			t.eq(ann:GetAttribute("PassUntil"), 14 * DAY, "the game second it runs out, for the screen")
-			t.eq(desk.untilDay(ann), 14)
-			t.eq(desk.words(ann), "5.0 in-game days left (about 60 minutes)")
-			t.deepEq({ desk.buy(ann) }, { false, "You already have a pass." })
-			t.eq(w.wallet.balance(ann), 280)
-			-- the lounge door an hour later: nothing left
-			w.t += 4.5 * DAY
-			t.near(desk.left(ann), 0.5)
-			t.eq(desk.words(ann), "12 in-game hours left (about 6 minutes)")
-			w.t += 0.5 * DAY
-			t.falsy(desk.has(ann))
-			t.eq(desk.words(ann), "No pass")
-			-- the price is changed: the charge, the door's sentence and the price list all follow
-			Tunables.applyOverrides({ ["economy.paintballPassCents"] = 35, ["economy.paintballPassDays"] = 3 })
-			t.deepEq({ desk.offer() }, { 35, 3, "A pass is 35c for three in-game days of paintball and both lounges." })
-			t.truthy(desk.buy(ann), "run out: it can be bought again")
-			t.eq(w.wallet.balance(ann), 245)
-			t.eq(ann:GetAttribute("PassUntil"), 17 * DAY)
-			Tunables.reset()
-			-- short of money: the words, and no pass
-			local bob = person("Bob", 12)
-			Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 7 })
-			w.wallet.join(bob)
-			Tunables.reset()
-			t.deepEq({ desk.buy(bob) }, { false, "You need 20c; you have 7c." })
-			t.falsy(desk.has(bob))
-			t.eq(bob:GetAttribute("PassUntil"), nil)
-			-- someone who never joined
-			t.deepEq({ desk.buy(person("Cat", 13)) }, { false, Bank.WORDS.none })
-		end)
-	end)
+	t.test(
+		"the pass: sold once for S$2.00, five in-game days on the game clock, in the paintball desk's shape",
+		function()
+			FakeEngine.with(function()
+				local w = town()
+				local ann = person("Ann", 11)
+				w.wallet.join(ann)
+				local desk = w.wallet.pass
+				t.falsy(desk.has(ann))
+				t.eq(desk.left(ann), 0)
+				t.eq(desk.untilDay(ann), nil)
+				t.eq(desk.words(ann), "No pass")
+				-- what a door says is the wallet's own sentence, from the numbers buy() charges by
+				t.deepEq(
+					{ desk.offer() },
+					{ 200, 5, "A pass is S$2.00 for five in-game days of paintball and both lounges." }
+				) -- owner D31
+				t.deepEq({ desk.buy(ann) }, { true, "Pass bought: five days of paintball and both lounges." })
+				t.truthy(desk.has(ann))
+				t.eq(w.wallet.balance(ann), 2300)
+				t.eq(ann:GetAttribute("Cents"), 2300)
+				t.eq(ann:GetAttribute("CentsNote"), "2|-200|a paintball pass")
+				t.eq(ann:GetAttribute("PassUntil"), 14 * DAY, "the game second it runs out, for the screen")
+				t.eq(desk.untilDay(ann), 14)
+				t.eq(desk.words(ann), "5.0 in-game days left (about 60 minutes)")
+				t.deepEq({ desk.buy(ann) }, { false, "You already have a pass." })
+				t.eq(w.wallet.balance(ann), 2300)
+				-- the lounge door an hour later: nothing left
+				w.t += 4.5 * DAY
+				t.near(desk.left(ann), 0.5)
+				t.eq(desk.words(ann), "12 in-game hours left (about 6 minutes)")
+				w.t += 0.5 * DAY
+				t.falsy(desk.has(ann))
+				t.eq(desk.words(ann), "No pass")
+				-- the price is changed: the charge, the door's sentence and the price list all follow
+				Tunables.applyOverrides({ ["economy.paintballPassCents"] = 35, ["economy.paintballPassDays"] = 3 })
+				t.deepEq(
+					{ desk.offer() },
+					{ 35, 3, "A pass is 35c for three in-game days of paintball and both lounges." }
+				)
+				t.truthy(desk.buy(ann), "run out: it can be bought again")
+				t.eq(w.wallet.balance(ann), 2265)
+				t.eq(ann:GetAttribute("PassUntil"), 17 * DAY)
+				Tunables.reset()
+				-- short of money: the words, and no pass
+				local bob = person("Bob", 12)
+				Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 7 })
+				w.wallet.join(bob)
+				Tunables.reset()
+				t.deepEq({ desk.buy(bob) }, { false, "You need S$2.00; you have 7c." })
+				t.falsy(desk.has(bob))
+				t.eq(bob:GetAttribute("PassUntil"), nil)
+				-- someone who never joined
+				t.deepEq({ desk.buy(person("Cat", 13)) }, { false, Bank.WORDS.none })
+			end)
+		end
+	)
 
 	t.test("leaving and coming back: the account is kept as it was left, and nothing more is given", function()
 		FakeEngine.with(function()
@@ -322,7 +332,7 @@ return function(t)
 			local ann = person("Ann", 11)
 			w.wallet.join(ann)
 			w.wallet.pass.buy(ann)
-			w.wallet.spend(ann, 80, "a day out")
+			w.wallet.spend(ann, 2100, "a day out") -- owner D31: S$25.00 less a S$2.00 pass and S$21.00
 			t.eq(w.wallet.balance(ann), 200)
 			-- mid-purchase when they left: the handing-over fails, the money is back in the kept account
 			local out: { any } = {}
@@ -357,8 +367,8 @@ return function(t)
 			t.eq(again:GetAttribute("PassUntil"), 14 * DAY)
 			t.truthy(w.wallet.pass.has(again))
 			t.near(w.wallet.pass.left(again), 4)
-			-- five more times, spending everything each time: S$3.00 was all there ever was
-			local spent = 100
+			-- five more times, spending everything each time: S$25.00 was all there ever was
+			local spent = 2300
 			local now = again
 			for i = 1, 5 do
 				local have = w.wallet.balance(now)
@@ -372,7 +382,7 @@ return function(t)
 				t.eq(now:GetAttribute("Cents"), 0)
 				t.eq(now:GetAttribute("PocketMoney"), nil)
 			end
-			t.eq(spent, 300)
+			t.eq(spent, 2500)
 			-- back with a run-out pass: none on the screen
 			w.wallet.leave(now)
 			w.t += 5 * DAY
@@ -384,7 +394,7 @@ return function(t)
 			local saved = w.wallet.export(last)
 			t.eq(type(saved.at), "number", "stamped with the real time, so a pass can be run down on loading")
 			saved.at = nil
-			t.deepEq(saved, { v = 1, cents = 12, pocket = 300, pocketLeft = 0, passes = {} })
+			t.deepEq(saved, { v = 1, cents = 12, pocket = 2500, pocketLeft = 0, passes = {} })
 			t.eq(w.wallet.export(person("Nobody", 99)), nil)
 		end)
 	end)
@@ -393,17 +403,17 @@ return function(t)
 		"saving later: the join comes first in the game, and wallet.import still puts a saved account back",
 		function()
 			FakeEngine.with(function()
-				-- an account with 980c and a pass, saved on one server
-				local saved = { v = 1, cents = 980, pocket = 300, pocketLeft = 0, passes = { paintball = 2 * DAY } }
+				-- an account with S$98.00 and a pass, saved on one server (owner D31: x10, S$25.00 of pocket money)
+				local saved = { v = 1, cents = 9800, pocket = 2500, pocketLeft = 0, passes = { paintball = 2 * DAY } }
 				-- a new server does what the game does: the player arrives (Roles asks for the purse at
 				-- PlayerAdded: join, pocket money), and the profile's load comes a moment later
 				local w = town()
 				local ann = person("Ann", 11)
-				t.eq(w.wallet.join(ann), 300)
+				t.eq(w.wallet.join(ann), 2500)
 				t.deepEq({ w.wallet.import(ann, saved) }, { true, nil })
-				t.eq(w.wallet.balance(ann), 980)
-				t.eq(ann:GetAttribute("Cents"), 980, "and the screen follows")
-				t.eq(ann:GetAttribute("CentsNote"), "2|680|your saved wallet")
+				t.eq(w.wallet.balance(ann), 9800)
+				t.eq(ann:GetAttribute("Cents"), 9800, "and the screen follows")
+				t.eq(ann:GetAttribute("CentsNote"), "2|7300|your saved wallet")
 				t.truthy(w.wallet.pass.has(ann))
 				t.eq(ann:GetAttribute("PassUntil"), 11 * DAY)
 				-- once they have bought something here, the account here is the newer one
@@ -411,7 +421,7 @@ return function(t)
 				w.wallet.join(bob)
 				w.wallet.spend(bob, 12, "coffee")
 				t.deepEq({ w.wallet.import(bob, saved) }, { false, "this account has already been used here" })
-				t.eq(w.wallet.balance(bob), 288)
+				t.eq(w.wallet.balance(bob), 2488)
 			end)
 		end
 	)
@@ -419,10 +429,10 @@ return function(t)
 	t.test("PlayerLike stubs (the engine smoke's players) get the same wallet, on their attrs", function()
 		local w = town()
 		local stub: any = { UserId = 4242, Name = "Smoke" }
-		t.eq(w.wallet.join(stub), 300)
-		t.eq(stub.attrs.Cents, 300)
+		t.eq(w.wallet.join(stub), 2500) -- owner D31: S$25.00 of pocket money
+		t.eq(stub.attrs.Cents, 2500)
 		t.truthy(w.wallet.spend(stub, 12, "coffee"))
-		t.eq(stub.attrs.Cents, 288)
+		t.eq(stub.attrs.Cents, 2488)
 		t.eq(stub.attrs.CentsNote, "2|-12|coffee")
 		t.truthy(w.wallet.pass.buy(stub))
 		t.eq(stub.attrs.PassUntil, 14 * DAY)
@@ -450,11 +460,11 @@ return function(t)
 			wallet.tell(player, words)
 		end
 		counter(ann, 12)
-		counter(ann, 500)
+		counter(ann, 5000) -- owner D31: more than the S$25.00 of pocket money
 		wallet.tell(ann, "") -- nothing to say: nothing sent
 		t.deepEq(told, {
-			{ "Ann", "Paid 12c for coffee. You have S$2.88." },
-			{ "Ann", "You need S$5.00; you have S$2.88." },
+			{ "Ann", "Paid 12c for coffee. You have S$24.88." },
+			{ "Ann", "You need S$50.00; you have S$24.88." },
 		})
 		-- the header's door: the sentence is the wallet's, never the door's own copy of the price
 		local function door(player: any): boolean
@@ -466,7 +476,7 @@ return function(t)
 			return false
 		end
 		t.falsy(door(ann))
-		t.eq(told[3][2], "Members only. A pass is 20c for five in-game days of paintball and both lounges.")
+		t.eq(told[3][2], "Members only. A pass is S$2.00 for five in-game days of paintball and both lounges.")
 		t.deepEq({ wallet.pass.buy(ann) }, { true, "Pass bought: five days of paintball and both lounges." })
 		t.truthy(door(ann))
 		t.eq(#told, 3)
@@ -512,28 +522,28 @@ return function(t)
 				local ann = person("Ann", 11)
 				table.insert(inGame, ann)
 				local purse = hooks.purse(ann)
-				t.eq(purse.cents, 300)
-				t.eq(ann:GetAttribute("Cents"), 300)
-				t.eq(ann:GetAttribute("PocketMoney"), 300)
+				t.eq(purse.cents, 2500) -- owner D31: S$25.00 of pocket money
+				t.eq(ann:GetAttribute("Cents"), 2500)
+				t.eq(ann:GetAttribute("PocketMoney"), 2500)
 				-- the once-a-second sweep: a join that was missed is caught; nobody already here gets anything
 				local bob = person("Bob", 12)
 				table.insert(inGame, bob)
 				hooks.sweep()
-				t.eq(bob:GetAttribute("Cents"), 300)
-				t.eq(wallet.balance(ann), 300)
+				t.eq(bob:GetAttribute("Cents"), 2500)
+				t.eq(wallet.balance(ann), 2500)
 				local n = #lines
 				for _ = 1, 5 do
 					hooks.sweep()
 				end
 				t.eq(#lines, n, "sweeping again changes nothing")
-				t.eq(wallet.balance(bob), 300)
+				t.eq(wallet.balance(bob), 2500)
 				-- wallet.tell is the game's "notice" toast, to that one player
 				wallet.tell(ann, "The till is closed.")
 				t.deepEq(fired, { { "Ann", { kind = "notice", text = "The till is closed." } } })
 				-- the minigames' charge IS wallet.spend: the same money, the same words
-				t.deepEq({ hooks.charge(ann, 12, "coffee") }, { true, "Paid 12c for coffee. You have S$2.88." })
-				t.eq(wallet.balance(ann), 288)
-				t.deepEq({ hooks.charge(ann, 1000, "a game") }, { false, "You need S$10.00; you have S$2.88." })
+				t.deepEq({ hooks.charge(ann, 12, "coffee") }, { true, "Paid 12c for coffee. You have S$24.88." })
+				t.eq(wallet.balance(ann), 2488)
+				t.deepEq({ hooks.charge(ann, 10000, "a game") }, { false, "You need S$100.00; you have S$24.88." })
 				-- nobody gets an account by being charged: a computer player, a stand-in, someone who never
 				-- came through the door
 				local computer = { ai = true, name = "Wall" }
@@ -569,8 +579,8 @@ return function(t)
 				-- back on a new Player object: the same account, nothing more given
 				local again = person("Ann", 11)
 				table.insert(inGame, again)
-				t.eq(hooks.purse(again).cents, 268)
-				t.eq(again:GetAttribute("Cents"), 268)
+				t.eq(hooks.purse(again).cents, 2288) -- owner D31: the pass is S$2.00
+				t.eq(again:GetAttribute("Cents"), 2288)
 				t.eq(again:GetAttribute("PocketMoney"), nil)
 				-- and Game.start plugs in exactly these hooks (it cannot run here: read that it does)
 				local src = fs.readFile("src/server/Boot/Game.luau")
@@ -626,12 +636,12 @@ return function(t)
 				local smoke: any = { UserId = 4242, Name = "Smoke", Character = nil, attrs = {} }
 				result = WalletFlow.play(hooks.wallet, { player = smoke, town = r.svc.town })
 				-- the flow left the stub as a client would find it
-				t.eq(smoke.attrs.Cents, 268)
+				t.eq(smoke.attrs.Cents, 2288) -- owner D31: S$25.00 less a coffee and a S$2.00 pass
 				t.eq(smoke.attrs.PocketMoney, nil, "it ended by coming back, which gives nothing")
 				t.eq(smoke.attrs.PassUntil, 14 * DAY)
 				t.eq(#warned, 1, "the price that was missing was said in the server's log, once")
 				t.eq(smoke.events[#smoke.events].text, "The till is closed.")
-				t.eq(r.wallet.balance(r.player), 300, "the rig's own wallet was not the one asked")
+				t.eq(r.wallet.balance(r.player), 2500, "the rig's own wallet was not the one asked")
 			end, {
 				sites = { [SITE] = PLACE },
 				furnish = FakeGames.furnish,
@@ -640,9 +650,9 @@ return function(t)
 			t.eq(table.concat(result.failures, "; "), "", "what the wallet check found")
 			t.truthy(result.ok)
 			t.truthy(result.numbers.town, "the minigames' town was checked too")
-			t.eq(result.numbers.pocket, 300)
+			t.eq(result.numbers.pocket, 2500)
 			t.near(result.numbers.passDays, 5)
-			t.eq(result.numbers.cents, 268)
+			t.eq(result.numbers.cents, 2288)
 			-- and PlayBuild runs exactly this (it cannot run here: read that it does)
 			local src = fs.readFile("tests/engine/PlayBuild.luau")
 			t.truthy(string.find(src, 'script.Parent:WaitForChild("WalletFlow")', 1, true))
@@ -697,9 +707,10 @@ return function(t)
 				})
 				local ann, bob, cat = person("Ann", 1), person("Bob", 2), person("Cat", 3)
 				t.eq(roles:onJoin(ann), "possessed")
-				t.eq(ann:GetAttribute("Cents"), 300, "pocket money came with the purse")
+				-- owner D31: S$25.00 of pocket money, wages of dollars
+				t.eq(ann:GetAttribute("Cents"), 2500, "pocket money came with the purse")
 				local purse = roles:member(1).purse
-				t.eq(purse.cents, 300, "the face reads the wallet")
+				t.eq(purse.cents, 2500, "the face reads the wallet")
 				t.eq(#purse.history, 1)
 				-- pocket money is a hand-out: it buys no place in the queue
 				t.eq(purse.counted, 0)
@@ -709,8 +720,8 @@ return function(t)
 					(purse :: any).cents = 999999
 				end)
 				t.falsy(wrote)
-				t.eq(w.wallet.balance(ann), 300)
-				t.eq(ann:GetAttribute("Cents"), 300)
+				t.eq(w.wallet.balance(ann), 2500)
+				t.eq(ann:GetAttribute("Cents"), 2500)
 				roles:onJoin(bob)
 				-- the server is full: the third is turned away before anything is touched, wallet included
 				t.eq(roles:onJoin(cat), "kicked")
@@ -718,18 +729,18 @@ return function(t)
 				t.falsy(w.wallet.bank:has(3))
 				t.eq(cat:GetAttribute("Cents"), nil)
 				-- Ladder pay lands in the wallet under plain words (never "work.completed"), and on the screen
-				roles:report({ kind = "work.completed", player = 1, class = "standard", pay = 6 })
-				t.eq(w.wallet.balance(ann), 306)
-				t.eq(ann:GetAttribute("Cents"), 306)
-				t.eq(ann:GetAttribute("CentsNote"), "2|6|work")
+				roles:report({ kind = "work.completed", player = 1, class = "standard", pay = 600 })
+				t.eq(w.wallet.balance(ann), 3100)
+				t.eq(ann:GetAttribute("Cents"), 3100)
+				t.eq(ann:GetAttribute("CentsNote"), "2|600|work")
 				t.eq(w.wallet.log()[#w.wallet.log()].why, "work")
-				t.eq(WalletHud.changeText(6, "work"), "+6c  work", "what the first wage reads on screen")
-				t.eq(roles:stats(ann).cents, 6, "earnings count")
+				t.eq(WalletHud.changeText(600, "work"), "+S$6.00  work", "what the first wage reads on screen")
+				t.eq(roles:stats(ann).cents, 600, "earnings count")
 				-- shopping with pocket money costs no rank: the queue counts what it counted before
-				t.truthy(w.wallet.spend(ann, 204, "the corner store"))
-				t.eq(roles:stats(ann).cents, 6)
+				t.truthy(w.wallet.spend(ann, 2110, "the corner store"))
+				t.eq(roles:stats(ann).cents, 600)
 				roles:queue("human")
-				t.eq(roles:member(1).stats.cents, 6)
+				t.eq(roles:member(1).stats.cents, 600)
 				t.eq(roles:member(2).stats.cents, 0, "someone who spent nothing is not ahead for it")
 				-- the Role Lab's "cents" is the money the queue counts, and goes through the wallet too
 				local lab = RoleLab.new(roles, {
@@ -737,26 +748,26 @@ return function(t)
 						return true
 					end,
 				})
-				t.truthy((lab:command(ann, "stat", { "cents", 500 })))
-				t.eq(roles:stats(ann).cents, 500)
-				t.eq(w.wallet.balance(ann), 596, "500 that count, and the 96c of pocket money still unspent")
-				t.eq(ann:GetAttribute("Cents"), 596)
-				t.eq(ann:GetAttribute("CentsNote"), "4|494|role lab")
+				t.truthy((lab:command(ann, "stat", { "cents", 5000 })))
+				t.eq(roles:stats(ann).cents, 5000)
+				t.eq(w.wallet.balance(ann), 5390, "5000 that count, and the S$3.90 of pocket money still unspent")
+				t.eq(ann:GetAttribute("Cents"), 5390)
+				t.eq(ann:GetAttribute("CentsNote"), "4|4400|role lab")
 				t.truthy((lab:command(ann, "stat", { "cents", 20 })))
 				t.eq(roles:stats(ann).cents, 20)
-				t.eq(w.wallet.balance(ann), 116)
+				t.eq(w.wallet.balance(ann), 410)
 				t.falsy((lab:command(ann, "stat", { "cents", 2.5 })))
-				t.eq(w.wallet.balance(ann), 116)
+				t.eq(w.wallet.balance(ann), 410)
 				t.eq(roles:stats(ann).cents, 20)
 				-- leaving and coming back: the Ladder's member is new, the money is not, and nothing is added
 				roles:onLeave(ann)
 				w.wallet.leave(ann)
 				t.eq(roles:onJoin(person("Ann", 1)), "possessed")
 				t.eq(roles:stats({ UserId = 1 }).cents, 20)
-				t.eq(w.wallet.balance({ UserId = 1 }), 116)
+				t.eq(w.wallet.balance({ UserId = 1 }), 410)
 				-- asking for a purse opens nothing and gives nothing (the review's case: spend to 0c, leave, then
 				-- wallet.purse(p) must not reopen the account, refill it, or let the absent player spend)
-				t.truthy(w.wallet.spend(bob, 300, "everything"))
+				t.truthy(w.wallet.spend(bob, 2500, "everything"))
 				roles:onLeave(bob)
 				w.wallet.leave(bob)
 				local ghost = w.wallet.purse(bob)
@@ -784,8 +795,8 @@ return function(t)
 				})
 				bare:onJoin(person("Dee", 4))
 				t.eq(bare:member(4).purse.cents, 0)
-				bare:report({ kind = "work.completed", player = 4, class = "standard", pay = 6 })
-				t.eq(bare:stats({ UserId = 4 }).cents, 6, "and its balance is what the queue counts")
+				bare:report({ kind = "work.completed", player = 4, class = "standard", pay = 600 })
+				t.eq(bare:stats({ UserId = 4 }).cents, 600, "and its balance is what the queue counts")
 			end)
 		end
 	)
@@ -797,10 +808,13 @@ return function(t)
 			Rig.play(function(r)
 				local town1 = FakeGames.tables[S.match].ctx.town
 				t.truthy(town1.charge == FakeGames.tables[S.coin].ctx.town.charge, "one town for every Table")
-				t.eq(r.wallet.balance(r.player), 300)
-				t.deepEq({ town1.charge(r.player, 20, "a token") }, { true, "Paid 20c for a token. You have S$2.80." })
-				t.eq(r.player:GetAttribute("Cents"), 280)
-				t.deepEq({ town1.charge(r.player, 500, "the arena") }, { false, "You need S$5.00; you have S$2.80." })
+				t.eq(r.wallet.balance(r.player), 2500) -- owner D31: S$25.00 of pocket money
+				t.deepEq({ town1.charge(r.player, 20, "a token") }, { true, "Paid 20c for a token. You have S$24.80." })
+				t.eq(r.player:GetAttribute("Cents"), 2480)
+				t.deepEq(
+					{ town1.charge(r.player, 5000, "the arena") },
+					{ false, "You need S$50.00; you have S$24.80." }
+				)
 				-- as in the game, nobody gets an account by being charged: a stand-in and a computer are refused,
 				-- and are left with nothing (the old rig joined them and handed them pocket money)
 				local bob = Rig.stub("Bob")
@@ -811,7 +825,7 @@ return function(t)
 				-- a case that wants someone else to pay joins them, as arriving in the game would
 				r.wallet.join(bob)
 				t.truthy(town1.charge(bob, 5, "a token"))
-				t.eq(r.wallet.balance(bob), 295)
+				t.eq(r.wallet.balance(bob), 2495)
 				-- ONE pass: bought through a game's ctx.town.pass (paintball's desk), it opens the lounge door
 				-- (wallet.pass.has) and shows on the screen (PassUntil); bought at a door, the game sees it
 				t.truthy(town1.pass == r.wallet.pass)
@@ -822,16 +836,16 @@ return function(t)
 				)
 				t.truthy(r.wallet.pass.has(r.player), "the lounge door lets them in")
 				t.eq(type(r.player:GetAttribute("PassUntil")), "number", "and the corner shows the pass line")
-				t.eq(r.wallet.balance(r.player), 260)
+				t.eq(r.wallet.balance(r.player), 2280)
 				t.deepEq({ r.wallet.pass.buy(r.player) }, { false, "You already have a pass." })
-				t.eq(r.wallet.balance(r.player), 260, "the lounge door does not sell a second one")
+				t.eq(r.wallet.balance(r.player), 2280, "the lounge door does not sell a second one")
 				t.truthy(r.wallet.pass.buy(bob), "bought at a lounge door")
 				t.truthy(town1.pass.has(bob), "and the arena sees it")
 				-- and sitting down at a game through the framework costs nothing and is not disturbed
 				Rig.press(r, S.coin)
 				Rig.run(r, 0.3)
 				t.eq(r.client.active(), S.coin)
-				t.eq(r.wallet.balance(r.player), 260)
+				t.eq(r.wallet.balance(r.player), 2280)
 				-- and the balance is on screen during the game: the HUD finds the real MinigameUI's scorecard by
 				-- the names it knows and stands above it
 				local hud = WalletHud.start({
@@ -852,7 +866,7 @@ return function(t)
 				t.truthy(top >= 182, `the card's top edge was read ({top})`)
 				t.eq(-stack.Position.Y.Offset, top + WalletHud.GAP)
 				t.truthy(hud.balance.Visible)
-				t.eq(hud.balance.Text, "Wallet  S$2.60")
+				t.eq(hud.balance.Text, "Wallet  S$22.80")
 				hud.stop()
 			end, { sites = { [SITE] = PLACE }, furnish = FakeGames.furnish })
 			-- a case with a charge of its own (a bare test's town) gets the service's stand-in pass, sold through
@@ -866,13 +880,13 @@ return function(t)
 				t.truthy(desk ~= r.wallet.pass)
 				t.falsy(desk.has(r.player))
 				t.deepEq({ desk.buy(r.player) }, { true, "Pass bought: five days of paintball and both lounges." })
-				t.deepEq(charged, { { r.player, 20, "a paintball pass" } })
+				t.deepEq(charged, { { r.player, 200, "a paintball pass" } })
 				t.truthy(desk.has(r.player))
 				t.near(desk.left(r.player), 5)
 				t.deepEq({ desk.buy(r.player) }, { false, "You already have a pass." })
 				t.eq(#charged, 1, "a holder is not charged again")
 				t.deepEq({ desk.offer() }, { r.wallet.pass.offer() })
-				t.eq(r.wallet.balance(r.player), 300, "the rig's wallet was not asked")
+				t.eq(r.wallet.balance(r.player), 2500, "the rig's wallet was not asked")
 				-- a refusal from that charge is passed on in its words
 				local refused = Rig.stub("Ref")
 				refused.broke = true
@@ -971,7 +985,7 @@ return function(t)
 					t.eq(Contract.Rules.passCents, cents, "paintball's contract and the wallet disagree on the price")
 					t.eq(Contract.Rules.passDays, days, "paintball's contract and the wallet disagree on the length")
 					t.truthy(
-						string.find(Contract.textFor("pass"), `{cents}c`, 1, true),
+						string.find(Contract.textFor("pass"), Bank.amount(cents), 1, true),
 						"the arena door's refusal names another price than the wallet charges"
 					)
 					local ada = kit.client("Ada")
@@ -981,17 +995,17 @@ return function(t)
 					t.deepEq({ kit.join(ada, Contract.DESK) }, { false, Contract.textFor("bought") })
 					t.truthy(wallet.pass.has(ada.stub), `a pass bought at the paintball desk opens the lounges: {JOIN}`)
 					t.eq(type(ada.stub.attrs.PassUntil), "number", "and the pass line shows in the corner")
-					t.eq(wallet.balance(ada.stub), 280)
+					t.eq(wallet.balance(ada.stub), 2300) -- owner D31: S$25.00 less a S$2.00 pass
 					t.deepEq({ wallet.pass.buy(ada.stub) }, { false, "You already have a pass." })
 					t.deepEq({ kit.join(ada, Contract.DESK) }, { false, Contract.textFor("has_pass") })
-					t.eq(wallet.balance(ada.stub), 280, "one pass, paid for once")
+					t.eq(wallet.balance(ada.stub), 2300, "one pass, paid for once")
 					-- the reverse: bought at a lounge door, the arena lets them in and its desk sells no second one
 					local bea = kit.client("Beatrice") -- (a stand-in is known by the length of its name: not Ada again)
 					wallet.join(bea.stub)
 					t.truthy(wallet.pass.buy(bea.stub))
 					t.deepEq({ kit.join(bea, Contract.DESK) }, { false, Contract.textFor("has_pass") })
 					t.truthy((kit.join(bea)), "a pass bought at a lounge door opens the arena")
-					t.eq(wallet.balance(bea.stub), 280)
+					t.eq(wallet.balance(bea.stub), 2300)
 				end, { realPass = true })
 			end
 		)
@@ -1071,12 +1085,12 @@ return function(t)
 			t.falsy(hud.note.Visible)
 			t.falsy(hud.pass.Visible)
 			-- the server opens the account: the balance and the pocket money line appear in that frame
-			w.wallet.join(player)
+			w.wallet.join(player) -- owner D31: S$25.00 of pocket money
 			frame()
 			t.truthy(hud.balance.Visible)
-			t.eq(hud.balance.Text, "Wallet  S$3.00")
+			t.eq(hud.balance.Text, "Wallet  S$25.00")
 			t.truthy(hud.note.Visible)
-			t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+			t.eq(hud.note.Text, "Pocket money: S$25.00 to spend")
 			t.falsy(hud.pass.Visible)
 			FakeEngine.runDelayed()
 			t.falsy(hud.note.Visible, "the pocket money line goes after a while")
@@ -1084,7 +1098,7 @@ return function(t)
 			-- a purchase: the new balance, the change and its reason above it, in red
 			t.truthy(w.wallet.spend(player, 12, "coffee"))
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.88")
+			t.eq(hud.balance.Text, "Wallet  S$24.88")
 			t.truthy(hud.note.Visible)
 			t.eq(hud.note.Text, "-12c  coffee")
 			t.eq(hud.note.TextColor3, roblox.Color3.fromRGB(255, 130, 110))
@@ -1092,16 +1106,16 @@ return function(t)
 			-- pay: green
 			t.truthy(w.wallet.add(player, 5, "mowing a lawn"))
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.balance.Text, "Wallet  S$24.93")
 			t.eq(hud.note.Text, "+5c  mowing a lawn")
 			t.eq(hud.note.TextColor3, roblox.Color3.fromRGB(120, 230, 120))
 			FakeEngine.runDelayed()
 			t.falsy(hud.note.Visible)
 			t.eq(hud.balance.TextColor3, roblox.Color3.new(1, 1, 1), "and settles back to white")
 			-- a refusal changes nothing on screen (the shop shows the words itself)
-			t.falsy((w.wallet.spend(player, 999, "a jet ski")))
+			t.falsy((w.wallet.spend(player, 9999, "a jet ski")))
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.balance.Text, "Wallet  S$24.93")
 			t.falsy(hud.note.Visible)
 			-- a purchase that could not be handed over, all in one frame: the balance went down and straight
 			-- back, a client never saw it move, and nothing is said (the shop says why it did not work)
@@ -1109,18 +1123,18 @@ return function(t)
 				return false
 			end)
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.balance.Text, "Wallet  S$24.93")
 			t.falsy(hud.note.Visible, "no '+30c refund' for money that never visibly left")
 			-- and the two changes nobody saw are not counted into the next total: two spends in the next frame
 			-- read "and 1 more", not "and 3 more"
 			w.wallet.spend(player, 1, "bubble gum")
 			w.wallet.spend(player, 2, "a comic")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.90")
+			t.eq(hud.balance.Text, "Wallet  S$24.90")
 			t.eq(hud.note.Text, "-3c  a comic and 1 more")
 			w.wallet.add(player, 3, "a refund at the till")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.balance.Text, "Wallet  S$24.93")
 			FakeEngine.runDelayed()
 			-- the same over two frames (a handing-over that waited): down, then back up with its reason
 			local co = coroutine.create(function()
@@ -1131,11 +1145,11 @@ return function(t)
 			end)
 			coroutine.resume(co)
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.63")
+			t.eq(hud.balance.Text, "Wallet  S$24.63")
 			t.eq(hud.note.Text, "-30c  a kite", "exact, although two changes went unseen before it")
 			coroutine.resume(co)
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.balance.Text, "Wallet  S$24.93")
 			t.eq(hud.note.Text, "+30c  refund: a kite")
 			FakeEngine.runDelayed()
 			-- the review's checkout charging thing by thing: bubbles 3, soda 4 and a kite 60 in one frame. The
@@ -1144,26 +1158,26 @@ return function(t)
 			w.wallet.spend(player, 4, "soda")
 			w.wallet.spend(player, 60, "a kite")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.26")
+			t.eq(hud.balance.Text, "Wallet  S$24.26")
 			t.eq(hud.note.Text, "-67c  a kite and 2 more")
 			-- what the header tells a till to do instead: one purchase, one spend
 			w.wallet.spend(player, 67, "3 things")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$1.59")
+			t.eq(hud.balance.Text, "Wallet  S$23.59")
 			t.eq(hud.note.Text, "-67c  3 things")
 			-- a spend and a pay in one frame: the total, in the colour of where it ended, and no wrong reason
 			w.wallet.spend(player, 12, "coffee")
 			w.wallet.add(player, 5, "a tip")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$1.52")
+			t.eq(hud.balance.Text, "Wallet  S$23.52")
 			t.eq(hud.note.Text, "-7c")
 			t.eq(hud.note.TextColor3, roblox.Color3.fromRGB(255, 130, 110))
 			FakeEngine.runDelayed()
 			-- the pass: a line of its own with the time left, counted down from the day clock once a second
 			t.truthy(w.wallet.pass.buy(player))
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$1.32")
-			t.eq(hud.note.Text, "-20c  a paintball pass")
+			t.eq(hud.balance.Text, "Wallet  S$21.52")
+			t.eq(hud.note.Text, "-S$2.00  a paintball pass")
 			t.truthy(hud.pass.Visible)
 			t.eq(hud.pass.Text, "Pass: 5.0 days (60 min)")
 			w.t += 1.5 * DAY
@@ -1198,7 +1212,7 @@ return function(t)
 			t.eq(heartbeat.count(), 0)
 			w.wallet.spend(player, 1, "bubble gum")
 			frame()
-			t.eq(hud.balance.Text, "Wallet  S$1.12", "nothing redrawn after stop")
+			t.eq(hud.balance.Text, "Wallet  S$19.52", "nothing redrawn after stop")
 		end)
 	end)
 
@@ -1206,7 +1220,7 @@ return function(t)
 		FakeEngine.with(function()
 			FakeEngine.deferAttributes(true)
 			local w = town()
-			-- the review's case: a 12c coffee, leave, rejoin. The old wallet refilled to S$3.00 and the screen
+			-- the review's case: a 12c coffee, leave, rejoin. The old wallet refilled to its S$3.00 and the screen
 			-- read "Pocket money: S$0.12 to spend" over it
 			local first = person("Ann", 11)
 			w.wallet.join(first)
@@ -1222,12 +1236,12 @@ return function(t)
 			})
 			t.eq(w.wallet.join(player), 0)
 			FakeEngine.frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.88")
+			t.eq(hud.balance.Text, "Wallet  S$24.88") -- owner D31: S$25.00 of pocket money
 			t.falsy(hud.note.Visible, "nothing was given: nothing is said")
 			-- and the next change reads exactly, from the count the join handed over
 			w.wallet.spend(player, 5, "nachos")
 			FakeEngine.frame()
-			t.eq(hud.balance.Text, "Wallet  S$2.83")
+			t.eq(hud.balance.Text, "Wallet  S$24.83")
 			t.eq(hud.note.Text, "-5c  nachos")
 			hud.stop()
 		end)
@@ -1252,9 +1266,9 @@ return function(t)
 					return serverTime
 				end)
 				local hud = WalletHud.start()
-				t.eq(hud.balance.Text, "Wallet  S$2.80")
+				t.eq(hud.balance.Text, "Wallet  S$23.00") -- owner D31: S$25.00 less a S$2.00 pass
 				t.truthy(hud.balance.Visible)
-				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				t.eq(hud.note.Text, "Pocket money: S$25.00 to spend")
 				t.truthy(hud.note.Visible)
 				t.truthy(hud.pass.Visible)
 				t.eq(hud.pass.Text, "Pass: 3.0 days (36 min)", "two days into a five-day pass, by the published clock")
@@ -1437,7 +1451,7 @@ return function(t)
 				w.wallet.join(player)
 				FakeEngine.frame()
 				t.falsy(stack.Visible, "under the open menu")
-				t.eq(hud.balance.Text, "Wallet  S$3.00")
+				t.eq(hud.balance.Text, "Wallet  S$25.00") -- owner D31: S$25.00 of pocket money
 				-- 25 seconds of choosing a role: any timer there was has run out
 				for _ = 1, 25 do
 					heartbeat.fire(1)
@@ -1449,7 +1463,7 @@ return function(t)
 				heartbeat.fire(1 / 60)
 				t.truthy(stack.Visible)
 				t.truthy(hud.note.Visible, "the pocket money line, after all")
-				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				t.eq(hud.note.Text, "Pocket money: S$25.00 to spend")
 				t.eq(FakeEngine.delayedCount(), 1, "one timer: the line's own")
 				-- the menu opens again part-way through: said again in full when it shuts
 				menu.Visible = true
@@ -1459,7 +1473,7 @@ return function(t)
 				menu.Visible = false
 				heartbeat.fire(1 / 60)
 				t.truthy(hud.note.Visible)
-				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				t.eq(hud.note.Text, "Pocket money: S$25.00 to spend")
 				-- once it has had its time it is not said again
 				FakeEngine.runDelayed()
 				t.falsy(hud.note.Visible)
@@ -1478,7 +1492,7 @@ return function(t)
 				menu.Visible = false
 				heartbeat.fire(1 / 60)
 				t.falsy(hud.note.Visible)
-				t.eq(hud.balance.Text, "Wallet  S$2.88")
+				t.eq(hud.balance.Text, "Wallet  S$24.88")
 				-- on a wide screen nothing waits: the line is up the moment the money is
 				-- (a new server: a fresh wallet, and a client that has been told nothing yet)
 				hud.stop()
@@ -1494,7 +1508,7 @@ return function(t)
 				FakeEngine.frame()
 				t.truthy(wide.gui:FindFirstChild("Stack").Visible, "room beside the menu")
 				t.truthy(wide.note.Visible)
-				t.eq(wide.note.Text, "Pocket money: S$3.00 to spend")
+				t.eq(wide.note.Text, "Pocket money: S$25.00 to spend")
 				wide.stop()
 			end)
 		end
