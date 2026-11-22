@@ -42,9 +42,9 @@
    "displayName": "SR yard dog bark 2",
    "description": "Spicy Rodent: a friendly medium dog's woof woof, second take (synthesised offline, tools/audio).",
    "sha": "6b492a80e93fc4ec",
-   "assetId": null,
-   "moderation": null,
-   "approved": false
+   "assetId": "100106365730248",
+   "moderation": "Reviewing",
+   "approved": true
   },
   {
    "slot": "bowling_roll",

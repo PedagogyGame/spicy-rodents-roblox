@@ -12,7 +12,7 @@ Every id below was picked by its library title, description and length; **none h
 ## Uploads
 | Month | Uploaded | Notes |
 |---|---|---|
-| 2026-11 | **2** (20 November) | `dog_bark` = 93991496573985 and `bowling_roll` = 108677793120832, heard and approved by the owner ("sounds are good"), uploaded by the lead with `tools/cloud` `upload_asset --type Audio`; moderation Approved (checked 20 November). 2 of the 40 working budget used, 38 left; the owner keeps at least 50 of his 100. |
+| 2026-11 | **3** (20 and 22 November) | `dog_bark` = 93991496573985 and `bowling_roll` = 108677793120832, heard and approved by the owner ("sounds are good"), uploaded by the lead with `tools/cloud` `upload_asset --type Audio`; moderation Approved (checked 20 November). 2 of the 40 working budget used, 38 left; the owner keeps at least 50 of his 100. 22 November: `dog_bark` second take = 100106365730248 (`dog_bark_v2`), heard and approved by the owner ("thats good enough"), uploaded by the lead; the first take 93991496573985 retired. 3 of 40 used, 37 left. |
 
 The upload slots (`src/shared/Audio/Uploads.luau`: the game reads the id from there; empty until uploaded, and the cue is silent until then):
 
