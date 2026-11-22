@@ -3,14 +3,16 @@
 -- The bowler's aiming, as pure state the client feeds with input (Client/Minigames/BowlingClient) so it can be
 -- tested. It aims the way a real bowler does (owner D32: "no way to put any angle or twist ... the aiming
 -- wasn't very good"): where you STAND along the foul line (A / D), the TARGET you roll the ball over at the
--- lane's arrows (the mouse, Left / Right or the gamepad stick move it board by board), and the line through the
--- two is the throw's angle; the HOOK in four notches each way (Z / X, the mouse wheel, LB / RB); and the power
+-- lane's arrows (the mouse, Left / Right or the gamepad stick), and the line through the two is the throw's
+-- angle. A press of a step or aim key moves exactly one board (nudge: a board at the feet is three at the pins,
+-- so the keys must be that fine); held, it carries on smoothly after REPEAT_AFTER; the HOOK in four notches each way (Z / X, the mouse wheel, LB / RB); and the power
 -- meter (hold Space, the mouse button, R2 or A: the needle runs up and back; let go to bowl; the green band is
 -- the clean release, full power is wild). It also owns the words: one HELP card and one status line, so the
 -- screen never says two different things about the keys. A throw the server refuses puts you straight back to
 -- aiming (input is never swallowed).
 -- Pure; Lune-tested (tests/unit/bowling_aim.spec.luau).
--- Interface: new() -> Aim; step(aim, input, dt); hook(aim, dir); charge(aim, down) -> Params? (on let-go);
+-- Interface: new() -> Aim; step(aim, input, dt); nudge(aim, what "stand" | "target", dir) (one board); hook(aim,
+--   dir); charge(aim, down) -> Params? (on let-go);
 --   power(aim) -> 0..1; params(aim) -> Params; angleOf(offset, target) -> radians; sent(aim); refused(aim);
 --   nextBall(aim); canAim(aim) -> bool; preview(aim) -> { { x, d, hooked } }; standX(aim) -> x at the foul
 --   line; targetPoint(aim) -> (x, d) on the arrows; board(x) -> 1..39 (from the right, as a right-hander
@@ -29,6 +31,7 @@ AimModel.MAX_TARGET = AlleyLayout.LANE_W / 2 - AimModel.BOARD / 2 -- the target 
 AimModel.TARGET_RATE = 1.0 -- studs a second on the keys (about ten boards: a tap moves it one or two)
 AimModel.MOUSE_SENS = 0.004 -- studs of target per pixel of mouse travel (250 pixels is a stud: ten boards)
 AimModel.STICK_RATE = 1.6 -- studs a second at full stick
+AimModel.REPEAT_AFTER = 0.3 -- seconds a step or aim key is held before it moves smoothly (a press is one board)
 AimModel.NOTCHES = 4 -- hook notches either side of straight
 AimModel.PREVIEW_D = 42 -- the aim line runs over the arrows and on to where the back end starts to bite: how
 -- far a hook then bends is the bowler's to learn
@@ -46,8 +49,8 @@ AimModel.HELP = {
 		"Straight works too, but only dead on the pocket.",
 	},
 	keys = {
-		"A / D  step left / right along the line",
-		"Mouse or Left / Right arrows  move your target arrow",
+		"A / D  step a board left / right (hold to walk)",
+		"Mouse or Left / Right arrows  move your target arrow (a press: one board)",
 		"Z / X or mouse wheel  hook left / right",
 		"Hold Space or the mouse button  power meter",
 		"Let go in the green band to bowl",
@@ -114,6 +117,20 @@ function AimModel.step(aim: Aim, input: Input, dt: number)
 	if aim.charging then
 		aim.chargeT += dt
 	end
+end
+
+-- One board left (dir < 0) or right: where you stand, or the target.
+function AimModel.nudge(aim: Aim, what: string, dir: number)
+	if aim.phase ~= "aim" then
+		return
+	end
+	local s = if dir < 0 then -1 else 1
+	if what == "stand" then
+		aim.offset = math.clamp(aim.offset + s * AimModel.BOARD / BallPath.releaseX(1), -1, 1)
+	else
+		aim.target = math.clamp(aim.target + s * AimModel.BOARD, -AimModel.MAX_TARGET, AimModel.MAX_TARGET)
+	end
+	aim.angle = AimModel.angleOf(aim.offset, aim.target)
 end
 
 -- One notch of hook left (dir < 0) or right.

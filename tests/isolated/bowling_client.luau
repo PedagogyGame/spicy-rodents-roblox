@@ -155,13 +155,25 @@ return function(t)
 				t.eq(r.ui.clockWarning, nil)
 				-- step right, move the target left, hook
 				key(Key.D, true, true) -- (the control module marks WASD processed: a key still counts)
+				-- (a press is one board at once; held past REPEAT_AFTER it walks smoothly)
+				local standBoard = AimModel.BOARD / (AlleyLayout.LANE_W / 2 - AlleyLayout.BALL_D / 2 - 0.05)
+				t.near(r.bowler.aim.offset, standBoard, 1e-9, "one board at the press")
 				frames(r, 0.5)
 				key(Key.D, false)
-				t.near(r.bowler.aim.offset, 0.5 * AimModel.STEP_RATE, 0.02)
+				t.near(
+					r.bowler.aim.offset,
+					standBoard + (0.5 + 1 / 60 - AimModel.REPEAT_AFTER) * AimModel.STEP_RATE,
+					0.025
+				)
 				key(Key.Left, true)
+				t.near(r.bowler.aim.target, -AimModel.BOARD, 1e-9, "one board at the press")
 				frames(r, 0.5)
 				key(Key.Left, false)
-				t.near(r.bowler.aim.target, -0.5 * AimModel.TARGET_RATE, 0.02)
+				t.near(
+					r.bowler.aim.target,
+					-AimModel.BOARD - (0.5 + 1 / 60 - AimModel.REPEAT_AFTER) * AimModel.TARGET_RATE,
+					0.025
+				)
 				t.near(r.bowler.aim.angle, AimModel.angleOf(r.bowler.aim.offset, r.bowler.aim.target), 1e-9)
 				key(Key.Z, true)
 				key(Key.Z, false)
@@ -412,7 +424,7 @@ return function(t)
 				key(Key.D, true)
 				frames(r, 0.5)
 				key(Key.D, false)
-				t.truthy(r.bowler.aim.offset > 0.4)
+				t.truthy(r.bowler.aim.offset > 0.2)
 				key(Key.Space, true)
 				frames(r, 0.9)
 				key(Key.Space, false)
@@ -484,7 +496,7 @@ return function(t)
 			frames(r2, 0.5)
 			r2.ui.touched.up("right")
 			t.eq(r2.bowler.aim.notch, 1)
-			t.truthy(r2.bowler.aim.offset > 0.4)
+			t.truthy(r2.bowler.aim.offset > 0.2)
 			r2.ui.touched.down("bowl")
 			frames(r2, 1.0)
 			r2.ui.touched.up("bowl")

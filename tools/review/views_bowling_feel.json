@@ -1,0 +1,10 @@
+{
+  "_": "Bowling D32 (owner: room to walk between the lanes; a ball whose spin shows): the aisles between the pairs' settees and a lane ball's finger holes. Local to world: x = 1300 + X, y = 16.5 + Y, z = -420 - D; eye height is the floor + 5.2. Render: lune run tools/bake/attractions.luau, then a scene of the attractions (tools/review/attractions_export.luau on build/Attractions.rbxm) and render.py --views tools/review/views_bowling_feel.json. Committed pictures: docs/renders/bowling_feel/.",
+  "defaults": { "res": "960x540", "samples": 20, "groups": ["attractions"] },
+  "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
+  "views": [
+    {"name": "01_aisle_from_the_concourse", "desc": "Standing on the concourse at the head of the aisle between lanes 4 and 5, looking down it to the approaches: settees either side, the ball returns between each pair's two lanes.", "pos": [1306.2, 21.7, -393], "look": [1306.2, 18.5, -411], "fov": 70},
+    {"name": "02_settees_from_above", "desc": "From up under the ceiling over the concourse: three pairs' settees with an aisle between each, the approaches and the racks beyond.", "pos": [1306.2, 27.6, -386], "look": [1306.2, 16.5, -409], "fov": 78},
+    {"name": "03_ball_holes", "desc": "Lane 1's ball on its rack, close: the thumb and two finger holes that turn with it as it rolls.", "pos": [1288.9, 19.4, -414.0], "look": [1287.6, 18.4, -415.2], "fov": 35}
+  ]
+}

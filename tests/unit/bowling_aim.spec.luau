@@ -43,6 +43,32 @@ return function(t)
 		t.deepEq({ aim.offset, aim.target, aim.angle }, before)
 	end)
 
+	t.test("a press is one board: at the feet and at the target; nothing moves once the ball is away", function()
+		local aim = AimModel.new()
+		local board = AimModel.BOARD
+		AimModel.nudge(aim, "stand", 1)
+		t.near(AimModel.standX(aim), board, 1e-9)
+		t.eq(AimModel.standText(aim), "board 19")
+		AimModel.nudge(aim, "target", -1)
+		AimModel.nudge(aim, "target", -1)
+		t.near(aim.target, -2 * board, 1e-9)
+		t.eq(AimModel.board(aim.target), 22)
+		t.near(aim.angle, AimModel.angleOf(aim.offset, aim.target), 1e-12)
+		-- clamped at the edges
+		for _ = 1, 60 do
+			AimModel.nudge(aim, "stand", -1)
+			AimModel.nudge(aim, "target", 1)
+		end
+		t.eq(aim.offset, -1)
+		t.eq(aim.target, AimModel.MAX_TARGET)
+		AimModel.charge(aim, true)
+		AimModel.charge(aim, false)
+		local was = { aim.offset, aim.target }
+		AimModel.nudge(aim, "stand", 1)
+		AimModel.nudge(aim, "target", -1)
+		t.deepEq({ aim.offset, aim.target }, was)
+	end)
+
 	t.test("the line: where you stand and the arrow you aim at make the angle, as on a real lane", function()
 		-- stand in the middle, aim at the middle arrow: straight down the lane
 		t.eq(AimModel.angleOf(0, 0), 0)

@@ -318,7 +318,7 @@ local function fingerHoles(kit: any, ball: any, x: number, y: number, d: number)
 		local look = Vector3.new(dir.X, dir.Y, -dir.Z)
 		local rot = CFrame.lookAt(Vector3.new(0, 0, 0), look) * CFrame.Angles(0, math.pi / 2, 0)
 		local depth = 0.06
-		local c = r - depth / 2 + 0.008
+		local c = r - depth / 2 + 0.002 -- (its face just proud of the ball)
 		local hole = kit:cyl(
 			ball,
 			if i == 1 then "Thumb" else "Finger",

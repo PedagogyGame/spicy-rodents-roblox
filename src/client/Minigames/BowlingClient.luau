@@ -7,8 +7,9 @@
 -- On your turn your person waits at the back of the approach holding the ball (the server welds it to your
 -- hand), the camera stands behind you, and the aim guide is on the lane: a glowing mark on the foul line where
 -- the ball will leave your hand, a glowing chevron on the target arrow, and a dotted line through both down to
--- where the back end starts to bite (orange where a hook has begun to bend it). A / D step along the foul line;
--- the mouse (or Left / Right, or the gamepad stick) moves the target board by board; Z / X, the mouse wheel or
+-- where the back end starts to bite (orange where a hook has begun to bend it). A / D step along the foul line
+-- and Left / Right move the target, one board a press (held, smoothly); the mouse or the gamepad stick move the
+-- target too; Z / X, the mouse wheel or
 -- LB / RB put hook on; hold Space, the mouse button or R2 to run the power meter and let go: your person walks
 -- four steps, swings the ball back and through, slides and lets go at the line (in the green band the ball goes
 -- exactly where you aimed). Touch players get buttons for all of it. The camera rides behind the ball, cuts to
@@ -70,7 +71,7 @@ function BowlingClient.new(ctx: { [string]: any }): any
 	self.turnLeft = nil :: number?
 	self.turnLeftAt = 0
 	self.mouseDx = 0
-	self.held = {} :: { [string]: boolean }
+	self.held = {} :: { [string]: number } -- step and aim keys down: since when
 	self.dots = {} :: { BasePart }
 	self.dotSig = ""
 	self.conns = {} :: { RBXScriptConnection }
@@ -127,16 +128,44 @@ function BowlingClient.new(ctx: { [string]: any }): any
 				AimModel.hook(self.aim, if id == "hookL" then -1 else 1)
 			end
 		else
-			self.held[id] = true
+			self:_hold(id, true)
 		end
 	end, function(id)
 		if id == "bowl" then
 			self:_charge(false)
 		else
-			self.held[id] = nil
+			self:_hold(id, false)
 		end
 	end)
 	return self
+end
+
+-- the step and aim keys: a press moves one board at once; held, they move smoothly after AimModel.REPEAT_AFTER
+local NUDGE: { [string]: { any } } = {
+	left = { "stand", -1 },
+	right = { "stand", 1 },
+	aimL = { "target", -1 },
+	aimR = { "target", 1 },
+}
+
+function BowlingClient._hold(self: any, id: string, down: boolean)
+	if not down then
+		self.held[id] = nil
+		return
+	end
+	if self.held[id] == nil then
+		self.held[id] = BowlingClient.clock()
+		local n = NUDGE[id]
+		if n and self.canBowl then
+			AimModel.nudge(self.aim, n[1], n[2])
+		end
+	end
+end
+
+-- is this step or aim key held long enough to move smoothly?
+function BowlingClient._repeating(self: any, id: string, now: number): boolean?
+	local since = self.held[id]
+	return if since ~= nil and now - since >= AimModel.REPEAT_AFTER then true else nil
 end
 
 function BowlingClient._key(self: any, io: InputObject, down: boolean)
@@ -147,13 +176,13 @@ function BowlingClient._key(self: any, io: InputObject, down: boolean)
 	if name == "Space" or name == "MouseButton1" or name == "ButtonR2" or name == "ButtonA" then
 		self:_charge(down)
 	elseif name == "A" or name == "DPadLeft" then
-		self.held.left = down or nil
+		self:_hold("left", down)
 	elseif name == "D" or name == "DPadRight" then
-		self.held.right = down or nil
+		self:_hold("right", down)
 	elseif name == "Left" then
-		self.held.aimL = down or nil
+		self:_hold("aimL", down)
 	elseif name == "Right" then
-		self.held.aimR = down or nil
+		self:_hold("aimR", down)
 	elseif down and self.canBowl and (name == "Z" or name == "ButtonL1") then
 		AimModel.hook(self.aim, -1)
 	elseif down and self.canBowl and (name == "X" or name == "ButtonR1") then
@@ -365,10 +394,10 @@ function BowlingClient._frame(self: any, dt: number)
 	local aiming = self.canBowl and aim.phase ~= "watch"
 	if aiming then
 		local input: { [string]: any } = {
-			left = self.held.left,
-			right = self.held.right,
-			aimL = self.held.aimL,
-			aimR = self.held.aimR,
+			left = self:_repeating("left", now),
+			right = self:_repeating("right", now),
+			aimL = self:_repeating("aimL", now),
+			aimR = self:_repeating("aimR", now),
 		}
 		-- the mouse turns the aim by how far it moved (never by where it is, so a fine aim set with the arrow
 		-- keys is not thrown away by a nudge): a locked cursor (first person) reports its travel, a free one
