@@ -114,7 +114,7 @@ HollowLayout.C = {
 	maxSlope = 0.5, -- the steepest the climb rises, studs per stud along it (27 degrees: the old spiral's 0.48)
 	minSlope = 0.2, -- and the shallowest, off the ledges
 	slopeSwing = 0.45, -- the pitch swings this fraction either side of the authored mean
-	crossRise = 1.2, -- studs the root across the hollow rises, all in its middle part (level where it turns at each
+	crossRise = 0.7, -- studs the root across the hollow rises, all in its middle part (level where it turns at each
 	-- end); half a turn either side of it the climb is at its steepest, so the runs over and under it clear it
 	rootRadius = 0.45, -- studs: the root's thickness (a log under the run, its top C.ledgeDrop under the line)
 	passGap = 2.4, -- studs (level) within which one turn of the climb passes over another: a body's half and a ledge
@@ -1516,6 +1516,7 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 			flatLeft = 0
 			if chamberDue then
 				chamberDue = false
+				nodes[#nodes].kind = "flat"
 				table.insert(landingAt, #nodes)
 			end
 		end
