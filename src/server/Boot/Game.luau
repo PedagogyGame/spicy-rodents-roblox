@@ -14,8 +14,8 @@
 --      RoleService (the 49 cap and the Ladder stay in force: a joining player is a townsperson, the
 --      50th is turned away), the device fleet (patrol cars, carts, bikes, the drone).
 --   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Duel(verb) (the rodent's
---      click, "pounce", and F, "feint"), Event (server -> client: picked, refused, bite, bitten, med, hurt, died, kick,
---      duel).
+--      click, "pounce", and F, "feint"), StandUp() (a seated person gets up: World/SeatStand, the lounge's seats
+--      first; owner D32), Event (server -> client: picked, refused, bite, bitten, med, hurt, died, kick, duel).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
 -- people and the player-held squirrels (RunOver kills: "RUN OVER") and the computer's squirrels out on the asphalt
 -- (RunOver knocks one flat: Wildlife/RoadSquirrels), poses stream to clients at 15 Hz
@@ -128,6 +128,8 @@ local OverheadService = require("../Stealth/OverheadService")
 local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../../shared/Speech/SpeechRules"))
 local AreaPace = Import.shared("Speech/AreaPace") :: typeof(require("../../shared/Speech/AreaPace"))
 local LoungeService = require("../Attractions/LoungeService")
+local SeatStand = require("../World/SeatStand")
+local SeatRules = Import.shared("World/SeatRules") :: typeof(require("../../shared/World/SeatRules"))
 local HospitalProps = require("../Hospital/HospitalProps")
 local DoctorService = require("../Hospital/DoctorService")
 local DoctorRules = Import.shared("Hospital/DoctorRules") :: typeof(require("../../shared/Hospital/DoctorRules"))
@@ -549,6 +551,7 @@ function Game.start(opts: Opts?): any
 	local kickRemote = remote(playNet, "Kick")
 	local eventRemote = remote(playNet, "Event")
 	local duelRemote = remote(playNet, "Duel")
+	local standRemote = remote(playNet, SeatRules.REMOTE)
 	local kindsJson: { [string]: any } = {}
 	for id, k in traffic:kinds() do
 		kindsJson[tostring(id)] = k
@@ -2209,8 +2212,26 @@ function Game.start(opts: Opts?): any
 			warn(`[SpicyRodents] duel {verb} failed: {err}`)
 		end
 	end
+	-- a seated person asks to get up (owner D32): the lounge's own seats first (its grace on the seat prompts), then any
+	-- other seat that carries a stand spot (a lawn chair)
+	local standUp = SeatStand.handler({
+		bodyOf = function(player: any): any?
+			local actor = possession:actorOf(player)
+			return if actor then actor.body else nil
+		end,
+		first = function(player: any): boolean
+			return lounge ~= nil and lounge:stand(player)
+		end,
+	})
+	local function onStand(player: any)
+		local ok, err = pcall(standUp, player)
+		if not ok then
+			warn(`[SpicyRodents] stand up failed: {err}`)
+		end
+	end
 	local conns: { RBXScriptConnection } = {}
 	table.insert(conns, pickRemote.OnServerEvent:Connect(onPick))
+	table.insert(conns, standRemote.OnServerEvent:Connect(onStand))
 	table.insert(conns, kickRemote.OnServerEvent:Connect(onKick))
 	table.insert(conns, duelRemote.OnServerEvent:Connect(onDuel))
 	table.insert(

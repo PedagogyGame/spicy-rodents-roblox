@@ -347,6 +347,9 @@ return function(t)
 			["Movement/BodyPin.luau"] = 1,
 			["Rides/SkyLiftService.luau"] = 13,
 			["Wildlife/YardHazards.luau"] = 4,
+			-- (owner D32: a seated person got up reads their root's height to stand them on the floor; people only sit,
+			-- never a squirrel, and the body is put where the seat says in the same thread)
+			["World/SeatStand.luau"] = 1,
 		}
 		local NEEDLES = {
 			"PrimaryPart",

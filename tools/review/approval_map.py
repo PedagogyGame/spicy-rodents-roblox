@@ -405,7 +405,7 @@ def main():
     de.dashed_poly([(rs[0], rs[2]), (rs[1], rs[2]), (rs[1], rs[3]), (rs[0], rs[3])], (40, 40, 40, 255), 2, (5, 4))
     de.text((rs[0] + rs[1]) / 2, rs[2] + 12, "KEPT FOR THE BACKSTAGE (the park keeps it until it arrives)", 11,
             (40, 40, 40), True)
-    for lid, label in [("east_chilis_restaurant", "CHILI PEPPER GRILL"), ("east_fuel_market", "FUEL"), ("east_corner_shops", "CORNER SHOPS")]:
+    for lid, label in [("east_chilis_restaurant", "CHILI PEPPER GRILL"), ("east_fuel_market", "FUEL"), ("east_corner_shops", "ELM ROW OFFICES")]:
         l = next(x for x in data["lots"] if x["id"] == lid)
         de.text(l["x"], l["z"], label, 12, (90, 70, 50), True)
     # scale bars and compasses

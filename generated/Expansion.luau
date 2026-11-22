@@ -13,7 +13,12 @@ return {
 			food = "bar_and_grill",
 			lot = "east_chilis_restaurant",
 		},
-		{ name = "CORNER SHOPS (diner)", enterable = false, food = "diner", lot = "east_corner_shops" },
+		{
+			name = "ELM ROW OFFICES (diner in the food census only)",
+			enterable = false,
+			food = "diner",
+			lot = "east_corner_shops",
+		},
 		{
 			name = "ICE CREAM (standalone)",
 			enterable = false,
@@ -3095,7 +3100,7 @@ return {
 		},
 		{
 			id = "f1_up_corner_shops",
-			name = "CORNER SHOPS",
+			name = "ELM ROW OFFICES",
 			district = "existing",
 			["type"] = "upgrade",
 			facing = "+Z",

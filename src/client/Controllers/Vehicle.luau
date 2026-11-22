@@ -13,8 +13,13 @@
 -- car that pulled up against it, never locks it in; review 2026-11-18).
 -- A shared vehicle that bumps someone (owner D29: the vehicle's BumpAt, Server/Vehicles/RideBumps) loses some of its speed:
 -- the rider feels the bump (afterBump).
+-- A leaning kind (the bike motor: the bike, the moped, the electric scooter) leans about its box's centre, and the box is
+-- lifted by leanLift so its lowest edge never goes into the road (owner D32: "a whole flash of a glitch across the
+-- whole screen" when steering the scooter and the moped: a leaned box's corner was pressed up to 0.15 studs into the
+-- ground every frame of a turn, the physics pushed it back out and rolled it upright between the motor's writes, and
+-- the first-person camera on it shook; Camera/CameraRig keeps its own roll gentle as well).
 -- Interface: start(vehicle, kind, metrics, ctx) -> stop(); ctx = { world, input }; blocked(state, cars, walls) (the motor's
--- wall test); afterBump(speed, seen, stamp) -> (speed, seen)
+-- wall test); afterBump(speed, seen, stamp) -> (speed, seen); leanLift(kind, lean) -> studs (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -62,6 +67,17 @@ function Vehicle.afterBump(speed: number, seen: any, stamp: any): (number, any)
 	return speed, seen
 end
 
+-- leanLift(kind, lean): how far a box leaned by `lean` radians about its centre is lifted so its lowest edge stays on
+-- the ground it stood on upright (0 upright). Pure
+function Vehicle.leanLift(kind: string, lean: number): number
+	if lean == 0 then
+		return 0
+	end
+	local size = VehicleKinds.kind(kind).size
+	local a = math.abs(lean)
+	return math.max(0, size[2] / 2 * math.cos(a) + size[1] / 2 * math.sin(a) - size[2] / 2)
+end
+
 function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
 	local root = vehicle.PrimaryPart
 	if root == nil then
@@ -85,7 +101,9 @@ function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any },
 		CarMotor.step(state, { throttle = f.fw, steer = f.side, handbrake = f.handbrake }, dt, motorWorld)
 		metrics.vehicleSpeed = state.speed
 		local vel = Vector3.new(math.sin(state.yaw) * state.speed, state.vy, math.cos(state.yaw) * state.speed)
-		local tilt = if state.lean ~= 0 then CFrame.Angles(0, 0, state.lean) else nil
+		local tilt = if state.lean ~= 0
+			then CFrame.new(0, Vehicle.leanLift(kind, state.lean), 0) * CFrame.Angles(0, 0, state.lean)
+			else nil
 		return Vector3.new(state.x, state.y, state.z), state.yaw, vel, tilt
 	end)
 end

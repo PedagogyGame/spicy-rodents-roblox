@@ -12,6 +12,7 @@ local Lounge = require("../../tools/bake/lounge_classic/Lounge")
 local Style = require("../../tools/bake/lounge_classic/Style")
 local Data = require("@shared/Data")
 local LoungeArt = require("@shared/Attractions/LoungeArt")
+local LoungeClassic = require("@shared/Attractions/LoungeClassic")
 
 local Vector3 = roblox.Vector3
 
@@ -250,6 +251,19 @@ return function(t)
 			end
 		end
 	)
+
+	-- owner D32 ("sitting down traps you and you can't actually leave"): the server stands a person who gets up at the
+	-- seat's LoungeClassic.standSpot; a body (radius a stud) there is clear of every solid piece of furniture and on the
+	-- floor that is walked to from the door, so getting up never leaves anyone wedged in a booth or behind a chair
+	t.test("D32: every seat's stand spot is clear floor, reached from the door", function()
+		local root, v = bake()
+		local at = flood(root, v, 1.0)
+		for _, st in LoungeClassic.SEATS do
+			local x, d = LoungeClassic.standSpot(st)
+			t.truthy(at(x, d), `{st.id}: its stand spot X {x} D {d} is not reached from the door`)
+			t.truthy(LoungeClassic.inside(x, 0, d), `{st.id}: in the room`)
+		end
+	end)
 
 	t.test("mild: hot drinks and snow cones only; no bottles, taps or cocktail glasses anywhere", function()
 		local root = bake()
