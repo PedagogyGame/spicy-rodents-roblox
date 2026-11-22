@@ -3721,6 +3721,7 @@ return {
 		kinds = {
 			balsam_fir = {
 				art = {
+					assetId = "115547020797616",
 					leaf = { 60, 90, 56 },
 					tris = 3658,
 				},
@@ -3741,6 +3742,7 @@ return {
 			},
 			black_walnut = {
 				art = {
+					assetId = "115327149181307",
 					leaf = { 107, 143, 59 },
 					tris = 5008,
 				},
@@ -3769,6 +3771,7 @@ return {
 			},
 			great_elm = {
 				art = {
+					assetId = "104187875953344",
 					leaf = { 103, 143, 68 },
 					tris = 15206,
 				},
@@ -3810,6 +3813,7 @@ return {
 			},
 			hazel = {
 				art = {
+					assetId = "120666357141153",
 					leaf = { 108, 149, 63 },
 					tris = 1932,
 				},
@@ -3828,6 +3832,7 @@ return {
 			},
 			king_oak = {
 				art = {
+					assetId = "126349488362090",
 					leaf = { 105, 142, 62 },
 					tris = 15234,
 				},
@@ -3862,6 +3867,7 @@ return {
 			},
 			norway_spruce = {
 				art = {
+					assetId = "134963300387789",
 					leaf = { 58, 86, 52 },
 					tris = 4832,
 				},
@@ -3883,6 +3889,7 @@ return {
 			},
 			old_beech = {
 				art = {
+					assetId = "126542543339334",
 					leaf = { 107, 150, 59 },
 					tris = 15207,
 				},
@@ -3908,6 +3915,7 @@ return {
 			},
 			pin_oak = {
 				art = {
+					assetId = "112329730680321",
 					leaf = { 83, 123, 54 },
 					tris = 5000,
 				},
@@ -3928,6 +3936,7 @@ return {
 			},
 			red_pine = {
 				art = {
+					assetId = "95094776320564",
 					leaf = { 68, 102, 52 },
 					tris = 4382,
 				},
@@ -3949,6 +3958,7 @@ return {
 			},
 			shagbark_hickory = {
 				art = {
+					assetId = "133116116990122",
 					leaf = { 98, 136, 57 },
 					tris = 5012,
 				},
@@ -3969,6 +3979,7 @@ return {
 			},
 			sweet_chestnut = {
 				art = {
+					assetId = "129664441980943",
 					leaf = { 91, 132, 54 },
 					tris = 5011,
 				},
@@ -3989,6 +4000,7 @@ return {
 			},
 			white_oak = {
 				art = {
+					assetId = "137637976933880",
 					leaf = { 96, 136, 55 },
 					tris = 5000,
 				},
@@ -4009,6 +4021,7 @@ return {
 			},
 			white_pine = {
 				art = {
+					assetId = "124906492197387",
 					leaf = { 78, 116, 76 },
 					tris = 4896,
 				},

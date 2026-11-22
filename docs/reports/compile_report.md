@@ -1,6 +1,6 @@
 # Compile report: authored data -> `generated/`
 
-Generated 2026-11-22T22:04:42.650996931+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
+Generated 2026-11-22T22:20:10.187982694+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
 
 ## Inputs
 
@@ -142,43 +142,43 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 
 | module | records | bytes | require (ms, Lune) | source |
 |---|---|---|---|---|
-| Lots | 243 | 190558 | 8.6 | data/authored/town/lots/*.json |
-| Roads | 116 | 44060 | 2.3 | data/authored/town/roads.json |
-| Lanes | 25 | 18253 | 1.7 | data/authored/town/lanes.json |
-| Cast | 87 | 71807 | 2.4 | data/authored/cast/cast.json |
+| Lots | 243 | 190558 | 6.9 | data/authored/town/lots/*.json |
+| Roads | 116 | 44060 | 2.0 | data/authored/town/roads.json |
+| Lanes | 25 | 18253 | 1.4 | data/authored/town/lanes.json |
+| Cast | 87 | 71807 | 2.0 | data/authored/cast/cast.json |
 | RoutesCatalog | 60 | 41830 | 1.7 | data/authored/routes/catalog.json |
-| Wildlife | 95 | 61201 | 5.1 | data/authored/wildlife/*.json |
-| Routes_01 | 391 | 204760 | 13.8 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_02 | 447 | 204694 | 11.6 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_03 | 413 | 205046 | 9.2 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Wildlife | 95 | 61201 | 4.2 | data/authored/wildlife/*.json |
+| Routes_01 | 391 | 204760 | 11.0 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_02 | 447 | 204694 | 12.6 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_03 | 413 | 205046 | 14.5 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
 | Routes_04 | 81 | 36112 | 2.0 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Forks | 95 | 193316 | 8.1 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| LotTypes | 0 | 23067 | 1.5 | data/authored/lot_types.json |
+| Forks | 95 | 193316 | 9.5 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| LotTypes | 0 | 23067 | 1.6 | data/authored/lot_types.json |
 | Interiors | 0 | 11610 | 1.0 | data/interiors/*.json |
 | Buildings | 0 | 6132 | 0.7 | data/buildings/*.json |
-| HarvestPatches | 0 | 12240 | 0.6 | data/harvest_patches.json |
+| HarvestPatches | 0 | 12240 | 0.5 | data/harvest_patches.json |
 | Population | 0 | 3471 | 0.5 | data/population.json |
 | Hollows | 0 | 8052 | 0.8 | data/hollows.json |
 | TerrainExtensions | 0 | 2379 | 0.0 | data/terrain_extensions.json |
-| Lighting | 0 | 1163 | 0.5 | data/authored/town/lighting.json |
-| Attractions | 33 | 60360 | 2.7 | data/attractions.json |
+| Lighting | 0 | 1163 | 0.4 | data/authored/town/lighting.json |
+| Attractions | 33 | 60360 | 2.8 | data/attractions.json |
 | Sewers | 6 | 46279 | 3.4 | data/sewers.json |
 | Expansion | 47 | 144240 | 0.1 | data/expansion.json |
-| HollowTrees | 24 | 178363 | 11.6 | data/hollows.json |
-| TreeArt | 98 | 182486 | 7.6 | data/art/tree_meshes.json |
+| HollowTrees | 24 | 178363 | 13.9 | data/hollows.json |
+| TreeArt | 98 | 182486 | 8.5 | data/art/tree_meshes.json |
 | TreeArtNext | 98 | 16975 | 1.5 | data/art/trees_v2.json |
-| TreeShapes | 84 | 131757 | 7.1 | data/tree_shapes.json |
-| LampPosts | 308 | 220985 | 10.1 | data/lamp_posts.json |
-| BranchNooks | 1623 | 404889 | 28.9 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) |
-| BranchNookRoutes_01 | 527 | 205002 | 10.2 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 1 of 4) |
-| BranchNookRoutes_02 | 519 | 205316 | 10.1 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 2 of 4) |
-| BranchNookRoutes_03 | 516 | 205145 | 10.4 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 3 of 4) |
-| BranchNookRoutes_04 | 61 | 24885 | 1.5 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 4 of 4) |
-| ShopArt | 445 | 68298 | 4.8 | data/art/neighbourhood_shop.json |
-| PinballArt | 107 | 26856 | 2.0 | data/art/pinball.json |
+| TreeShapes | 84 | 132198 | 8.6 | data/tree_shapes.json |
+| LampPosts | 308 | 220985 | 11.9 | data/lamp_posts.json |
+| BranchNooks | 1623 | 404889 | 39.6 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) |
+| BranchNookRoutes_01 | 527 | 205002 | 12.0 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 1 of 4) |
+| BranchNookRoutes_02 | 519 | 205316 | 11.6 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 2 of 4) |
+| BranchNookRoutes_03 | 516 | 205145 | 11.2 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 3 of 4) |
+| BranchNookRoutes_04 | 61 | 24885 | 1.6 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 4 of 4) |
+| ShopArt | 445 | 68298 | 4.5 | data/art/neighbourhood_shop.json |
+| PinballArt | 107 | 26856 | 1.9 | data/art/pinball.json |
 | Index | 1 | 2385 | 0.1 | tools/compile (module list, counts and the harvest pin) |
 
-Total 35 files, 3463972 bytes; largest BranchNooks (404889 bytes, 28.9 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
+Total 35 files, 3464413 bytes; largest BranchNooks (404889 bytes, 39.6 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
 
 ## Notes for the lead
 
