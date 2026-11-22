@@ -1,0 +1,2371 @@
+{
+  "$schema": "lamp posts v1 (Shared/World/LampPosts: its header is the format)",
+  "src": "BRIEF_ADDENDUM D35 (owner, 2026-11-22): 'make all trees climbable, and even all light posts'. Written by tools/bake/lamp_posts.luau from the baked models (do not edit by hand: re-run it after a bake that moves a lamp). Studs, world space. Owner sheet: docs/owner/CLIMB_POSTS_CHECK.md.",
+  "idBase": 20001,
+  "posts": [
+    {
+      "id": "town:detail_36_porch_light",
+      "source": "town",
+      "path": "Town/Lots/detail_36_porch_light/Greybox",
+      "ground": 0.532,
+      "radius": 0.15,
+      "top": 5.332,
+      "x": 147.5,
+      "z": 507.5
+    },
+    {
+      "id": "town:detail_37_porch_light",
+      "source": "town",
+      "path": "Town/Lots/detail_37_porch_light/Greybox",
+      "ground": 15.025,
+      "radius": 0.15,
+      "top": 19.825,
+      "x": -572.5,
+      "z": -212.5
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_L11",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 3.762,
+      "radius": 0.42,
+      "top": 18.762,
+      "x": -24.312,
+      "z": -629.125
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_L12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_L12",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 4.044,
+      "radius": 0.42,
+      "top": 19.044,
+      "x": -24.312,
+      "z": -534.375
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_L31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_L31",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": -24.312,
+      "z": 94.25
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_L32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_L32",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6,
+        "run": 3.8
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": -24.312,
+      "z": 218.75
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_L33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_L33",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 1.767,
+      "radius": 0.42,
+      "top": 16.767,
+      "x": -24.312,
+      "z": 333.25
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_R21",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 1.528,
+      "radius": 0.42,
+      "top": 16.528,
+      "x": 24.313,
+      "z": -339.5
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_R22",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6,
+        "run": 3.8
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": 24.313,
+      "z": -217.5
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_R23",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": 24.313,
+      "z": -95.5
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_R41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_R41",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 8.633,
+      "radius": 0.42,
+      "top": 23.633,
+      "x": 24.313,
+      "z": 516.938
+    },
+    {
+      "id": "town:rd_001_grid_ns_x0_R42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_001_grid_ns_x0/Post_rd_001_grid_ns_x0_R42",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 12.736,
+      "radius": 0.42,
+      "top": 27.736,
+      "x": 24.313,
+      "z": 631.813
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_L21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_L21",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 10.888,
+      "radius": 0.42,
+      "top": 25.888,
+      "x": -474.312,
+      "z": -339.5
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_L22",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 7.717,
+      "radius": 0.42,
+      "top": 22.717,
+      "x": -474.312,
+      "z": -217.5
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_L23",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 5.849,
+      "radius": 0.42,
+      "top": 20.849,
+      "x": -474.312,
+      "z": -95.5
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_L41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_L41",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 13.292,
+      "radius": 0.42,
+      "top": 28.292,
+      "x": -474.312,
+      "z": 516.938
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_L42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_L42",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 17.166,
+      "radius": 0.42,
+      "top": 32.166,
+      "x": -474.312,
+      "z": 626.813
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_R11",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 5.945,
+      "radius": 0.42,
+      "top": 20.945,
+      "x": -425.687,
+      "z": -661.5
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_R12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_R12",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 7.799,
+      "radius": 0.42,
+      "top": 22.799,
+      "x": -425.687,
+      "z": -533.5
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_R31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_R31",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 2.279,
+      "radius": 0.42,
+      "top": 17.279,
+      "x": -425.687,
+      "z": 94.25
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_R32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_R32",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.305,
+      "radius": 0.42,
+      "top": 15.305,
+      "x": -425.687,
+      "z": 218.75
+    },
+    {
+      "id": "town:rd_004_grid_ns_x-180_R33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_004_grid_ns_x-180/Post_rd_004_grid_ns_x-180_R33",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.217,
+      "radius": 0.42,
+      "top": 15.217,
+      "x": -425.687,
+      "z": 343.25
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_L11",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.097,
+      "radius": 0.42,
+      "top": 33.097,
+      "x": 420.688,
+      "z": -661.5
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_L12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_L12",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 20.654,
+      "radius": 0.42,
+      "top": 35.654,
+      "x": 420.688,
+      "z": -533.5
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_L31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_L31",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 8.237,
+      "radius": 0.42,
+      "top": 23.237,
+      "x": 420.688,
+      "z": 94.25
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_L32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_L32",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 6.181,
+      "radius": 0.42,
+      "top": 21.181,
+      "x": 420.688,
+      "z": 218.75
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_L33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_L33",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 1.91,
+      "radius": 0.42,
+      "top": 16.91,
+      "x": 420.688,
+      "z": 333.25
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_R21",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 8.015,
+      "radius": 0.42,
+      "top": 23.015,
+      "x": 469.313,
+      "z": -339.5
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_R22",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.249,
+      "radius": 0.42,
+      "top": 15.249,
+      "x": 469.313,
+      "z": -217.5
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_R23",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.249,
+      "radius": 0.42,
+      "top": 15.249,
+      "x": 469.313,
+      "z": -95.5
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_R41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_R41",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 3.028,
+      "radius": 0.42,
+      "top": 18.028,
+      "x": 469.313,
+      "z": 508.75
+    },
+    {
+      "id": "town:rd_007_grid_ns_x178_R42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_007_grid_ns_x178/Post_rd_007_grid_ns_x178_R42",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 5.823,
+      "radius": 0.42,
+      "top": 20.823,
+      "x": 469.313,
+      "z": 617.25
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_L21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_L21",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 2.741,
+      "radius": 0.42,
+      "top": 17.741,
+      "x": -362.875,
+      "z": -24.312
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_L22",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 0.071,
+      "radius": 0.42,
+      "top": 15.071,
+      "x": -272.625,
+      "z": -24.312
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_L23",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": -177.375,
+      "z": -24.312
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_L24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_L24",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": -82.125,
+      "z": -24.312
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_L41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_L41",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 1.386,
+      "radius": 0.42,
+      "top": 16.386,
+      "x": 531.875,
+      "z": -24.312
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R11",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.328,
+      "radius": 0.42,
+      "top": 15.328,
+      "x": -639.937,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R12",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 2.04,
+      "radius": 0.42,
+      "top": 17.04,
+      "x": -536.312,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R31",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": 81.5,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R32",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0,
+      "radius": 0.42,
+      "top": 15,
+      "x": 175.5,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R33",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.14,
+      "radius": 0.42,
+      "top": 15.14,
+      "x": 274.5,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_010_grid_ew_z0_R34",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_010_grid_ew_z0/Post_rd_010_grid_ew_z0_R34",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 4.118,
+      "radius": 0.42,
+      "top": 19.118,
+      "x": 363.5,
+      "z": 24.313
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L11",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6,
+        "run": 3.3
+      },
+      "ground": 12.555,
+      "radius": 0.42,
+      "top": 27.555,
+      "x": -622.875,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L12",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6,
+        "run": 3.3
+      },
+      "ground": 12.678,
+      "radius": 0.42,
+      "top": 27.678,
+      "x": -530.625,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L31",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.405,
+      "radius": 0.42,
+      "top": 23.405,
+      "x": 81.5,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L32",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.956,
+      "radius": 0.42,
+      "top": 23.956,
+      "x": 175.5,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L33",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 10.865,
+      "radius": 0.42,
+      "top": 25.865,
+      "x": 269.5,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_L34",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_L34",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 15.563,
+      "radius": 0.42,
+      "top": 30.563,
+      "x": 363.5,
+      "z": -459.312
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R21",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 3.781,
+      "radius": 0.42,
+      "top": 18.781,
+      "x": -367.875,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R22",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.196,
+      "radius": 0.42,
+      "top": 15.196,
+      "x": -272.625,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R23",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.196,
+      "radius": 0.42,
+      "top": 15.196,
+      "x": -177.375,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R24",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.196,
+      "radius": 0.42,
+      "top": 15.196,
+      "x": -82.125,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R41",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 13.259,
+      "radius": 0.42,
+      "top": 28.259,
+      "x": 526.875,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_013_grid_ew_z-174_R42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_013_grid_ew_z-174/Post_rd_013_grid_ew_z-174_R42",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 7.76,
+      "radius": 0.42,
+      "top": 22.76,
+      "x": 626.625,
+      "z": -410.687
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_L22",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.706,
+      "radius": 0.42,
+      "top": 23.706,
+      "x": -272.625,
+      "z": 403.188
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_L23",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 9.738,
+      "radius": 0.42,
+      "top": 24.738,
+      "x": -177.375,
+      "z": 403.188
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_L24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_L24",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 6.93,
+      "radius": 0.42,
+      "top": 21.93,
+      "x": -82.125,
+      "z": 403.188
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_L41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_L41",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 4.696,
+      "radius": 0.42,
+      "top": 19.696,
+      "x": 526.875,
+      "z": 403.188
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_L42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_L42",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 13.492,
+      "radius": 0.42,
+      "top": 28.492,
+      "x": 626.625,
+      "z": 403.188
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R11",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 8.28,
+      "radius": 0.42,
+      "top": 23.28,
+      "x": -639.937,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R12",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 7.514,
+      "radius": 0.42,
+      "top": 22.514,
+      "x": -536.312,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R31",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 3.287,
+      "radius": 0.42,
+      "top": 18.287,
+      "x": 81.5,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R32",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.895,
+      "radius": 0.42,
+      "top": 15.895,
+      "x": 175.5,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R33",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.242,
+      "radius": 0.42,
+      "top": 15.242,
+      "x": 269.5,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_016_grid_ew_z171_R34",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_016_grid_ew_z171/Post_rd_016_grid_ew_z171_R34",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 0.242,
+      "radius": 0.42,
+      "top": 15.242,
+      "x": 363.5,
+      "z": 451.813
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_L11",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 0.25,
+      "radius": 0.42,
+      "top": 15.25,
+      "x": 672.438,
+      "z": -35.937
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_L12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_L12",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 0.25,
+      "radius": 0.42,
+      "top": 15.25,
+      "x": 755.313,
+      "z": -35.937
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R21",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 12.344,
+      "radius": 0.42,
+      "top": 27.344,
+      "x": 971.518,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R22",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 9.909,
+      "radius": 0.42,
+      "top": 24.909,
+      "x": 1063.054,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R23",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 5.471,
+      "radius": 0.42,
+      "top": 20.471,
+      "x": 1194.589,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R24",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 6.992,
+      "radius": 0.42,
+      "top": 21.992,
+      "x": 1306.125,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R25",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R25",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 8.065,
+      "radius": 0.42,
+      "top": 23.065,
+      "x": 1397.661,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R26",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R26",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 4.686,
+      "radius": 0.42,
+      "top": 19.686,
+      "x": 1529.196,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_019_commercial_blvd_R27",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_019_commercial_blvd/Post_rd_019_commercial_blvd_R27",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 4.828,
+      "radius": 0.42,
+      "top": 19.828,
+      "x": 1640.732,
+      "z": 35.938
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_L21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_L21",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 8.172,
+      "radius": 0.42,
+      "top": 23.172,
+      "x": 829.625,
+      "z": 94.2
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_L22",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 13.135,
+      "radius": 0.42,
+      "top": 28.135,
+      "x": 829.625,
+      "z": 183.6
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_L23",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.366,
+      "radius": 0.42,
+      "top": 33.366,
+      "x": 829.625,
+      "z": 293
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_L24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_L24",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 20.029,
+      "radius": 0.42,
+      "top": 35.029,
+      "x": 829.625,
+      "z": 392.4
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_L25",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_L25",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.023,
+      "radius": 0.42,
+      "top": 33.023,
+      "x": 829.625,
+      "z": 491.8
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_R11",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 10.353,
+      "radius": 0.42,
+      "top": 25.353,
+      "x": 905.375,
+      "z": -482.8
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_R12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_R12",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 12.011,
+      "radius": 0.42,
+      "top": 27.011,
+      "x": 905.375,
+      "z": -385.4
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_R13",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_R13",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 9.091,
+      "radius": 0.42,
+      "top": 24.091,
+      "x": 905.375,
+      "z": -288
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_R14",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_R14",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 6.023,
+      "radius": 0.42,
+      "top": 21.023,
+      "x": 905.375,
+      "z": -190.6
+    },
+    {
+      "id": "town:rd_022_commercial_cross_x347_R15",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_022_commercial_cross_x347/Post_rd_022_commercial_cross_x347_R15",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 6.304,
+      "radius": 0.42,
+      "top": 21.304,
+      "x": 905.375,
+      "z": -93.2
+    },
+    {
+      "id": "town:rd_030_quay_approach_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_030_quay_approach/Post_rd_030_quay_approach_L11",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 9.358,
+      "radius": 0.42,
+      "top": 24.358,
+      "x": 1706.75,
+      "z": -22.2
+    },
+    {
+      "id": "town:rd_030_quay_approach_L12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_030_quay_approach/Post_rd_030_quay_approach_L12",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 18.622,
+      "radius": 0.42,
+      "top": 33.622,
+      "x": 1798.25,
+      "z": -22.2
+    },
+    {
+      "id": "town:rd_033_stone_bridge_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_033_stone_bridge/Post_rd_033_stone_bridge_R11",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 30.029,
+      "radius": 0.42,
+      "top": 45.029,
+      "x": 1917.8,
+      "z": 17.5
+    },
+    {
+      "id": "town:rd_033_stone_bridge_R12",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_033_stone_bridge/Post_rd_033_stone_bridge_R12",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 39.725,
+      "radius": 0.42,
+      "top": 54.725,
+      "x": 2021.4,
+      "z": 17.5
+    },
+    {
+      "id": "town:rd_033_stone_bridge_R13",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_033_stone_bridge/Post_rd_033_stone_bridge_R13",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 39.725,
+      "radius": 0.42,
+      "top": 54.725,
+      "x": 2125,
+      "z": 17.5
+    },
+    {
+      "id": "town:rd_033_stone_bridge_R14",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_033_stone_bridge/Post_rd_033_stone_bridge_R14",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 39.725,
+      "radius": 0.42,
+      "top": 54.725,
+      "x": 2228.6,
+      "z": 17.5
+    },
+    {
+      "id": "town:rd_033_stone_bridge_R15",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_033_stone_bridge/Post_rd_033_stone_bridge_R15",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 30.029,
+      "radius": 0.42,
+      "top": 45.029,
+      "x": 2332.2,
+      "z": 17.5
+    },
+    {
+      "id": "town:rd_034_estate_connector_x0_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_034_estate_connector_x0/Post_rd_034_estate_connector_x0_L11",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 3.849,
+      "radius": 0.42,
+      "top": 18.849,
+      "x": -24.312,
+      "z": -694.5
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L21",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 12.893,
+      "radius": 0.42,
+      "top": 27.893,
+      "x": -367.875,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L22",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 14.432,
+      "radius": 0.42,
+      "top": 29.432,
+      "x": -272.625,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L23",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 12.612,
+      "radius": 0.42,
+      "top": 27.612,
+      "x": -177.375,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L24",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 7.647,
+      "radius": 0.42,
+      "top": 22.647,
+      "x": -82.125,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L41",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 10.117,
+      "radius": 0.42,
+      "top": 25.117,
+      "x": 519.375,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_L42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_L42",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 9.785,
+      "radius": 0.42,
+      "top": 24.785,
+      "x": 599.125,
+      "z": -798.725
+    },
+    {
+      "id": "town:rd_037_estate_avenue_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_R11",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 10.464,
+      "radius": 0.42,
+      "top": 25.464,
+      "x": -546.75,
+      "z": -726.275
+    },
+    {
+      "id": "town:rd_037_estate_avenue_R31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_R31",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 7.5,
+      "radius": 0.42,
+      "top": 22.5,
+      "x": 81.5,
+      "z": -726.275
+    },
+    {
+      "id": "town:rd_037_estate_avenue_R32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_R32",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 15.147,
+      "radius": 0.42,
+      "top": 30.147,
+      "x": 175.5,
+      "z": -726.275
+    },
+    {
+      "id": "town:rd_037_estate_avenue_R33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_R33",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 19.804,
+      "radius": 0.42,
+      "top": 34.804,
+      "x": 269.5,
+      "z": -726.275
+    },
+    {
+      "id": "town:rd_037_estate_avenue_R34",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_037_estate_avenue/Post_rd_037_estate_avenue_R34",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.6
+      },
+      "ground": 17.988,
+      "radius": 0.42,
+      "top": 32.989,
+      "x": 363.5,
+      "z": -726.275
+    },
+    {
+      "id": "town:rd_046_north_access_x175_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_046_north_access_x175/Post_rd_046_north_access_x175_R21",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 8.429,
+      "radius": 0.42,
+      "top": 23.429,
+      "x": 456.063,
+      "z": 785.875
+    },
+    {
+      "id": "town:rd_046_north_access_x175_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_046_north_access_x175/Post_rd_046_north_access_x175_R22",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 12.504,
+      "radius": 0.42,
+      "top": 27.504,
+      "x": 456.063,
+      "z": 891.125
+    },
+    {
+      "id": "town:rd_046_north_access_x175_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_046_north_access_x175/Post_rd_046_north_access_x175_R23",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.181,
+      "radius": 0.42,
+      "top": 33.181,
+      "x": 456.063,
+      "z": 996.375
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L21",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 19.447,
+      "radius": 0.42,
+      "top": 34.447,
+      "x": -367.875,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L22",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 18.662,
+      "radius": 0.42,
+      "top": 33.662,
+      "x": -272.625,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L23",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 17.154,
+      "radius": 0.42,
+      "top": 32.154,
+      "x": -177.375,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L24",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 16.03,
+      "radius": 0.42,
+      "top": 31.03,
+      "x": -82.125,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L41",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.196,
+      "radius": 0.42,
+      "top": 23.196,
+      "x": 517.688,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L410",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L410",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 16.064,
+      "radius": 0.42,
+      "top": 31.064,
+      "x": 1463.813,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L411",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L411",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 17.061,
+      "radius": 0.42,
+      "top": 32.061,
+      "x": 1568.938,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L42",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.113,
+      "radius": 0.42,
+      "top": 23.113,
+      "x": 622.813,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L43",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L43",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 7.724,
+      "radius": 0.42,
+      "top": 22.724,
+      "x": 727.938,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L44",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L44",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 9.018,
+      "radius": 0.42,
+      "top": 24.018,
+      "x": 833.063,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L45",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L45",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 8.759,
+      "radius": 0.42,
+      "top": 23.759,
+      "x": 938.188,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L46",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L46",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 4.867,
+      "radius": 0.42,
+      "top": 19.867,
+      "x": 1043.313,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L47",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L47",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 1.759,
+      "radius": 0.42,
+      "top": 16.759,
+      "x": 1148.438,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L48",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L48",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 4.593,
+      "radius": 0.42,
+      "top": 19.593,
+      "x": 1253.563,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_049_north_cross_z283_L49",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_049_north_cross_z283/Post_rd_049_north_cross_z283_L49",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 11.403,
+      "radius": 0.42,
+      "top": 26.403,
+      "x": 1358.688,
+      "z": 690.438
+    },
+    {
+      "id": "town:rd_065_hospital_road_z283_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_065_hospital_road_z283/Post_rd_065_hospital_road_z283_L11",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 3.858,
+      "radius": 0.42,
+      "top": 18.858,
+      "x": -974.25,
+      "z": 689.813
+    },
+    {
+      "id": "town:rd_065_hospital_road_z283_L31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_065_hospital_road_z283/Post_rd_065_hospital_road_z283_L31",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.6
+      },
+      "ground": 2.129,
+      "radius": 0.42,
+      "top": 17.129,
+      "x": -646.375,
+      "z": 689.813
+    },
+    {
+      "id": "town:rd_068_hospital_drive_R11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_068_hospital_drive/Post_rd_068_hospital_drive_R11",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.25,
+      "radius": 0.42,
+      "top": 15.25,
+      "x": -877.937,
+      "z": 740.5
+    },
+    {
+      "id": "town:rd_071_westside_street_L11",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_L11",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 11.783,
+      "radius": 0.42,
+      "top": 26.783,
+      "x": -742.812,
+      "z": -539.25
+    },
+    {
+      "id": "town:rd_071_westside_street_L31",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_L31",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 2.998,
+      "radius": 0.42,
+      "top": 17.998,
+      "x": -742.812,
+      "z": 94.25
+    },
+    {
+      "id": "town:rd_071_westside_street_L32",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_L32",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 6.667,
+      "radius": 0.42,
+      "top": 21.667,
+      "x": -742.812,
+      "z": 223.75
+    },
+    {
+      "id": "town:rd_071_westside_street_L33",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_L33",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 10.653,
+      "radius": 0.42,
+      "top": 25.653,
+      "x": -742.812,
+      "z": 333.25
+    },
+    {
+      "id": "town:rd_071_westside_street_R21",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R21",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.356,
+      "radius": 0.42,
+      "top": 33.356,
+      "x": -702.187,
+      "z": -372.25
+    },
+    {
+      "id": "town:rd_071_westside_street_R22",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R22",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 21.585,
+      "radius": 0.42,
+      "top": 36.585,
+      "x": -702.187,
+      "z": -275.75
+    },
+    {
+      "id": "town:rd_071_westside_street_R23",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R23",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 18.986,
+      "radius": 0.42,
+      "top": 33.986,
+      "x": -702.187,
+      "z": -179.25
+    },
+    {
+      "id": "town:rd_071_westside_street_R24",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R24",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 10.942,
+      "radius": 0.42,
+      "top": 25.942,
+      "x": -702.187,
+      "z": -82.75
+    },
+    {
+      "id": "town:rd_071_westside_street_R41",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R41",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 5.924,
+      "radius": 0.42,
+      "top": 20.924,
+      "x": -702.187,
+      "z": 516.625
+    },
+    {
+      "id": "town:rd_071_westside_street_R42",
+      "source": "town",
+      "path": "Town/Lamps/Lamps_rd_071_westside_street/Post_rd_071_westside_street_R42",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.6
+      },
+      "ground": 0.955,
+      "radius": 0.42,
+      "top": 15.955,
+      "x": -702.187,
+      "z": 625.875
+    },
+    {
+      "id": "attractions:Forecourt_LampPost1",
+      "source": "attractions",
+      "path": "Attractions/BowlingAlley/Forecourt/LampPost",
+      "ground": 15.5,
+      "radius": 0.175,
+      "top": 24.7,
+      "x": 1313.8,
+      "z": -339.5
+    },
+    {
+      "id": "attractions:Forecourt_LampPost2",
+      "source": "attractions",
+      "path": "Attractions/BowlingAlley/Forecourt/LampPost",
+      "ground": 15.5,
+      "radius": 0.175,
+      "top": 24.7,
+      "x": 1330.2,
+      "z": -339.5
+    },
+    {
+      "id": "attractions:xs_chapel_st_L11",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L11",
+      "ground": 7.676,
+      "radius": 0.42,
+      "top": 22.676,
+      "x": 702.344,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L110",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L110",
+      "ground": 19.445,
+      "radius": 0.42,
+      "top": 34.445,
+      "x": 1626.531,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L111",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L111",
+      "ground": 13.738,
+      "radius": 0.42,
+      "top": 28.738,
+      "x": 1729.219,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L112",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L112",
+      "ground": 6.314,
+      "radius": 0.42,
+      "top": 21.314,
+      "x": 1831.906,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L113",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L113",
+      "ground": 4.427,
+      "radius": 0.42,
+      "top": 19.427,
+      "x": 1934.594,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L114",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L114",
+      "ground": 7.599,
+      "radius": 0.42,
+      "top": 22.599,
+      "x": 2037.281,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L115",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L115",
+      "ground": 9.439,
+      "radius": 0.42,
+      "top": 24.439,
+      "x": 2139.969,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L116",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L116",
+      "ground": 8.008,
+      "radius": 0.42,
+      "top": 23.008,
+      "x": 2242.656,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L12",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L12",
+      "ground": 1.166,
+      "radius": 0.42,
+      "top": 16.166,
+      "x": 805.031,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L13",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L13",
+      "ground": 0.25,
+      "radius": 0.42,
+      "top": 15.25,
+      "x": 907.719,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L14",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L14",
+      "ground": 0.25,
+      "radius": 0.42,
+      "top": 15.25,
+      "x": 1010.406,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L15",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L15",
+      "ground": 4.123,
+      "radius": 0.42,
+      "top": 19.123,
+      "x": 1113.094,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L16",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L16",
+      "ground": 10.289,
+      "radius": 0.42,
+      "top": 25.289,
+      "x": 1215.781,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L17",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L17",
+      "ground": 12.426,
+      "radius": 0.42,
+      "top": 27.426,
+      "x": 1318.469,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L18",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L18",
+      "ground": 14.577,
+      "radius": 0.42,
+      "top": 29.577,
+      "x": 1421.156,
+      "z": -798.725
+    },
+    {
+      "id": "attractions:xs_chapel_st_L19",
+      "source": "attractions",
+      "path": "Attractions/Ways/Lamps_xs_chapel_st/Post_xs_chapel_st_L19",
+      "ground": 18.54,
+      "radius": 0.42,
+      "top": 33.54,
+      "x": 1523.844,
+      "z": -798.725
+    },
+    {
+      "id": "bowl_lane:Lamp1",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp1/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 12.799,
+      "radius": 0.42,
+      "top": 27.799,
+      "x": 978,
+      "z": -292.4
+    },
+    {
+      "id": "bowl_lane:Lamp2",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp2/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 20.097,
+      "radius": 0.42,
+      "top": 35.097,
+      "x": 1104,
+      "z": -292.4
+    },
+    {
+      "id": "bowl_lane:Lamp3",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp3/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 20.797,
+      "radius": 0.42,
+      "top": 35.797,
+      "x": 1232,
+      "z": -292.4
+    },
+    {
+      "id": "bowl_lane:Lamp4",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp4/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 8.577,
+      "radius": 0.42,
+      "top": 23.577,
+      "x": 1452,
+      "z": -292.4
+    },
+    {
+      "id": "bowl_lane:Lamp5",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp5/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 4.82,
+      "radius": 0.42,
+      "top": 19.82,
+      "x": 1566,
+      "z": -292.4
+    },
+    {
+      "id": "bowl_lane:Lamp6",
+      "source": "bowl_lane",
+      "path": "F2/xs_bowl_lane/Lamps/Lamp6/Post",
+      "arm": {
+        "ox": 0,
+        "oz": -1,
+        "reach": 4.2
+      },
+      "ground": 2.594,
+      "radius": 0.42,
+      "top": 17.594,
+      "x": 1642,
+      "z": -292.4
+    },
+    {
+      "id": "skylift:Lamp1",
+      "source": "skylift",
+      "path": "F4/xs_lift_approach/Lamps/Lamp1/Post",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.2
+      },
+      "ground": 10.155,
+      "radius": 0.42,
+      "top": 25.155,
+      "x": -702.15,
+      "z": -650
+    },
+    {
+      "id": "skylift:Lamp2",
+      "source": "skylift",
+      "path": "F4/xs_lift_approach/Lamps/Lamp2/Post",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.2
+      },
+      "ground": 7.046,
+      "radius": 0.42,
+      "top": 22.046,
+      "x": -742.85,
+      "z": -755
+    },
+    {
+      "id": "skylift:Lamp3",
+      "source": "skylift",
+      "path": "F4/xs_lift_approach/Lamps/Lamp3/Post",
+      "arm": {
+        "ox": -1,
+        "oz": 0,
+        "reach": 4.2
+      },
+      "ground": 8.485,
+      "radius": 0.42,
+      "top": 23.485,
+      "x": -702.15,
+      "z": -860
+    },
+    {
+      "id": "skylift:LampStation",
+      "source": "skylift",
+      "path": "F4/xs_lift_approach/Lamps/LampStation/Post",
+      "arm": {
+        "ox": 1,
+        "oz": 0,
+        "reach": 4.2
+      },
+      "ground": 5.491,
+      "radius": 0.42,
+      "top": 20.491,
+      "x": -751.5,
+      "z": -937
+    },
+    {
+      "id": "skylift:LampTrailhead",
+      "source": "skylift",
+      "path": "F4/xs_lift_approach/Lamps/LampTrailhead/Post",
+      "arm": {
+        "ox": 0,
+        "oz": 1,
+        "reach": 4.2
+      },
+      "ground": 6.207,
+      "radius": 0.42,
+      "top": 21.207,
+      "x": -730,
+      "z": -962.5
+    }
+  ]
+}

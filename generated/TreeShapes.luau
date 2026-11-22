@@ -3175,7 +3175,7 @@ return {
 		},
 	},
 	woods = {
-		climbBase = 20001,
+		climbBase = 15001,
 		climbs = {
 			{
 				x = -1028.88,

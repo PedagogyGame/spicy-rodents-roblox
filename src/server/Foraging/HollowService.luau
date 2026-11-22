@@ -3,7 +3,8 @@
 -- The hollow trees and the fallen log on the server (brief v2 §3 "Hollow trees", §8 "the rodent therefore needs
 -- refuges between bites: hollows, the sewer, poles and trees"; BRIEF_ADDENDUM D6). Their insides are enclosed routes
 -- (Shared/World/HollowLayout over Shared/Routes/Enclosure; the motor runs them); this is what being in one means:
---   * The shell: start() builds every hollow's inside as plain parts (World/HollowShell) under Workspace.HollowTrees.
+--   * The shell: start() builds every hollow's inside as plain parts (World/HollowShell) under Workspace.HollowTrees,
+--     its walls wearing their tree's bark map (Shared/Generated/TreeArt).
 --   * Cover: a squirrel whose body is in a hollow's cavity (HollowLayout.contains) is out of AI/TownAI's threat grid
 --     (the computer's squirrel only on one of that hollow's own runs: its point is its route's line, and a trunk's
 --     line, the axis, runs up through the cavity while it climbs the bark outside)
@@ -250,10 +251,14 @@ function HollowService.start(opts: Opts): Service
 		end
 	end
 	self = HollowService.new(opts)
+	-- (the inside walls wear their tree's own bark map: Shared/Generated/TreeArt)
+	local data = Import.shared("Data") :: any
+	local treeArt = if data.default():has("TreeArt") then data.default():module("TreeArt") else nil
 	local root, report = HollowShell.build(
 		{ Instance = Instance, CFrame = CFrame, Vector3 = Vector3, Color3 = Color3, Enum = Enum },
 		self.layout,
-		nil
+		nil,
+		{ bark = HollowShell.barkMaps(treeArt) }
 	)
 	local C = HollowService.C.pennant
 	for _, h in self.layout.hollows do

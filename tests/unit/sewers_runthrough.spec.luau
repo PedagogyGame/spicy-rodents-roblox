@@ -240,7 +240,11 @@ return function(t)
 							pounce = how == "pounce" and f == 8,
 						})
 					end, { validator = true })
-					t.eq(next(tr.routes), nil, `{m.id}: {how} over it heading ({dir[1]}, {dir[2]})`)
+					-- (no sewer route: P3.S's grate lies by the alley forecourt's lamp post, whose climb (owner D35) a
+					-- run past it may take)
+					for id in tr.routes do
+						t.truthy(not isSewer(id), `{m.id}: {how} over it heading ({dir[1]}, {dir[2]}): {id}`)
+					end
 					t.eq(tr.violations, 0)
 				end
 				-- stood on it, W held toward the opening: stays up

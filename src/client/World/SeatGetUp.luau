@@ -16,8 +16,11 @@
 --   heartbeat: boolean? (default true: step on RunService.Heartbeat), move: (() -> Vector3)? (default: the
 --   PlayerModule's move vector), request: (() -> ())? (default: PlayNet.StandUp:FireServer()), toast: ((text) ->
 --   ())?, now: (() -> number)? (default os.clock), gui: boolean? (default true: the STAND button), keys: boolean?
---   (default true: listen to UserInputService) }; seated(body) -> Seat? (a seat its Humanoid sits on that it may get
---   up from); WORDS
+--   (default true: listen to UserInputService), perch: (() -> any?)?, perchUp: (() -> boolean)? }; seated(body) ->
+--   Seat? (a seat its Humanoid sits on that it may get up from); WORDS
+-- A squirrel sat in a branch nook or on a hangout's ledge (owner D34: World/BranchNookClient; a squirrel has no
+-- Humanoid) is seated the same way: ctx.perch() is its place while it sits, and getting up (the same keys, a move, the
+-- STAND button) calls ctx.perchUp() instead of asking the server: its sitting is its own screen's.
 -- Engine only inside the functions; no side effects on require.
 
 local Import = require("../Import")
@@ -116,6 +119,8 @@ function SeatGetUp.start(ctx: {
 	now: (() -> number)?,
 	gui: boolean?,
 	keys: boolean?,
+	perch: (() -> any?)?,
+	perchUp: (() -> boolean)?,
 }): Handle
 	local move: () -> Vector3 = if ctx.move then ctx.move else moveVector()
 	local request: () -> () = ctx.request or fireRemote
@@ -125,12 +130,25 @@ function SeatGetUp.start(ctx: {
 	local told: any = nil -- the seat the player was last told about (once per sitting)
 	local conns: { RBXScriptConnection } = {}
 
+	-- a seat one may get up from, or the branch nook a squirrel sits in (ctx.perch)
+	local function seatOf(body: Model?): any?
+		local seat = SeatGetUp.seated(body)
+		if seat == nil and ctx.perch then
+			return ctx.perch()
+		end
+		return seat
+	end
+
 	-- ask to get up (true: asked now; false: seated nowhere one may get up from, or asked a moment ago)
 	local function getUp(): boolean
 		local body = ctx.current()
-		local seat = SeatGetUp.seated(body)
+		local seat = seatOf(body)
 		if seat == nil then
 			return false
+		end
+		if SeatGetUp.seated(body) == nil and ctx.perchUp then
+			-- (a squirrel in a branch nook: up on its own screen, no server; never a Humanoid's jump)
+			return ctx.perchUp()
 		end
 		local t = now()
 		if t - asked < SeatRules.REPEAT then
@@ -159,7 +177,7 @@ function SeatGetUp.start(ctx: {
 	-- one look a frame: seated somewhere one may get up from? the button, the toast once, and a move gets up
 	local function step(): boolean
 		local body = ctx.current()
-		local seat = SeatGetUp.seated(body)
+		local seat = seatOf(body)
 		if screen then
 			(screen :: any).Enabled = seat ~= nil
 		end

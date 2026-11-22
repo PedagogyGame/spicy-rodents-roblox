@@ -1,7 +1,7 @@
 {
  "$schema": "audio/candidates v1",
  "src": "tools/audio/make_candidates.py (made offline); tools/audio/publish.py (the lead's upload record)",
- "uploadsPlanned": 2,
+ "uploadsPlanned": 3,
  "candidates": [
   {
    "slot": "dog_bark",
@@ -22,6 +22,28 @@
    "sha": "376244cc9aefa650",
    "assetId": "93991496573985",
    "moderation": "Approved",
+   "approved": true
+  },
+  {
+   "slot": "dog_bark_v2",
+   "replaces": "dog_bark",
+   "cues": [
+    "Dogs.Bark"
+   ],
+   "file": "assets/audio/candidates/dog_bark_v2.ogg",
+   "seconds": 0.68,
+   "channels": 1,
+   "sampleRate": 44100,
+   "peakDb": -1.6,
+   "truePeakDb": -1.5,
+   "loudnessLufs": -15.2,
+   "how": "synthesised offline (tools/audio/make_candidates.py dog_bark_v2, seed 3602): two barks (0.20 and 0.23 s of breath, 0.37 s apart), each a chest push and a noisy burst at the onset, a 'w'/'r' glide (low formants, F3 dipped) opening into 'uh', a pressed pulse train (2.5 % jitter, 10 % shimmer, an irregular onset, then period doubling) with pulse-synchronous breath through five moving formants (F1 360->840->380, F2 820->1650->900 Hz), pitch 520->640->360 and 480->600->320 Hz, a quick decay closing on a soft 'f'; a touch of yard (ground, fence and wall reflections, 60 ms of faint scatter, no reverb tail); loudness-normalised",
+   "licence": "the game's own: synthesised offline from code in this repository, no recording or third-party audio (CC0-equivalent)",
+   "displayName": "SR yard dog bark 2",
+   "description": "Spicy Rodent: a friendly medium dog's woof woof, second take (synthesised offline, tools/audio).",
+   "sha": "6b492a80e93fc4ec",
+   "assetId": "100106365730248",
+   "moderation": "Reviewing",
    "approved": true
   },
   {

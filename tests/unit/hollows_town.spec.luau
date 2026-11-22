@@ -7,8 +7,8 @@
 -- outside the cavity (the screen showing bark), never in the squirrel's head. The hollow look (CameraRig.hollowView,
 -- owner D32 "allow the squirrel to actually look around"): along every run of every tree, turned any way round and up
 -- or down the hollow, the eye stays in the cavity and out of the bark (or goes into the head, first person, where the
--- cavity is too narrow to stand behind it); the keys turn it, it eases back behind a moving body; at every hole up a
--- trunk the peek's eye is at the hole's face, looking out of it.
+-- cavity is too narrow to stand behind it); the keys turn it, it eases back behind a moving body and up the hollow
+-- (its rest, owner D33); at every hole up a trunk the peek's eye is at the hole's face, looking out of it.
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
@@ -192,10 +192,17 @@ return function(t)
 					if layout.contains(hx, hy, hz) ~= h.space then
 						continue
 					end
+					-- (drawn towards the middle line of the cavity round the head, as the rig does)
+					local mx, mz = nil :: number?, nil :: number?
+					for _, c in h.cavities do
+						if hy >= c.bottom - 0.5 and hy <= c.top then
+							mx, mz = c.x, c.z
+						end
+					end
 					for _, yaw in { 0, math.pi / 2, math.pi, -math.pi / 2, 2.5 } do
-						for _, pitch in { H.pitchMin, -0.5, 0, 0.6, H.pitchMax } do
+						for _, pitch in { H.pitchMin, -0.5, 0, H.rest, H.pitchMax } do
 							local ex, ey, ez, _, _, _, first =
-								CameraRig.hollowView(hx, hy, hz, lx, lz, yaw, pitch, layout.keepCamera)
+								CameraRig.hollowView(hx, hy, hz, lx, lz, yaw, pitch, layout.keepCamera, mx, mz)
 							looks += 1
 							t.truthy(
 								layout.within(h, ex, ey, ez),
@@ -228,8 +235,11 @@ return function(t)
 			t.near(p, H.pitchMax, 1e-9, "looking up stops at the top")
 			y, p = CameraRig.hollowLook(y, p, 0, 10, true)
 			t.near(p, H.pitchMax, 1e-9, "inverted, the mouse down looks up")
-			local y2, p2 = CameraRig.hollowRecentre(1, 0.5, H.idle + 0.1, true, 0.1)
-			t.truthy(y2 < 1 and p2 < 0.5, "a moving body's view eases back")
+			-- (back to the rest, up the hollow: from below it and from above it)
+			local y2, p2 = CameraRig.hollowRecentre(1, 0, H.idle + 0.1, true, 0.1)
+			t.truthy(y2 < 1 and p2 > 0 and p2 < H.rest, "a moving body's view eases back")
+			local _, p5 = CameraRig.hollowRecentre(1, H.pitchMax, H.idle + 0.1, true, 0.1)
+			t.truthy(p5 < H.pitchMax and p5 > H.rest, "from looking straight up too")
 			local y3, p3 = CameraRig.hollowRecentre(1, 0.5, H.idle - 0.1, true, 0.1)
 			t.truthy(y3 == 1 and p3 == 0.5, "but not while the player is still looking")
 			local y4 = CameraRig.hollowRecentre(1, 0.5, 5, false, 0.1)

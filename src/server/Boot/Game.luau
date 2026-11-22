@@ -15,7 +15,8 @@
 --      50th is turned away), the device fleet (patrol cars, carts, bikes, the drone).
 --   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Duel(verb) (the rodent's
 --      click, "pounce", and F, "feint"), StandUp() (a seated person gets up: World/SeatStand, the lounge's seats
---      first; owner D32), Event (server -> client: picked, refused, bite, bitten, med, hurt, died, kick, duel).
+--      first; owner D32), Stash(routeId) (E at a branch nook's knot-hole: Foraging/BranchStash; owner D34), Event
+--      (server -> client: picked, refused, bite, bitten, med, hurt, died, kick, duel).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
 -- people and the player-held squirrels (RunOver kills: "RUN OVER") and the computer's squirrels out on the asphalt
 -- (RunOver knocks one flat: Wildlife/RoadSquirrels), poses stream to clients at 15 Hz
@@ -59,7 +60,8 @@
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, wallet (Economy/Credits: spend, add, balance,
 --   pass), pick(player, choice) -> (ok, why?),
---   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player), Duel(player, verb) } (the PlayNet handlers),
+--   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player), Duel(player, verb), Stash(player, routeId) }
+--   (the PlayNet handlers),
 --   combat (Combat/CombatService; nil when it could not start),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
@@ -119,6 +121,8 @@ local InfectionService = require("../Infection/InfectionService")
 local CombatService = require("../Combat/CombatService")
 local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
+local BranchStash = require("../Foraging/BranchStash")
+local BranchNooks = Import.shared("World/BranchNooks") :: typeof(require("../../shared/World/BranchNooks"))
 local ForageService = require("../Foraging/ForageService")
 local ForageRules = Import.shared("Foraging/ForageRules") :: typeof(require("../../shared/Foraging/ForageRules"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
@@ -553,6 +557,8 @@ function Game.start(opts: Opts?): any
 	local eventRemote = remote(playNet, "Event")
 	local duelRemote = remote(playNet, "Duel")
 	local standRemote = remote(playNet, SeatRules.REMOTE)
+	-- E at a knot-hole in a branch nook (Foraging/BranchStash; owner D34): the nook's route id
+	local stashRemote = remote(playNet, "Stash")
 	local kindsJson: { [string]: any } = {}
 	for id, k in traffic:kinds() do
 		kindsJson[tostring(id)] = k
@@ -963,6 +969,38 @@ function Game.start(opts: Opts?): any
 		setAttr(player, "NutTreeName", if own then own.tree else "")
 		setAttr(player, "NutStore", if own then math.floor(ownMeter * 100 + 0.5) / 100 else 0)
 		setAttr(player, "NutInside", inside)
+	end
+	-- the knot-hole stashes in the branch nooks (Foraging/BranchStash; owner D34): E in a nook's cup puts the nuts carried
+	-- in, or takes some out; per player (claimKey), where the server holds the body (heldPlace). The player's holes with
+	-- nuts in show as acorns on their own screen (attribute NutStashes: "route=n,..."). A failure leaves the nooks empty
+	local stash: any = nil
+	if hollows then
+		local okB, errB = pcall(function()
+			stash = BranchStash.new({
+				nooks = BranchNooks.new(data:module("BranchNooks") :: any),
+				hollows = hollows,
+				placeOf = heldPlace,
+				keyOf = claimKey,
+			})
+		end)
+		if not okB then
+			stash = nil
+			warn(`[SpicyRodents] the branch stashes did not start (the nooks stay empty): {errB}`)
+		end
+	end
+	local function useStash(player: any, routeId: any)
+		local actor = possession:actorOf(player)
+		local tid = if actor then townIdOf[actor.id] else nil
+		local a = if tid then world.actorsById[tid] else nil
+		if stash == nil or tid == nil or a == nil or not ForageRules.forages(a.species, a.variant) then
+			return
+		end
+		local res = stash:use(tid, routeId)
+		if res.text ~= "" then
+			fire(player, { kind = "notice", text = res.text })
+		end
+		setAttr(player, "NutStashes", stash:list(claimKey(tid)))
+		showNuts(player)
 	end
 	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
 	-- that does not load leaves its drains in the bake's plain parts
@@ -2230,9 +2268,18 @@ function Game.start(opts: Opts?): any
 			warn(`[SpicyRodents] stand up failed: {err}`)
 		end
 	end
+	local function onStash(player: any, routeId: any)
+		local ok, err = pcall(function()
+			useStash(player, routeId)
+		end)
+		if not ok then
+			warn(`[SpicyRodents] stash failed: {err}`)
+		end
+	end
 	local conns: { RBXScriptConnection } = {}
 	table.insert(conns, pickRemote.OnServerEvent:Connect(onPick))
 	table.insert(conns, standRemote.OnServerEvent:Connect(onStand))
+	table.insert(conns, stashRemote.OnServerEvent:Connect(onStash))
 	table.insert(conns, kickRemote.OnServerEvent:Connect(onKick))
 	table.insert(conns, duelRemote.OnServerEvent:Connect(onDuel))
 	table.insert(
@@ -2995,7 +3042,7 @@ function Game.start(opts: Opts?): any
 		timings = timings,
 		pick = pick,
 		kick = kick,
-		remotes = { Pick = onPick, Kick = onKick, Duel = onDuel },
+		remotes = { Pick = onPick, Kick = onKick, Duel = onDuel, Stash = onStash },
 		kill = kill,
 		combat = combat,
 		step = function(dt: number)

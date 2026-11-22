@@ -2,7 +2,7 @@
   "$schema": "woods v1 (Shared/World/TreeShapes WOODS AND CLIMBS: a kind's `climb` is a ClimbSpec; WorldGen/WoodsPlan: where a tree may stand)",
   "src": "BRIEF_ADDENDUM D34 (owner, 2026-11-22): 'add even more of the tall tree models, even taller before, with a large scattered introduction of pine trees and other nut trees, making the map have more trees!'; D35: 'make all trees climbable'. Kinds: the model each tree wears (tools/blender/trees/grove.py and build_trees.py build them round `climb`), its family, its crown's reach and model height at scale 1 (studs). Groves: where tools/blender/trees/place_woods.luau scatters them (data/woods_placed.json): `rect` [x0, x1, z0, z1] or `disc` [x, z, r], how many (a `clump` [radius, trees] grove in copses), the crown-share between neighbours (smaller: denser), the kinds' weights and the scale range; a `lone` grove is one tree near `at`. Owner sheet: docs/owner/MORE_TREES_CHECK.md.",
   "idBase": 10001,
-  "climbBase": 20001,
+  "climbBase": 15001,
   "seed": 20261122,
   "kinds": {
     "king_oak": {
