@@ -33,7 +33,9 @@
 --   (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
 --   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
---   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); notify: ((text) -> ())?
+--   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); notify: ((text) -> ())?;
+--   seeOut(eye, cframe, size, glass) -> number? (pure: a vehicle part's LocalTransparencyModifier from the eye);
+--   COCKPIT
 -- No side effects on require (services are looked up inside the functions).
 
 local Import = require("../Import")
@@ -282,6 +284,22 @@ function CameraRig.lookStep(yaw: number, elev: number, dx: number, dy: number, i
 	local nextYaw = (yaw - dx) % (2 * math.pi)
 	local nextElev = math.clamp(elev + (if invert then -dy else dy), L.elevMin, L.elevMax)
 	return nextYaw, nextElev
+end
+
+-- THE DRIVER SEES OUT (D29: "a blank grey screen when i was in the pickup truck"). A closed vehicle's drawing is
+-- solid blocks: the eye at a seated driver's head is inside its Cabin (the SUV's Hull) and its SideGlass, and the
+-- windscreen in front of it is Glass at Transparency 0, which the engine draws opaque: the view was the back of the
+-- windscreen. In first person every part of the vehicle the eye is inside (within `near` studs of: the camera's near
+-- plane) is hidden on this screen, and its glass is made see-through (`glass`); the rest (the roof, the bonnet, the
+-- dash) is left as it is. Any vehicle: the drawn kinds, a greybox, a richer model under Assets.Vehicles.
+CameraRig.COCKPIT = { near = 0.25, glass = 0.75 }
+function CameraRig.seeOut(eye: Vector3, cframe: CFrame, size: Vector3, glass: boolean): number?
+	local p = cframe:PointToObjectSpace(eye)
+	local n = CameraRig.COCKPIT.near
+	if math.abs(p.X) <= size.X / 2 + n and math.abs(p.Y) <= size.Y / 2 + n and math.abs(p.Z) <= size.Z / 2 + n then
+		return 1
+	end
+	return if glass then CameraRig.COCKPIT.glass else nil
 end
 
 -- The gondola's free look from a seat (vehicleFirst with targets.free): dx, dy in radians as lookStep has them; the
@@ -652,7 +670,24 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			-- (the default camera does this only for its own first person)
 			local hidden: { BasePart } = {}
 			local driver = targets.body
+			-- and the vehicle's own parts round the eye (CameraRig.seeOut), once it is there; not the gondola's
+			local cleared: { BasePart }? = if free then {} else nil
+			local car: Instance = vehicle :: any
 			bind(function(dt: number)
+				if cleared == nil then
+					local list: { BasePart } = {}
+					local at = eye.WorldPosition
+					for _, d in car:GetDescendants() do
+						if d:IsA("BasePart") and d.Transparency < 1 then
+							local k = CameraRig.seeOut(at, d.CFrame, d.Size, d.Material == Enum.Material.Glass)
+							if k then
+								d.LocalTransparencyModifier = k
+								table.insert(list, d)
+							end
+						end
+					end
+					cleared = list
+				end
 				if driver and #hidden == 0 then
 					for _, d in driver:GetDescendants() do
 						if d:IsA("BasePart") then
@@ -700,6 +735,12 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			onUnbind = function()
 				for _, part in hidden do
 					part.LocalTransparencyModifier = 0
+				end
+				local seen = cleared
+				if seen then
+					for _, part in seen do
+						part.LocalTransparencyModifier = 0
+					end
 				end
 			end
 		elseif vehicle then

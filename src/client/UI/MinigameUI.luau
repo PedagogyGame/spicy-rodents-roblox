@@ -21,11 +21,30 @@
 --   "name" are drawn as rank and name), foot? (a format with one %d: the seconds left) };
 --   kit = { C (palette: NAVY, GOLD, CYAN, WHITE), label(parent, text, size, pos, color?, font?) -> TextLabel,
 --   corner(parent, radius), button(parent, text, width) -> TextButton }
+--   MinigameUI.cardShown() -> boolean (a game's How-to-play card is up), MinigameUI.watchCard(fn()) (told when
+--   open, close or H change it): UI/PlayMenu puts its keys panel away while the card is up (the two stood on the
+--   same side and overlapped, D29).
 
 local CameraRig = require("../Camera/CameraRig")
 
 local MinigameUI = {}
 MinigameUI.__index = MinigameUI
+
+-- Whether a game's How-to-play card is on the screen, and who is told at once when open, close or H change it
+-- (a game's own controller may also show or hide the frame: a watcher reads cardShown() again now and then).
+local current: any = nil
+local cardWatchers: { () -> () } = {}
+function MinigameUI.cardShown(): boolean
+	return current ~= nil and current.gui.Enabled and current.helpFrame.Visible
+end
+function MinigameUI.watchCard(fn: () -> ())
+	table.insert(cardWatchers, fn)
+end
+local function tellCard()
+	for _, fn in cardWatchers do
+		fn()
+	end
+end
 
 -- colours are built on first use (requiring this module must not touch the engine: Lune loads it)
 local RGB: { [string]: { number } } =
@@ -88,6 +107,7 @@ function MinigameUI.new(): any
 	help.Parent = gui
 	corner(help, 12)
 	self.helpFrame = help
+	current = self
 	self.title = label(help, "", UDim2.new(1, -20, 0, 34), UDim2.fromOffset(10, 8), C.GOLD, Enum.Font.FredokaOne)
 	local list = Instance.new("TextLabel")
 	list.BackgroundTransparency = 1
@@ -344,6 +364,7 @@ function MinigameUI.open(self: any, _game: string, title: string, help: { how: {
 	end
 	corner(self.card, 10)
 	self.card.Visible = true
+	tellCard()
 end
 
 function MinigameUI.close(self: any)
@@ -355,10 +376,12 @@ function MinigameUI.close(self: any)
 	self:summary(nil)
 	self:buttons({}, function() end)
 	self:touch({}, function() end, function() end)
+	tellCard()
 end
 
 function MinigameUI.toggleHelp(self: any)
 	self.helpFrame.Visible = not self.helpFrame.Visible
+	tellCard()
 end
 
 function MinigameUI.banner(self: any, text: string, big: boolean?)

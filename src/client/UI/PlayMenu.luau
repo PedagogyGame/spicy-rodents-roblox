@@ -44,6 +44,7 @@ local InputMap = require("../Input/InputMap")
 local Import = require("../Import")
 local MoveDiag = Import.shared("Movement/MoveDiag") :: typeof(require("../../shared/Movement/MoveDiag"))
 local MoveDiagPanel = require("./MoveDiagPanel")
+local MinigameUI = require("./MinigameUI")
 
 PlayMenu.CHOICES = table.freeze({
 	{
@@ -568,6 +569,9 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	-- the keys panel starts collapsed to one small line (owner, 2026-11-21: "collapse the black box with the text
 	-- explaining the keys"); K or a click on it opens and closes it
 	local keysOpen = false
+	-- while a minigame's How-to-play card is up the keys panel is put away: the card stands on the same side and
+	-- the panel showed through under it (D29); it comes back as it was when the card goes
+	local underCard = false
 	local toastToken, bannerToken = 0, 0
 	local way: Way? = nil -- to the hospital door, while this player is infected
 
@@ -609,6 +613,15 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	end
 	player.AttributeChanged:Connect(refresh)
 
+	local function checkCard()
+		local shown = MinigameUI.cardShown()
+		if shown ~= underCard then
+			underCard = shown
+			help.Visible = not isOpen and not underCard
+		end
+	end
+	MinigameUI.watchCard(checkCard)
+
 	-- the way to the hospital, four times a second while this player is infected and not yet inside
 	task.spawn(function()
 		local shown: string? = nil
@@ -632,6 +645,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 				markerLabel.Text = PlayMenu.markerText(dist)
 			end
 			way = found
+			checkCard()
 			marker.Enabled = found ~= nil and not isOpen
 			local line = PlayMenu.sickLine({ Infected = sickStatus }, found)
 			if line ~= shown then
@@ -646,7 +660,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	local function setOpen(open: boolean)
 		isOpen = open
 		menu.Visible = open
-		help.Visible = not open
+		help.Visible = not open and not underCard
 		status.Visible = not open
 		menuButton.Visible = not open
 		refresh()

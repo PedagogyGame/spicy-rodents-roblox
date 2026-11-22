@@ -571,9 +571,11 @@ local function gamesRoom(kit: any, root: any)
 	-- clear for it (AlleyLayout.standing), so the big room reads as a place for each game and whoever dresses it
 	-- sees what to leave alone (the air hockey table stands on its own). Two flat parts each: a border and a
 	-- field (a rug is not a floor: nothing stands on it and nothing collides with it).
+	-- The pool tables' rugs are a deep purple-navy (owner, D29: "the green on green background for the pool
+	-- tables doesn't work"): the green felt stands out on them; the border a shade darker than the field.
 	local RUGS = {
-		pool_1 = { { 30, 74, 62 }, { 40, 96, 78 } },
-		pool_2 = { { 30, 74, 62 }, { 40, 96, 78 } },
+		pool_1 = { { 32, 28, 66 }, { 42, 38, 80 } },
+		pool_2 = { { 32, 28, 66 }, { 42, 38, 80 } },
 		bumper_pool = { { 112, 40, 36 }, { 142, 54, 44 } },
 		air_hockey = { { 36, 54, 104 }, { 48, 72, 134 } },
 	}
