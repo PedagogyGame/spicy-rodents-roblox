@@ -115,7 +115,7 @@ return function(t)
 		local s = {
 			activeGameDays = GATE,
 			activeMinutes = 40,
-			cents = 1250,
+			cents = 125000, -- (owner D31: money x100, its weight /100)
 			reputation = 7,
 			entourage = 2,
 			kicks = 1,
@@ -123,7 +123,7 @@ return function(t)
 		}
 		t.near(Ladder.score("human", s), 10 + 12.5 + 7 + 6 + 15 + 4)
 		-- money and reputation dominate the slow time term
-		t.truthy(Ladder.score("human", { activeGameDays = GATE, cents = 10000 }) > Ladder.score("human", {
+		t.truthy(Ladder.score("human", { activeGameDays = GATE, cents = 1000000 }) > Ladder.score("human", {
 			activeGameDays = GATE,
 			activeMinutes = 300,
 		}))
@@ -169,7 +169,7 @@ return function(t)
 	t.test("recruitment by seniority: top-ranked human first, then by time served", function()
 		-- rich newcomer ranks first by score; the rest go by activeMinutes, not score
 		local c = ctxOf({
-			human("rich", 5, { cents = 100000 }),
+			human("rich", 5, { cents = 10000000 }), -- (owner D31: money x100)
 			human("veteran", 500),
 			human("famous", 50, { reputation = 90 }),
 			human("mid", 200),

@@ -55,7 +55,7 @@ Ladder.sideExits = table.freeze({
 -- 35 + 7 + 1 + 5 + 1 = 49 = maxPlayers (brief v2 §5).
 
 Ladder.params = {
-	w = { money = 1.0, reputation = 1.0, time = 0.25, entourage = 3.0, kick = 15, quest = 1.0 }, -- human queue (§13a, §6, A2)
+	w = { money = 0.01, reputation = 1.0, time = 0.25, entourage = 3.0, kick = 15, quest = 1.0 }, -- human queue (§13a, §6, A2); money 1.0 -> 0.01 with owner D31's money x100, to keep the old balance
 	rankGateDays = 10,                                          -- in-game days before a human is ranked (§13a)
 	wAdmin = { performance = 1.0, quest = 1.0, time = 0.2 },     -- tier-2 rank: performance only, never money (§13a)
 	kickEvent = 25,                                             -- rank points per landed kick on the rodent or an infected squirrel (A2)
