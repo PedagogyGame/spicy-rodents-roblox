@@ -44,6 +44,7 @@ local Layout =
 local Round =
 	Import.shared("Minigames/WhackAMole/Round") :: typeof(require("../../../shared/Minigames/WhackAMole/Round"))
 local MinigameSounds = require("../MinigameSounds")
+local Hand = require("./Hand")
 
 local Cabinet = {}
 
@@ -109,6 +110,7 @@ export type Cab = {
 	went: boolean, -- GO sounded
 	hurried: number, -- the last of the final seconds sounded
 	popped: { [number]: boolean }, -- rise id -> its pop has been sounded (or it was up when this screen came)
+	hand: Hand.Hand?, -- the arm holding the mallet while it swings (Client/Minigames/WhackAMole/Hand)
 }
 
 local cabs: { [string]: Cab } = {}
@@ -245,6 +247,7 @@ function Cabinet.get(station: string, place: any?): Cab
 			went = false,
 			hurried = math.huge,
 			popped = {},
+			hand = nil,
 		}
 		cabs[station] = cab
 	elseif place ~= nil and cab.place == nil then
@@ -377,6 +380,9 @@ local function forget(cab: Cab)
 	cab.score = 0
 	cab.mallet = nil
 	cab.sayUntil = -math.huge
+	if cab.hand then
+		Hand.hide(cab.hand)
+	end
 end
 
 function Cabinet.idle(cab: Cab, _msg: { [string]: any }?)
@@ -405,6 +411,10 @@ end
 function Cabinet.release(cab: Cab)
 	cab.live = false
 	cab.cardLabel = nil
+	if cab.hand then
+		-- (shown again, as the next player's, at the next swing)
+		Hand.hide(cab.hand)
+	end
 end
 
 function Cabinet.roundTime(cab: Cab): number?
@@ -602,6 +612,64 @@ local function cues(cab: Cab, t: number)
 	end
 end
 
+-- The body of the person playing this cabinet: this player's own while it is theirs, else whoever stands at it
+-- (the nearest body within a few studs of where the player stands), or nil.
+local function player(cab: Cab): any
+	local found: any = nil
+	pcall(function()
+		local Players = game:GetService("Players")
+		if cab.live then
+			found = (Players.LocalPlayer :: any).Character
+			return
+		end
+		local S = Layout.STAND
+		local spot = Cabinet.cframe(cab, S.u, 0, S.w).Position
+		local best = 4
+		for _, pl in Players:GetPlayers() do
+			local char = pl.Character
+			local root = char and char.PrimaryPart
+			if root then
+				local d = Vector3.new(root.Position.X - spot.X, 0, root.Position.Z - spot.Z).Magnitude
+				if d < best then
+					best, found = d, char
+				end
+			end
+		end
+	end)
+	return found
+end
+
+-- the arm on the mallet: shown while it swings and hovers (until it goes home), placed when the mallet moves
+local HOLD = Cabinet.MOVE + Cabinet.DOWN + Cabinet.UP + Cabinet.HOVER
+local function holdMallet(cab: Cab, p: any, pivot: CFrame?, tnow: number)
+	local m = cab.mallet
+	local holding = m ~= nil and not cab.free and tnow - m.at < HOLD
+	local had = cab.hand
+	if not holding then
+		if had then
+			Hand.hide(had)
+		end
+		return
+	end
+	-- (made on the first swing; made again if the cabinet streamed out and back in)
+	local h: Hand.Hand = if had and had.model.Parent ~= nil then had else Hand.new(p.model)
+	if h ~= had then
+		if had then
+			Hand.hide(had)
+		end
+		cab.hand = h
+	end
+	if not h.on then
+		Hand.show(h, player(cab))
+	elseif pivot == nil then
+		return
+	end
+	local at = pivot or p.mallet:GetPivot()
+	local shoulder = Hand.shoulderOf(h.body)
+		or Cabinet.cframe(cab, Hand.SHOULDER.u, Hand.SHOULDER.v, Layout.STAND.w).Position
+	Hand.place(h, Hand.solve(at, shoulder, Cabinet.cframe(cab, 0, 0, 0).XVector))
+end
+
 -- one cabinet's frame; returns whether anything is still moving (or a round is on)
 local function draw(cab: Cab): boolean
 	local p = partsOf(cab)
@@ -627,16 +695,17 @@ local function draw(cab: Cab): boolean
 		if mallet then
 			local u, v, w, rx, ry, rz = Cabinet.malletPose(cab, tnow)
 			local key = string.format("%.3f %.3f %.3f %.3f %.3f %.3f", u, v, w, rx, ry, rz)
+			local pivot: CFrame? = nil
 			if key ~= cab.malletShown then
 				cab.malletShown = key
-				mallet:PivotTo(
-					Cabinet.cframe(cab, u, v, w)
-						* CFrame.Angles(0, ry, 0)
-						* CFrame.Angles(0, 0, rz)
-						* CFrame.Angles(rx, 0, 0)
-				)
+				pivot = Cabinet.cframe(cab, u, v, w)
+					* CFrame.Angles(0, ry, 0)
+					* CFrame.Angles(0, 0, rz)
+					* CFrame.Angles(rx, 0, 0)
+				mallet:PivotTo(pivot)
 				moving = true
 			end
+			holdMallet(cab, p, pivot, tnow)
 		end
 		local words = Cabinet.windows(cab)
 		write(cab, p.score, "score", words.score)

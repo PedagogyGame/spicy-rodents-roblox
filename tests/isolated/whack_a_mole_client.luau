@@ -295,6 +295,35 @@ return function(t: any)
 		end
 	)
 
+	t.test("D29: a hand holds the mallet while it swings, goes with it, and lets go when it goes home", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.run(w, Round.READY + 0.5)
+			local hand = cabModel(w):FindFirstChild("MalletHand")
+			t.truthy(hand == nil or hand:FindFirstChild("Fist").Transparency == 1, "no hand before a swing")
+			press(Key.Two)
+			Rig.run(w, 0.05)
+			hand = cabModel(w):FindFirstChild("MalletHand")
+			t.truthy(hand ~= nil, "a hand is made at the first swing")
+			local mallet = cabModel(w):FindFirstChild(N.mallet)
+			local function grip(): number
+				return (hand:FindFirstChild("Fist").CFrame.Position - mallet:GetPivot().Position).Magnitude
+			end
+			for _, name in { "Fist", "Thumb", "Forearm", "Elbow", "UpperArm" } do
+				local p = hand:FindFirstChild(name)
+				t.truthy(p ~= nil and p.Transparency == 0, `{name} shown`)
+				t.eq(p.CanCollide, false)
+				t.eq(p.CanQuery, false)
+			end
+			t.truthy(grip() < 0.3, `the fist is on the handle's foot ({grip()})`)
+			Rig.run(w, Cabinet.MOVE + Cabinet.DOWN + 0.02)
+			t.truthy(grip() < 0.3, `and stays on it through the swing ({grip()})`)
+			Rig.run(w, Cabinet.UP + Cabinet.HOVER + Cabinet.HOME)
+			t.eq(hand:FindFirstChild("Fist").Transparency, 1, "let go when the mallet went home")
+			t.eq(#w.broken, 0)
+		end, opts())
+	end)
+
 	t.test("a watcher: the moles and the windows move on this screen while a stub plays", function()
 		Rig.play(function(w: Rig.World)
 			local ann = Rig.stub("Ann")
