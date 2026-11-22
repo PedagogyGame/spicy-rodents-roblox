@@ -11,6 +11,10 @@
 -- WIRING IT LIVE: the profile it credits must be the one Persistence/PlayerSaves already holds for the player
 -- (the live server's only session lock on key p_<userId>), never one loaded through its own ProfileStore or
 -- Persistence/Profiles: a second lock on the same key from the same server would lock the two out of each other.
+-- What a receipt grants is deps.grant's (default ReceiptLedger.grant, the saved wallet; Economy/StockOptions passes
+-- ReceiptLedger.grantOptions), and the durable write is deps.save's (default profile:save(); live, PlayerSaves'
+-- saveNow, which goes through that player's one queue of DataStore calls). deps.enabled false (the Flags switch)
+-- answers NotProcessedYet to everything: Roblox keeps the receipt and offers it again later.
 -- Interface: new(deps) -> Handler; handler:process(receiptInfo) -> Decision; handler.stats
 
 local Import = require("../Import")
@@ -26,8 +30,14 @@ export type Deps = {
 	profileOf: (playerId: number) -> ProfileStore.Profile?, -- nil while the player is absent or loading
 	catalog: Catalog,
 	now: () -> number,
+	-- credits the receipt into the profile's data and records it in the ledger, in one step (ReceiptLedger.grant)
+	grant: ((data: any, receipt: ReceiptLedger.Receipt, cents: number, now: number) -> (boolean, string?))?,
+	-- makes the profile durable: (true) once a write holding everything it had when called has landed
+	save: ((profile: ProfileStore.Profile, playerId: number) -> (boolean, string?))?,
+	enabled: (() -> boolean)?, -- false: everything is NotProcessedYet (default on)
 }
 export type Stats = {
+	off: number,
 	granted: number,
 	credited: number,
 	duplicates: number,
@@ -44,8 +54,23 @@ export type Handler = {
 
 local Receipts = {}
 
+local function save(self: Handler, profile: ProfileStore.Profile, playerId: number): boolean
+	local fn = self.deps.save
+	local ok = if fn then fn(profile, playerId) else profile:save()
+	return ok == true
+end
+
 local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 	local stats = self.stats
+	local enabled = self.deps.enabled
+	if enabled and not enabled() then
+		stats.off += 1
+		return "NotProcessedYet"
+	end
+	if type(receipt) ~= "table" or type(receipt.ProductId) ~= "number" or type(receipt.PlayerId) ~= "number" then
+		stats.unknownProduct += 1
+		return "NotProcessedYet"
+	end
 	local tier = Products.lookup(self.deps.catalog, receipt.ProductId)
 	local cents = if tier then Products.grantFor(tier, receipt) else nil
 	if cents == nil then
@@ -70,7 +95,7 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 			return "PurchaseGranted"
 		end
 	else
-		local ok = ReceiptLedger.grant(profile.data, receipt, cents, self.deps.now())
+		local ok = (self.deps.grant or ReceiptLedger.grant)(profile.data, receipt, cents, self.deps.now())
 		if not ok then
 			stats.saveFailed += 1
 			return "NotProcessedYet"
@@ -78,7 +103,7 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 		self.pending[key] = profile:markDirty()
 		stats.credited += 1
 	end
-	local saved = profile:save()
+	local saved = save(self, profile, receipt.PlayerId)
 	if saved and profile.savedRevision >= (self.pending[key] or 0) then
 		self.pending[key] = nil
 		stats.granted += 1
@@ -92,7 +117,7 @@ function Receipts.new(deps: Deps): Handler
 	return {
 		deps = deps,
 		pending = {},
-		stats = { granted = 0, credited = 0, duplicates = 0, notReady = 0, unknownProduct = 0, saveFailed = 0 },
+		stats = { off = 0, granted = 0, credited = 0, duplicates = 0, notReady = 0, unknownProduct = 0, saveFailed = 0 },
 		process = process,
 	}
 end
