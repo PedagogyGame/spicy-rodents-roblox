@@ -1,7 +1,9 @@
 --!strict
--- Minigames/Bowling/BallPath (brief v2 §13a "choose your angle and power, bowl"): the ball's line from the hand
--- to the pin deck: speed from power, the angle, a hook that only bends on the back end and bends more when
--- slow, gutters that keep the ball, the sweet band of the power meter, and the samples playback reads.
+-- Minigames/Bowling/BallPath (brief v2 §13a "choose your angle and power, bowl"; owner D32 "no way to put any
+-- angle or twist"): the ball's line from the hand to the pin deck: speed from power, the angle, the hook as real
+-- bowling has it (it skids on the oil, hooks on the dry back end, then rolls straight on; more spin and a slower
+-- ball bend more; the direction of the spin is the direction of the hook; a straight ball stays straight), gutters
+-- that keep the ball, the sweet band of the power meter, and the samples (with the spin) playback reads.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local BallPath = require("@shared/Minigames/Bowling/BallPath")
 local Rng = require("@shared/Util/Rng")
@@ -20,8 +22,9 @@ return function(t)
 			t.near(e.vx, 0, 0.001)
 			local speed = BallPath.speedOf(power)
 			local expect = (AlleyLayout.DECK_START - BallPath.RELEASE_D) / speed
-			t.truthy(e.t > expect and e.t < expect * 1.12, `power {power}: {e.t} s against {expect}`)
-			t.truthy(e.vd < speed and e.vd > speed - 6, "it slows a little, never much")
+			t.truthy(e.t > expect and e.t < expect * 1.2, `power {power}: {e.t} s against {expect}`)
+			-- (it skids until its spin catches up, then rolls: it loses a fifth of its speed or so, never a third)
+			t.truthy(e.vd < speed and e.vd > speed * 0.67, `power {power}: {e.vd} at the deck from {speed}`)
 			t.eq(path.gutterT, nil)
 			t.eq(path.tEnd, e.t)
 		end
@@ -42,37 +45,97 @@ return function(t)
 		t.eq(BallPath.releaseX(5), BallPath.releaseX(1))
 	end)
 
-	t.test("hook: nothing on the oil, a bend on the back end, more with more spin and at low speed", function()
-		local straight = throw(0.3, 0, 0.7, 0)
-		local hooked = throw(0.3, 0, 0.7, -1)
-		-- identical until the oil ends
-		local tOil = (BallPath.HOOK_START - BallPath.RELEASE_D) / BallPath.speedOf(0.7) - 0.05
+	t.test("hook: it skids on the oil, hooks on the dry back end, then rolls straight on", function()
+		local straight = throw(0.6, 0, 0.7, 0)
+		local hooked = throw(0.6, 0, 0.7, -1)
+		-- on the oil the hook ball barely leaves the straight line (a skid: a few boards at most)
+		local tOil = (BallPath.HOOK_START - BallPath.RELEASE_D) / BallPath.speedOf(0.7)
 		for i = 0, 10 do
 			local tt = tOil * i / 10
 			local xa = BallPath.at(straight, tt)
 			local xb = BallPath.at(hooked, tt)
-			t.near(xa, xb, 1e-9, `on the oil at {tt}`)
+			t.truthy(xa - xb >= -1e-9 and xa - xb < 0.35, `on the oil at {tt}: {xa - xb} studs apart`)
 		end
 		local e0 = straight.entry :: BallPath.Entry
 		local e1 = hooked.entry :: BallPath.Entry
-		local half = throw(0.3, 0, 0.7, -0.5).entry :: BallPath.Entry
-		t.truthy(e1.x < half.x and half.x < e0.x, "hook left moves left, more with more spin")
-		t.truthy(e0.x - e1.x > 0.8 and e0.x - e1.x < 2.5, `full hook breaks {e0.x - e1.x} studs`)
-		-- full hook at medium power comes into the pins at four to six degrees
+		-- most of the break comes on the back end: more in the last third than in the first two
+		local xOil = BallPath.at(hooked, tOil)
+		t.truthy((e0.x - e1.x) - (BallPath.at(straight, tOil) - xOil) > 2 * (BallPath.at(straight, tOil) - xOil))
+		t.truthy(e0.x - e1.x > 1 and e0.x - e1.x < 2.5, `full hook breaks {e0.x - e1.x} studs`)
+		-- full hook at medium power comes into the pins at five to eight degrees
 		local deg = math.deg(math.atan2(-e1.vx, e1.vd))
-		t.truthy(deg >= 4 and deg <= 6, `entry angle {deg}`)
-		-- slower ball, bigger break
+		t.truthy(deg >= 5 and deg <= 8, `entry angle {deg}`)
+		-- it stopped skidding on the back end, and from there it rolls: its spin goes the way it goes
+		local rollD = hooked.rollD :: number
+		t.truthy(rollD ~= nil and rollD > BallPath.OIL_D and rollD < AlleyLayout.DECK_START, `rolls from {rollD}`)
+		t.near(e1.rx, e1.vx, 0.002)
+		t.near(e1.rd, e1.vd, 0.002)
+		-- once rolling it goes straight on: the last samples lie on one line
+		local s = hooked.samples
+		local n = #s // 3
+		local slopes = {}
+		for k = n - 3, n - 1 do
+			if s[3 * k] > rollD + 1 then
+				table.insert(slopes, (s[3 * k + 2] - s[3 * k - 1]) / (s[3 * k + 3] - s[3 * k]))
+			end
+		end
+		t.truthy(#slopes >= 2)
+		for _, sl in slopes do
+			t.near(sl, slopes[1], 0.004, "rolling straight after the hook")
+		end
+		-- more spin bends more; a slower ball bends more, a harder one less
+		local half = throw(0.6, 0, 0.7, -0.5).entry :: BallPath.Entry
+		t.truthy(e1.x < half.x and half.x < e0.x, "hook left moves left, more with more spin")
 		local soft = throw(1, 0, 0.35, -1).entry :: BallPath.Entry
 		local hard = throw(1, 0, 1, -1).entry :: BallPath.Entry
 		local mid = throw(1, 0, 0.7, -1).entry :: BallPath.Entry
 		t.truthy(soft.x < mid.x - 0.5 and mid.x < hard.x - 0.2, `breaks {soft.x} {mid.x} {hard.x}`)
-		-- but a ball is never turned more than about seven degrees, however soft
-		local softest = throw(1, 0, 0, -1).entry :: BallPath.Entry
-		t.truthy(-softest.vx / softest.vd <= BallPath.HOOK_MAX_TURN + 0.005, "the turn is capped")
-		-- hook right is the mirror
-		local r = throw(-0.3, 0, 0.7, 1).entry :: BallPath.Entry
+		-- and however soft, never more than about fourteen degrees across the lane
+		local softest = throw(1, 0, 0.1, -1)
+		local sx = softest.samples
+		local worst = 0
+		for k = 3, #sx // 3 do
+			local dx = sx[3 * k - 1] - sx[3 * k - 4]
+			local dd = sx[3 * k] - sx[3 * k - 3]
+			if dd > 0.01 and (softest.gutterT == nil or sx[3 * k - 2] < softest.gutterT) then
+				worst = math.max(worst, math.abs(math.deg(math.atan2(dx, dd))))
+			end
+		end
+		t.truthy(worst < 14, `the softest full hook turns {worst} degrees`)
+		-- spin direction honoured: hook right is the mirror, bending right
+		local r = throw(-0.6, 0, 0.7, 1).entry :: BallPath.Entry
 		t.near(r.x, -e1.x, 1e-9)
 		t.near(r.vx, -e1.vx, 1e-9)
+		t.truthy(r.vx > 0 and r.x > (throw(-0.6, 0, 0.7, 0).entry :: BallPath.Entry).x + 1)
+	end)
+
+	t.test("a straight ball is still possible: no spin, no bend, from anywhere on the line at any angle", function()
+		for _, c in { { 0, 0, 0.7 }, { 0.8, -0.05, 0.4 }, { -0.5, 0.03, 1 }, { 0.3, 0, 0 } } do
+			local path = throw(c[1], c[2], c[3], 0)
+			local e = path.entry :: BallPath.Entry
+			t.truthy(e ~= nil)
+			-- the angle it left the hand at is the angle it arrives at
+			t.near(math.atan2(e.vx, e.vd), c[2], 1e-3, `throw {c[1]} {c[2]} {c[3]}`)
+			t.near(e.x, BallPath.releaseX(c[1]) + math.tan(c[2]) * (AlleyLayout.DECK_START - BallPath.RELEASE_D), 0.02)
+			-- its spin rolls it the way it goes all the way
+			for i = 1, #path.spin, 2 do
+				t.near(path.spin[i], c[2], 2e-3)
+			end
+		end
+	end)
+
+	t.test("the spin is drawn: its axis starts turned toward the hook and comes round to the line", function()
+		local path = throw(0.6, 0.02, 0.7, -1)
+		local w = path.spin
+		t.eq(#w, 2 * (#path.samples // 3))
+		t.near(w[1], 0.02 - BallPath.AXIS_MAX, 1e-3, "at the release the spin is turned toward the hook's side")
+		local e = path.entry :: BallPath.Entry
+		t.near(w[#w - 1], math.atan2(e.vx, e.vd), 2e-3, "by the pins it rolls the way it goes")
+		for i = 4, #w, 2 do
+			t.truthy(w[i] > w[i - 2], "the ball keeps turning")
+		end
+		local _, _, _, turn, heading = BallPath.at(path, 1)
+		t.truthy(turn > 10 and heading < 0.02, `{turn} radians turned, heading {heading}`)
 	end)
 
 	t.test("mirror: negating offset, angle and spin mirrors every sample exactly", function()

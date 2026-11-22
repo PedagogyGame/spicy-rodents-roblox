@@ -2,13 +2,16 @@
 -- tests/isolated/bowling_client.luau: cases for tests/unit/bowling_client.spec.luau, run in their own Lune
 -- process (tests/lib/Isolated) because they install fake engine globals (tests/lib/FakeEngine).
 -- Client/Minigames/BowlingClient driven by fake input and fake frames: a turn from the server's "your turn"
--- to the camera handed back. Aim with the keys and the mouse, the meter, one "release" sent; the throw
--- camera follows the ball, cuts once to the pins and is released when the frame is over; a refused throw and
--- a throw the server never answers both hand the controls back with words; typing in chat moves nothing; a
--- click on a button is not a throw; the second ball keeps the line; stop() cleans up.
+-- to the camera handed back. Aim with the keys and the mouse (where you stand and the target arrow), the meter,
+-- the approach (four steps, the swing, the slide: the body walks to the line, its joints turn and are put back)
+-- and one "release" sent at its end; the throw camera follows the ball, cuts once to the pins and is released when
+-- the frame is over; a refused throw and a throw the server never answers both hand the controls back with words;
+-- typing in chat moves nothing; a click on a button is not a throw; the second ball keeps the line; stop() cleans
+-- up.
 -- Interface: return function(t) (the spec shape)
 local AimModel = require("@shared/Minigames/Bowling/AimModel")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local Approach = require("@shared/Minigames/Bowling/Approach")
 local PinModel = require("@shared/Minigames/Bowling/PinModel")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
 local Shots = require("@shared/Minigames/Bowling/Shots")
@@ -31,7 +34,7 @@ type Rig = {
 	now: number,
 }
 
-local function rig(): Rig
+local function rig(body: any?): Rig
 	local r: Rig = { bowler = nil, sent = {}, shots = {}, released = 0, controls = {}, toasts = {}, ui = {}, now = 50 }
 	local ui = {
 		touched = nil :: any,
@@ -82,7 +85,7 @@ local function rig(): Rig
 			table.insert(r.toasts, text)
 		end,
 		body = function(): any
-			return nil
+			return body
 		end,
 	})
 	return r
@@ -113,6 +116,9 @@ local function key(code: any, down: boolean, processed: boolean?)
 	FakeEngine.input(if down then "began" else "ended", { KeyCode = code, UserInputType = Kind.Keyboard }, processed)
 end
 
+-- the time from letting go of the button to the release (the approach)
+local APPROACH = BowlingClient.APPROACH + 0.05
+
 local function dots(): number
 	local n = 0
 	for _, c in FakeEngine.workspace().CurrentCamera:GetChildren() do
@@ -139,10 +145,15 @@ return function(t)
 				t.truthy(string.find(r.ui.statusText, "Z/X", 1, true) ~= nil)
 				t.truthy(#r.shots > 5, "the aiming shot is up")
 				t.truthy(dots() >= 12, `{dots()} aim dots on the lane`)
+				local cam = FakeEngine.workspace().CurrentCamera
+				t.truthy(
+					cam:FindFirstChild("AimStand") and cam:FindFirstChild("AimTargetL"),
+					"the stand and target marks"
+				)
 				t.eq(r.ui.hookNotch, 0)
 				t.truthy(r.ui.clockLeft ~= nil and r.ui.clockLeft <= 60 and r.ui.clockLeft > 59)
 				t.eq(r.ui.clockWarning, nil)
-				-- step right, aim left, hook
+				-- step right, move the target left, hook
 				key(Key.D, true, true) -- (the control module marks WASD processed: a key still counts)
 				frames(r, 0.5)
 				key(Key.D, false)
@@ -150,7 +161,8 @@ return function(t)
 				key(Key.Left, true)
 				frames(r, 0.5)
 				key(Key.Left, false)
-				t.near(r.bowler.aim.angle, -0.5 * AimModel.AIM_RATE, 0.002)
+				t.near(r.bowler.aim.target, -0.5 * AimModel.TARGET_RATE, 0.02)
+				t.near(r.bowler.aim.angle, AimModel.angleOf(r.bowler.aim.offset, r.bowler.aim.target), 1e-9)
 				key(Key.Z, true)
 				key(Key.Z, false)
 				frames(r, 0.05)
@@ -158,12 +170,12 @@ return function(t)
 				FakeEngine.input("changed", { UserInputType = Kind.MouseWheel, Position = roblox.Vector3.new(0, 0, 1) })
 				frames(r, 0.05)
 				t.eq(r.ui.hookNotch, 0, "the wheel turns the hook back")
-				-- the mouse moves 200 pixels right: the angle turns by that much, on top of the keys' aim
-				local before = r.bowler.aim.angle
+				-- the mouse moves 200 pixels right: the target moves by that much, on top of the keys' aim
+				local before = r.bowler.aim.target
 				FakeEngine.uis().mouse = roblox.Vector2.new(960 + 200, 500)
 				frames(r, 0.05)
-				t.near(r.bowler.aim.angle, before + 200 * AimModel.MOUSE_SENS, 1e-6)
-				local aimed = r.bowler.aim.angle
+				t.near(r.bowler.aim.target, before + 200 * AimModel.MOUSE_SENS, 1e-6)
+				local aimed = r.bowler.aim.target
 				-- a locked cursor (first person) reports travel instead of position
 				FakeEngine.uis().MouseBehavior = roblox.Enum.MouseBehavior.LockCenter
 				FakeEngine.input(
@@ -171,7 +183,7 @@ return function(t)
 					{ UserInputType = Kind.MouseMovement, Delta = roblox.Vector3.new(-50, 0, 0) }
 				)
 				frames(r, 1 / 60)
-				t.near(r.bowler.aim.angle, aimed - 50 * AimModel.MOUSE_SENS, 1e-6)
+				t.near(r.bowler.aim.target, aimed - 50 * AimModel.MOUSE_SENS, 1e-6)
 				FakeEngine.uis().MouseBehavior = roblox.Enum.MouseBehavior.Default
 				frames(r, 0.05)
 				aimed = r.bowler.aim.angle
@@ -182,6 +194,12 @@ return function(t)
 				t.deepEq(r.ui.meterSweet, AimModel.SWEET)
 				t.truthy(string.find(r.ui.meterText :: string, "green", 1, true) ~= nil)
 				key(Key.Space, false)
+				-- the approach: nothing goes out until the release at its end
+				t.eq(#r.sent, 0)
+				t.eq(dots(), 0, "the aim line goes as the bowler walks up")
+				frames(r, BowlingClient.APPROACH - 0.1)
+				t.eq(#r.sent, 0)
+				frames(r, 0.15)
 				t.eq(#r.sent, 1)
 				t.eq(r.sent[1].verb, "release")
 				t.near(r.sent[1].args[1], r.bowler.aim.offset, 1e-9)
@@ -209,6 +227,7 @@ return function(t)
 				key(Key.Space, true)
 				frames(r, 1.0)
 				key(Key.Space, false)
+				frames(r, APPROACH)
 				t.eq(#r.sent, 1)
 				local script =
 					RollScript.build({ offset = 0.165, angle = 0, power = 0.7, spin = 0 }, PinModel.fullRack(), 5)
@@ -263,6 +282,7 @@ return function(t)
 			key(Key.Space, true)
 			frames(r, 1.0)
 			key(Key.Space, false)
+			frames(r, APPROACH)
 			local script = RollScript.build({ offset = 0.5, angle = 0, power = 0.7, spin = 0 }, PinModel.fullRack(), 4)
 			t.truthy(script.down < 10)
 			r.bowler:onRoll({ seat = 1 }, script)
@@ -281,6 +301,7 @@ return function(t)
 			key(Key.Space, true)
 			frames(r, 0.9)
 			key(Key.Space, false)
+			frames(r, APPROACH)
 			t.eq(#r.sent, 2)
 			r.bowler:stop()
 			BowlingClient.clock = os.clock
@@ -294,12 +315,14 @@ return function(t)
 			key(Key.Space, true)
 			frames(r, 1.0)
 			key(Key.Space, false)
+			frames(r, APPROACH)
 			t.eq(#r.sent, 1)
 			r.bowler:onRefused({ verb = "release", text = "Wait for the pinsetter and the ball" })
 			t.truthy(AimModel.canAim(r.bowler.aim))
 			key(Key.Space, true)
 			frames(r, 1.0)
 			key(Key.Space, false)
+			frames(r, APPROACH)
 			t.eq(#r.sent, 2, "the next hold-and-release throws again")
 			-- this one is never answered (dropped by a rate limit, a lost packet)
 			frames(r, BowlingClient.SEND_TIMEOUT + 0.2)
@@ -309,6 +332,7 @@ return function(t)
 			key(Key.Space, true)
 			frames(r, 1.0)
 			key(Key.Space, false)
+			frames(r, APPROACH)
 			t.eq(#r.sent, 3)
 			-- a refusal of something else (Start now in mid-game) does not disturb a throw on its way
 			r.bowler:onRefused({ verb = "start", text = "already playing" })
@@ -345,6 +369,7 @@ return function(t)
 				FakeEngine.input("began", { UserInputType = Kind.MouseButton1 }, false)
 				frames(r, 0.9)
 				FakeEngine.input("ended", { UserInputType = Kind.MouseButton1 }, false)
+				frames(r, APPROACH)
 				t.eq(#r.sent, 1)
 				-- Bob's turn: Space does nothing here, the status line says whose go it is
 				local r2 = rig()
@@ -378,7 +403,7 @@ return function(t)
 				state(r, 1, true)
 				frames(r, 1.0)
 				t.eq(r.bowler.aim.offset, 0, "the held D did not walk me along the foul line")
-				t.eq(r.bowler.aim.angle, 0, "the held arrow did not turn my aim")
+				t.eq(r.bowler.aim.target, 0, "the held arrow did not move my target")
 				t.eq(r.bowler.aim.charging, false, "the held Space did not start the meter")
 				key(Key.Space, false)
 				t.eq(#r.sent, 0, "and letting it go threw nothing")
@@ -391,6 +416,7 @@ return function(t)
 				key(Key.Space, true)
 				frames(r, 0.9)
 				key(Key.Space, false)
+				frames(r, APPROACH)
 				t.eq(#r.sent, 1)
 				-- a meter left running when the turn clock took the frame away is not the next frame's throw
 				local r2 = rig()
@@ -462,8 +488,91 @@ return function(t)
 			r2.ui.touched.down("bowl")
 			frames(r2, 1.0)
 			r2.ui.touched.up("bowl")
+			frames(r2, APPROACH)
 			t.eq(#r2.sent, 1)
-			t.eq(r2.sent[1].args[4], 0.5)
+			t.eq(r2.sent[1].args[4], 1 / AimModel.NOTCHES)
+			r2.bowler:stop()
+			BowlingClient.clock = os.clock
+		end)
+	end)
+	t.test("the approach: four steps up to the line, the swing and the slide, the joints put back after", function()
+		FakeEngine.with(function()
+			local root = FakeEngine.part("HumanoidRootPart", roblox.CFrame.new(0, 7, 0))
+			local body = FakeEngine.model("Bowler", roblox.CFrame.new(0, 7, 0))
+			root.Parent = body
+			body.PrimaryPart = root
+			local joints = {}
+			for _, name in { "RightShoulder", "LeftHip", "LeftKnee", "RightHip", "Waist" } do
+				local j = FakeEngine.new("Motor6D", name, { C0 = roblox.CFrame.new(0, 1, 0) })
+				j.Parent = body
+				joints[name] = j
+			end
+			local r = rig(body)
+			state(r, 1, true)
+			frames(r, 0.1)
+			-- waiting at the back of the approach, ball in hand
+			local function dOf(): number
+				local p = root.CFrame.Position
+				local _, _, d = AlleyLayout.toLocal(PLACE, p.X, p.Y, p.Z)
+				return d
+			end
+			t.near(dOf(), Approach.START_D, 0.01)
+			t.near(root.CFrame.Position.Y, 7, 1e-6)
+			key(Key.Space, true)
+			frames(r, 1.0)
+			key(Key.Space, false)
+			-- walking up: always forward, the arm swung back before it comes through
+			local last = dOf()
+			local back, through = false, false
+			for _ = 1, math.floor(BowlingClient.APPROACH * 60) - 1 do
+				frames(r, 1 / 60)
+				local d = dOf()
+				t.truthy(d >= last - 1e-6, "never a step back")
+				last = d
+				local arm = joints.RightShoulder.C0
+				local rx = select(1, arm:ToEulerAnglesXYZ())
+				back = back or rx < -0.8
+				through = through or (back and rx > 0.3)
+			end
+			t.truthy(back and through, "the ball swung back and through")
+			t.eq(#r.sent, 0)
+			frames(r, 2 / 60)
+			t.eq(#r.sent, 1, "released at the end of the approach")
+			t.truthy(
+				dOf() > Approach.START_D + 5 and dOf() < AlleyLayout.FOUL_D - 0.5,
+				`at the line, short of it: {dOf()}`
+			)
+			-- facing down the line of the throw
+			local look = root.CFrame.LookVector
+			local fx, fz = AlleyLayout.dirToWorld(PLACE, 0, 1)
+			t.truthy(look.X * fx + look.Z * fz > 0.99, "facing down the lane")
+			-- the follow-through ends and every joint is as it was
+			frames(r, Approach.FOLLOW + 0.1)
+			for name, j in joints do
+				t.truthy(j.C0 == roblox.CFrame.new(0, 1, 0), `{name} put back`)
+			end
+			-- a body can never be stood into its pair's ball return, whatever the stand
+			for lane = 1, AlleyLayout.LANES do
+				for _, off in { -1, 0, 1 } do
+					local x = AlleyLayout.laneX(lane) + BowlingClient.bodyX(lane, off)
+					local px = AlleyLayout.pairX(AlleyLayout.pairOf(lane))
+					t.truthy(math.abs(x - px) >= BowlingClient.BODY_CLEAR - 1e-9, `lane {lane} offset {off}`)
+				end
+			end
+			r.bowler:stop()
+			-- the turn moved on during the approach: nothing is thrown, the joints are put back
+			local r2 = rig(body)
+			state(r2, 1, true)
+			key(Key.Space, true)
+			frames(r2, 0.8)
+			key(Key.Space, false)
+			frames(r2, 0.3)
+			state(r2, 2, true)
+			frames(r2, BowlingClient.APPROACH)
+			t.eq(#r2.sent, 0)
+			for name, j in joints do
+				t.truthy(j.C0 == roblox.CFrame.new(0, 1, 0), `{name} put back after a cut-short approach`)
+			end
 			r2.bowler:stop()
 			BowlingClient.clock = os.clock
 		end)

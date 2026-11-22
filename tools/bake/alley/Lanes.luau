@@ -53,15 +53,19 @@ local function board(kit: any, parent: any, lane: number)
 	local half = L.LANE_W / 2
 	-- collision bed (one smooth surface for the ball), boards drawn just above it
 	kit:box(parent, "Bed", x - half, x + half, L.DUCT_CEIL, -0.01, L.FOUL_D, L.DECK_START, MAPLE, "Wood")
-	-- the boards: one part per zone (maple heads, pine middle, maple at the pins) and a seam every other board
+	-- the boards: one part per zone (maple heads, pine middle, maple at the pins) and a seam every other board. The
+	-- heads and the pine are oiled (they shine a little: the ball skids there, Shared/Minigames/Bowling/BallPath
+	-- OIL_D); the back end before the deck is dry (D32: you can see where the hook will bite)
 	local strips = 13
 	local w = L.LANE_W / strips
-	local zones = { { L.FOUL_D, 16, MAPLE }, { 16, 40, PINE }, { 40, L.DECK_START, MAPLE2 } }
+	local zones = { { L.FOUL_D, 16, MAPLE, 0.1 }, { 16, 40, PINE, 0.1 }, { 40, L.DECK_START, MAPLE2, 0 } }
 	for _, z in zones do
+		local shine = z[4] :: number
 		kit:box(parent, "Boards", x - half + 0.006, x + half - 0.006, -0.012, 0, z[1], z[2], z[3], "Wood", {
 			collide = false,
 			query = false,
 			shadow = false,
+			reflectance = if shine > 0 then shine else nil,
 		})
 	end
 	for sIdx = 2, strips - 1, 2 do
@@ -103,9 +107,8 @@ local function board(kit: any, parent: any, lane: number)
 	)
 	-- target arrows: seven chevrons in a V pointing at the pins (boards 5..35)
 	for k = 1, 7 do
-		local ax = x - half + (k * 5 - 0.5) * (L.LANE_W / 39)
-		local depthBack = math.abs(k - 4)
-		local ad = L.ARROWS_D - depthBack * 0.55
+		local arrowX, ad = L.arrow(k)
+		local ax = x + arrowX
 		for side = -1, 1, 2 do
 			kit:at(
 				parent,

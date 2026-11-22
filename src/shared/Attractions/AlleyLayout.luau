@@ -43,7 +43,9 @@ AlleyLayout.GUTTER_DEPTH = 0.32
 
 AlleyLayout.APPROACH_D = -15 -- back of the approach
 AlleyLayout.FOUL_D = 0
-AlleyLayout.ARROWS_D = 14 -- target arrows (15 ft)
+AlleyLayout.ARROWS_D = 14 -- target arrows (15 ft): the middle one's tip; the others stand nearer, in a V
+AlleyLayout.BOARDS = 39 -- a real lane's boards across the bed
+AlleyLayout.ARROW_STAGGER = 0.55 -- each arrow out from the middle is this much nearer the bowler
 AlleyLayout.HEAD_D = 56 -- head pin
 AlleyLayout.PIN_SPACING = 1.16 -- 12 in centre to centre
 AlleyLayout.ROW_D = AlleyLayout.PIN_SPACING * math.sqrt(3) / 2
@@ -151,6 +153,21 @@ function AlleyLayout.pinSpots(): { { number } }
 		{ s / 2, 3 * r },
 		{ 1.5 * s, 3 * r },
 	}
+end
+
+-- The target arrows (k = 1..7, left to right as the bowler sees them; on boards 35, 30 .. 5 counted from the right
+-- as a right-hander counts): the tip of arrow k across the lane from its centre and down it. The bake draws them
+-- here and the aim (Minigames/Bowling/AimModel) rolls the ball over them.
+function AlleyLayout.arrow(k: number): (number, number)
+	local bw = AlleyLayout.LANE_W / AlleyLayout.BOARDS
+	return -AlleyLayout.LANE_W / 2 + (k * 5 - 0.5) * bw,
+		AlleyLayout.ARROWS_D - math.abs(k - 4) * AlleyLayout.ARROW_STAGGER
+end
+
+-- Where the line of arrows is at x across the lane (the V through their tips).
+function AlleyLayout.arrowsD(x: number): number
+	local step = 5 * AlleyLayout.LANE_W / AlleyLayout.BOARDS
+	return AlleyLayout.ARROWS_D - math.min(math.abs(x) / step, 3) * AlleyLayout.ARROW_STAGGER
 end
 
 function AlleyLayout.pinLocal(lane: number, n: number): (number, number)

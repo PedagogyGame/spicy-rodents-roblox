@@ -82,7 +82,36 @@ return function(t)
 			return area
 		end
 		local flat, steep = window(0), window(-5)
-		t.truthy(steep > flat * 1.2, `the strike window: {flat} studs straight, {steep} at five degrees`)
+		t.truthy(steep > flat * 1.4, `the strike window: {flat} studs straight, {steep} at five degrees`)
+	end)
+
+	t.test("the ball's spin drives it through the rack: an angled pocket hit carries more because of it", function()
+		-- the same five-degree pocket line with the deck's grip on the ball's spin, and with none (a ball that
+		-- only bounces off pins, as the model was before D32)
+		local line = entry(0.42, -5, 24)
+		local grip = PinModel.GRIP
+		local with = run(line, nil, 120)
+		local deflectWith = 0
+		for seed = 1, 40 do
+			local r = PinModel.roll(line, PinModel.fullRack(), seed)
+			deflectWith += r.ball[#r.ball - 3] / 40
+		end
+		PinModel.GRIP = 0
+		local without = run(line, nil, 120)
+		local deflectWithout = 0
+		for seed = 1, 40 do
+			local r = PinModel.roll(line, PinModel.fullRack(), seed)
+			deflectWithout += r.ball[#r.ball - 3] / 40
+		end
+		PinModel.GRIP = grip
+		t.truthy(
+			deflectWith < deflectWithout - 0.15,
+			`the ball leaves the deck at x {deflectWith} (spin) against {deflectWithout}`
+		)
+		t.truthy(with.strike > without.strike + 0.04, `strikes {with.strike} with the spin, {without.strike} without`)
+		-- a ball with no spin to speak of (a straight ball already rolling the way it goes) is unchanged by it
+		local straight = PinModel.roll(entry(2.45, 0, 24), PinModel.fullRack(), 1)
+		t.eq(#straight.ball, 10, "nothing touched, nothing rubbed: two key points")
 	end)
 
 	t.test("dead centre is not a strike ball: few strikes, many splits", function()
@@ -301,7 +330,7 @@ return function(t)
 
 	t.test("regression: five golden throws keep their exact leaves", function()
 		local golden: { { any } } = {
-			{ 0.25, 0, 26, 1, "8" },
+			{ 0.25, 0, 26, 1, "" },
 			{ 0, 0, 26, 2, "4-6-7-10" },
 			{ 0.75, 0, 26, 3, "1-2-4-8" },
 			{ 1.5, 0, 24, 4, "1-2-3-4-5-7-8" },

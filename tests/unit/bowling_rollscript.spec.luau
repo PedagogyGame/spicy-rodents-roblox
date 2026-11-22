@@ -284,7 +284,7 @@ return function(t)
 		t.eq(RollScript.check("roll"), nil)
 		t.eq(
 			broken(function(w)
-				w.v = 2
+				w.v = 1 -- a script from before the spin (D32)
 			end),
 			"version"
 		)
@@ -324,6 +324,25 @@ return function(t)
 				w.path.samples[4] = -1
 			end),
 			"path sample"
+		)
+		-- the spin (D32): one heading and turn per sample, the turn never running backwards
+		t.eq(
+			broken(function(w)
+				table.remove(w.path.spin)
+			end),
+			"path spin"
+		)
+		t.eq(
+			broken(function(w)
+				w.path.spin[4] = -5
+			end),
+			"path spin sample"
+		)
+		t.eq(
+			broken(function(w)
+				w.path.spin[3] = 0 / 0
+			end),
+			"path spin sample"
 		)
 		t.eq(
 			broken(function(w)

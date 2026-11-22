@@ -208,7 +208,7 @@ function BowlingLane._writeBall(self: any, b: { [string]: any })
 			ball.CFrame = self.rackCF
 		end
 	else
-		ball.CFrame = PartPose.ball(self.place, self.lane, b.x, b.y, b.d, b.turn)
+		ball.CFrame = PartPose.ball(self.place, self.lane, b.x, b.y, b.d, b.turn, b.heading)
 	end
 	self.ballWhere = b.where
 end

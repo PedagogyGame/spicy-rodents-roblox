@@ -210,12 +210,14 @@ return function(t)
 				send(r, stateMsg(r, 1, true, 4))
 				send(r, stateMsg(r, 1, true, 5))
 				t.truthy(card:GetChildren()[2] == firstRow, "same scorecard instances")
-				-- hold Space, let go: one release goes to the server; the meter shows its band and words meanwhile
+				-- hold Space, let go: the bowler walks up and one release goes to the server at the line; the meter
+				-- shows its band and words meanwhile
 				key(Key.Space, true)
 				frames(1.0)
 				t.truthy(r.gui:FindFirstChild("Meter").Visible)
 				t.truthy(has(texts(r.gui), "let go in the green"))
 				key(Key.Space, false)
+				frames(BowlingClient.APPROACH + 0.05)
 				local rel = lastSent(r)
 				t.eq(rel.verb, "release")
 				t.eq(#rel.args, 4)
@@ -231,6 +233,7 @@ return function(t)
 				key(Key.Space, true)
 				frames(1.0)
 				key(Key.Space, false)
+				frames(BowlingClient.APPROACH + 0.05)
 				t.eq(#r.input.fired, 4, "a second release went out")
 				-- the throw: its script arrives, the strike banner, the scorecard changes
 				local script =
@@ -328,6 +331,7 @@ return function(t)
 					key(Key.Space, true)
 					frames(0.1)
 					key(Key.Space, false)
+					frames(BowlingClient.APPROACH + 0.05)
 				end
 				-- a quick tap: almost no power. The slow ball pushes a pin along and its script is long
 				tap()

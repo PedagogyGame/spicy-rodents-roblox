@@ -13,7 +13,8 @@
 -- floor (the ball's y is its centre; a pin's y is how far its pivot has dropped from standing).
 -- Pure; Lune-tested (tests/unit/bowling_rollscript.spec.luau).
 -- Interface: build(params, mask, seed) -> Script; fake(mask, n) -> Script (n pins tip over where they stand:
---   the engine smoke's scripted pinfall); ball(script, t) -> (x, y, d, turn, where "hand" | "lane" | "pit")?;
+--   the engine smoke's scripted pinfall); ball(script, t) -> (x, y, d, turn, where "hand" | "lane" | "pit",
+--   heading)? (turn and heading: how far the ball has spun and the way its spin rolls it, BallPath.at);
 --   pin(script, n, t) -> (x, y, d, tilt, yaw, hidden); cues(script) -> { { t, name, volume } };
 --   check(any) -> (Script?, why?) (a table off the wire is validated before anything plays it); size(script)
 --   -> how many numbers it carries; FALL_TIME, PIT_HIDE
@@ -25,7 +26,7 @@ local PinModel = require("./PinModel")
 
 local RollScript = {}
 
-RollScript.VERSION = 1
+RollScript.VERSION = 2 -- 2: the ball's spin (BallPath.Path.spin; D32)
 RollScript.FALL_TIME = 0.35 -- seconds for a hit pin to go from standing to lying
 RollScript.LIE_DROP = 0.22 -- a lying pin's pivot is this much lower than a standing one's
 RollScript.PIT_HIDE = 0.3 -- seconds after going over the edge before a pin is out of sight
@@ -120,7 +121,11 @@ function RollScript.build(params: any, mask: { boolean }, seed: number): Script
 			flags = flagsOf(m, m, true, nil),
 		}
 	end
-	local deck = PinModel.roll({ x = entry.x, vx = entry.vx, vd = entry.vd }, m, (seed * 31 + 7) % 4294967296)
+	local deck = PinModel.roll(
+		{ x = entry.x, vx = entry.vx, vd = entry.vd, rx = entry.rx, rd = entry.rd },
+		m,
+		(seed * 31 + 7) % 4294967296
+	)
 	local tImpact = entry.t + (deck.firstHit or ((AlleyLayout.HEAD_D - AlleyLayout.DECK_START) / entry.vd))
 	local tBallEnd = entry.t + deck.ballEnd
 	return {
@@ -190,26 +195,39 @@ local function smooth(a: number): number
 	return a * a * (3 - 2 * a)
 end
 
+-- the velocity of the key point in force at tau (flat { t, x, d, vx, vd } key points)
+local function segVelocity(keys: { number }, tau: number): (number, number)
+	local n = #keys // 5
+	if n == 0 then
+		return 0, 0
+	end
+	local i = 1
+	while i < n and keys[5 * i + 1] <= tau do
+		i += 1
+	end
+	return keys[5 * i - 1], keys[5 * i]
+end
+
 -- The ball at time t: x, y (centre), d, how far it has turned, and where it is. nil for a script with no ball.
-function RollScript.ball(script: Script, t: number): (number?, number, number, number, string)
+function RollScript.ball(script: Script, t: number): (number?, number, number, number, string, number)
 	local path = script.path
 	if path == nil then
-		return nil, 0, 0, 0, "hand"
+		return nil, 0, 0, 0, "hand", 0
 	end
 	if t <= 0 then
-		local x, y, d, turn = BallPath.at(path, 0)
-		return x, y, d, turn, "hand"
+		local x, y, d, turn, heading = BallPath.at(path, 0)
+		return x, y, d, turn, "hand", heading
 	end
 	local deck = script.deck
-	local x, y, d, turn
+	local x, y, d, turn, heading
 	local vx, vd = 0, 0
 	if deck == nil or t <= script.tEntry then
 		if t <= path.tEnd then
-			x, y, d, turn = BallPath.at(path, t)
-			return x, y, d, turn, "lane"
+			x, y, d, turn, heading = BallPath.at(path, t)
+			return x, y, d, turn, "lane", heading
 		end
 		-- the end of a gutter ball: off the end of the channel
-		x, y, d, turn = BallPath.at(path, path.tEnd)
+		x, y, d, turn, heading = BallPath.at(path, path.tEnd)
 		local s = path.samples
 		local n = #s
 		local span = math.max(1e-3, s[n - 2] - s[n - 5])
@@ -217,11 +235,16 @@ function RollScript.ball(script: Script, t: number): (number?, number, number, n
 	else
 		local keys = deck.ball
 		local tau = math.min(t, script.tBallEnd) - script.tEntry
-		x, d = PinModel.segAt(keys, tau, 0)
+		local moving
+		x, d, moving = PinModel.segAt(keys, tau, 0)
 		y = BallPath.BALL_Y
-		turn = (d - BallPath.RELEASE_D) / (AlleyLayout.BALL_D / 2)
+		-- on the deck it rolls the way it goes: the turn carries on from the entry by the distance covered
+		local _, _, _, turnIn = BallPath.at(path, script.tEntry)
+		local kvx, kvd = segVelocity(keys, tau)
+		heading = if moving or kvx ~= 0 or kvd ~= 0 then math.atan2(kvx, kvd) else 0
+		turn = turnIn + (d - AlleyLayout.DECK_START) / (AlleyLayout.BALL_D / 2)
 		if t <= script.tBallEnd then
-			return x, y, d, turn, "lane"
+			return x, y, d, turn, "lane", heading
 		end
 		vx, vd = keys[#keys - 1], keys[#keys]
 	end
@@ -233,7 +256,7 @@ function RollScript.ball(script: Script, t: number): (number?, number, number, n
 	local px = math.clamp(x + vx * tau, -wall, wall)
 	local pd = math.min(d + math.max(vd, 4) * tau, AlleyLayout.CUSHION_D - 0.8)
 	local py = math.max(AlleyLayout.PIT_Y + R, y - 0.5 * RollScript.GRAVITY * tau * tau)
-	return px, py, pd, turn + tau * 6, "pit"
+	return px, py, pd, turn + tau * 6, "pit", heading
 end
 
 -- Pin n at time t: x, y (how far its pivot has dropped), d, tilt (radians, 0 standing .. pi/2 lying), yaw (the
@@ -323,7 +346,7 @@ end
 function RollScript.size(script: Script): number
 	local n = 12
 	if script.path then
-		n += #script.path.samples + 6
+		n += #script.path.samples + #script.path.spin + 6
 	end
 	local deck = script.deck
 	if deck then
@@ -413,7 +436,7 @@ function RollScript.check(w: any): (Script?, string?)
 	if
 		type(p) ~= "table"
 		or not num(p.offset, -1, 1)
-		or not num(p.angle, -0.2, 0.2)
+		or not num(p.angle, -BallPath.RANGES.angle, BallPath.RANGES.angle)
 		or not num(p.power, 0, 1)
 		or not num(p.spin, -1, 1)
 	then
@@ -445,6 +468,18 @@ function RollScript.check(w: any): (Script?, string?)
 		end
 		if not num(path.tEnd, 0, 20) or (path.gutterT ~= nil and not num(path.gutterT, 0, 20)) then
 			return nil, "path times"
+		end
+		-- the spin: a heading and a turn for every sample, the turn never going back
+		local spin = path.spin
+		if type(spin) ~= "table" or #spin ~= 2 * (#s // 3) then
+			return nil, "path spin"
+		end
+		local lastTurn = 0
+		for i = 1, #spin, 2 do
+			if not num(spin[i], -math.pi, math.pi) or not num(spin[i + 1], lastTurn, 5000) then
+				return nil, "path spin sample"
+			end
+			lastTurn = spin[i + 1]
 		end
 	end
 	local deck = w.deck
