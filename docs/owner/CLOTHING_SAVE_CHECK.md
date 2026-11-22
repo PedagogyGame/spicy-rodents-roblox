@@ -7,8 +7,8 @@ Everything below has been tested without a screen, including failing saves, two 
 ## What counts as clothing
 | Item | Where it is sold | Saved between servers? |
 |---|---|---|
-| **Alley shirt** (10c, a navy shirt) | The bowling alley's gift shop, at the cash desk | **Yes**, and whether you have it on |
-| **Paintball gear** (100c) | The paintball lobby's gear counter, which is not built yet | **Yes**, once the counter sells it |
+| **Alley shirt** (S$1.00, a navy shirt) | The bowling alley's gift shop, at the cash desk | **Yes**, and whether you have it on |
+| **Paintball gear** (S$10.00) | The paintball lobby's gear counter, which is not built yet | **Yes**, once the counter sells it |
 | The sewer fashion stand's hats, jackets and trousers | Not built yet | **Yes**, once it is built (the stand will use the same wardrobe) |
 
 **Not clothing, so they stay on the server where they were bought:**
@@ -51,7 +51,7 @@ Play never stops or waits for saving, and nothing you have bought is ever taken 
 
 | # | What to try | What you should see |
 |---|---|---|
-| 1 | Press Play, pick a person, and walk into the bowling alley's lobby. Go into the gift shop (the glass shopfront marked GIFT SHOP) and press **E** at the cash desk (**Alley shirt**) | "Paid 10c for an alley shirt. You have S$2.90. It is yours on every server." The shirt on your person turns navy. Your money drops by 10c, once |
+| 1 | Press Play, pick a person, and walk into the bowling alley's lobby. Go into the gift shop (the glass shopfront marked GIFT SHOP) and press **E** at the cash desk (**Alley shirt**) | "Paid S$1.00 for an alley shirt. You have S$24.00. It is yours on every server." The shirt on your person turns navy. Your money drops by S$1.00, once |
 | 2 | Press **E** at the desk again, and then once more | "You take off your alley shirt." and then "You put on your alley shirt." Each time is free |
 | 3 | In the Explorer, select your player under Players and look at its Attributes | **ClothesSaved** = `saved`, and **Clothes** = `alley_shirt` while you have it on |
 | 4 | Pick another person from the menu (M) | The shirt moves with you to the new person, and the first person's shirt goes back to its own colour |

@@ -43,7 +43,7 @@ The lift and the Lookout are baked separately from the town. Run `lune run tools
 ## Known not done
 - **Nothing has run in the real engine.** The server checks cannot run until the key's Luau Execution permission is back. These are untested: seating a person on an anchored seat, the seated height (the rider may sit a little high or low on the bench), how riders look to *other* players, and the telescope's streaming of the town.
 - **No sound.** The cue points are named in `docs/AUDIO_BUDGET.md`; nothing is uploaded.
-- **The lunch is free** until the wallet (`feat/wallet`) lands. Then the one charge is 10 cents, in the counter's handler in `src/server/Rides/SkyLiftService.luau` (`hilltop_lunch` in `src/shared/Economy/EconomyRules.luau`).
+- **The lunch is free** until the wallet (`feat/wallet`) lands. Then the one charge is S$1.00 (D31), in the counter's handler in `src/server/Rides/SkyLiftService.luau` (`hilltop_lunch` in `src/shared/Economy/EconomyRules.luau`).
 - **The town from the top is drawn simply where the game has not loaded it**: houses as plain shapes with a roof and window bands, and trees as round crowns. The telescope loads the real streets it looks at; the terrace and the cabins do not.
 - **The hill is a mound on a flat plain**, steeper than "a slight hill". The trail is quicker on foot than the ride.
 - **Animals cannot ride** (people only, as planned).

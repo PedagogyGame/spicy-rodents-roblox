@@ -26,12 +26,12 @@ All of it is tested without a screen. Nobody has seen it inside Roblox yet, so t
 ## 2. Please check: seeing it
 | # | What to try | What you should see |
 |---|---|---|
-| 1 | Press **M** (the menu) | Under the role buttons: "Money  S$3.00   ·   Reputation  Good (0)" |
+| 1 | Press **M** (the menu) | Under the role buttons: "Money  S$25.00   ·   Reputation  Good (0)" |
 | 2 | With the menu open on a wide screen | Beside the wallet in the bottom-right corner, a "Reputation  Good (0)" line under your balance. It goes away when the menu closes |
 | 3 | Play normally | No reputation on screen at all |
 
 ## 3. Please check: the kick ball
-The kick ball is on sale in **Pepper's Corner Store for 7c**. It is a red rubber ball with a cream band. Look on the fourth low shelf unit, on the far side from the duct tape, at the front end.
+The kick ball is on sale in **Pepper's Corner Store for 70c**. It is a red rubber ball with a cream band. Look on the fourth low shelf unit, on the far side from the duct tape, at the front end.
 
 | # | What to try | What should happen |
 |---|---|---|
@@ -59,7 +59,7 @@ Mopeds and scooters still carry one person.
 2. **What should the menu show: the word and the number ("Fair (-10)"), or just the word?** Default: both.
 3. **Should hitting the computer's townspeople with the ball count?** Default: yes, the same as hitting players.
 4. **How fast should it come back?** Default: one point every 3 minutes. From one bad act (-10), you are back to Good after about 18 minutes.
-5. **Is 7c the right price for the kick ball?** The frisbee is 5c and the football 6c.
+5. **Is 70c the right price for the kick ball?** The frisbee is 50c and the football 60c (every price went up ten times with the pay, D31).
 
 ## 6. What it costs (phones)
 - **The kick ball:** 2 parts in the hand, a ball and its band (2 more on the shelf, plus 2 copies beside it). While a hard ball is flying, the server checks about 100 nearby people once per frame. Nothing runs when no ball is flying.
