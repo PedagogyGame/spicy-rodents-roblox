@@ -58,7 +58,7 @@ return function(t)
 			end
 			for _, rec in d:forks() do
 				local trunk = reg:get(rec.trunk)
-				if trunk and trunk.kind == "trunk" then
+				if trunk and trunk.kind == "trunk" and trunk.origin ~= "lampPost" then
 					climbable += 1
 					local h = have[rec.trunk]
 					t.truthy(h ~= nil and h.nook >= 1 and h.stash >= 1, `{trunk.name}: a nook with a stash`)
