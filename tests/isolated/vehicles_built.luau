@@ -343,4 +343,188 @@ return function(t)
 		-- (board, tyres) bring it to 84)
 		t.truthy(total <= 90, `the parked fleet: {total} shadow casters (240 before the bikes pass)`)
 	end)
+
+	-- owner D32: "a little bit of glitching when you're turning or just kind of adjusting your steering direction.
+	-- There's like a whole flash of a glitch across the whole screen" (the scooter and the moped, first person on entry)
+	t.test(
+		"D32: steering the leaning rides: the box never in the road, the eye never jumps, the hidden parts stay",
+		function()
+			local CarMotor = require("@shared/Movement/CarMotor")
+			local Units = require("@shared/Config/Units")
+			local Vehicle = require("@client/Controllers/Vehicle")
+			local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
+			local dt = 1 / 60
+			-- the steering: straight to speed, then taps and holds both ways (A / D "adjusting the direction")
+			local function steerAt(f: number): number
+				if f < 90 then
+					return 0
+				end
+				local k = (f - 90) % 150
+				local side = if math.floor((f - 90) / 150) % 2 == 0 then 1 else -1
+				if k < 8 then
+					return side -- a tap
+				elseif k < 40 then
+					return 0
+				elseif k < 100 then
+					return -side -- a hold the other way
+				end
+				return 0
+			end
+			-- a one-frame wobble of the drawn root's lean (what the physics did to a box pressed into the road): the
+			-- camera must not pass it on
+			local seed = 12345
+			local function wobble(): number
+				seed = (seed * 1103515245 + 12345) % 2147483648
+				return (seed / 2147483648 - 0.5) * 0.06
+			end
+			for _, id in { "moped", "escooter", "bike" } do
+				local m = Placeholder.build(id, id)
+				local eyeRel = CFrame.new(at(Placeholder.eyeSocket(m)))
+				local k = VehicleKinds.kind(id)
+				local half = k.size[2] / 2
+				local s = CarMotor.new(id, 0, half, 0, 0)
+				local world = {
+					groundAt = function(): number
+						return 0
+					end,
+				}
+				-- the parts the camera hides round the eye on entry (CameraRig.seeOut at the eye, upright, parked)
+				local drawn = {}
+				for _, d in m:GetDescendants() do
+					if d:IsA("BasePart") and d.Transparency < 1 then
+						table.insert(drawn, d)
+					end
+				end
+				local function nearSet(eye: any, root: any): { [any]: boolean }
+					local out = {}
+					for _, d in drawn do
+						local kk =
+							CameraRig.seeOut(eye, root * d.CFrame, d.Size, d.Material == roblox.Enum.Material.Glass)
+						if kk == 1 then
+							out[d] = true
+						end
+					end
+					return out
+				end
+				local entry = nearSet(eyeRel.Position, CFrame.new())
+				local shown = 0
+				local lastNew, lastOld, lastRollNew, lastRollOld = nil, nil, nil, nil
+				local jumpNew, jumpOld, rollNew, rollOld = 0, 0, 0, 0
+				local swingNew, swingOld, leanMax, lowest, extra = 0, 0, 0, math.huge, 0
+				for f = 1, 60 * 10 do
+					CarMotor.step(s, { throttle = 1, steer = steerAt(f), handbrake = false }, dt, world)
+					local lift = Vehicle.leanLift(id, s.lean)
+					local root = Units.yawCFrame(s.yaw, Vector3.new(s.x, s.y, s.z))
+						* CFrame.new(0, lift, 0)
+						* CFrame.Angles(0, 0, s.lean)
+					leanMax = math.max(leanMax, math.abs(s.lean))
+					-- the leaned box's lowest corner, over the road (0) it stands on
+					for _, cx in { -1, 1 } do
+						for _, cy in { -1, 1 } do
+							for _, cz in { -1, 1 } do
+								local c = root * Vector3.new(cx * k.size[1] / 2, cy * half, cz * k.size[3] / 2)
+								lowest = math.min(lowest, c.Y)
+							end
+						end
+					end
+					if s.lean ~= 0 then
+						-- the least lift: the lowest corner just on the road, not above it
+						local lo = math.huge
+						for _, cx in { -1, 1 } do
+							for _, cy in { -1, 1 } do
+								lo = math.min(lo, (root * Vector3.new(cx * k.size[1] / 2, cy * half, 0)).Y)
+							end
+						end
+						extra = math.max(extra, lo)
+					end
+					local drawnRoot = root * CFrame.Angles(0, 0, wobble())
+					shown = CameraRig.rollStep(shown, CameraRig.rollOf(drawnRoot), dt)
+					local cam = CameraRig.rideEye(drawnRoot, eyeRel, shown)
+					local old = drawnRoot * eyeRel -- the camera before D32: the eye socket as the root carried it
+					-- the eye's place in the vehicle's upright frame (its travel and its turn taken out), frame to frame
+					local up = CameraRig.upright(drawnRoot)
+					local relNew, relOld = up:PointToObjectSpace(cam.Position), up:PointToObjectSpace(old.Position)
+					if lastNew then
+						jumpNew = math.max(jumpNew, (relNew - lastNew).Magnitude)
+						jumpOld = math.max(jumpOld, (relOld - lastOld).Magnitude)
+						rollNew = math.max(rollNew, math.abs(CameraRig.rollOf(cam) - lastRollNew))
+						rollOld = math.max(rollOld, math.abs(CameraRig.rollOf(old) - lastRollOld))
+					end
+					lastNew, lastOld = relNew, relOld
+					lastRollNew, lastRollOld = CameraRig.rollOf(cam), CameraRig.rollOf(old)
+					-- sideways from where it sits upright
+					swingNew = math.max(swingNew, math.abs(relNew.X - eyeRel.Position.X))
+					swingOld = math.max(swingOld, math.abs(relOld.X - eyeRel.Position.X))
+					-- no part the camera did not hide on entry comes round it (nothing is shown and hidden in turn)
+					for d in nearSet(cam.Position, drawnRoot) do
+						t.truthy(entry[d], `{id}: {d.Name} comes round the eye at frame {f} (not hidden on entry)`)
+					end
+				end
+				print(
+					string.format(
+						"      %s: lean up to %.2f rad; eye jump a frame %.3f st (rigid %.3f), roll a frame %.2f deg (rigid %.2f), swing %.2f st (rigid %.2f), lowest corner %.4f",
+						id,
+						leanMax,
+						jumpNew,
+						jumpOld,
+						math.deg(rollNew),
+						math.deg(rollOld),
+						swingNew,
+						swingOld,
+						lowest
+					)
+				)
+				t.truthy(leanMax > 0.4, `{id}: the sweep leans it (to {leanMax})`)
+				t.truthy(lowest >= -1e-6, `{id}: the leaned box stays out of the road ({lowest})`)
+				t.truthy(extra <= 1e-6, `{id}: and is lifted no more than that ({extra})`)
+				t.truthy(jumpNew <= 0.05, `{id}: the eye moves at most 0.05 st a frame against the vehicle ({jumpNew})`)
+				t.truthy(math.deg(rollNew) <= 1, `{id}: the view turns at most a degree a frame about its axis`)
+				t.truthy(swingNew <= 0.4 * swingOld, `{id}: the eye swings well under half as far as the rigid eye did`)
+				-- (the old camera, for the record: it carried every wobble and the whole lean)
+				t.truthy(math.deg(rollOld) > 3 * math.deg(rollNew), `{id}: the rigid eye's roll a frame was far worse`)
+			end
+		end
+	)
+
+	t.test("D32: third person: the driver is faded before the engine camera can come inside them", function()
+		local Vector3 = roblox.Vector3
+		for _, id in drawnKinds() do
+			local m = Placeholder.build(id, id)
+			local lo, hi = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") then
+					local h = d.Size / 2
+					for _, sx in { -1, 1 } do
+						for _, sy in { -1, 1 } do
+							for _, sz in { -1, 1 } do
+								local c = d.CFrame * Vector3.new(sx * h.X, sy * h.Y, sz * h.Z)
+								lo, hi = lo:Min(c), hi:Max(c)
+							end
+						end
+					end
+				end
+			end
+			local focus = Vector3.new(0, CameraRig.followLift(hi.Y - lo.Y), 0)
+			-- the driver (a seated or standing R15) round the seat: a stud each side, feet to the top of the head
+			local seat = child(m, "DriverSeat", nil)
+			local top = seatTop(seat)
+			local stands = VehicleKinds.stands(id)
+			local feet = if stands then top.Y else top.Y - Placeholder.SEATED.feetBelow
+			local head = top.Y + Placeholder.SEATED.head + 0.5
+			local reach = 0
+			for _, sx in { -1, 1 } do
+				for _, y in { feet, head } do
+					for _, sz in { -1, 1 } do
+						reach = math.max(reach, (Vector3.new(top.X + sx, y, top.Z + sz * 1.2) - focus).Magnitude)
+					end
+				end
+			end
+			local hideAt = CameraRig.riderHide(math.min(reach, CameraRig.RIDER_REACH))
+			t.truthy(hideAt < 8, `{id}: the fade starts inside the engine camera's least distance ({hideAt})`)
+			if id == "moped" or id == "escooter" or id == "bike" then
+				t.truthy(reach <= CameraRig.RIDER_REACH, `{id}: the rider's whole reach is counted ({reach})`)
+				t.eq(CameraRig.fadeAt(reach, hideAt), 1, `{id}: gone with the camera at their reach`)
+			end
+		end
+	end)
 end

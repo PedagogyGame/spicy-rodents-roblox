@@ -13,7 +13,15 @@
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
 --                            +/-110 degrees of the nose; vehicleThird follows the vehicle root. With
 --                            targets.free (the sky-lift gondola: a seat's EyeSocket) the look is free: no
---                            button, all the way round, no spring back (cars keep the right button by design)
+--                            button, all the way round, no spring back (cars keep the right button by design).
+--                            A leaning vehicle (the bike, the moped, the electric scooter; owner D32: "a whole flash
+--                            of a glitch across the whole screen" when steering) does not throw the camera with it:
+--                            the eye is taken in the vehicle's upright frame (its heading and place) and leans only
+--                            RIDE.roll of the vehicle's lean, eased (rollStep, rideEye), so a tap of A or D neither
+--                            whips the horizon nor swings the eye of a standing rider across the street. The parts
+--                            hidden round the eye (the driver's body, CameraRig.seeOut) are chosen once on entering
+--                            and never toggled after. vehicleThird fades the driver's body as the engine camera comes
+--                            close to it (riderHide: a wall behind pulls the camera in), so it is never inside it.
 --   drone                    the follow camera on the drone root
 --   overview / outbreak      a parked scriptable shot
 -- The orbit camera (owner 2026-11-10: "be sure that the mouse is controlling the camera view and that
@@ -35,7 +43,9 @@
 --   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
 --   (pure); tunnelPoint(hx, hy, hz, lx, lz, cast, keep?) -> x, y, z (pure); notify: ((text) -> ())?;
 --   seeOut(eye, cframe, size, glass) -> number? (pure: a vehicle part's LocalTransparencyModifier from the eye);
---   COCKPIT
+--   COCKPIT; RIDE; rollOf(cframe) -> radians (pure); upright(cframe) -> CFrame (pure); rollStep(shown, actual, dt) ->
+--   radians (pure); rideEye(root, eyeRel, shown) -> CFrame (pure); riderHide(radius) -> hideAt (pure); RIDER_PAD;
+--   RIDER_REACH; followLift(height) -> studs (pure)
 -- No side effects on require (services are looked up inside the functions).
 
 local Import = require("../Import")
@@ -158,6 +168,11 @@ function CameraRig.focusStep(
 	return px, py, pz
 end
 
+-- How far over a followed body's root its focus is, for a body `height` studs tall. Pure
+function CameraRig.followLift(height: number): number
+	return math.max(0.6, height * 0.6)
+end
+
 function CameraRig.follow(body: Model)
 	unbind()
 	local camera = workspace.CurrentCamera
@@ -179,7 +194,7 @@ function CameraRig.follow(body: Model)
 	local rootPart = root :: BasePart
 	local f = focusPart()
 	local _, size = body:GetBoundingBox()
-	local lift = math.max(0.6, size.Y * 0.6) -- look slightly above the body, not at its feet
+	local lift = CameraRig.followLift(size.Y) -- look slightly above the body, not at its feet
 	local pos = rootPart.Position + Vector3.new(0, lift, 0)
 	local last = pos
 	f.CFrame = CFrame.new(pos)
@@ -300,6 +315,49 @@ function CameraRig.seeOut(eye: Vector3, cframe: CFrame, size: Vector3, glass: bo
 		return 1
 	end
 	return if glass then CameraRig.COCKPIT.glass else nil
+end
+
+-- A leaning vehicle's first-person eye (owner D32). The camera leans RIDE.roll of the vehicle's lean, eased at RIDE.rate
+-- per second (a one-frame wobble of the physics is smoothed out with it), and the eye's place is taken in the vehicle's
+-- upright frame turned by that much lean, not by all of it: a standing rider's eyes are 3.5 studs over the box's centre,
+-- and the full lean (up to 0.5 rad) swung them 1.7 studs across in half a second at every steering tap.
+CameraRig.RIDE = { roll = 0.3, rate = 6 }
+
+-- The roll of a frame about its own forward axis (positive: its right side up), with its heading taken out. Pure
+function CameraRig.rollOf(cf: CFrame): number
+	local look, right = cf.LookVector, cf.RightVector
+	local fl = math.sqrt(look.X * look.X + look.Z * look.Z)
+	if fl < 1e-6 then
+		return 0
+	end
+	-- the upright right of that heading: (-look.Z, 0, look.X) flattened
+	local ux, uz = -look.Z / fl, look.X / fl
+	return math.atan2(right.Y, right.X * ux + right.Z * uz)
+end
+
+-- The frame at cf's place with only its heading (no lean, no pitch). Pure
+function CameraRig.upright(cf: CFrame): CFrame
+	local look = cf.LookVector
+	return CFrame.new(cf.Position) * CFrame.Angles(0, math.atan2(-look.X, -look.Z), 0)
+end
+
+-- One frame of the camera's lean following RIDE.roll of the vehicle's `actual` lean. Pure
+function CameraRig.rollStep(shown: number, actual: number, dt: number): number
+	local R = CameraRig.RIDE
+	return shown + (actual * R.roll - shown) * (1 - math.exp(-R.rate * math.max(dt, 0)))
+end
+
+-- The eye for a vehicle whose root frame is `root`, its EyeSocket `eyeRel` in that frame, leaning `shown`. Pure
+function CameraRig.rideEye(root: CFrame, eyeRel: CFrame, shown: number): CFrame
+	return CameraRig.upright(root) * CFrame.Angles(0, 0, shown) * eyeRel
+end
+
+-- vehicleThird: the camera distance from the focus at which the driver's body has started to fade, for a body that
+-- reaches `radius` studs from the focus: it is gone (fadeAt 1) with the camera RIDER_PAD outside that reach. Pure
+CameraRig.RIDER_PAD = 0.75
+CameraRig.RIDER_REACH = 4.4 -- the most reach counted: the fade then starts inside 8 studs, the engine camera's least
+function CameraRig.riderHide(radius: number): number
+	return (radius + CameraRig.RIDER_PAD) / 0.65
 end
 
 -- The gondola's free look from a seat (vehicleFirst with targets.free): dx, dy in radians as lookStep has them; the
@@ -667,12 +725,16 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			local free = targets.free == true
 			local GuiService = game:GetService("GuiService")
 			-- the eye sits where the driver's head is: hide the driver's own body on this screen
-			-- (the default camera does this only for its own first person)
-			local hidden: { BasePart } = {}
+			-- (the default camera does this only for its own first person); chosen once, never toggled
+			local hidden: { Instance } = {}
 			local driver = targets.body
 			-- and the vehicle's own parts round the eye (CameraRig.seeOut), once it is there; not the gondola's
 			local cleared: { BasePart }? = if free then {} else nil
 			local car: Instance = vehicle :: any
+			-- a vehicle (not the gondola): the eye in the vehicle's upright frame, leaning gently (RIDE)
+			local root = (vehicle :: Model).PrimaryPart
+			local eyeRel: CFrame? = nil
+			local shown = 0
 			bind(function(dt: number)
 				if cleared == nil then
 					local list: { BasePart } = {}
@@ -690,13 +752,16 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				end
 				if driver and #hidden == 0 then
 					for _, d in driver:GetDescendants() do
-						if d:IsA("BasePart") then
+						if d:IsA("BasePart") or d:IsA("Decal") then
 							table.insert(hidden, d)
 						end
 					end
 				end
 				for _, part in hidden do
-					part.LocalTransparencyModifier = 1
+					-- (kept at 1: something else may write it, e.g. a fade on the way in; a write only then)
+					if (part :: any).LocalTransparencyModifier ~= 1 then
+						(part :: any).LocalTransparencyModifier = 1
+					end
 				end
 				if free then
 					-- the gondola: the mouse is the look (as on foot), the cursor out for a menu or Left Alt
@@ -730,11 +795,19 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 					yaw *= 0.92
 					pitch *= 0.92
 				end
-				camera.CFrame = eye.WorldCFrame * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
+				local at = eye.WorldCFrame
+				if not free and root and root.Parent then
+					local rootCf = root.CFrame
+					local rel = eyeRel or rootCf:ToObjectSpace(at)
+					eyeRel = rel
+					shown = CameraRig.rollStep(shown, CameraRig.rollOf(rootCf), dt)
+					at = CameraRig.rideEye(rootCf, rel, shown)
+				end
+				camera.CFrame = at * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
 			end)
 			onUnbind = function()
 				for _, part in hidden do
-					part.LocalTransparencyModifier = 0
+					(part :: any).LocalTransparencyModifier = 0
 				end
 				local seen = cleared
 				if seen then
@@ -753,6 +826,45 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			CameraRig.follow(vehicle)
 			player.CameraMinZoomDistance = 8
 			player.CameraMaxZoomDistance = 60
+			-- the driver's body fades as the engine camera comes in close to it (a wall behind pulls it in), so the
+			-- camera is never inside the driver; read after the engine camera has moved, in the same frame
+			local driver = targets.body
+			if driver then
+				local parts: { Instance } = {}
+				for _, d in driver:GetDescendants() do
+					if d:IsA("BasePart") or d:IsA("Decal") then
+						table.insert(parts, d)
+					end
+				end
+				-- how far the driver's body reaches from the focus `follow` keeps over the vehicle (capped: faded only
+				-- inside the engine camera's least distance, CameraMinZoomDistance)
+				local cf, size = driver:GetBoundingBox()
+				local _, vsize = vehicle:GetBoundingBox()
+				local vroot = vehicle.PrimaryPart
+				local focusAt = (if vroot then vroot.Position else cf.Position)
+					+ Vector3.new(0, CameraRig.followLift(vsize.Y), 0)
+				local reach = (cf.Position - focusAt).Magnitude + size.Magnitude / 2
+				local hideAt = CameraRig.riderHide(math.min(reach, CameraRig.RIDER_REACH))
+				local faded = -1
+				local function fade(a: number)
+					if a == faded then
+						return
+					end
+					faded = a
+					for _, d in parts do
+						(d :: any).LocalTransparencyModifier = a
+					end
+				end
+				local RunService = game:GetService("RunService")
+				local name = "SpicyCameraRigRider"
+				RunService:BindToRenderStep(name, Enum.RenderPriority.Camera.Value + 1, function()
+					fade(CameraRig.fadeAt((camera.CFrame.Position - camera.Focus.Position).Magnitude, hideAt))
+				end)
+				onUnbind = function()
+					RunService:UnbindFromRenderStep(name)
+					fade(0)
+				end
+			end
 		end
 	elseif mode == "drone" then
 		local drone = targets.drone
