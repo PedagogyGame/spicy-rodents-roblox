@@ -31,5 +31,5 @@ You asked: "instead of being able to choose to play as police drone (operator) l
 
 ## Cost
 
-- No new parts in the town. An ambulance out with a doctor is the same drawing the traffic uses (about 30 parts), only while it is out (three at most); the fleet's own ambulance is hidden meanwhile.
+- No new parts in the town. An ambulance out with a doctor is the same drawing the traffic uses (at most 42 parts, the limit every player vehicle is held to), only while it is out (three at most); the fleet's own ambulance is hidden meanwhile.
 - Server: the doctors' rules run five times a second, a few distance checks per doctor. Client: the flashing looks at the vehicle folder ten times a second and changes two parts per ambulance out.
