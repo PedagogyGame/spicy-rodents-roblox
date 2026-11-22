@@ -833,7 +833,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 					steer = nil
 					return
 				end
-				local layout = assert(hollows)
+				local layout = assert(hollows, "the hollow trees are loaded")
 				-- the look: the mouse (unless the cursor is out) and the right stick
 				local typing = held or GuiService.MenuIsOpen or UIS:GetFocusedTextBox() ~= nil
 				local free = typing or UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or next(cursorWanted) ~= nil
