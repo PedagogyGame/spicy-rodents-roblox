@@ -96,38 +96,49 @@ return function(t)
 
 	t.test("the uploads: few, each with a checked candidate in the manifest, none recorded without a file", function()
 		local manifest = serde.decode("json", fs.readFile("assets/audio/candidates/manifest.json"))
-		local bySlot: { [string]: any } = {}
+		-- a slot's takes: its own candidate and any later take that "replaces" it (e.g. dog_bark_v2, owner D33);
+		-- the take in the game is the one whose file the slot names (tools/audio/publish.py --record points it)
+		local takes: { [string]: { any } } = {}
 		for _, c in manifest.candidates do
-			bySlot[c.slot] = c
+			local slot = c.replaces or c.slot
+			t.truthy(Uploads.SLOTS[slot] ~= nil, `{c.slot}: a take for the slot {slot}, which Uploads has`)
+			takes[slot] = takes[slot] or {}
+			table.insert(takes[slot], c)
 		end
 		local count = 0
 		for slot, s in Uploads.SLOTS do
-			count += 1
-			local c = bySlot[slot]
-			t.truthy(c ~= nil, `{slot} has a candidate in the manifest`)
-			if c then
-				t.eq(c.file, s.file, `{slot}: the same file`)
-				t.truthy(fs.isFile(s.file), `{s.file} is there`)
-				t.truthy(c.channels == 1 and c.seconds > 0 and c.seconds <= 7, `{slot}: mono, short`)
-				t.truthy(type(c.licence) == "string" and #c.licence > 0, `{slot}: its licence is recorded`)
-				t.truthy(type(c.how) == "string" and #c.how > 0, `{slot}: how it was made is recorded`)
+			count += #(takes[slot] or {})
+			local live = nil
+			for _, c in takes[slot] or {} do
+				local name = c.slot
+				t.truthy(fs.isFile(c.file), `{c.file} is there`)
+				t.truthy(c.channels == 1 and c.seconds > 0 and c.seconds <= 7, `{name}: mono, short`)
+				t.truthy(type(c.licence) == "string" and #c.licence > 0, `{name}: its licence is recorded`)
+				t.truthy(type(c.how) == "string" and #c.how > 0, `{name}: how it was made is recorded`)
 				-- level with the game's other short sounds, never clipping (tools/audio/make_candidates.py measures
 				-- the encoded file; tools/audio/publish.py measures it again before an upload)
 				t.truthy(
 					type(c.loudnessLufs) == "number" and c.loudnessLufs >= -16 and c.loudnessLufs <= -14,
-					`{slot}: {c.loudnessLufs} LUFS (want -16 to -14)`
+					`{name}: {c.loudnessLufs} LUFS (want -16 to -14)`
 				)
 				t.truthy(
 					type(c.truePeakDb) == "number" and c.truePeakDb <= -1,
-					`{slot}: true peak {c.truePeakDb} dBTP (want at most -1)`
+					`{name}: true peak {c.truePeakDb} dBTP (want at most -1)`
 				)
-				t.truthy(c.sampleRate == 44100, `{slot}: 44.1 kHz`)
-				t.eq(#c.cues, #s.cues)
+				t.truthy(c.sampleRate == 44100, `{name}: 44.1 kHz`)
+				t.eq(#c.cues, #s.cues, `{name}: the slot's cues`)
+				if c.file == s.file then
+					live = c
+				end
+			end
+			t.truthy(live ~= nil, `{slot}: the file it names is one of its takes in the manifest`)
+			if live then
 				-- an id in the game is the id in the manifest (tools/audio/publish.py --record writes both)
-				t.eq(s.id, c.assetId or "", `{slot}: the game's id is the manifest's`)
+				t.eq(s.id, live.assetId or "", `{slot}: the game's id is the manifest's`)
 			end
 			t.eq(Uploads.id(slot), if s.id == "" then "" else `rbxassetid://{s.id}`)
 		end
+		t.eq(count, #manifest.candidates, "every candidate is a take for a slot")
 		t.eq(count, manifest.uploadsPlanned)
 		t.truthy(count >= 1 and count <= UPLOAD_PLAN, `{count} uploads planned (at most {UPLOAD_PLAN})`)
 		-- the custom bark is one of them (owner #36)

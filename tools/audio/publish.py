@@ -1,7 +1,7 @@
 """The game's audio uploads: check the candidates, then record the ids the lead got (stdlib only).
 
   python3 -I tools/audio/publish.py --skip-upload              (check every candidate; print the lead's upload commands)
-  python3 -I tools/audio/publish.py --record dog_bark=123456789 [--moderation Approved] [--approve]
+  python3 -I tools/audio/publish.py --record dog_bark=123456789 [--moderation Approved] [--approve] [--take dog_bark_v2]
 
 Mirrors tools/blender/neighbourhood_shop/publish.py: the manifest (assets/audio/candidates/manifest.json, written
 by tools/audio/make_candidates.py) holds each candidate's file, length, loudness, true peak and content hash (sha),
@@ -13,6 +13,10 @@ tools/cloud or any network. Upload only a take that has been heard and approved 
 in docs/AUDIO_BUDGET.md "Uploads".
 --record writes the id into the manifest and into src/shared/Audio/Uploads.luau (the slot's `id = "..."`), which
 is all the game reads: the cue sounds from then on.
+A second take of a slot (a candidate with "replaces": "<slot>", e.g. dog_bark_v2) has its own file and sha and waits
+in the manifest beside the take in the game. --record <slot>=<assetId> records the id onto the slot's one waiting
+take (or onto the candidate --take names) and points the slot in Uploads.luau at that take's file as well; the
+earlier take keeps its old id in the manifest, the record of that upload.
 """
 import argparse
 import hashlib
@@ -64,12 +68,24 @@ def loudness(path):
     return float(i[-1]), float(tp[-1])
 
 
+def slot_of(c):
+    """The Uploads.luau slot a candidate is a take for: its own, or the one it replaces."""
+    return c.get("replaces") or c["slot"]
+
+
+def slot_block(luau, slot):
+    m = re.search(r"\b" + re.escape(slot) + r" = table\.freeze\(\{(.*?)\}\),\n", luau, re.S)
+    return m.group(1) if m else None
+
+
 def check(doc):
-    """Every candidate: its file exists, is mono Vorbis, short, small, the length the manifest says; and it has a
-    slot in Shared/Audio/Uploads naming the same file and cues."""
+    """Every candidate: its file exists, is mono Vorbis, short, small, the length the manifest says; and it is a
+    take for a slot in Shared/Audio/Uploads with the same cues. Each slot names one of its takes' files, and the
+    slot's id is that take's."""
     with open(UPLOADS_LUAU) as fh:
         luau = fh.read()
     problems = []
+    live = {}
     for c in doc["candidates"]:
         path = os.path.join(ROOT, c["file"])
         if not os.path.exists(path):
@@ -99,37 +115,63 @@ def check(doc):
             if not (LUFS_RANGE[0] <= lufs <= LUFS_RANGE[1]) or tp > MAX_TRUE_PEAK:
                 problems.append(f"{c['slot']}: {lufs} LUFS, {tp} dBTP (want {LUFS_RANGE[0]} to {LUFS_RANGE[1]} "
                                 f"LUFS, at most {MAX_TRUE_PEAK} dBTP)")
-        m = re.search(r"\b" + re.escape(c["slot"]) + r" = table\.freeze\(\{(.*?)\}\),\n", luau, re.S)
-        if m is None:
-            problems.append(f"{c['slot']}: no slot in src/shared/Audio/Uploads.luau")
-        elif f'file = "{c["file"]}"' not in m.group(1) or any(f'"{cue}"' not in m.group(1) for cue in c["cues"]):
-            problems.append(f"{c['slot']}: the Uploads.luau slot names another file or other cues")
+        block = slot_block(luau, slot_of(c))
+        in_game = False
+        if block is None:
+            problems.append(f"{c['slot']}: no slot {slot_of(c)} in src/shared/Audio/Uploads.luau")
+        elif any(f'"{cue}"' not in block for cue in c["cues"]):
+            problems.append(f"{c['slot']}: the Uploads.luau slot {slot_of(c)} names other cues")
+        elif f'file = "{c["file"]}"' in block:
+            in_game = True
+            live[slot_of(c)] = c
+            if f'id = "{c.get("assetId") or ""}"' not in block:
+                problems.append(f"{c['slot']}: the Uploads.luau slot's id is not this take's ({c.get('assetId')})")
         state = "uploaded " + c["assetId"] if c.get("assetId") else "to upload"
+        if c.get("replaces"):
+            state += f"; a take for {c['replaces']}" + ("" if in_game else ", not in the game yet")
+        elif not in_game:
+            state += "; replaced in the game by a later take"
         level = f"{lo[0]:5.1f} LUFS {lo[1]:5.1f} dBTP" if lo else "unmeasured"
         print(f"  {c['slot']:14s} {secs:5.2f} s {size:7d} B  {level}  cues {', '.join(c['cues'])}  ({state})")
+    for slot in sorted({slot_of(c) for c in doc["candidates"]} - set(live)):
+        if slot_block(luau, slot) is not None:
+            problems.append(f"{slot}: the Uploads.luau slot's file is none of its takes in the manifest")
     return problems
 
 
-def record(doc, slot, asset_id, moderation, approve):
+def record(doc, slot, asset_id, moderation, approve, take=None):
+    """The id onto the take uploaded (--take's; else the slot's one waiting second take; else the slot's own row),
+    then the slot in Uploads.luau gets that id and that take's file."""
     if not re.fullmatch(r"\d{5,20}", asset_id):
         sys.exit(f"--record {slot}={asset_id}: an asset id is digits")
-    rows = [c for c in doc["candidates"] if c["slot"] == slot]
+    family = [c for c in doc["candidates"] if slot_of(c) == slot]
+    if not family:
+        sys.exit(f"--record: no candidate for slot {slot}")
+    if take:
+        rows = [c for c in family if c["slot"] == take]
+    else:
+        rows = [c for c in family if c.get("replaces") and not c.get("assetId")]
+        if len(rows) > 1:
+            sys.exit(f"--record {slot}: takes {', '.join(c['slot'] for c in rows)} are waiting; name one with --take")
+        rows = rows or [c for c in family if c["slot"] == slot]
     if not rows:
-        sys.exit(f"--record: no candidate {slot}")
-    rows[0]["assetId"] = asset_id
-    rows[0]["moderation"] = moderation
-    rows[0]["approved"] = approve or rows[0].get("approved", False)
-    save(doc)
+        sys.exit(f"--record {slot}: {take} is not one of its takes")
+    row = rows[0]
     with open(UPLOADS_LUAU) as fh:
         luau = fh.read()
-    pat = re.compile(r"(\b" + re.escape(slot) + r" = table\.freeze\(\{\n\t\tid = \")(\d*)(\")")
+    pat = re.compile(r"(\b" + re.escape(slot) + r" = table\.freeze\(\{\n\t\tid = \")(\d*)"
+                     r"(\",\n\t\tfile = \")([^\"]*)(\")")
     if not pat.search(luau):
         sys.exit(f"--record: slot {slot} not found in src/shared/Audio/Uploads.luau")
-    luau = pat.sub(lambda m: m.group(1) + asset_id + m.group(3), luau, count=1)
+    row["assetId"] = asset_id
+    row["moderation"] = moderation
+    row["approved"] = approve or row.get("approved", False)
+    save(doc)
+    luau = pat.sub(lambda m: m.group(1) + asset_id + m.group(3) + row["file"] + m.group(5), luau, count=1)
     with open(UPLOADS_LUAU, "w") as fh:
         fh.write(luau)
-    print(f"recorded {slot} = {asset_id} ({moderation}) in the manifest and src/shared/Audio/Uploads.luau; "
-          "add it to docs/AUDIO_BUDGET.md's upload tally")
+    print(f"recorded {slot} = {asset_id} ({moderation}; take {row['slot']}, {row['file']}) in the manifest and "
+          "src/shared/Audio/Uploads.luau; add it to docs/AUDIO_BUDGET.md's upload tally")
 
 
 def main():
@@ -138,6 +180,8 @@ def main():
     ap.add_argument("--record", action="append", default=[], help="slot=assetId, after the lead's upload")
     ap.add_argument("--moderation", default="Pending")
     ap.add_argument("--approve", action="store_true", help="the take was heard and approved before upload")
+    ap.add_argument("--take", default=None, help="with --record: the candidate uploaded (default: the slot's one "
+                    "waiting second take, else the slot's own)")
     a = ap.parse_args()
     doc = load()
     problems = check(doc)
@@ -145,7 +189,7 @@ def main():
         sys.exit("candidates not ready:\n  " + "\n  ".join(problems))
     for r in a.record:
         slot, _, asset_id = r.partition("=")
-        record(doc, slot, asset_id, a.moderation, a.approve)
+        record(doc, slot, asset_id, a.moderation, a.approve, a.take)
     if not a.record:
         todo = [c for c in doc["candidates"] if not c.get("assetId")]
         print(f"{len(doc['candidates'])} candidates, {len(todo)} to upload (nothing uploaded here)"
@@ -160,7 +204,8 @@ def upload_command(c):
         return "'" + s.replace("'", "'\\''") + "'"
     return (f"  node tools/cloud/cloud.mjs upload_asset {c['file']} --type Audio --name {q(c['displayName'])} "
             f"--description {q(c['description'])} --i-am-within-audio-budget --out build/audio/{c['slot']}.upload.json\n"
-            f"  python3 -I tools/audio/publish.py --record {c['slot']}=<assetId> --moderation <state> --approve")
+            f"  python3 -I tools/audio/publish.py --record {slot_of(c)}=<assetId> --moderation <state> --approve"
+            + (f" --take {c['slot']}" if c.get("replaces") else ""))
 
 
 if __name__ == "__main__":

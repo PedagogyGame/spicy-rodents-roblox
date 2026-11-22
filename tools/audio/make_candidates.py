@@ -15,6 +15,10 @@ Slots (the names Shared/Audio/Uploads uses):
                 a glottal pulse train (jitter, shimmer, a moment of period doubling for the bark's rasp) with
                 breath noise, through a dog's time-varying vocal-tract formants (the mouth opening on "wuh" and
                 closing on "f"), a noisy burst on the onset, the pitch jumping up then dropping; no growl
+  dog_bark_v2   a second take of the bark (owner D33: "an improved dog bark"), a candidate to take over dog_bark's
+                id: each bark a chest push and a noisy burst, a "w"/"r" glide opening into "uh", a pressed,
+                irregular pulse train (period doubling, breath on every pulse) through five moving formants, a
+                quick decay closing on a soft "f"; a touch of yard (a few short reflections, no reverb tail)
   bowling_roll  a ball rumbling down a wooden lane, 2.6 s: low noise through the lane's and the ball's resonances,
                 the ball's turn as a lumpy once-a-turn pulse, rolling grit and irregular lane-board ticks (so it is
                 heard on a phone speaker, not only as sub-bass), going away: a slight pitch drop, duller and
@@ -241,6 +245,141 @@ def dog_bark(rng):
     return loudness_normalise(fade(x, 0.002, 0.02))
 
 
+# ---- the dog's bark, second take (owner D33: "an improved dog bark") ----
+
+def _track(u, points):
+    """A smooth contour through (u, value) breakpoints (monotone cubic, so it never overshoots between them)."""
+    from scipy.interpolate import PchipInterpolator
+    us, vs = zip(*points)
+    return PchipInterpolator(us, vs)(np.clip(u, 0, 1))
+
+
+def glottal_train_v2(rng, fs, f0, amp, close_q, jitter, shimmer, sub, chaos):
+    """The voice source, period by period, from per-sample tracks (each read at the period's start): a Rosenberg
+    pulse (0.55 of the period opening, `close_q` of it closing; a short closing is a pressed, bright voice), its
+    derivative taken (the lips' radiation). Each period's length wanders by `jitter` and its height by `shimmer`,
+    both raised by `chaos` (the irregular patch at a bark's onset); where `sub` > 0 every other period is longer
+    and weaker (period doubling: the subharmonic roughness of a bark, not a growl). Returns (flow', flow)."""
+    n = len(f0)
+    flow = np.zeros(n + 1)
+    t, k = 0, 0
+    while t < n:
+        s, c = sub[t], chaos[t]
+        alt = 1 if k % 2 == 0 else -1
+        period = fs / f0[t] * (1 + (jitter + 0.08 * c) * rng.standard_normal()) * (1 + 0.07 * s * alt)
+        period = max(period, fs / 1400)
+        a = amp[t] * max(0.15, 1 + (shimmer + 0.2 * c) * rng.standard_normal()) * (1 - 0.45 * s * (alt < 0))
+        n_open = int(period * 0.55)
+        n_close = max(2, int(period * close_q[t]))
+        rise = 0.5 - 0.5 * np.cos(np.pi * np.arange(n_open) / n_open)
+        fall = np.cos(0.5 * np.pi * np.arange(n_close) / n_close)
+        pulse = a * np.concatenate([rise, fall])
+        end = min(n, t + len(pulse))
+        flow[t:end] += pulse[: end - t]
+        t += int(round(period))
+        k += 1
+    return np.diff(flow) * fs / 1000, flow[:n]
+
+
+def woof_v2(rng, fs, dur, f0_pts, level, open_by=1.0):
+    """One bark of a friendly medium dog at rate fs: a breath of `dur` seconds; f0_pts the pitch contour as (u, Hz)
+    breakpoints over the bark (u = 0..1); `open_by` how wide the mouth opens (1 = the first bark).
+
+    In order: a chest push (a low thump under the onset) and a noisy burst as the air is let go; a "w"/"r" glide
+    (formants low, F3 dipped) opening fast into "uh"; the voiced body, a harsh pulse train (jitter, shimmer, an
+    irregular patch at the onset, then period doubling) with breath riding on each pulse, through five formants
+    of a ~14 cm vocal tract (dispersion about 1.1 kHz) that open and then close; a quick decay as the mouth
+    closes ("f": the formants fall, a little labial hiss)."""
+    n = int(dur * fs)
+    t = np.arange(n) / fs
+    u = t / dur
+    # pitch: the breakpoints with a slow wander (a live voice never holds a line)
+    wander = signal.sosfiltfilt(sos_low(18, 2, fs), rng.standard_normal(n))
+    wander /= np.max(np.abs(wander)) + 1e-12
+    f0 = _track(u, f0_pts) * (1 + 0.025 * wander)
+    # loudness of the breath, in dB: up in ~3 ms, at its loudest by ~20 ms, held, then falling ~30 dB as the mouth
+    # closes; the hard onset (chest-driven) is the loudest moment
+    env_db = _track(u, [(0, -40), (0.012, -4), (0.05, 0), (0.3, -2.5), (0.55, -7), (0.8, -16), (1, -42)])
+    amp = 10 ** (env_db / 20)
+    close_q = _track(u, [(0, 0.06), (0.3, 0.09), (0.7, 0.16), (1, 0.28)])  # pressed and bright, softening
+    sub = _track(u, [(0, 0), (0.14, 0), (0.24, 0.7), (0.45, 0.6), (0.58, 0), (1, 0)])
+    chaos = _track(u, [(0, 1), (0.06, 0.8), (0.13, 0), (1, 0)])
+    dflow, flow = glottal_train_v2(rng, fs, f0, amp, close_q, 0.025, 0.1, sub, chaos)
+    dflow /= np.max(np.abs(dflow)) + 1e-12
+    flow /= np.max(flow) + 1e-12
+    # breath: turbulence riding on each pulse (pulse-synchronous) over a steady part, stronger at the onset and as
+    # the mouth closes; it is what makes a bark harsh rather than a sung tone
+    breath = signal.sosfilt(sos_high(400, 2, fs), rng.standard_normal(n))
+    breath *= (0.3 + 0.7 * flow) * amp * _track(u, [(0, 1.6), (0.1, 0.9), (0.6, 0.9), (1, 1.5)])
+    # the mouth: (u, Hz) per formant. "w"/"r" at the onset (lips rounded, F3 dipped), open "uh", closing on "f"
+    o = open_by
+    f1 = _track(u, [(0, 360), (0.07, 560 + 80 * o), (0.2, 700 + 140 * o), (0.5, 680 + 100 * o), (0.82, 520),
+                    (1, 380)])
+    f2 = _track(u, [(0, 820), (0.07, 1200), (0.2, 1450 + 200 * o), (0.5, 1450 + 120 * o), (0.82, 1150),
+                    (1, 900)])
+    f3 = _track(u, [(0, 1900), (0.1, 2450), (0.25, 2750), (0.7, 2700), (1, 2450)])
+    f4 = _track(u, [(0, 3500), (0.2, 3900), (1, 3700)])
+    f5 = _track(u, [(0, 4600), (0.2, 4900), (1, 4700)])
+    bw1 = _track(u, [(0, 90), (0.2, 130), (0.8, 110), (1, 90)])  # an open mouth radiates more: wider
+    tracks = [(f1, bw1)] + [(f, np.full(n, bw)) for f, bw in ((f2, 120.0), (f3, 160.0), (f4, 220.0), (f5, 320.0))]
+    voiced = formant_cascade(dflow + 0.55 * breath / (np.max(np.abs(breath)) + 1e-12), fs, tracks)
+    # an open mouth radiates the upper harmonics strongly: about +6 dB above ~2 kHz (a gentle shelf)
+    voiced = voiced + signal.sosfilt(sos_high(2000, 1, fs), voiced)
+    voiced /= np.max(np.abs(voiced)) + 1e-12
+    # the hiss above the voice (breath through the upper formants, in parallel)
+    hiss = breath * (0.5 + 0.5 * flow)
+    hiss = resonator(hiss, 3900, 3.0, fs) + 0.7 * resonator(hiss, 5200, 3.0, fs) + 0.3 * signal.sosfilt(
+        sos_band(6000, 10000, 2, fs), hiss)
+    hiss /= np.max(np.abs(hiss)) + 1e-12
+    # the onset: the air let go (a noisy burst, coloured by the still-rounded mouth) over a chest push
+    burst = signal.sosfilt(sos_band(700, 6500, 2, fs), rng.standard_normal(n))
+    burst = resonator(burst, 1100, 2.0, fs) + 0.8 * resonator(burst, 2600, 2.5, fs)
+    burst *= (1 - np.exp(-t / 0.0006)) * np.exp(-t / 0.007)
+    burst /= np.max(np.abs(burst)) + 1e-12
+    chest = np.sin(2 * np.pi * 150 * t) * (1 - np.exp(-t / 0.002)) * np.exp(-t / 0.018)
+    # the mouth closing: a soft labial "f" as the lips meet the teeth
+    close = signal.sosfilt(sos_band(1500, 6000, 2, fs), rng.standard_normal(n))
+    close *= np.exp(-((u - 0.93) / 0.04) ** 2)
+    close /= np.max(np.abs(close)) + 1e-12
+    x = voiced + 0.28 * hiss + 0.5 * burst + 0.35 * chest + 0.03 * close
+    return x * level
+
+
+def yard(x, rng, fs):
+    """A touch of the yard (no reverb tail): the ground's reflection, a fence and the house wall a few metres off,
+    each duller and quieter than the bark, then ~60 ms of faint scatter dying away."""
+    ir = np.zeros(int(0.09 * fs))
+    ir[0] = 1.0
+    for ms, db_, cut in ((2.3, -10, 6000), (9.5, -16, 4500), (21.0, -19, 3500), (33.0, -25, 3000)):
+        tap = np.zeros_like(ir)
+        tap[int(ms / 1000 * fs)] = 10 ** (db_ / 20)
+        ir += signal.sosfilt(sos_low(cut, 2, fs), tap)
+    k = np.arange(len(ir)) / fs
+    scatter = signal.sosfilt(sos_band(300, 4000, 2, fs), rng.standard_normal(len(ir)))
+    scatter *= np.exp(-k / 0.014) * (k > 0.012)
+    ir += scatter * np.sqrt(10 ** (-22 / 10) / np.sum(scatter ** 2))  # its energy 22 dB under the direct sound
+    return signal.fftconvolve(x, ir)[: len(x)]
+
+
+def dog_bark_v2(rng):
+    os_ = 2  # synthesised at 88.2 kHz and brought down, so the sharp pulses do not alias
+    fs = SR * os_
+    total = np.zeros(int(0.68 * fs))
+    barks = (  # at (s), breath (s), pitch breakpoints (u, Hz), level, mouth
+        (0.003, 0.2, [(0, 520), (0.1, 640), (0.45, 520), (1, 360)], 1.0, 1.0),
+        (0.37, 0.23, [(0, 480), (0.13, 600), (0.5, 470), (1, 320)], 0.88, 0.85),
+    )
+    for at, dur, f0_pts, level, open_by in barks:
+        w = woof_v2(rng, fs, dur, f0_pts, level, open_by)
+        i = int(at * fs)
+        total[i:i + len(w)] += w[: len(total) - i]
+    total = yard(total, rng, fs)
+    x = signal.resample_poly(total, 1, os_)
+    x = signal.sosfilt(sos_high(90, 4), x)
+    x = signal.sosfilt(sos_low(11000, 4), x)
+    return loudness_normalise(fade(x, 0.001, 0.03))
+
+
 # ---- the bowling ball ----
 
 def bowling_roll(rng):
@@ -311,6 +450,21 @@ SLOTS = [
                "pulse train (3 % jitter, 12 % shimmer, a moment of period doubling) with pulse-synchronous breath "
                "through three time-varying formants (the mouth opening on 'wuh', closing on 'f') and two upper "
                "ones for the hiss, a noise burst on each onset, pitch 400->590->320 and 380->550->290 Hz; loudness-normalised",
+    },
+    {
+        # a second take of the bark (owner D33): once uploaded it takes over dog_bark's id (tools/audio/publish.py
+        # --record dog_bark=<assetId> records the id onto this take and points the game's slot at this file)
+        "slot": "dog_bark_v2", "replaces": "dog_bark", "cues": ["Dogs.Bark"], "make": dog_bark_v2, "seed": 3602,
+        "displayName": "SR yard dog bark 2",
+        "description": "Spicy Rodent: a friendly medium dog's woof woof, second take (synthesised offline, "
+                       "tools/audio).",
+        "how": "synthesised offline (tools/audio/make_candidates.py dog_bark_v2, seed 3602): two barks (0.20 and "
+               "0.23 s of breath, 0.37 s apart), each a chest push and a noisy burst at the onset, a 'w'/'r' glide "
+               "(low formants, F3 dipped) opening into 'uh', a pressed pulse train (2.5 % jitter, 10 % shimmer, an "
+               "irregular onset, then period doubling) with pulse-synchronous breath through five moving formants "
+               "(F1 360->840->380, F2 820->1650->900 Hz), pitch 520->640->360 and 480->600->320 Hz, a quick decay "
+               "closing on a soft 'f'; a touch of yard (ground, fence and wall reflections, 60 ms of faint "
+               "scatter, no reverb tail); loudness-normalised",
     },
     {
         "slot": "bowling_roll", "cues": ["roll"], "make": bowling_roll, "seed": 5002,
@@ -397,6 +551,7 @@ def main():
         prev = old.get(s["slot"], {})
         rows.append({
             "slot": s["slot"],
+            **({"replaces": s["replaces"]} if s.get("replaces") else {}),
             "cues": s["cues"],
             "file": os.path.relpath(ogg, ROOT),
             "seconds": round(len(x) / SR, 2),
