@@ -566,7 +566,8 @@ function BranchNooks.plan(
 						-- (a nook's cup: no other route within the stash's reach of its end, its own bough and the
 						-- trunk's axis included, so the stash is used from the cup and nowhere else)
 						local tail = smp[#smp]
-						local cupClear = kind ~= "nook" or nearestOther(ctx.hash, tail, {}) >= C.stashReach + C.stashMargin
+						local cupClear = kind ~= "nook"
+							or nearestOther(ctx.hash, tail, {}) >= C.stashReach + C.stashMargin
 						if cupClear and keeps(ctx, smp, b, trunk) then
 							local e = smp[#smp]
 							local place: Place = {
@@ -668,8 +669,7 @@ function BranchNooks.plan(
 				for k, ang in C.spurAngles do
 					local hx, hz = headingAt(reg, b, st)
 					local dx, dz = rotate(hx, hz, side * ang)
-					local pts =
-						pointsFrom(s, dx, dz, C.spurLens[k], C.spurRise, C.spurArch, -side * C.spurCurl)
+					local pts = pointsFrom(s, dx, dz, C.spurLens[k], C.spurRise, C.spurArch, -side * C.spurCurl)
 					pts[1] = { s.x, s.y, s.z }
 					local rec = record(nextId, `spur off route {b.id}`, pts, b.surfaceRadius * C.spurSurface)
 					local smp = samplesOf(rec)
