@@ -91,6 +91,8 @@ function InputMap.HINTS(role: string): string
 		return "W/S drive and brake · A/D steer · Space handbrake · V view · E get out"
 	elseif role == "drone" then
 		return "WASD fly · Space up · Ctrl/Q down · Shift boost · E land"
+	elseif role == "passenger" then
+		return "Riding beside the driver · V first person · E get off"
 	end
 	return "Waiting for a body…"
 end

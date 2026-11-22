@@ -1444,7 +1444,7 @@ function Game.start(opts: Opts?): any
 		if actor == nil or actor.species ~= "human" then
 			return nil
 		end
-		if devices and type(player.UserId) == "number" and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) then
+		if devices and type(player.UserId) == "number" and PlayerVehicles.aboard(devices.fleet, player.UserId) then
 			return nil
 		end
 		local root = (actor.body :: Model).PrimaryPart
@@ -2080,7 +2080,7 @@ function Game.start(opts: Opts?): any
 				if
 					devices
 					and type(player.UserId) == "number"
-					and PlayerVehicles.vehicleOf(devices.fleet, player.UserId)
+					and PlayerVehicles.aboard(devices.fleet, player.UserId)
 				then
 					return false, "Get out of the vehicle first (E)"
 				end
@@ -2413,7 +2413,7 @@ function Game.start(opts: Opts?): any
 					local player = playerOf(id)
 					return player ~= nil
 						and devices ~= nil
-						and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) ~= nil
+						and PlayerVehicles.aboard(devices.fleet, player.UserId) ~= nil -- (a passenger too: D30)
 				end,
 				busy = function(id: number): boolean
 					return (infection ~= nil and infection:engaged(id))

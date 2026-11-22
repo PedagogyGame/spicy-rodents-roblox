@@ -5,8 +5,13 @@
 -- is parked. Keys only change hands while the vehicle is parked: a driver who drops out of the top
 -- two keeps driving until they exit, then the key passes (§1.5). The engine side (prompts, seat
 -- weld, network ownership, the camera switch) lives in Server/Actors/DeviceService and reads this.
+-- A passenger (owner D30: the golf cart seats two; VehicleKinds.seats): board(f, id, who) beside a driver, alight(f,
+-- who) off again; nobody is a driver and a passenger at once, and a passenger stays aboard when the driver gets out.
+-- aboard(f, who) is either seat (a body aboard is never in a vehicle's way, cannot kick, cannot take a new body).
 -- Interface: new() -> Fleet; add(f, id, kind, x, z, yaw); get(f, id); enter(f, id, driver, ctx)
---   -> (ok, reason); exit(f, driver) -> vehicleId?; vehicleOf(f, driver); setMotion(f, id, speed);
+--   -> (ok, reason); exit(f, driver) -> vehicleId?; vehicleOf(f, driver); board(f, id, who) -> (ok, reason);
+--   alight(f, who) -> vehicleId?; passengerOf(f, who) -> vehicleId?; aboard(f, who) -> vehicleId?;
+--   setMotion(f, id, speed);
 --   grantKeys(f, group, holders) (group "humanDriver" | "police"); keyHolder(f, id) -> driver?;
 --   check(f) -> (ok, errors)
 -- Drivers are numbers (Player.UserId). Pure. No side effects on require.
@@ -24,12 +29,14 @@ export type Vehicle = {
 	pendingKey: number | false | nil, -- the next holder, applied when parked (false = nobody)
 	speed: number,
 	parked: boolean,
+	passenger: number?, -- the one beside the driver (a kind with VehicleKinds.seats 2)
 }
 
 export type Fleet = {
 	vehicles: { [string]: Vehicle },
 	order: { string },
 	byDriver: { [number]: string },
+	byPassenger: { [number]: string },
 }
 
 export type EnterCtx = {
@@ -51,8 +58,18 @@ local function group(kind: string): string?
 	return nil
 end
 
+-- the passengers' map (made on first use for a fleet put together by hand without one)
+local function riders(f: Fleet): { [number]: string }
+	local r = f.byPassenger
+	if r == nil then
+		r = {}
+		f.byPassenger = r
+	end
+	return r
+end
+
 function PlayerVehicles.new(): Fleet
-	return { vehicles = {}, order = {}, byDriver = {} }
+	return { vehicles = {}, order = {}, byDriver = {}, byPassenger = {} }
 end
 
 function PlayerVehicles.add(f: Fleet, id: string, kind: string, x: number, z: number, yaw: number): Vehicle
@@ -107,6 +124,9 @@ function PlayerVehicles.enter(f: Fleet, id: string, driver: number, ctx: EnterCt
 	if f.byDriver[driver] then
 		return false, "already driving"
 	end
+	if riders(f)[driver] then
+		return false, "already riding"
+	end
 	local ok, reason = VehicleKinds.mayDrive(v.kind, {
 		keyHolder = v.key == driver,
 		officer = ctx.officer,
@@ -132,6 +152,56 @@ function PlayerVehicles.exit(f: Fleet, driver: number): string?
 	f.byDriver[driver] = nil
 	applyPendingKey(v)
 	return id
+end
+
+-- board(f, id, who): `who` sits beside the driver of a vehicle that seats two. Only while somebody drives it (an empty
+-- one is driven, not boarded), never by its driver, never twice.
+function PlayerVehicles.board(f: Fleet, id: string, who: number): (boolean, string?)
+	local v = f.vehicles[id]
+	if not v then
+		return false, "no such vehicle"
+	end
+	if VehicleKinds.seats(v.kind) < 2 then
+		return false, "one seat"
+	end
+	if v.driver == nil then
+		return false, "nobody driving"
+	end
+	if v.driver == who or f.byDriver[who] then
+		return false, "already driving"
+	end
+	if riders(f)[who] then
+		return false, "already riding"
+	end
+	if v.passenger ~= nil then
+		return false, "seat taken"
+	end
+	v.passenger = who
+	riders(f)[who] = id
+	return true, nil
+end
+
+-- alight(f, who): off the passenger seat; the vehicle's id, or nil when `who` was not a passenger.
+function PlayerVehicles.alight(f: Fleet, who: number): string?
+	local id = riders(f)[who]
+	if not id then
+		return nil
+	end
+	riders(f)[who] = nil
+	local v = f.vehicles[id]
+	if v and v.passenger == who then
+		v.passenger = nil
+	end
+	return id
+end
+
+function PlayerVehicles.passengerOf(f: Fleet, who: number): string?
+	return riders(f)[who]
+end
+
+-- aboard(f, who): the vehicle `who` drives or rides in, if any.
+function PlayerVehicles.aboard(f: Fleet, who: number): string?
+	return f.byDriver[who] or riders(f)[who]
 end
 
 function PlayerVehicles.setMotion(f: Fleet, id: string, speed: number, x: number?, z: number?, yaw: number?)
@@ -197,6 +267,21 @@ function PlayerVehicles.check(f: Fleet): (boolean, { string })
 		local v = f.vehicles[id]
 		if v.driver and f.byDriver[v.driver] ~= id then
 			table.insert(errors, `vehicle {id} seats {v.driver} who is not mapped back`)
+		end
+		if v.passenger and riders(f)[v.passenger] ~= id then
+			table.insert(errors, `vehicle {id} carries {v.passenger} who is not mapped back`)
+		end
+		if v.passenger and v.passenger == v.driver then
+			table.insert(errors, `vehicle {id}: {v.driver} in both seats`)
+		end
+	end
+	for who, id in riders(f) do
+		local v = f.vehicles[id]
+		if not v or v.passenger ~= who then
+			table.insert(errors, `passenger {who} maps to {id} which does not carry them`)
+		end
+		if f.byDriver[who] then
+			table.insert(errors, `{who} drives and rides at once`)
 		end
 	end
 	return #errors == 0, errors

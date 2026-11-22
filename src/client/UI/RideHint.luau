@@ -5,9 +5,10 @@
 -- in a person's body, the nearest free one within REACH studs shows a little label over it: "E  ride" on a keyboard
 -- ("Y  ride" on a gamepad: the same E as every vehicle, Possession/PossessionClient sends it); on a touch screen the label
 -- is a RIDE button, and while riding one a GET OFF button sits above the jump button: a tap is the same E. Nothing for
--- a squirrel, the rodent, the other vehicles, or one someone is riding. Looked for four times a second (the ten models
+-- a squirrel, the rodent, the other vehicles, or one someone is riding, except a golf cart whose seat beside its driver
+-- is free (owner D30): "E  sit beside" (on a touch screen SIT). Looked for four times a second (the ten models
 -- in workspace.Vehicles; no per-frame work); one BillboardGui and one ScreenGui, made once.
--- Interface: REACH; pick(x, z, rides) -> index? (pure); words(kind, touch, pad) -> string (pure);
+-- Interface: REACH; pick(x, z, rides) -> index? (pure); words(kind, touch, pad, beside?) -> string (pure);
 --   start(opts { request: () -> (), state: () -> State }) -> stop()
 -- No side effects on require.
 
@@ -19,23 +20,28 @@ local RideHint = {}
 RideHint.REACH = 14 -- studs (the server takes E for the nearest vehicle within 16)
 RideHint.EVERY = 0.25 -- seconds between looks
 
-export type Candidate = { x: number, z: number, free: boolean }
+-- (beside: someone drives it and the seat beside them is free: a golf cart, owner D30)
+export type Candidate = { x: number, z: number, free: boolean, beside: boolean? }
 export type State = { onFoot: boolean, riding: boolean, at: Vector3? }
 
--- pick(x, z, rides): the nearest free shared vehicle within REACH of (x, z), by its index in `rides`.
+-- pick(x, z, rides): the nearest shared vehicle within REACH of (x, z) that is free or has a free seat beside its
+-- driver, by its index in `rides`.
 function RideHint.pick(x: number, z: number, rides: { Candidate }): number?
 	local best, bestD = nil, RideHint.REACH * RideHint.REACH
 	for i, r in rides do
 		local d = (r.x - x) ^ 2 + (r.z - z) ^ 2
-		if r.free and d <= bestD then
+		if (r.free or r.beside == true) and d <= bestD then
 			best, bestD = i, d
 		end
 	end
 	return best
 end
 
--- words(kind, touch, pad): the label over it.
-function RideHint.words(kind: string?, touch: boolean, pad: boolean): string
+-- words(kind, touch, pad, beside?): the label over it.
+function RideHint.words(kind: string?, touch: boolean, pad: boolean, beside: boolean?): string
+	if beside then
+		return if touch then "SIT" else `{if pad then "Y" else "E"}  sit beside the driver`
+	end
 	if touch then
 		return "RIDE"
 	end
@@ -130,7 +136,12 @@ function RideHint.start(opts: { request: () -> (), state: () -> State }): () -> 
 					if root then
 						local seat = m:FindFirstChild("DriverSeat")
 						local free = not (seat and seat:IsA("Seat") and seat.Occupant ~= nil)
-						table.insert(candidates, { x = root.Position.X, z = root.Position.Z, free = free })
+						local other = m:FindFirstChild("PassengerSeat")
+						local beside = not free and other ~= nil and other:IsA("Seat") and other.Occupant == nil
+						table.insert(
+							candidates,
+							{ x = root.Position.X, z = root.Position.Z, free = free, beside = beside }
+						)
 						table.insert(models, m :: Model)
 					end
 				end
@@ -142,7 +153,7 @@ function RideHint.start(opts: { request: () -> (), state: () -> State }): () -> 
 			end
 			local m = models[i]
 			local pad = UIS:GetLastInputType() == Enum.UserInputType.Gamepad1
-			label.Text = RideHint.words(m:GetAttribute("VehicleKind") :: string?, touch, pad)
+			label.Text = RideHint.words(m:GetAttribute("VehicleKind") :: string?, touch, pad, not candidates[i].free)
 			hint.Adornee = m.PrimaryPart :: BasePart
 			hint.Enabled = true
 		end)
