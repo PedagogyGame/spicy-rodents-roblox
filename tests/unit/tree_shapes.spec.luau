@@ -462,6 +462,28 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"the ten reshaped trees' rebuilt models (grown boughs in the bark) wait in data/art/trees_v2.json",
+		function()
+			local v2 = serde.decode("json", fs.readFile("data/art/trees_v2.json"))
+			local byTrunk: { [number]: any } = {}
+			for _, rec in v2.trees do
+				byTrunk[rec.trunkRoute] = rec
+			end
+			for _, tree in trees("reshaped") do
+				local rec = byTrunk[tree.trunk]
+				-- not uploaded yet: the live Model stays and the rebuilt one is "pending" (tools/blender/trees publish.py
+				-- --merge); once uploaded, the record is the rebuilt Model's and lists the grown boughs among its routes
+				local m = if rec.pending then rec.pending else rec
+				for _, id in tree.routes do
+					t.truthy(table.find(m.routes, id) ~= nil, `{tree.label}: the model is built round bough {id}`)
+				end
+				t.eq(m.checks.promisesBroken, 0, `{tree.label}: every promise kept`)
+				t.truthy(m.tris.bark <= 8000 and m.tris.leaves <= 6000, `{tree.label}: within the tree budgets`)
+			end
+		end
+	)
+
 	t.test("budgets: the town under 27,000 parts; the grown boughs' stand-ins and the planted trees' cost", function()
 		local plans = Bake.plans(Bake.data())
 		local total, grownParts, plantedParts = 0, 0, 0

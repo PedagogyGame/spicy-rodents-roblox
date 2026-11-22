@@ -25,6 +25,7 @@ def merge_data(data, shapes):
     import numpy as np
 
     merge_routes(data["routes"], shapes)
+    data["grown"] = {r["id"] for r in shapes["routes"]}
     for rid, pts in shapes["samples"]:
         data["samples"][rid] = np.array(pts, dtype=float)
     for f in shapes["forks"]:

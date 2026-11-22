@@ -50,6 +50,9 @@ and are climbable at once (their branches leave the trunk at three heights):
   inside every tree were made from fewer, longer pieces, which made room).
 - The ten trees' stand-in branches: 539 parts until the new models are uploaded.
 - The three new trees: 195 parts and about 51,000 triangles (the same as the trees they copy).
+- The ten rebuilt tree models, once uploaded: about 11,000 triangles more than the ten models they replace
+  (123,190 -> 134,775; every one within the per-tree budget of 8,000 bark and 6,000 leaf triangles). Their low
+  branches carry leaves too, so the crowns come down in tiers instead of one ball on a pole.
 
 ## Please check in Studio
 
