@@ -244,7 +244,8 @@ function TreeShapes.build(doc: Doc, harvest: any, forks: { ForkRecord }, heightA
 		table.insert(trees, tree)
 	end
 
-	for _, pl in doc.planted or {} do
+	local planted: { Plant } = doc.planted or {}
+	for _, pl in planted do
 		local src = harvest:get(pl.source)
 		assert(src and src.kind == "trunk", `tree shapes: planted source {pl.source} is not a trunk`)
 		local srcForks = forksOf[pl.source]
