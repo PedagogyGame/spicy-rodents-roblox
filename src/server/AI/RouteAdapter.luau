@@ -17,7 +17,8 @@ local Import = require("../Import")
 local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
 
 export type Link = { s: number, to: number, toS: number }
--- (woods: a D34 woods tree's route, Shared/World/TreeShapes: named "<LABEL> woods <i> ...")
+-- (woods: a D34 woods tree's route, Shared/World/TreeShapes: named "<LABEL> woods <i> ..."; lamp: a D35 light post's
+-- climb or arm, Shared/World/LampPosts: origin "lampPost", a "trunk" climbed as a tree's is but no tree)
 export type RouteLike = {
 	id: number,
 	kind: string,
@@ -25,6 +26,7 @@ export type RouteLike = {
 	points: { { number } },
 	links: { Link },
 	woods: boolean?,
+	lamp: boolean?,
 }
 export type Adapter = {
 	routes: { RouteLike },
@@ -120,6 +122,7 @@ function RouteAdapter.new(rail: any): Adapter
 			length = cum[#cum],
 			points = pts,
 			woods = string.find(route.name or "", " woods ", 1, true) ~= nil,
+			lamp = route.origin == "lampPost",
 		}, meta)
 		local like = (r :: any) :: RouteLike
 		byId[route.id] = like

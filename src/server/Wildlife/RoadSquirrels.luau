@@ -150,7 +150,8 @@ function RoadSquirrels.hit(self: any, id: number): boolean
 	return true
 end
 
--- a tree to come back on: a trunk (not an enclosed run), by choice one no player can see
+-- a tree to come back on: a trunk (not an enclosed run, not a D35 light post's climb: a post is climbed as a tree is,
+-- but a squirrel comes back to town on a tree), by choice one no player can see
 local function tree(self: any): (any?, number)
 	local world = self.world
 	local routes = world.routes
@@ -158,7 +159,7 @@ local function tree(self: any): (any?, number)
 	if trunks == nil then
 		trunks = {}
 		for _, r in routes.routes do
-			if r.kind == "trunk" and r.length >= C.minTrunk and not routes.enclosed(r.id) then
+			if r.kind == "trunk" and r.length >= C.minTrunk and not routes.enclosed(r.id) and not r.lamp then
 				table.insert(trunks, r)
 			end
 		end

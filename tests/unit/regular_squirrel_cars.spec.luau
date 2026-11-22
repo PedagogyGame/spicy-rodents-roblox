@@ -35,6 +35,9 @@ local FlatView = require("@client/Render/FlatView")
 
 local DT = 1 / 30
 local C = RoadCrossing.C
+-- the trees with a crossing on the real town (TownAI.setRoad): the town's own trees, the set D21 was tuned on (168
+-- with the D35 light posts counted)
+local D21_SITES = 118
 
 return function(t)
 	local data = Data.default()
@@ -290,12 +293,26 @@ return function(t)
 			end)
 			local road = world.ctx.road :: any
 			print(`      {n} trees with a crossing`)
-			t.truthy(n >= 80, `{n} trees`)
+			-- D21's own set: the town's trees only. The D35 light posts' climbs and the D34 woods' trunks are "trunk"
+			-- routes too (both in the town's routes here, so the checks below bite), climbed but never crossed from or
+			-- to: with the posts counted the crossings came to 168, ~42% more than the owner tuned.
+			local lamps, woods = 0, 0
+			for _, r in world.routes.routes do
+				if r.kind == "trunk" and r.lamp then
+					lamps += 1
+				elseif r.kind == "trunk" and r.woods then
+					woods += 1
+				end
+			end
+			t.truthy(lamps > 0 and woods > 0, `light post climbs {lamps}, woods trunks {woods}`)
+			t.eq(n, D21_SITES, "the trees with a crossing are D21's")
 			for id, site in road.sites do
 				t.eq(site.route, id)
 				local from, to = world.routes.byId(site.route), world.routes.byId(site.to)
 				t.eq(from.kind, "trunk")
 				t.eq(to.kind, "trunk")
+				t.falsy(from.lamp or to.lamp, `no crossing from or to a light post ({site.route} -> {site.to})`)
+				t.falsy(from.woods or to.woods, `nor a woods tree ({site.route} -> {site.to})`)
 				t.truthy(site.width >= 20 and site.width <= 80, `kerb to kerb {site.width}`)
 				t.truthy(site.length <= 2 * C.reach + site.width, `the whole run {site.length}`)
 				-- the kerbs are off the asphalt, the middle is on it
@@ -625,6 +642,11 @@ return function(t)
 		t.eq(attrs.Flat, "nil", "the attribute is gone")
 		t.eq(possessable, true)
 		t.eq(brain.route.kind, "trunk", "on a tree")
+		-- (a tree, never a light post's climb: none is among the trunks it comes back on)
+		t.falsy(brain.route.lamp, "not a light post")
+		for _, r in (roads :: any).trunks do
+			t.falsy(r.lamp, `trunk {r.id} to come back on is a light post's climb`)
+		end
 		t.eq(sq.intent.mode, "rail")
 		local h = sq.y - Height.at(sq.x, sq.z)
 		t.truthy(h > 3, `up its trunk ({h} studs over the ground)`)
