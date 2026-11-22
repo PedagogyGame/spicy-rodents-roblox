@@ -24,6 +24,7 @@ local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
 local Sewers = require("./lib/Sewers")
 local HollowTrees = require("./lib/HollowTrees")
+local TreeShapes = require("./lib/TreeShapes")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -518,6 +519,32 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local treeArtNextModule = TreeArtNext.compile({ repo = repo, invariant = invariant, compare = compare })
 	if treeArtNextModule then
 		table.insert(w1.modules, treeArtNextModule)
+	end
+	-- data/tree_shapes.json: the D32 grown boughs and planted trees (Shared/World/TreeShapes); a planted tree's
+	-- art records are copied from its source into the two art modules above
+	local shapeOtherIds = table.clone(hollowOtherIds)
+	for _, r in (if hollowModule then hollowModule.value.routes else {}) :: { any } do
+		shapeOtherIds[r.id] = true
+	end
+	local treeShapesModule = TreeShapes.compile({
+		repo = repo,
+		routes = routesConv,
+		forks = forksConv,
+		routeIds = routeIds,
+		otherIds = shapeOtherIds,
+		terrainExtensions = terrainExtensions,
+		treeArt = if treeArtModule then treeArtModule.value else nil,
+		treeArtNext = if treeArtNextModule then treeArtNextModule.value else nil,
+		invariant = invariant,
+		compare = compare,
+	})
+	if treeShapesModule then
+		table.insert(w1.modules, treeShapesModule)
+		for _, m in { treeArtModule, treeArtNextModule } do
+			if m then
+				m.records = #m.value
+			end
+		end
 	end
 	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
 	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })

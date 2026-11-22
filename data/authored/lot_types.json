@@ -1430,7 +1430,8 @@
         "makeOuterTree",
         "makeAppleTree",
         "makeLookoutTree",
-        "estateGateOak"
+        "estateGateOak",
+        "treeShape"
       ],
       "look": "bark",
       "lod": "Automatic",

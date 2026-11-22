@@ -97,6 +97,10 @@ return {
 			count = 1,
 			chunks = { "TreeArtNext" },
 		},
+		TreeShapes = {
+			count = 1,
+			chunks = { "TreeShapes" },
+		},
 		Wildlife = {
 			count = 1,
 			chunks = { "Wildlife" },

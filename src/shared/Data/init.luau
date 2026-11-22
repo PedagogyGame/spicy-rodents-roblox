@@ -13,6 +13,7 @@
 --            missing(); module(name) for any other compiled module
 
 local Registry = require("./Routes/Registry")
+local TreeShapes = require("./World/TreeShapes")
 
 export type Loader = (name: string) -> any?
 
@@ -168,6 +169,13 @@ function Data.new(loader: Loader): Data
 					return if h and h.routes then h.routes else {}
 				end)
 			end
+			-- the D32 tree shapes (data/tree_shapes.json, Shared/World/TreeShapes): grown boughs and planted trees, 9701-
+			if self:index().modules.TreeShapes then
+				table.insert(loaders, function()
+					local s = loadName(self, "TreeShapes")
+					return if s and s.routes then s.routes else {}
+				end)
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry
@@ -181,8 +189,21 @@ function Data.new(loader: Loader): Data
 	function data.cast(self: Data)
 		return self:module("Cast")
 	end
+	-- the canopy forks: the harvest's, with the D32 tree shapes' grown and planted ones merged in (TreeShapes.mergeForks)
 	function data.forks(self: Data)
-		return self:module("Forks")
+		local cached = self._cache["forks:merged"]
+		if cached ~= nil then
+			return cached
+		end
+		local merged: { any } = self:module("Forks")
+		if self:index().modules.TreeShapes then
+			local s = loadName(self, "TreeShapes")
+			if s and s.forks and #s.forks > 0 then
+				merged = TreeShapes.mergeForks(merged :: any, s.forks) :: any
+			end
+		end
+		self._cache["forks:merged"] = merged
+		return merged
 	end
 	function data.wildlife(self: Data)
 		return self:module("Wildlife")

@@ -47,6 +47,12 @@ function Bake.data(): Data
 			table.insert(routes, r)
 		end
 	end
+	-- the D32 grown boughs and planted trees (Shared/World/TreeShapes): drawn with their trees (RouteProps)
+	if index.modules.TreeShapes then
+		for _, r in Import.generated("TreeShapes").routes do
+			table.insert(routes, r)
+		end
+	end
 	return {
 		lots = Import.generated("Lots"),
 		roads = Import.generated("Roads"),

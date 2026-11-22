@@ -176,7 +176,35 @@ export type ArtPart = {
 	material: string,
 	doubleSided: boolean?,
 }
-export type Art = { trunkRoute: number, assetId: string?, pivot: { number }, parts: { ArtPart } }
+-- `routes`: the routes the model's bark is built round (a planted copy's: all of them). Absent: the harvested ones.
+export type Art = {
+	trunkRoute: number,
+	assetId: string?,
+	pivot: { number },
+	parts: { ArtPart },
+	routes: { number }?,
+}
+
+-- Whether a tree's mesh model draws a route's bark: the routes it lists, else every harvested route (a bough grown
+-- for D32, Shared/World/TreeShapes, origin "treeShape", is not in a model made before it).
+function Trees.covered(art: Art?, route: any): boolean
+	if not art then
+		return false
+	end
+	if art.routes then
+		return table.find(art.routes, route.id) ~= nil
+	end
+	return route.origin ~= "treeShape"
+end
+
+-- Invisible bark proxies under a mesh are cut in pieces of up to this many studs along their polyline (visible bark:
+-- BOUGH_PIECE). The pieces lie on the same polyline either way; only the unseen taper steps are coarser (D32: 1,194
+-- parts fewer over the 95 trees, room for the grown boughs and the planted trees in the 27,000 budget).
+Trees.BOUGH_PIECE = 11
+Trees.PROXY_PIECE = 24
+-- A grown bough on a tree whose model does not draw it yet (until its model is rebuilt and uploaded): visible bark in
+-- the tree's bark colour, twigs at its tip and this many leaf clusters at most along it (D32 interim look).
+Trees.GROWN_LEAVES = 6
 
 export type Opts = {
 	groundAt: (number, number, number?) -> (number, boolean),
@@ -305,7 +333,18 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			end
 		end
 	end
+	-- a grown bough the model does not draw (art present, route not covered): visible bark, twigs and a few leaves,
+	-- every part of it marked Grown = its route id (Server/Assets/TreeArt hides them under a model that covers it)
+	local grownBoughs: { Bough } = {}
 	for _, b in boughs do
+		local grown = art ~= nil and not Trees.covered(art, b.route)
+		local boughOpts: Spec.Opts = barkOpts
+		if grown then
+			boughOpts =
+				{ color = barkColor, material = "Wood", role = "Limb", attrs = { Grown = b.route.id } :: Spec.Attrs }
+			table.insert(grownBoughs, b)
+		end
+		local maxPiece = if art and not grown then Trees.PROXY_PIECE else Trees.BOUGH_PIECE
 		local lf = lift(b.route)
 		local base = math.min(lf * 0.95, trunkRAtY(b.line[1][2]) * 0.85)
 		local tip = math.max(0.35, lf * 0.6)
@@ -314,7 +353,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		for k = 1, n do
 			local a, e = b.line[k], b.line[k + 1]
 			local sl = len3(sub(e, a))
-			local parts = math.max(1, math.ceil(sl / 11))
+			local parts = math.max(1, math.ceil(sl / maxPiece))
 			for j = 1, parts do
 				piece += 1
 				local f0, f1 = (j - 1) / parts, j / parts
@@ -322,10 +361,10 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				local p1 = { a[1] + (e[1] - a[1]) * f1, a[2] + (e[2] - a[2]) * f1, a[3] + (e[3] - a[3]) * f1 }
 				local u = (b.c[k] + sl * (f0 + f1) / 2) / b.L
 				local r = base + (tip - base) * u
-				cylinder(list, `R{b.route.id}_{piece}`, p0, p1, r, r * 0.6, barkOpts)
+				cylinder(list, `R{b.route.id}_{piece}`, p0, p1, r, r * 0.6, boughOpts)
 			end
 		end
-		if b.route.kind == "branch" and not art then
+		if b.route.kind == "branch" and (not art or grown) then
 			local e = b.line[#b.line]
 			local _, d = at(b.line, b.c, b.L)
 			local side = unit(cross(d, { 0, 1, 0 }))
@@ -354,6 +393,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 						canQuery = false,
 						castShadow = false,
 						role = "Twig",
+						attrs = if grown then { Grown = b.route.id } :: Spec.Attrs else nil,
 					}
 				)
 			end
@@ -397,7 +437,62 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				},
 			})
 		end
-		return leaves
+		-- the grown boughs' few leaf clusters: beside the outer half of each and round its tip, clear of every
+		-- bough's tunnel (the squirrel on a bough stays seen) and of the trunk
+		local function clearOfBoughs(p: { number }, r: number): boolean
+			for _, b in boughs do
+				for k = 1, #b.line - 1 do
+					local a, e = b.line[k], b.line[k + 1]
+					if segDist({ a[1], a[2] + 2, a[3] }, { e[1], e[2] + 2, e[3] }, p) < r + 1.6 then
+						return false
+					end
+				end
+			end
+			for k = 1, #trunkLine - 1 do
+				if segDist(trunkLine[k], trunkLine[k + 1], p) < r + trunkRAtY(p[2]) + 2.2 then
+					return false
+				end
+			end
+			return true
+		end
+		local g1 = (trunk.id % #greens) + 1
+		local n = 0
+		for _, b in grownBoughs do
+			local placed = 0
+			local function leaf(p: { number }, r: number)
+				if placed >= Trees.GROWN_LEAVES or p[2] - r < foot[2] + 3 or not clearOfBoughs(p, r) then
+					return
+				end
+				placed += 1
+				n += 1
+				local col = shade(greens[((g1 + n) % #greens) + 1], 0.92 + 0.12 * rand())
+				list:add(ORIGIN :: any, `GrownLeaves{n}`, p[1], p[2], p[3], 2 * r, 2 * r, 2 * r, {
+					shape = "Ball",
+					color = col,
+					material = "LeafyGrass",
+					canCollide = false,
+					canQuery = false,
+					castShadow = true,
+					role = "Leaves",
+					attrs = { Grown = b.route.id } :: Spec.Attrs,
+				})
+			end
+			for i, u in { 0.45, 0.6, 0.75, 0.9 } do
+				local p, d = at(b.line, b.c, b.L * u)
+				local side = unit(cross(d, { 0, 1, 0 }))
+				local s = if i % 2 == 1 then 1 else -1
+				local r = scale * (2.6 + 1.2 * u) * (0.85 + 0.3 * rand())
+				leaf({ p[1] + side[1] * s * (r + 1.8), p[2] + r * 0.3, p[3] + side[3] * s * (r + 1.8) }, r)
+			end
+			local e, d = at(b.line, b.c, b.L)
+			local r = scale * (3.4 + 0.8 * rand())
+			local fx, fz = d[1], d[3]
+			local fl = math.sqrt(fx * fx + fz * fz)
+			fx, fz = if fl > 1e-6 then fx / fl else 1, if fl > 1e-6 then fz / fl else 0
+			leaf({ e[1] + fx * (r + 1.8), e[2] + r * 0.3, e[3] + fz * (r + 1.8) }, r)
+			leaf({ e[1], e[2] + r + 3.9, e[3] }, scale * (3.0 + 0.8 * rand()))
+		end
+		return leaves + n
 	end
 
 	-- 2. leaf clusters ---------------------------------------------------------------------------

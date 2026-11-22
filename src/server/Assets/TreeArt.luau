@@ -36,7 +36,15 @@ TreeArt.MESHES = table.freeze({ Bark = true, LeavesShade = true, LeavesMid = tru
 -- the leaf green of a tree with none of its own in the data (the v2 trees' run 100-125, 141-161, 73-83)
 TreeArt.LEAF = table.freeze({ 106, 148, 77 })
 
-export type Next = { trunkRoute: number, assetId: string?, pivot: { number }, leaf: { number }? }
+-- covers: the D32 grown boughs (route ids, Shared/World/TreeShapes) this Model draws: the baked stand-ins for them
+-- (parts marked Grown = route) are hidden under it once it is swapped in
+export type Next = {
+	trunkRoute: number,
+	assetId: string?,
+	pivot: { number },
+	leaf: { number }?,
+	covers: { number }?,
+}
 export type Env = { CFrame: any, Enum: any, Color3: any }
 export type Opts = {
 	load: ((assetId: number) -> Instance)?, -- default InsertService:LoadAsset
@@ -163,7 +171,14 @@ end
 -- shows where a map has not streamed in; default the importer's). Returns the parts put in; 0, and the tree left as
 -- baked, when the tree has no baked meshes, the Model has no Bark, or a leaf part did not take DoubleSided and
 -- AlphaMode Transparency (read back before anything baked is removed).
-function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: Env?, leaf: { number }?): number
+function TreeArt.swap(
+	tree: Instance,
+	asset: Instance,
+	pivot: { number },
+	env: Env?,
+	leaf: { number }?,
+	covers: { number }?
+): number
 	local e = env or engineEnv()
 	if not baked(tree) then
 		return 0
@@ -213,7 +228,34 @@ function TreeArt.swap(tree: Instance, asset: Instance, pivot: { number }, env: E
 		p.CastShadow = true
 		p.Parent = tree
 	end
+	if covers then
+		TreeArt.hideGrown(tree, covers)
+	end
 	return #fresh
+end
+
+-- hideGrown(tree, covers) -> parts: the baked stand-ins for the grown boughs a Model draws (parts whose Grown
+-- attribute names a route in `covers`: Builders/Trees) made unseen: the bark stays as an invisible proxy (it collides
+-- and answers rays, like every bough under a mesh), the twigs and leaf clusters go.
+function TreeArt.hideGrown(tree: Instance, covers: { number }): number
+	local set: { [number]: boolean } = {}
+	for _, id in covers do
+		set[id] = true
+	end
+	local n = 0
+	for _, d in tree:GetChildren() do
+		local id = tonumber(d:GetAttribute("Grown"))
+		if id and set[id] and d:IsA("BasePart") then
+			n += 1
+			if (d :: BasePart).CanCollide then
+				d.Transparency = 1
+				d.CastShadow = false
+			else
+				d:Destroy()
+			end
+		end
+	end
+	return n
 end
 
 function TreeArt.run(
@@ -266,7 +308,7 @@ function TreeArt.run(
 			end)
 			local put = 0
 			if ok and asset then
-				put = TreeArt.swap(tree, asset, n.pivot, o.env, n.leaf)
+				put = TreeArt.swap(tree, asset, n.pivot, o.env, n.leaf, n.covers)
 				asset:Destroy()
 			end
 			if put > 0 then

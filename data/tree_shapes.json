@@ -1,0 +1,154 @@
+{
+  "$schema": "tree shapes v1 (Shared/World/TreeShapes: its header is the format)",
+  "src": "BRIEF_ADDENDUM D32 (owner, 2026-11-22): 'Enhance the branches on some of the trees, to make for more levels, overall bigger trees, not just a single place and point where branches come out of and all split ... edit the branches of about 11% of the other trees, just to polish and shape them up, add a few lower branches, make some trees even bigger, and add a couple trees.' Ten of the 83 trees that are not hollow (12 %), spread over the town, each keeping every harvested route; three trees planted as copies of trees that already have uploaded art. Studs; bearings clockwise from +z; heights above the trunk's foot. Owner sheet: docs/owner/TREE_SHAPES_CHECK.md.",
+  "idBase": 9701,
+  "reshaped": [
+    {
+      "trunk": 543,
+      "label": "STREET OAK 30",
+      "why": "west of the old town core, by the sidewalk south of it: all five boughs left one point 23 studs up; made bigger",
+      "big": true,
+      "boughs": [
+        { "tier": "low", "at": 8, "bearing": 340, "reach": 28, "rise": 1.5, "arch": 4, "curl": 10 },
+        { "tier": "low", "at": 11, "bearing": 62, "reach": 16, "rise": 2, "arch": 3, "curl": -12 },
+        { "tier": "mid", "at": 15.5, "bearing": 230, "reach": 18, "rise": 7, "arch": 2.5, "curl": 0 },
+        { "tier": "mid", "at": 18, "bearing": 140, "reach": 11, "rise": 8, "arch": 2, "curl": -6 },
+        { "tier": "high", "at": 27.5, "bearing": 225, "reach": 17, "rise": 18, "arch": 1.5, "curl": 8 },
+        { "tier": "high", "at": 25.5, "bearing": 65, "reach": 18, "rise": 17, "arch": 1.5, "curl": -10 }
+      ]
+    },
+    {
+      "trunk": 479,
+      "label": "STREET MAPLE 23",
+      "why": "north of the centre on the way to the north houses: eight boughs from one point 25 studs up",
+      "boughs": [
+        { "tier": "low", "at": 8.5, "bearing": 155, "reach": 17, "rise": 1, "arch": 3.5, "curl": -10 },
+        { "tier": "low", "at": 11.5, "bearing": 290, "reach": 15, "rise": 2.5, "arch": 3, "curl": 12 },
+        { "tier": "mid", "at": 16, "bearing": 20, "reach": 18, "rise": 7, "arch": 2.5, "curl": 10 },
+        { "tier": "mid", "at": 19.5, "bearing": 220, "reach": 16, "rise": 8, "arch": 2, "curl": -8 },
+        { "tier": "high", "at": 30, "bearing": 130, "reach": 15, "rise": 14, "arch": 1.5, "curl": 10 }
+      ]
+    },
+    {
+      "trunk": 470,
+      "label": "STREET SYCAMORE 22",
+      "why": "north, west of the main street: seven boughs from one point 31 studs up",
+      "boughs": [
+        { "tier": "low", "at": 9, "bearing": 170, "reach": 19, "rise": 0, "arch": 3.5, "curl": 10 },
+        { "tier": "low", "at": 12, "bearing": 330, "reach": 17, "rise": 2, "arch": 3, "curl": -10 },
+        { "tier": "mid", "at": 18, "bearing": 235, "reach": 19, "rise": 7, "arch": 2.5, "curl": 8 },
+        { "tier": "mid", "at": 23, "bearing": 50, "reach": 17, "rise": 8, "arch": 2, "curl": -10 },
+        { "tier": "high", "at": 37, "bearing": 200, "reach": 14, "rise": 13, "arch": 1.5, "curl": 10 }
+      ]
+    },
+    {
+      "trunk": 377,
+      "label": "STREET ELM 11",
+      "why": "east of the centre: six boughs from one point 39 studs up, nothing below",
+      "boughs": [
+        { "tier": "low", "at": 10, "bearing": 60, "reach": 20, "rise": 1, "arch": 3.5, "curl": -10 },
+        { "tier": "low", "at": 13, "bearing": 240, "reach": 18, "rise": 2, "arch": 3, "curl": 10 },
+        { "tier": "mid", "at": 20, "bearing": 300, "reach": 19, "rise": 8, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 26, "bearing": 120, "reach": 18, "rise": 9, "arch": 2, "curl": 10 },
+        { "tier": "mid", "at": 31, "bearing": 180, "reach": 16, "rise": 7, "arch": 2, "curl": -10 }
+      ]
+    },
+    {
+      "trunk": 370,
+      "label": "STREET OAK 10",
+      "why": "east, by the east commercial street (its sidewalk east of it, a telephone wire west of it): five boughs from one point 23 studs up",
+      "boughs": [
+        { "tier": "low", "at": 7.5, "bearing": 220, "reach": 21, "rise": 1, "arch": 3.5, "curl": -10 },
+        { "tier": "low", "at": 10, "bearing": 340, "reach": 18, "rise": 2, "arch": 3, "curl": 12 },
+        { "tier": "mid", "at": 14, "bearing": 135, "reach": 14, "rise": 8, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 17.5, "bearing": 275, "reach": 20, "rise": 8, "arch": 2.5, "curl": 8 }
+      ]
+    },
+    {
+      "trunk": 506,
+      "label": "STREET ELM 26",
+      "why": "south of the old town core: six boughs from one point 24 studs up",
+      "boughs": [
+        { "tier": "low", "at": 8, "bearing": 180, "reach": 18, "rise": 0.5, "arch": 3.5, "curl": 10 },
+        { "tier": "low", "at": 11, "bearing": 300, "reach": 19, "rise": 2, "arch": 3, "curl": -10 },
+        { "tier": "mid", "at": 15.5, "bearing": 65, "reach": 18, "rise": 6, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 18.5, "bearing": 125, "reach": 16, "rise": 8, "arch": 2, "curl": 10 },
+        { "tier": "high", "at": 28, "bearing": 15, "reach": 15, "rise": 15, "arch": 1.5, "curl": 6 }
+      ]
+    },
+    {
+      "trunk": 489,
+      "label": "STREET OAK 24",
+      "why": "north-east, by the north gardens: nine boughs from one point 29 studs up",
+      "boughs": [
+        { "tier": "low", "at": 9, "bearing": 255, "reach": 19, "rise": 1, "arch": 3.5, "curl": 10 },
+        { "tier": "low", "at": 12, "bearing": 140, "reach": 17, "rise": 2, "arch": 3, "curl": -10 },
+        { "tier": "mid", "at": 18, "bearing": 60, "reach": 18, "rise": 7, "arch": 2.5, "curl": 8 },
+        { "tier": "mid", "at": 22, "bearing": 305, "reach": 16, "rise": 8, "arch": 2, "curl": -8 }
+      ]
+    },
+    {
+      "trunk": 333,
+      "label": "STREET ELM 6",
+      "why": "south-east: six boughs from one point 37 studs up, nothing below",
+      "boughs": [
+        { "tier": "low", "at": 9.5, "bearing": 60, "reach": 20, "rise": 1, "arch": 3.5, "curl": -10 },
+        { "tier": "low", "at": 12.5, "bearing": 260, "reach": 18, "rise": 2, "arch": 3, "curl": 10 },
+        { "tier": "mid", "at": 19, "bearing": 140, "reach": 19, "rise": 8, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 25, "bearing": 320, "reach": 17, "rise": 9, "arch": 2, "curl": 10 },
+        { "tier": "mid", "at": 30, "bearing": 195, "reach": 16, "rise": 8, "arch": 2, "curl": -8 }
+      ]
+    },
+    {
+      "trunk": 702,
+      "label": "PARK OAK 94",
+      "why": "Sycamore Park, between the playground and the gazebo: nine boughs from one point 28 studs up; made bigger",
+      "big": true,
+      "boughs": [
+        { "tier": "low", "at": 7.5, "bearing": 180, "reach": 33, "rise": 1.5, "arch": 4.5, "curl": 10 },
+        { "tier": "low", "at": 10, "bearing": 20, "reach": 19, "rise": 1.5, "arch": 3, "curl": -12 },
+        { "tier": "mid", "at": 15, "bearing": 240, "reach": 20, "rise": 6, "arch": 2.5, "curl": 8 },
+        { "tier": "mid", "at": 19, "bearing": 95, "reach": 19, "rise": 7, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 23, "bearing": 315, "reach": 19, "rise": 10, "arch": 2, "curl": 6 },
+        { "tier": "high", "at": 31, "bearing": 165, "reach": 18, "rise": 16, "arch": 1.5, "curl": 10 }
+      ]
+    },
+    {
+      "trunk": 718,
+      "label": "PARK ELM 96",
+      "why": "Sycamore Park, north edge: six boughs from one point 25 studs up",
+      "boughs": [
+        { "tier": "low", "at": 8, "bearing": 300, "reach": 18, "rise": 0.5, "arch": 3.5, "curl": 10 },
+        { "tier": "low", "at": 11, "bearing": 135, "reach": 17, "rise": 2, "arch": 3, "curl": -10 },
+        { "tier": "mid", "at": 16, "bearing": 70, "reach": 18, "rise": 7, "arch": 2.5, "curl": -8 },
+        { "tier": "mid", "at": 19.5, "bearing": 195, "reach": 16, "rise": 8, "arch": 2, "curl": 10 }
+      ]
+    }
+  ],
+  "planted": [
+    {
+      "id": "P1",
+      "source": 960,
+      "x": 60,
+      "z": 845,
+      "label": "PLAYGROUND SHADE OAK",
+      "why": "Sycamore Park, on the lawn just north of the playground: a big shade oak with boughs at three heights (a copy of WESTSIDE 0 SHADE OAK)"
+    },
+    {
+      "id": "P2",
+      "source": 900,
+      "x": -200,
+      "z": -200,
+      "label": "BACK LOT OAK",
+      "why": "behind the old town core's south-west houses, on the open ground between the yards: an oak with boughs at three heights (a copy of VILLA OAK SOUTH)"
+    },
+    {
+      "id": "P3",
+      "source": 969,
+      "x": -225,
+      "z": 170,
+      "label": "WEST LAWN SHADE OAK",
+      "why": "west of the old town core's north-west houses, on the open ground: the tallest shade oak, boughs at three heights (a copy of WESTSIDE 1 SHADE OAK)"
+    }
+  ]
+}
