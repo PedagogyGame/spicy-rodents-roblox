@@ -638,9 +638,9 @@ TownAI.FOOT = 2.5 -- studs over the ground: a trunk's end this low is the tree's
 function TownAI.setRoad(world: World, cars: () -> { any }): number
 	local ends = {}
 	for _, r in world.routes.routes do
-		-- (the town's own trees: the D34 woods are climbed but not crossed from, so the crossings stay as many and as
-		-- careful as D21 tuned them)
-		if r.kind ~= "trunk" or world.routes.enclosed(r.id) or r.woods then
+		-- (the town's own trees: the D34 woods and the D35 light posts are climbed but not crossed from, so the
+		-- crossings stay as many and as careful as D21 tuned them)
+		if r.kind ~= "trunk" or world.routes.enclosed(r.id) or r.woods or r.lamp then
 			continue
 		end
 		for _, i in { 1, #r.points } do
