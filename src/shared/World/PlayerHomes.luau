@@ -8,7 +8,8 @@
 -- attribute ATTRIBUTE, so the server and the player's own screen read it the same way (homeOf).
 -- The computer is the monitor on the house's desk (WorldGen/Builders/Interior: the study's or the den's desk, or the
 -- one it adds to the bedroom); `computer` is the monitor's centre in world studs, checked against the bake plan by
--- tests/unit/stock_options.spec.luau, and `desk` the root part's name inside Workspace.Town.<lot>.
+-- tests/unit/stock_options.spec.luau, and `desk` the root part's name inside Workspace.Town.Lots.<lot> (its screen is
+-- the part "<desk>_Monitor" beside it).
 -- Other features (D30 errands: "places it in their home") use homeOf and inside(lotId, x, z).
 -- Interface: HOMES; ATTRIBUTE; REACH; lot(id) -> Home?; nearest(x, z) -> Home; homeOf(player) -> lot id?;
 --   inside(lotId, x, z) -> boolean; atComputer(lotId, x, y, z) -> boolean; new() -> Registry

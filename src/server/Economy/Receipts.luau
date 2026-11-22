@@ -95,7 +95,9 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 			return "PurchaseGranted"
 		end
 	else
-		local ok = (self.deps.grant or ReceiptLedger.grant)(profile.data, receipt, cents, self.deps.now())
+		local grant: (any, ReceiptLedger.Receipt, number, number) -> (boolean, string?) = self.deps.grant
+			or ReceiptLedger.grant
+		local ok = grant(profile.data, receipt, cents, self.deps.now())
 		if not ok then
 			stats.saveFailed += 1
 			return "NotProcessedYet"

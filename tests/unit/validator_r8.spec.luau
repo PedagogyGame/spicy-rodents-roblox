@@ -321,6 +321,9 @@ return function(t)
 			-- (13th and 14th, 2026-11-22, owner D29: the shared vehicles' roots for Vehicles/RideBumps, never a body; a held
 			-- squirrel a shared vehicle bumped is put aside from its held place (ActorsRuntime.placeOf), its rotation kept)
 			["Boot/Game.luau"] = 14,
+			-- (15th, 2026-11-22, owner D30: a held PERSON's place, for their home computer's reach and their home; never a
+			-- squirrel's)
+			["Economy/StockOptions.luau"] = 1,
 			["Items/CornerStore.luau"] = 1,
 			["Items/ItemWorld.luau"] = 13,
 			["Minigames/BowlingLane.luau"] = 2,

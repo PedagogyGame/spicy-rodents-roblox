@@ -45,6 +45,9 @@ local Products = Import.shared("Economy/Products") :: typeof(require("../../shar
 local PlayerHomes = Import.shared("World/PlayerHomes") :: typeof(require("../../shared/World/PlayerHomes"))
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
 local Receipts = require("./Receipts")
+-- (exported type names do not cross Import: the same types, taken from values)
+type Home = typeof(PlayerHomes.HOMES[1])
+type Registry = typeof(PlayerHomes.new())
 local ReceiptLedger = require("./ReceiptLedger")
 
 local StockOptions = {}
@@ -123,7 +126,7 @@ export type Deps = {
 
 export type Service = {
 	deps: Deps,
-	homes: PlayerHomes.Registry,
+	homes: Registry,
 	receipts: Receipts.Handler,
 	withdrawn: { [number]: number }, -- options withdrawn on this server, by UserId (never saved)
 	busy: { [number]: boolean },
@@ -138,6 +141,7 @@ export type Service = {
 	loaded: (player: any, data: any) -> (),
 	sweep: (players: { any }) -> (),
 	withdrawnHere: (player: any) -> number,
+	stop: (() -> ())?, -- (start's: the prompts, the remote's handler and the sweep go; receipts are no longer taken)
 }
 
 local function whole(v: any): boolean
@@ -279,7 +283,7 @@ function StockOptions.new(deps: Deps): Service
 			show(player)
 			self.open(player, "menu")
 		end
-		return decision
+		return decision :: Receipts.Decision
 	end
 
 	function self.promptBuy(player: any): (boolean, string)
@@ -319,7 +323,7 @@ function StockOptions.new(deps: Deps): Service
 		if home == nil then
 			return say(player, false, W.noHome)
 		end
-		local h = PlayerHomes.lot(home) :: PlayerHomes.Home
+		local h = PlayerHomes.lot(home) :: Home
 		if x == nil or y == nil or z == nil or not PlayerHomes.atComputer(home, x, y, z) then
 			return say(player, false, string.format(W.far, h.name))
 		end
@@ -403,7 +407,7 @@ function StockOptions.new(deps: Deps): Service
 			return
 		end
 		if home ~= lotId then
-			local h = PlayerHomes.lot(home) :: PlayerHomes.Home
+			local h = PlayerHomes.lot(home) :: Home
 			say(player, false, string.format(StockOptions.WORDS.notHome, h.name))
 			return
 		end
@@ -487,6 +491,9 @@ function StockOptions.start(opts: StartOpts): Service?
 			if not (a and body) then
 				return nil
 			end
+			if a.species ~= "human" then
+				return a.species -- (only a person's place is read: a held squirrel's is MovementService's to judge)
+			end
 			local ok, pos = pcall(function(): Vector3
 				return (body :: Model):GetPivot().Position
 			end)
@@ -520,11 +527,16 @@ function StockOptions.start(opts: StartOpts): Service?
 		end
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	ev.OnServerEvent:Connect(function(player: Player, verb: any, arg: any)
+	local conns: { RBXScriptConnection } = {}
+	local made: { Instance } = {}
+	local running = true
+	conns[#conns + 1] = ev.OnServerEvent:Connect(function(player: Player, verb: any, arg: any)
 		if type(verb) ~= "string" or #verb > 16 then
 			return
 		end
-		local ok, err = pcall(service.request, player, verb, arg)
+		local ok, err = pcall(function()
+			service.request(player, verb, arg)
+		end)
 		if not ok then
 			warn(`[StockOptions] a request failed: {err}`)
 		end
@@ -542,8 +554,9 @@ function StockOptions.start(opts: StartOpts): Service?
 	end)
 	-- a prompt on each home's computer screen (the bake's desk; at its recorded place if the desk is not found)
 	for _, h in PlayerHomes.HOMES do
-		local lot = opts.town and opts.town:FindFirstChild(h.lot, true)
-		local screen = lot and lot:FindFirstChild(h.desk .. "_Monitor", true)
+		local lots = opts.town and opts.town:FindFirstChild("Lots") -- (Workspace.Town.Lots.<lot>; Town.Skyline has
+		local lot = lots and lots:FindFirstChild(h.lot) --   a far-view stand-in of the same name)
+		local screen = lot and lot:FindFirstChild(h.desk .. "_Monitor")
 		local att = Instance.new("Attachment")
 		att.Name = "HomeComputer"
 		if screen and screen:IsA("BasePart") then
@@ -564,9 +577,12 @@ function StockOptions.start(opts: StartOpts): Service?
 		prompt.HoldDuration = 0
 		prompt:SetAttribute("Door", true) -- E belongs to the prompt (Client/Minigames/MinigameClient)
 		prompt.Parent = att
+		table.insert(made, att)
 		local lotId = h.lot
-		prompt.Triggered:Connect(function(player: Player)
-			local ok, err = pcall(service.computer, player, lotId)
+		conns[#conns + 1] = prompt.Triggered:Connect(function(player: Player)
+			local ok, err = pcall(function()
+				service.computer(player, lotId)
+			end)
 			if not ok then
 				warn(`[StockOptions] the computer failed: {err}`)
 			end
@@ -574,13 +590,27 @@ function StockOptions.start(opts: StartOpts): Service?
 	end
 	if opts.heartbeat ~= false then
 		task.spawn(function()
-			while true do
+			while running do
 				task.wait(1)
-				local ok, err = pcall(service.sweep, Players:GetPlayers())
+				local ok, err = pcall(function()
+					service.sweep(Players:GetPlayers())
+				end)
 				if not ok then
 					warn(`[StockOptions] the home sweep failed: {err}`)
 				end
 			end
+		end)
+	end
+	service.stop = function()
+		running = false
+		for _, c in conns do
+			c:Disconnect()
+		end
+		for _, i in made do
+			i:Destroy()
+		end
+		pcall(function()
+			(Marketplace :: any).ProcessReceipt = nil
 		end)
 	end
 	return service

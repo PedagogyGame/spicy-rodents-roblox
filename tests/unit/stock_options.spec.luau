@@ -14,6 +14,7 @@ local Credits = require("@server/Economy/Credits")
 local Products = require("@shared/Economy/Products")
 local PlayerHomes = require("@shared/World/PlayerHomes")
 local Flags = require("@shared/Config/Flags")
+local StockOptionsUI = require("@client/UI/StockOptionsUI")
 local Bake = require("@worldgen/Bake")
 local Furniture = require("@worldgen/Builders/Furniture")
 local InteriorCheck = require("@worldgen/InteriorCheck")
@@ -642,6 +643,46 @@ return function(t)
 		t.truthy(string.find(lower, "s$100", 1, true))
 		t.eq(StockOptions.PER_ROBUX, 4)
 		t.eq(StockOptions.CAP, 100)
+	end)
+
+	t.test("the screen (Client/UI/StockOptionsUI): its lines and the amounts the computer offers", function()
+		local view = {
+			kind = "view",
+			where = "menu",
+			enabled = true,
+			loaded = true,
+			held = 170,
+			withdrawnHere = 30,
+			cap = 100,
+			capLeft = 70,
+			homeName = "the blue cottage",
+			price = 25,
+			perRobux = 4,
+		}
+		t.deepEq(StockOptionsUI.lines(view), {
+			"Your options: 170 (saved)",
+			"Withdrawn on this server: S$30 of S$100",
+			"Your home: the blue cottage",
+			"One purchase: 25 Robux for 100 options.",
+		})
+		view.where = "computer"
+		t.deepEq(StockOptionsUI.amounts(view), { 5, 10, 25, 50, 70 }, "the choices that fit, then the most there is")
+		view.held = 12
+		t.deepEq(StockOptionsUI.amounts(view), { 5, 10, 12 })
+		view.held = 5
+		t.deepEq(StockOptionsUI.amounts(view), { 5 }, "the most only once")
+		view.held, view.capLeft = 0, 70
+		t.deepEq(StockOptionsUI.amounts(view), {})
+		view.held, view.capLeft = 40, 0
+		t.deepEq(StockOptionsUI.amounts(view), {})
+		view.enabled = false
+		view.capLeft = 70
+		t.deepEq(StockOptionsUI.amounts(view), {})
+		t.eq(StockOptionsUI.lines(view)[1], "Spicy Stock Options are closed for now.")
+		local loading = StockOptionsUI.lines({ loaded = false, where = "menu", perRobux = 4 })
+		t.eq(loading[1], "Your saved options are still loading.")
+		t.eq(loading[3], "You get a home when you first walk the town as a person.")
+		t.eq(loading[4], "4 options for each Robux (the Roblox window shows the price).")
 	end)
 
 	t.test("PlayerSaves.saveNow: only a held profile; waits for the queue; false when it cannot", function()
