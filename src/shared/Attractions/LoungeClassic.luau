@@ -14,16 +14,18 @@
 --     every SIP_EVERY seconds). People have no stamina in this game, so a drink is for the look only.
 --   The jazz: a stock-library playlist by cue name (JAZZ; ids empty until the lead picks them), heard inside only.
 --   The seats (SEATS): the seven bar stools, the four booths (two on each bench), the club chairs round the four
---     small tables and the two armchairs by the fire. A person let in sits with E on the seat's prompt (a Seat:
+--     small tables and the two armchairs by the fire. A person let in sits with R on the seat's prompt (a Seat:
 --     the game's own sitting, as the lawn chair and the sky lift), stays in first person, keeps a drink in hand and
---     sips it, and gets up with jump or by moving (Client/World/SeatGetUp). A seated person is inside.
+--     sips it, and gets up with the seat key again, jump or by moving (Client/World/SeatGetUp asks the server:
+--     Shared/World/SeatRules), standing at the seat's standSpot. A seated person is inside.
 -- Everything is in the venue's local frame (Shared/Attractions/AlleyLayout: X across the frontage, Y up from the
 -- floor, D into the building; the front is at D -28) unless it says world.
 -- Interface: VENUE; DOOR_OUTSIDE, DOOR_INSIDE ({ X, Y, D, facing D sign }); INSIDE; GUARDED; GUARD_POSTS; COUNTER;
 --   DRINKS; SIPS; SIP_EVERY; JAZZ; ZONE; WORDS; drink(id) -> Drink?; inside(x, y, d) -> boolean; guarded(x, y, d)
 --   -> boolean; door(species?, hasPass) -> "enter" | "offer" | "guard" | "refuse"; nextTrack(list, from) ->
 --   index?; placeOf(venue) -> Place; SEATS ({ id, kind, x, y (the seat's top), d, fx, fd (the way the sitter faces)
---   }); SEAT_ATTRIBUTE; SEAT_WORDS; standUp(moveX, moveZ, jump) -> boolean
+--   }); SEAT_ATTRIBUTE; SEAT_WORDS; standUp(moveX, moveZ, jump) -> boolean; standSpot(seat) -> x, d (where its
+--   sitter stands up); STAND_BACK; STAND_BOOTH_X
 -- Pure. No side effects on require.
 
 local LoungeClassic = {}
@@ -102,6 +104,19 @@ LoungeClassic.SEATS = table.freeze(seats)
 -- Whether a seated person's input gets them up: a jump, or a move past a small dead zone (the stick's rest).
 function LoungeClassic.standUp(moveX: number, moveZ: number, jump: boolean): boolean
 	return jump or moveX * moveX + moveZ * moveZ > 0.25 * 0.25
+end
+
+-- Where a person who gets up from a seat stands (owner D32: "we can get back up with another button push"; the server
+-- puts them there, Shared/World/SeatRules): clear of every piece of furniture and on the floor the door is reached
+-- from (tests/unit/lounge_classic.spec floods it). From a stool, a club chair or an armchair: STAND_BACK behind it;
+-- from a booth: out at its open end, toward the middle of the room (STAND_BOOTH_X), level with the place.
+LoungeClassic.STAND_BACK = 3
+LoungeClassic.STAND_BOOTH_X = 11.8
+function LoungeClassic.standSpot(seat: Seat): (number, number)
+	if seat.kind == "booth" then
+		return (if seat.x < 0 then -1 else 1) * LoungeClassic.STAND_BOOTH_X, seat.d
+	end
+	return seat.x - seat.fx * LoungeClassic.STAND_BACK, seat.d - seat.fd * LoungeClassic.STAND_BACK
 end
 
 export type Drink = {

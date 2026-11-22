@@ -5,11 +5,19 @@
 -- Seat with a "Sit" prompt on every place in LoungeClassic.SEATS; only a person the door let in sits, on a free
 -- seat; a seated person is inside for the room's sweep whatever the pivot says; a drink is ordered and sipped
 -- seated; the door gets a seated person up first; moving gets up (a lounge seat only), as jump does.
+-- Owner D32 ("sitting down traps you and you can't actually leave... get back up with another button push"): the
+-- server gets a seated person up (Server/World/SeatStand, PlayNet.StandUp) at the seat's stand spot; the seat key
+-- pressed again (the nearest free stool's prompt) gets them up instead of moving them along, and the same press cannot
+-- sit them down again for SeatRules.GRACE; the client asks with R, Space, the gamepad's A or Y, a move or the STAND
+-- button, never while typing, at most once every SeatRules.REPEAT; a lawn chair's sitter gets up the same way; a
+-- vehicle's seat (no stand spot) is never touched.
 -- Interface: return function(t) (the spec shape)
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local LoungeClassic = require("@shared/Attractions/LoungeClassic")
 local LoungeService = require("@server/Attractions/LoungeService")
 local SeatGetUp = require("@client/World/SeatGetUp")
+local SeatStand = require("@server/World/SeatStand")
+local SeatRules = require("@shared/World/SeatRules")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
 
@@ -34,6 +42,17 @@ local function teachSeats(svc: any)
 			self.Occupant = hum
 			local w = FakeEngine.new("Weld", "SeatWeld")
 			w.Parent = self
+			-- (as the engine: the weld gone, the Humanoid sits nowhere and the seat is free)
+			local sat = self
+			rawset(w, "Destroy", function(weld: any)
+				weld.Parent = nil
+				if hum.SeatPart == sat then
+					hum.SeatPart = nil
+				end
+				if sat.Occupant == hum then
+					sat.Occupant = nil
+				end
+			end)
 		end)
 	end
 end
@@ -351,6 +370,228 @@ return function(t)
 			t.eq(h.step(), false)
 			t.eq(hum.Jump, false)
 			h.stop()
+		end)
+	end)
+
+	-- the body's feet in the venue frame and its facing (venue X, D)
+	local function feetOf(svc: any, b: any): (number, number, number, number, number)
+		local cf = b:GetPivot()
+		local p = cf.Position
+		local x, y, d = AlleyLayout.toLocal(svc.place, p.X, p.Y - 3, p.Z)
+		local ahead = p + cf.LookVector
+		local ax, _, ad = AlleyLayout.toLocal(svc.place, ahead.X, ahead.Y, ahead.Z)
+		return x, y, d, ax - x, ad - d
+	end
+
+	t.test("D32: every seat's stand spot: its StandOffset is LoungeClassic.standSpot, on the floor", function()
+		FakeEngine.with(function()
+			local svc = svcWith({})
+			for i, seat in svc.seats do
+				local st = LoungeClassic.SEATS[i]
+				local off = seat:GetAttribute(SeatRules.STAND_ATTRIBUTE)
+				t.eq(typeof(off), "Vector3", st.id)
+				local w = seat.CFrame:PointToWorldSpace(off)
+				local x, y, d = AlleyLayout.toLocal(svc.place, w.X, w.Y, w.Z)
+				local sx, sd = LoungeClassic.standSpot(st)
+				t.near(x, sx, 1e-3, `{st.id} across`)
+				t.near(d, sd, 1e-3, `{st.id} along`)
+				t.near(y, 0, 1e-3, `{st.id}: on the floor`)
+				t.truthy(LoungeClassic.inside(sx, 0, sd), `{st.id}: in the room`)
+			end
+			svc:stop()
+		end)
+	end)
+
+	t.test("D32: the seat key again gets a seated person up (never along the bar); no sitting again at once", function()
+		FakeEngine.with(function()
+			local ann = { species = "human", pass = true }
+			local svc = svcWith({ ann })
+			ann.body = body("Ann", roblox.CFrame.new(svc:world(0, 3, -30)))
+			svc:enter(ann)
+			local hum = ann.body:FindFirstChildOfClass("Humanoid")
+			for _, id in { "stool4", "booth2b1", "club3a", "armchair2" } do
+				local i = indexOf(id)
+				local st = LoungeClassic.SEATS[i]
+				svc.seatPrompts[i].Triggered.fire(ann)
+				t.eq(svc:seatOf(ann.body), i, `{id}: sat`)
+				-- R again: the nearest free seat's prompt (a neighbour), pressed while seated
+				local other = if i > 1 then i - 1 else i + 1
+				svc.seatPrompts[other].Triggered.fire(ann)
+				t.eq(svc:seatOf(ann.body), nil, `{id}: up, not moved to the next seat`)
+				t.eq(hum.Sit, false)
+				t.eq(svc.seats[i]:FindFirstChild("SeatWeld"), nil, `{id}: the weld is gone`)
+				local x, y, d, fx, fd = feetOf(svc, ann.body)
+				local sx, sd = LoungeClassic.standSpot(st)
+				t.near(x, sx, 1e-3, `{id}: standing at its spot`)
+				t.near(d, sd, 1e-3)
+				t.near(y, 0, 1e-3, `{id}: feet on the floor`)
+				t.near(fx, st.fx, 1e-3, `{id}: facing the seat's way`)
+				t.near(fd, st.fd, 1e-3)
+				t.truthy(svc:inRoom(ann.body) and svc:isInside(ann), `{id}: still in the room`)
+				-- the same press reaching a seat's prompt a moment later does not sit them again
+				svc.seatPrompts[other].Triggered.fire(ann)
+				t.eq(svc:seatOf(ann.body), nil, `{id}: not straight back down`)
+				svc._advance(SeatRules.GRACE + 0.01)
+			end
+			-- after the grace a seat's prompt sits them as ever
+			svc.seatPrompts[indexOf("stool2")].Triggered.fire(ann)
+			t.eq(svc:seatOf(ann.body), indexOf("stool2"))
+			svc:stop()
+		end)
+	end)
+
+	t.test(
+		"D32: PlayNet.StandUp gets up from a lounge seat or a lawn chair; a vehicle's seat is never touched",
+		function()
+			FakeEngine.with(function()
+				local ann = { species = "human", pass = true }
+				local svc = svcWith({ ann })
+				ann.body = body("Ann", roblox.CFrame.new(svc:world(0, 3, -30)))
+				svc:enter(ann)
+				local clock = 0
+				local stand = SeatStand.handler({
+					bodyOf = function(p: any): any?
+						return p.body
+					end,
+					first = function(p: any): boolean
+						return svc:stand(p)
+					end,
+					now = function(): number
+						return clock
+					end,
+				})
+				t.eq(stand(ann), false, "standing: nothing to do")
+				clock += 1
+				svc:sit(ann, indexOf("booth3a2"))
+				t.truthy(stand(ann), "up from the booth")
+				t.eq(svc:seatOf(ann.body), nil)
+				local x, _, d = feetOf(svc, ann.body)
+				t.near(x, -LoungeClassic.STAND_BOOTH_X, 1e-3, "out at the booth's open end")
+				t.near(d, LoungeClassic.SEATS[indexOf("booth3a2")].d, 1e-3)
+				-- asked again at once (a key held): not counted twice
+				svc._advance(SeatRules.GRACE + 0.01)
+				clock += 1
+				svc:sit(ann, indexOf("club1b"))
+				t.eq(stand(ann), true)
+				clock += 0.01
+				svc:sit(ann, indexOf("club1b"))
+				t.eq(svc:seatOf(ann.body), nil, "inside the grace: not sat again")
+				t.eq(stand(ann), false, "a second ask inside REPEAT / 2 is dropped")
+				-- a lawn chair (Server/Items/ItemWorld: anchored, sat in by Seat:Sit, a stand spot in front)
+				local bob = { species = "human" }
+				bob.body = body("Bob", roblox.CFrame.new(0, 3, 0))
+				local chair =
+					FakeEngine.part("Seat", roblox.CFrame.new(10, 1, 10) * roblox.CFrame.Angles(0, math.pi / 2, 0))
+				rawset(chair, "ClassName", "Seat")
+				chair:SetAttribute(SeatRules.STAND_ATTRIBUTE, roblox.Vector3.new(0, -1.0, -2.3))
+				local bhum = bob.body:FindFirstChildOfClass("Humanoid")
+				bhum.SeatPart = chair
+				local weld = FakeEngine.new("Weld", "SeatWeld")
+				weld.Parent = chair
+				clock += 1
+				t.truthy(stand(bob), "up from the lawn chair")
+				t.eq(bhum.Sit, false)
+				t.eq(chair:FindFirstChild("SeatWeld"), nil, "its weld gone")
+				local p = bob.body:GetPivot()
+				local want = chair.CFrame:PointToWorldSpace(roblox.Vector3.new(0, -1.0, -2.3))
+				t.near(
+					(p.Position - (want + roblox.Vector3.new(0, 3, 0))).Magnitude,
+					0,
+					1e-3,
+					"in front of it, standing"
+				)
+				-- a vehicle's DriverSeat: no stand spot, E's business (Server/Actors/DeviceService)
+				local car = FakeEngine.part("DriverSeat", roblox.CFrame.new(50, 2, 50))
+				rawset(car, "ClassName", "Seat")
+				local cw = FakeEngine.new("Weld", "SeatWeld")
+				cw.Parent = car
+				bhum.SeatPart = car
+				bhum.Sit = true
+				clock += 1
+				t.eq(stand(bob), false, "a driver is not got up here")
+				t.eq(bhum.Sit, true)
+				t.truthy(car:FindFirstChild("SeatWeld"), "the car's weld stays")
+				svc:stop()
+			end)
+		end
+	)
+
+	t.test("D32 SeatGetUp: R, Space, the pad's A or Y, a move or STAND ask; never typing; once per REPEAT", function()
+		FakeEngine.with(function()
+			local b = body("Me", roblox.CFrame.new(0, 3, 0))
+			local hum = b:FindFirstChildOfClass("Humanoid")
+			local asks, toasts = 0, {}
+			local clock = 0
+			local h = SeatGetUp.start({
+				current = function()
+					return b
+				end,
+				heartbeat = false,
+				move = function()
+					return roblox.Vector3.new(0, 0, 0)
+				end,
+				request = function()
+					asks += 1
+				end,
+				toast = function(text: string)
+					table.insert(toasts, text)
+				end,
+				now = function(): number
+					return clock
+				end,
+			})
+			local gui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+			local screen = gui and gui:FindFirstChild("SeatStand")
+			t.truthy(screen, "the STAND button's screen")
+			local key = function(name: string)
+				FakeEngine.input("began", { KeyCode = (roblox.Enum.KeyCode :: any)[name] })
+			end
+			h.step()
+			t.eq(screen.Enabled, false, "standing: no STAND")
+			key("R")
+			t.eq(asks, 0, "standing: R is the seat prompt's, nothing here")
+			-- seated on a lounge seat
+			local seat = FakeEngine.new("Seat", "Seat_stool1")
+			seat:SetAttribute(LoungeClassic.SEAT_ATTRIBUTE, "stool1")
+			seat:SetAttribute(SeatRules.STAND_ATTRIBUTE, roblox.Vector3.new(0, -2.46, 2.5))
+			hum.SeatPart = seat
+			h.step()
+			t.eq(screen.Enabled, true, "seated: STAND shows")
+			t.eq(#toasts, 1, "told how to get up")
+			h.step()
+			t.eq(#toasts, 1, "once per sitting")
+			for _, name in { "R", "Space", "ButtonA", "ButtonY" } do
+				clock += SeatRules.REPEAT + 0.01
+				hum.Jump = false
+				key(name)
+				t.eq(hum.Jump, true, `{name}: the engine's jump too`)
+			end
+			t.eq(asks, 4, "each stand key asked")
+			key("R")
+			t.eq(asks, 4, "not twice inside REPEAT")
+			clock += SeatRules.REPEAT + 0.01
+			key("E")
+			key("W")
+			t.eq(asks, 4, "E (vehicles, drinks) and a bare W press are not stand keys (a move is, through step)")
+			FakeEngine.uis().focused = true
+			key("R")
+			t.eq(asks, 4, "typing: nothing")
+			FakeEngine.uis().focused = nil
+			screen:FindFirstChild("Stand").Activated.fire()
+			t.eq(asks, 5, "the STAND button")
+			-- a lawn chair (a stand spot, no lounge id) is a seat one gets up from too; a car's is not
+			local chair = FakeEngine.new("Seat", "Seat")
+			chair:SetAttribute(SeatRules.STAND_ATTRIBUTE, roblox.Vector3.new(0, -1, -2.3))
+			hum.SeatPart = chair
+			clock += SeatRules.REPEAT + 0.01
+			t.truthy(h.press("Space"), "a lawn chair")
+			hum.SeatPart = FakeEngine.new("Seat", "DriverSeat")
+			clock += SeatRules.REPEAT + 0.01
+			t.eq(h.press("R"), false, "a car's seat: no")
+			h.step()
+			t.eq(screen.Enabled, false, "no STAND in a car (the vehicles' own button is UI/RideHint's)")
+			h.stop()
+			t.eq(gui:FindFirstChild("SeatStand"), nil, "the screen goes with it")
 		end)
 	end)
 end

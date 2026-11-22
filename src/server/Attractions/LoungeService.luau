@@ -30,9 +30,14 @@
 --     Seat on each, sat on through its prompt ("Sit", on its own key: SEAT_KEY, SEAT_PAD) by a person the door let in
 --     (Seat:Sit, the game's own sitting; never by walking into it: CanTouch off). Its own key, because a prompt
 --     shows only the nearest of those sharing a key, and in front of the bar the stools are nearer than the drinks. First person stays (the body's CameraZone is untouched), a
---     drink stays in the hand and is sipped; jump or a move gets up (Client/World/SeatGetUp). A taken seat's prompt
---     is off. A seated person is in the room whatever the pivot says (inRoom), and is got up before the door or a
---     release moves the body.
+--     drink stays in the hand and is sipped. A taken seat's prompt is off. A seated person is in the room whatever
+--     the pivot says (inRoom), and is got up before the door or a release moves the body.
+--   * Getting up (owner D32: sitting "traps you and you can't actually leave"): the server gets a seated person up
+--     (stand: the weld goes and the body stands at the seat's LoungeClassic.standSpot, Server/World/SeatStand), asked
+--     by the sitter's client (PlayNet.StandUp: R again, Space, the gamepad's A or Y, a move, the touch screen's STAND;
+--     Client/World/SeatGetUp) or by a seat's own prompt pressed while seated (R again: the nearest free stool's
+--     "Sit" no longer moves a seated person along the bar). For SeatRules.GRACE seconds after getting up a seat's
+--     prompt does not sit them again (the one press reaches both). Each Seat carries SeatRules.STAND_ATTRIBUTE.
 -- Sounds: named cue points only (Sound instances with empty ids, never synthesised): CUES. The jazz is the client's.
 -- Engine only inside the functions; no side effects on require. Steppable: step() reads the clock it was given.
 -- The joiner's lines in Boot/Game.start: lounge = LoungeService.start({ town = LoungeService.gameTown({ ... }),
@@ -41,8 +46,8 @@
 --   Service:enter(player) -> (ok, why?); Service:buyPass(player) -> (ok, words); Service:leave(player) -> ok;
 --   Service:order(player, id) -> (ok, words); Service:step() (the guards, the room, the sweep); Service:gone(player);
 --   Service:isInside(player) ->
---   boolean; Service:inRoom(body) -> boolean; Service:sit(player, index) -> (ok, why?); Service:seatOf(body) ->
---   index?; Service:counts() -> { inside, drinks, knockedOut, strikes, seated }; Service:stop(); constants TICK,
+--   boolean; Service:inRoom(body) -> boolean; Service:sit(player, index) -> (ok, why?); Service:stand(player) ->
+--   boolean (got up); Service:seatOf(body) -> index?; Service:counts() -> { inside, drinks, knockedOut, strikes, seated }; Service:stop(); constants TICK,
 --   STRIKE, SIP_HOLD, COOLDOWN, PROMPT_DISTANCE, SEAT_DISTANCE, SEAT_KEY, SEAT_PAD, STAND, CUES, FOLDER
 
 local Import = require("../Import")
@@ -52,6 +57,8 @@ local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Econo
 local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local LoungeClassic =
 	Import.shared("Attractions/LoungeClassic") :: typeof(require("../../shared/Attractions/LoungeClassic"))
+local SeatRules = Import.shared("World/SeatRules") :: typeof(require("../../shared/World/SeatRules"))
+local SeatStand = require("../World/SeatStand")
 
 local LoungeService = {}
 LoungeService.__index = LoungeService
@@ -235,6 +242,7 @@ function LoungeService.new(opts: Opts): any
 	self.folder = folder
 	self.inside = {} :: { [any]: any } -- player -> the body let in
 	self.misses = {} :: { [any]: number } -- player -> checks in a row its body let in was found outside
+	self.stoodAt = {} :: { [any]: number } -- player -> when the service last got them up (SeatRules.GRACE)
 	self.drinks = {} :: { [any]: Drink }
 	self.struck = {} :: { [any]: number } -- actor -> when
 	self.strikes = {} :: { [string]: Strike }
@@ -280,6 +288,9 @@ function LoungeService.new(opts: Opts): any
 		seat.CanQuery = false
 		seat.Transparency = 1
 		seat:SetAttribute(LoungeClassic.SEAT_ATTRIBUTE, st.id)
+		-- where its sitter stands when they get up (the feet, in the seat's frame: Server/World/SeatStand)
+		local sx, sd = LoungeClassic.standSpot(st)
+		seat:SetAttribute(SeatRules.STAND_ATTRIBUTE, seat.CFrame:PointToObjectSpace(self:world(sx, 0, sd)))
 		seat.Parent = folder
 		self.seats[i] = seat
 		self.seatIndex[seat] = i
@@ -405,12 +416,22 @@ function LoungeService.seatOf(self: any, body: any): number?
 	return if part then self.seatIndex[part] else nil
 end
 
--- A seat's prompt (R, gamepad Y) sits a person the door let in on a free seat (Seat:Sit; a seated one moves seats).
+-- A seat's prompt (R, gamepad Y) sits a person the door let in on a free seat (Seat:Sit). Pressed by one already
+-- seated here, it gets them up (owner D32: "get back up with another button push"); just after getting up it does
+-- nothing (the press that got them up reaches the nearest free seat's prompt too).
 function LoungeService.sit(self: any, player: any, index: number): (boolean, string?)
 	local seat = self.seats[index]
 	local body = self.inside[player]
 	if seat == nil or body == nil or self.town.speciesOf(player) ~= "human" or self.town.bodyOf(player) ~= body then
 		return false, "notInside"
+	end
+	if self:seatOf(body) ~= nil then
+		self:stand(player)
+		return false, "stood"
+	end
+	local stood = self.stoodAt[player]
+	if stood and self.now() - stood < SeatRules.GRACE then
+		return false, "justStood"
 	end
 	if seat.Occupant ~= nil then
 		return false, "taken"
@@ -423,6 +444,20 @@ function LoungeService.sit(self: any, player: any, index: number): (boolean, str
 		seat:Sit(hum)
 	end)
 	return ok, if ok then nil else "sit"
+end
+
+-- Get a player's body up from one of the lounge's seats, standing at the seat's stand spot (PlayNet.StandUp, or a
+-- seat's prompt pressed while seated). False when it sits on none of them.
+function LoungeService.stand(self: any, player: any): boolean
+	local body = self.inside[player] or self.town.bodyOf(player)
+	if body == nil or self:seatOf(body) == nil then
+		return false
+	end
+	if SeatStand.stand(body) == nil then
+		return false
+	end
+	self.stoodAt[player] = self.now()
+	return true
 end
 
 -- Get a seated body up (before the door or a release moves it: a body welded to an anchored seat stays put).
@@ -813,6 +848,7 @@ function LoungeService.gone(self: any, player: any)
 		self:_release(player, body, self:inRoom(body))
 	end
 	dropDrink(self, player)
+	self.stoodAt[player] = nil
 end
 
 function LoungeService.counts(self: any): { [string]: number }

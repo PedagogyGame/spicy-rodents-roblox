@@ -250,8 +250,14 @@ if not okJazz then
 	warn(`Client: LoungeMusic failed: {jazzErr}`)
 end
 
--- THE GILDED ACORN's seats: moving gets up, as jump does (World/SeatGetUp)
-local okSeat, seatErr = pcall(SeatGetUp.start, { current = client.current })
+-- getting up from a seat (THE GILDED ACORN's, a lawn chair; owner D32): R again, Space, a step or the STAND button asks
+-- the server (World/SeatGetUp, PlayNet.StandUp)
+local okSeat, seatErr = pcall(SeatGetUp.start, {
+	current = client.current,
+	toast = function(text: string)
+		menu.toast(text, 4)
+	end,
+})
 if not okSeat then
 	warn(`Client: SeatGetUp failed: {seatErr}`)
 end

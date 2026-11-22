@@ -4,11 +4,14 @@
 -- person may ride; Server/Actors/DeviceService marks them with the model attribute Shared). While this player is on foot
 -- in a person's body, the nearest free one within REACH studs shows a little label over it: "E  ride" on a keyboard
 -- ("Y  ride" on a gamepad: the same E as every vehicle, Possession/PossessionClient sends it); on a touch screen the label
--- is a RIDE button, and while riding one a GET OFF button sits above the jump button: a tap is the same E. Nothing for
+-- is a RIDE button, and while riding one a GET OFF button sits above the jump button: a tap is the same E (owner D32,
+-- "never stuck": the button shows in every vehicle, the golf cart's seat beside the driver and the drone, whose words
+-- are offWords: a touch screen has no E). Nothing for
 -- a squirrel, the rodent, the other vehicles, or one someone is riding, except a golf cart whose seat beside its driver
 -- is free (owner D30): "E  sit beside" (on a touch screen SIT). Looked for four times a second (the ten models
 -- in workspace.Vehicles; no per-frame work); one BillboardGui and one ScreenGui, made once.
 -- Interface: REACH; pick(x, z, rides) -> index? (pure); words(kind, touch, pad, beside?) -> string (pure);
+--   offWords(device?) -> string? (pure: the button's words while in a device, nil on foot or on the sky lift);
 --   start(opts { request: () -> (), state: () -> State }) -> stop()
 -- No side effects on require.
 
@@ -22,7 +25,8 @@ RideHint.EVERY = 0.25 -- seconds between looks
 
 -- (beside: someone drives it and the seat beside them is free: a golf cart, owner D30)
 export type Candidate = { x: number, z: number, free: boolean, beside: boolean? }
-export type State = { onFoot: boolean, riding: boolean, at: Vector3? }
+-- (riding: in any vehicle, beside a driver or flying the drone; off: the button's words, offWords)
+export type State = { onFoot: boolean, riding: boolean, at: Vector3?, off: string? }
 
 -- pick(x, z, rides): the nearest shared vehicle within REACH of (x, z) that is free or has a free seat beside its
 -- driver, by its index in `rides`.
@@ -35,6 +39,17 @@ function RideHint.pick(x: number, z: number, rides: { Candidate }): number?
 		end
 	end
 	return best
+end
+
+-- offWords(device): the touch screen's way out of the device this player is in (PossessionClient's device kinds), or
+-- nil when there is none to show (on foot; the sky lift, whose cabin takes its riders to the platform).
+function RideHint.offWords(device: string?): string?
+	if device == "vehicle" or device == "passenger" then
+		return "GET OFF"
+	elseif device == "drone" then
+		return "LAND"
+	end
+	return nil
 end
 
 -- words(kind, touch, pad, beside?): the label over it.
@@ -122,6 +137,7 @@ function RideHint.start(opts: { request: () -> (), state: () -> State }): () -> 
 			acc = 0
 			local s = opts.state()
 			screen.Enabled = touch and s.riding
+			off.Text = s.off or "GET OFF"
 			local at = s.at
 			if not s.onFoot or at == nil then
 				hint.Enabled = false

@@ -31,7 +31,8 @@
 --   write      the chalk's filtered words on the ground in front (5 minutes; 30 in the town at most)
 --   tape       a strip of duct tape on what is ahead (5 minutes; 40 at most)
 --   place      a lawn chair (sat in at once; E folds it back up, its owner's; one each: a second folds the first; left
---              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
+--              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt; its
+--              sitter gets up as from the lounge's seats, standing in front of it: Shared/World/SeatRules) or a
 --              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up: its
 --              owner's back in their things, whoever picks it up; left 10 minutes or its owner gone, it goes home)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
@@ -56,6 +57,7 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local KiteFlight = Import.shared("Items/KiteFlight") :: typeof(require("../../shared/Items/KiteFlight"))
 local KickBall = Import.shared("Items/KickBall") :: typeof(require("../../shared/Items/KickBall"))
+local SeatRules = Import.shared("World/SeatRules") :: typeof(require("../../shared/World/SeatRules"))
 local ItemService = require("./ItemService")
 local Lending = require("./Lending")
 -- (KiteFlight's exported types do not cross the Import cast)
@@ -1096,6 +1098,8 @@ function ItemWorld.start(opts: StartOpts): World
 				seat.Anchored = true
 				seat.CanCollide = false -- (sat in by Seat:Sit; never a wall)
 				seat.Material = Enum.Material.Fabric
+				-- getting up (owner D32): the server stands its sitter on the grass in front of it (Server/World/SeatStand)
+				seat:SetAttribute(SeatRules.STAND_ATTRIBUTE, Vector3.new(0, -1.0, -2.3))
 				seat.Parent = m
 				newPart(
 					"Back",

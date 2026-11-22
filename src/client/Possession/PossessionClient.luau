@@ -615,7 +615,8 @@ function PossessionClient.start(opts: Opts): Client
 		end
 	end)
 
-	-- the little prompt by a free shared vehicle, and the touch screen's RIDE and GET OFF (UI/RideHint, owner D29)
+	-- the little prompt by a free shared vehicle, and the touch screen's RIDE and GET OFF (UI/RideHint, owner D29; GET
+	-- OFF in every vehicle and LAND on the drone since D32)
 	RideHint.start({
 		request = function()
 			if deviceRequest and body then
@@ -624,11 +625,13 @@ function PossessionClient.start(opts: Opts): Client
 		end,
 		state = function(): RideHint.State
 			local root = if body then body.PrimaryPart else nil
-			local m = if device then device.model else nil
+			-- (owner D32, never stuck: the touch screen's GET OFF in every vehicle, beside a driver and on the drone)
+			local off = RideHint.offWords(if device then device.device else nil)
 			return {
 				onFoot = device == nil and payloadNow ~= nil and payloadNow.species == "human",
-				riding = m ~= nil and m:GetAttribute("Shared") == true,
+				riding = off ~= nil,
 				at = if root then root.Position else nil,
+				off = off,
 			}
 		end,
 	})
