@@ -112,7 +112,10 @@ return function(t)
 		t.truthy(waits > 50, `{waits} frames given back`)
 		t.truthy(median <= RailWorld.BUDGET, `median stretch {median * 1000} ms within the budget`)
 		-- (wall clock on a shared machine: a GC pause or preemption can stretch one step; the median above is the real check)
-		t.truthy(worst <= 3 * FRAME, `the longest stretch {worst * 1000} ms within three 60 Hz frames (re-run alone under load)`)
+		t.truthy(
+			worst <= 3 * FRAME,
+			`the longest stretch {worst * 1000} ms within three 60 Hz frames (re-run alone under load)`
+		)
 	end)
 
 	t.test("yielder: waits before the budget runs out, by the longest recent step", function()
