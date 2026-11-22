@@ -66,6 +66,8 @@ function TreeArt.compile(ctx: any): any?
 			trunkRoute = t.trunkRoute,
 			label = t.label,
 			assetId = t.assetId,
+			-- (the routes the model is built round, when the record says: a model rebuilt with D32 grown boughs)
+			routes = t.routes,
 			pivot = t.pivot,
 			parts = parts,
 		})

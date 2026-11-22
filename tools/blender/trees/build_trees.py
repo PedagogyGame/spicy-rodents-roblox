@@ -34,6 +34,7 @@ from mathutils.bvhtree import BVHTree  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import check_promises as cp  # noqa: E402
+import shapes as sh  # noqa: E402
 import textures as tx  # noqa: E402
 import treegen as tg  # noqa: E402
 import views as vw  # noqa: E402
@@ -709,13 +710,21 @@ def main(argv):
     ap.add_argument("--retries", type=int, default=0,
                     help="grow a tree that breaks a promise (check_promises.py --clearance-warn) again from up to N other seeds")
     ap.add_argument("--hollows", default="", help="dump_hollows.luau's JSON: the hollow trees keep their knotholes clear")
+    ap.add_argument("--shapes", default="", help="dump_shapes.luau's JSON: the D32 reshaped trees gain their grown boughs; "
+                    "--ids shapes builds just those trees")
     args = ap.parse_args(argv)
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     data = tg.load_data()
+    shapes = sh.load(args.shapes) if args.shapes else None
+    if shapes:
+        sh.merge_data(data, shapes)
     recs = tg.tree_records(data)
     if args.ids == "all":
         ids = list(range(len(recs)))
+    elif args.ids == "shapes":
+        want = set(sh.trunks(shapes)) if shapes else set()
+        ids = [i for i, r in enumerate(recs) if r["trunk"]["id"] in want]
     elif args.ids == "review":
         ids = REVIEW
     else:

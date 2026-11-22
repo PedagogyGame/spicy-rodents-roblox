@@ -33,7 +33,14 @@ return {
 			streaming = "Default",
 		},
 		tree = {
-			generators = { "makeTree", "makeOuterTree", "makeAppleTree", "makeLookoutTree", "estateGateOak" },
+			generators = {
+				"makeTree",
+				"makeOuterTree",
+				"makeAppleTree",
+				"makeLookoutTree",
+				"estateGateOak",
+				"treeShape",
+			},
 			lod = "Automatic",
 			look = "bark",
 			streaming = "Default",

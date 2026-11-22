@@ -586,8 +586,14 @@ def main(argv):
                     help="the trunk-clearance stretch of a branch (t < 0.2) is checked on the bough's own top line, "
                          "where the game draws the squirrel (SquirrelVisual.junctionT); on a late-collar branch the "
                          "game draws it at the pushed pose, reported apart as a warning (a known game-side issue)")
+    ap.add_argument("--shapes", default="", help="dump_shapes.luau's JSON: the D32 grown boughs are routes too")
     args = ap.parse_args(argv)
     routes = load_routes()
+    if args.shapes:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import shapes as sh  # noqa: E402  (a sibling module; only with --shapes)
+
+        sh.merge_routes(routes, sh.load(args.shapes))
     if args.ids:
         files = [os.path.join(args.dir, f"tree_{int(i):03d}.json") for i in args.ids.split(",") if i.strip()]
     else:

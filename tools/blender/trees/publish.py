@@ -105,6 +105,9 @@ def main():
     ap.add_argument("--hollows", default="", help="check_hollows.py --json output")
     ap.add_argument("--ids", default="all", help="upload only these (the data always lists every tree built)")
     ap.add_argument("--skip-upload", action="store_true")
+    ap.add_argument("--merge", action="store_true",
+                    help="change only the trees built in --build (the D32 reshaped trees: build_trees.py --shapes "
+                         "--ids shapes); without an id a rebuilt tree waits as its record's \"pending\" Model")
     a = ap.parse_args()
     build = os.path.abspath(a.build)
     infos = []
@@ -148,9 +151,28 @@ def main():
             rec["checks"]["hollow"] = hollows[i]["hollow"]
             rec["checks"]["hollowBoardMargin"] = hollows[i]["min_margin"]
         trees.append(rec)
+    if a.merge:
+        # only the trees in --build change; every other record stays as data/art/trees_v2.json has it. A rebuilt
+        # tree that has no id yet keeps its live Model and carries the rebuilt one as "pending" (sha, fbx, routes,
+        # parts, tris) until it is uploaded (then the record is the new Model's, and tools/compile lib/TreeShapes
+        # lists the grown boughs it covers)
+        with open(OUT) as fh:
+            by = {t["index"]: t for t in json.load(fh)["trees"]}
+        for rec in trees:
+            prev = by.get(rec["index"])
+            if rec["assetId"] or prev is None:
+                by[rec["index"]] = rec
+            else:
+                keep = {k: v for k, v in prev.items() if k != "pending"}
+                keep["pending"] = {k: rec[k] for k in ("sha", "fbxBytes", "tris", "routes", "parts", "checks")}
+                keep["pending"]["fbx"] = os.path.relpath(os.path.join(build, f"tree_{rec['index']:03d}.fbx"), ROOT)
+                keep["pending"]["state"] = rec["moderation"]
+                by[rec["index"]] = keep
+        trees = [by[k] for k in sorted(by)]
+    for rec in trees:
         for k in ("bark", "leaves", "fruit", "total"):
             totals[k] += rec["tris"][k]
-        totals["fbxBytes"] += info["fbxBytes"]
+        totals["fbxBytes"] += rec["fbxBytes"]
     doc = {
         "$schema": "art/trees v2",
         "src": "tools/blender/trees (build_trees.py: treegen.py geometry, textures.py maps; check_promises.py, "

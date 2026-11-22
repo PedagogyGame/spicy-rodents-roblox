@@ -1609,6 +1609,12 @@ class TreeBuilder:
         self.min_leaf_y = max(5.0 if self.sp == "apple" else 8.0, self.H * (0.6 if self.cat == "giant" else self.par["floor"]))
         if self.sp == "willow":
             self.min_leaf_y = 4.5
+        # a tree with D32 grown boughs (shapes.py: data["grown"]) carries leaves down to its lowest grown bough's tip,
+        # so the low boughs are leafy like the rest (never under 7 studs: a walker passes under)
+        grown = [m["id"] for m in self.rec["members"] if m["id"] in self.data.get("grown", ())]
+        if grown:
+            low = min(float(self.samples(g)[-1][1]) for g in grown)
+            self.min_leaf_y = min(self.min_leaf_y, max(7.0, low - 2.5))
         self.crown_top = self.H * self.par["top"]
         return c, rh, ylo, yhi
 

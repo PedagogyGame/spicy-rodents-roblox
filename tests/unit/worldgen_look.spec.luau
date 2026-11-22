@@ -101,7 +101,7 @@ return function(t)
 	end)
 
 	t.test("trees: a leafy crown around every trunk, poles with crossarms, lamp arms over the kerb", function()
-		local trees, crowned, poles, arms = 0, 0, 0, 0
+		local trees, crowned, poles, arms, grown = 0, 0, 0, 0, 0
 		for _, p in plans do
 			if p.kind == "props" and p.category == "tree" then
 				trees += 1
@@ -118,6 +118,13 @@ return function(t)
 						t.eq(b.canCollide, false)
 						t.eq(b.canQuery, false)
 						t.eq(b.yaw, 0)
+					elseif b.attrs and b.attrs.Grown then
+						-- a D32 grown bough its model does not draw yet (Shared/World/TreeShapes): bark that is seen and
+						-- collides, twigs and a few leaf clusters, every part marked with its route
+						grown += 1
+						t.truthy(b.role == "Limb" or b.role == "Twig" or b.role == "Leaves", b.name)
+						t.eq(b.transparency or 0, 0, b.name)
+						t.eq(b.canCollide ~= false, b.role == "Limb", b.name)
 					else
 						t.eq(b.transparency, 1, b.name)
 						t.eq(b.role, "Limb", b.name)
@@ -131,6 +138,8 @@ return function(t)
 			end
 		end
 		t.eq(crowned, trees)
+		t.eq(trees, 98) -- the 95 harvested trees and the three D32 planted copies
+		t.truthy(grown > 0, "the grown boughs' stand-ins")
 		t.eq(arms, poles)
 		local sky = byId.Skyline
 		local heads, armParts = 0, 0
@@ -180,7 +189,8 @@ return function(t)
 		end
 		t.truthy(wedges >= 100, `wedges {wedges}`)
 		print(`      balls {balls}, tree meshes {meshes}`)
-		t.eq(meshes, 392) -- 95 trees: bark + three leaf layers (+ apples on the 12 apple trees)
+		-- 95 trees: bark + three leaf layers (+ apples on the 12 apple trees); and the three D32 planted copies (no apples)
+		t.eq(meshes, 404)
 		t.eq(total, town:GetAttribute("PartCount"))
 		print(`      part count {total}`)
 		t.truthy(total <= 27000, `part budget: {total}`) -- art pass 2026-11-10: trim and interiors, under 27k

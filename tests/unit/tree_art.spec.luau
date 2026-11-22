@@ -242,6 +242,49 @@ return function(t)
 		t.eq(e.LeavesSun:FindFirstChildOfClass("SurfaceAppearance").AlphaMode, roblox.Enum.AlphaMode.Transparency)
 	end)
 
+	t.test(
+		"a v2 Model that covers grown boughs (D32) hides their baked stand-ins: bark unseen, twigs and leaves gone",
+		function()
+			local town = Instance.new("Folder")
+			local a = tree(town, "101", { "Bark", "LeavesSun" })
+			local function part(name: string, grown: number?, collide: boolean): any
+				local p = Instance.new("Part")
+				p.Name = name
+				p.CanCollide = collide
+				p.Transparency = 0
+				p.CastShadow = true
+				if grown then
+					p:SetAttribute("Grown", grown)
+				end
+				p.Parent = a
+				return p
+			end
+			local bark = part("R9701_1", 9701, true)
+			local twig = part("Twig9701_1", 9701, false)
+			local leaf = part("GrownLeaves1", 9701, false)
+			local other = part("R9702_1", 9702, true) -- a grown bough this Model does not draw
+			local proxy = part("R100_1", nil, true)
+			proxy.Transparency = 1
+			local n = TreeArt.swap(a, asset({ "Bark", "LeavesSun" }), { 0, 0, 0 }, env, nil, { 9701 })
+			t.eq(n, 2)
+			t.eq(bark.Parent, a, "the bark stays as a proxy")
+			t.eq(bark.Transparency, 1)
+			t.eq(bark.CastShadow, false)
+			t.eq(twig.Parent, nil)
+			t.eq(leaf.Parent, nil)
+			t.eq(other.Transparency, 0, "a bough the Model does not cover keeps its stand-in")
+			t.eq(proxy.Parent, a)
+			-- without covers (a Model made before the boughs grew) nothing of the stand-ins changes
+			local b = tree(town, "102", { "Bark", "LeavesSun" })
+			local keep = Instance.new("Part")
+			keep:SetAttribute("Grown", 9703)
+			keep.Parent = b
+			t.eq(TreeArt.swap(b, asset({ "Bark", "LeavesSun" }), { 0, 0, 0 }, env), 2)
+			t.eq(keep.Parent, b)
+			t.eq(keep.Transparency, 0)
+		end
+	)
+
 	t.test("the v2 data: one Model per live tree, every id digits", function()
 		local live: { [number]: boolean } = {}
 		for _, r in TreeArtNow :: any do

@@ -252,7 +252,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(kinds.tree, 95) -- one model per harvested tree trunk (trees.json: 95)
+		t.eq(kinds.tree, 98) -- one model per harvested tree trunk (trees.json: 95) and the three D32 planted trees
 		t.eq(kinds.pole, 110) -- the 97 grid poles plus 7 Westside and 6 estate-avenue telephone poles
 		t.eq(kinds.wire, 150)
 		t.truthy((kinds.pipe or 0) >= 60, `pipes {kinds.pipe}`)

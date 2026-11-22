@@ -17,9 +17,12 @@ return function(t)
 		local attractions = (d:module("Attractions") :: any).routes
 		local sewers = (d:module("Sewers") :: any).routes
 		local hollows = (d:module("HollowTrees") :: any).routes
+		-- and the D32 grown boughs and planted trees (data/tree_shapes.json)
+		local shapes = (d:module("TreeShapes") :: any).routes
 		local extra = (if attractions then #attractions else 0)
 			+ (if sewers then #sewers else 0)
 			+ (if hollows then #hollows else 0)
+			+ (if shapes then #shapes else 0)
 		t.eq(d:routes():count(), idx.modules.Routes.count + extra)
 		t.eq(d:bakeHash(), idx.harvestPin.sha256)
 		t.truthy(Data.default() == d)
