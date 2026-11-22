@@ -6,7 +6,9 @@
 --     BootReady, BootError), then this computer's own preparation (the climbing routes), with elapsed
 --     seconds; a boot error is shown in red, never a silent screen.
 --   * Menu: five big buttons (Spicy Rodent, Squirrel, Townsperson, Police, Police drone) that send
---     PlayNet.Pick; "Back to the game" when you already have a body; M or the Menu button reopens it.
+--     PlayNet.Pick; "Back to the game" when you already have a body; M or the Menu button reopens it. Under the
+--     buttons, money and reputation together (owner D30: "checkable with money, in paused and or side screen"):
+--     "Money  S$3.00   ·   Reputation  Good (0)" (the player attributes Cents and Reputation; standingLine).
 --   * Help panel (top left, always visible): the keys for the current role and device.
 --   * Status (top centre): role, health bar for the rodent and squirrels, bites and Power for the rodent.
 --   * Banners: big centred messages (RUN OVER!, KICKED OUT!) and short toasts for bites, kicks, refusals.
@@ -21,7 +23,7 @@
 -- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
 --   sickLine(attrs, way?) -> string? (a bitten player: what to do, under the status line; `way`
 --   { dist, words } adds how far the door is and which way), wayWords(dx, dz, lookX, lookZ) -> string,
---   markerText(dist) -> string, scaleFor(width, height) -> number.
+--   markerText(dist) -> string, scaleFor(width, height) -> number, standingLine(attrs) -> string.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
 --   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
 -- No side effects on require.
@@ -45,6 +47,7 @@ local Import = require("../Import")
 local MoveDiag = Import.shared("Movement/MoveDiag") :: typeof(require("../../shared/Movement/MoveDiag"))
 local MoveDiagPanel = require("./MoveDiagPanel")
 local MinigameUI = require("./MinigameUI")
+local Conduct = Import.shared("Reputation/Conduct") :: typeof(require("../../shared/Reputation/Conduct"))
 
 PlayMenu.CHOICES = table.freeze({
 	{
@@ -79,6 +82,12 @@ local CLIMB = {
 	"   (pad: right stick; touch: drag from the button) up to 30 degrees either way; up a little further, down sooner",
 	"G as you land  a barrel roll that keeps your speed",
 }
+
+-- The menu's money and reputation line (the player attributes Cents and Reputation, written by the server).
+function PlayMenu.standingLine(attrs: { [string]: any }): string
+	local cents, rep = attrs.Cents, attrs.Reputation
+	return Conduct.menuLine(if type(cents) == "number" then cents else nil, if type(rep) == "number" then rep else nil)
+end
 
 -- The help panel's lines for a role and device (device: nil | "vehicle" | "drone"); `owner`: the place's owner also
 -- gets the line for the movement diagnostics panel (UI/MoveDiagPanel, Shared/Movement/MoveDiag.HELP).
@@ -527,6 +536,16 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		})
 		table.insert(buttons, b)
 	end
+	-- money and reputation, checkable here (owner D30), between the buttons and "Back to the game"
+	local standing = text(panel, {
+		Name = "Standing",
+		Text = "",
+		TextSize = 16,
+		TextColor3 = Color3.fromRGB(235, 235, 220),
+		Size = UDim2.new(1, -48, 0, 22),
+		Position = UDim2.new(0, 24, 1, -84),
+		ZIndex = 22,
+	})
 	local back = Instance.new("TextButton")
 	back.AnchorPoint = Vector2.new(0.5, 1)
 	back.Position = UDim2.new(0.5, 0, 1, -14)
@@ -610,6 +629,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 			hpText.Text = `Health {h} / 100`
 		end
 		back.Visible = role ~= nil
+		standing.Text = PlayMenu.standingLine(a)
 	end
 	player.AttributeChanged:Connect(refresh)
 
