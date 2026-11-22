@@ -81,7 +81,16 @@ function WoodsWorld.new(): Ctx
 	local world = WoodsPlan.build(data, plans, Height.at, {
 		expansion = ex,
 		colliders = Colliders.fromData(d).boxes,
-		nutSpots = NutSpots.SPOTS :: any,
+		-- (the spots under the woods' own nut trees came after them)
+		nutSpots = (function(): any
+			local out = {}
+			for _, s in NutSpots.SPOTS do
+				if not string.find(s.near, " woods ", 1, true) then
+					table.insert(out, s)
+				end
+			end
+			return out
+		end)(),
 		trees = routeTrees :: any,
 		wires = wires,
 		rides = rides,
