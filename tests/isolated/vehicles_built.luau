@@ -10,12 +10,16 @@
 --   its head under a closed car's roof and the golf cart's (raised) canopy;
 --   the RootPart (the VehicleKinds box) is the only solid, queryable, massed part; every drawn part and the Seat
 --   collide with nothing, weigh nothing and are not anchored; the Seat is unseen on a drawn vehicle;
---   a parked vehicle casts shadows from its big parts only.
+--   a parked vehicle casts shadows from its big parts only;
+--   the driver sees out (D29: a blank grey screen in the pickup): with CameraRig.seeOut applied as vehicleFirst
+--   applies it, no part the driver sees is round the eye, and looking ahead, a little down and to the sides
+--   nothing opaque is within a couple of studs.
 -- A seated R15 is checked against numbers kept elsewhere: its root over the seat (Client/Animation/AnimationDriver.
 -- SIT_SEAT) and its eyes over the seat (Rides/SkyLift.EYE_ABOVE_SEAT).
 -- Interface: return function(t) (the spec shape)
 local roblox = require("@lune/roblox")
 local AnimationDriver = require("@client/Animation/AnimationDriver")
+local CameraRig = require("@client/Camera/CameraRig")
 local Placeholder = require("@shared/Vehicles/Placeholder")
 local SkyLift = require("@shared/Rides/SkyLift")
 local VehicleKinds = require("@shared/Vehicles/VehicleKinds")
@@ -241,6 +245,57 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("D29: the driver sees out: in first person nothing opaque is round the eye or just ahead of it", function()
+		-- the distance along a ray to a part's box, or nil
+		local function hit(cf: any, size: any, o: any, d: any): number?
+			local lo, ld = cf:PointToObjectSpace(o), cf:VectorToObjectSpace(d)
+			local tmin, tmax = 0, math.huge
+			for _, axis in { "X", "Y", "Z" } do
+				local h, oo, dd = size[axis] / 2, lo[axis], ld[axis]
+				if math.abs(dd) < 1e-9 then
+					if math.abs(oo) > h then
+						return nil
+					end
+				else
+					local a, b = (-h - oo) / dd, (h - oo) / dd
+					tmin, tmax = math.max(tmin, math.min(a, b)), math.min(tmax, math.max(a, b))
+				end
+			end
+			return if tmin <= tmax then tmin else nil
+		end
+		local looks = {}
+		for _, yaw in { 0, 0.6, -0.6 } do
+			for _, pitch in { 0, -0.25 } do
+				table.insert(looks, roblox.CFrame.Angles(0, yaw, 0) * roblox.CFrame.Angles(pitch, 0, 0))
+			end
+		end
+		for _, id in drawnKinds() do
+			local m = Placeholder.build(id, id)
+			local eye = at(Placeholder.eyeSocket(m))
+			local blocked = 0
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") and d.Transparency < 1 then
+					local k = CameraRig.seeOut(eye, d.CFrame, d.Size, d.Material == roblox.Enum.Material.Glass) or 0
+					local shown = 1 - (d.Transparency + (1 - d.Transparency) * k)
+					if shown > 0.5 then
+						t.falsy(
+							hit(d.CFrame, d.Size, eye, roblox.Vector3.new(0, 0, -1)) == 0,
+							`{id}: the eye is in {d.Name}`
+						)
+						for _, look in looks do
+							local dist = hit(d.CFrame, d.Size, eye, look.LookVector)
+							if dist and dist < 2 then
+								blocked += 1
+								print(`  {id}: {d.Name} {string.format("%.2f", dist)} studs ahead`)
+							end
+						end
+					end
+				end
+			end
+			t.eq(blocked, 0, `{id}: opaque parts just ahead of the eye`)
+		end
+	end)
 
 	t.test("a parked vehicle casts shadows from its big parts only (the body, the roof, the tyres)", function()
 		local placed = { car = 2, cart = 2, bike = 2, pickup = 1, suv = 1, jetski = 1 } -- the town's fleet
