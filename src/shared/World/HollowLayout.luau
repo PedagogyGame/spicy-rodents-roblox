@@ -856,29 +856,19 @@ local function boxesOf(b: Build): { Box }
 	return out
 end
 
--- how near (studs) a ball of radius `rad` at `c` comes to any of the boxes (negative: inside one)
-local function knotGap(b: Build, c: { number }, rad: number): number
-	local half = Enclosure.BODY.width / 2
-	local best = math.huge
-	for _, bx in boxesOf(b) do
-		local dx, dy, dz = c[1] - bx.a[1], c[2] - bx.a[2], c[3] - bx.a[3]
-		local f, side, up = bx.f, bx.side, bx.up
-		local along = dx * f[1] + dy * f[2] + dz * f[3]
-		local across = dx * side[1] + dy * side[2] + dz * side[3]
-		local upward = dx * up[1] + dy * up[2] + dz * up[3]
-		local ex = math.max(0, -along, along - bx.seg)
-		local ey = math.max(0, math.abs(across) - half)
-		local ez = math.max(0, -upward, upward - Enclosure.C.height - 0.1)
-		best = math.min(best, math.sqrt(ex * ex + ey * ey + ez * ez) - rad)
-	end
-	return best
-end
-
--- does any of `points` stand in a body's box (from 0.1 over the line, 0.05 wider either side than the body)? The
--- boxes of route `own` from span i0 to i1 (the stretch the piece is laid under: the drop under its own line keeps it
--- out of those, and the clearance sweep holds it to that) are not asked.
-local function intrudes(boxes: { Box }, points: { { number } }, own: number?, i0: number?, i1: number?): boolean
-	local half = Enclosure.BODY.width / 2 + 0.05
+-- does any of `points` stand in a body's box (from 0.1 over the line, 0.05 wider either side than the body; `margin`
+-- more all round)? The boxes of route `own` from span i0 to i1 (the stretch the piece is laid under: the drop under
+-- its own line keeps it out of those, and the clearance sweep holds it to that) are not asked.
+local function intrudes(
+	boxes: { Box },
+	points: { { number } },
+	own: number?,
+	i0: number?,
+	i1: number?,
+	margin: number?
+): boolean
+	local m = margin or 0
+	local half = Enclosure.BODY.width / 2 + 0.05 + m
 	for _, q in points do
 		for _, bx in boxes do
 			if bx.route == own and bx.i >= (i0 or 0) and bx.i <= (i1 or 0) then
@@ -887,12 +877,12 @@ local function intrudes(boxes: { Box }, points: { { number } }, own: number?, i0
 			local dx, dy, dz = q[1] - bx.a[1], q[2] - bx.a[2], q[3] - bx.a[3]
 			local f, side, up = bx.f, bx.side, bx.up
 			local along = dx * f[1] + dy * f[2] + dz * f[3]
-			if along < -0.05 or along > bx.seg + 0.05 then
+			if along < -0.05 - m or along > bx.seg + 0.05 + m then
 				continue
 			end
 			local across = dx * side[1] + dy * side[2] + dz * side[3]
 			local upward = dx * up[1] + dy * up[2] + dz * up[3]
-			if math.abs(across) <= half and upward >= 0.1 and upward <= Enclosure.C.height + 0.05 then
+			if math.abs(across) <= half and upward >= 0.1 - m and upward <= Enclosure.C.height + 0.05 + m then
 				return true
 			end
 		end
@@ -921,6 +911,14 @@ local function surfacePoints(pc: Piece): { { number } }
 				at(a * pc.size[1], math.cos(ang) * rad, math.sin(ang) * rad)
 			end
 		end
+		-- (and its end faces, the middle and half way out)
+		for _, a in { -0.5, 0.5 } do
+			at(a * pc.size[1], 0, 0)
+			for k = 0, 5 do
+				local ang = k * math.pi / 3
+				at(a * pc.size[1], math.cos(ang) * rad / 2, math.sin(ang) * rad / 2)
+			end
+		end
 		return out
 	end
 	for _, a in steps do
@@ -932,23 +930,30 @@ local function surfacePoints(pc: Piece): { { number } }
 	return out
 end
 
--- A knot (burl) bulging from the inside wall at (bearing, h): a ball whose inner face stands `inner` studs from the
--- axis, as big as `size` (at most C.burlMax), shrunk until no point of it passes the bark's flats
--- (HollowLayout.barkOver) and it keeps C.burlGap off every run's body. Whether one of at least 0.5 studs fits.
+-- A knot (burl) bulging from the inside wall at (bearing, h): a round boss whose face, `size` across (at most
+-- C.burlMax), stands `inner` studs from the axis and which reaches back into the wall (a cylinder along the level
+-- radial, as deep as 0.6 of its width: a few dozen triangles, where a ball is hundreds), shrunk until no point of it
+-- passes the bark's flats (HollowLayout.barkOver) and it keeps C.burlGap off every run's body. Whether one of at
+-- least 0.5 studs fits.
 local function burl(b: Build, bearing: number, inner: number, h: number, size: number): boolean
 	local tr = b.trunk
+	local boxes = boxesOf(b)
 	local d = math.min(size, C.burlMax)
 	while d >= 0.5 do
-		local c = tr.toWorld(bearing, inner + d / 2, h)
+		local depth = d * 0.6
+		local c = tr.toWorld(bearing, inner + depth / 2, h)
+		local ox, oz = dirOf(bearing)
 		local pc: Piece = {
 			role = "burl",
-			shape = "Ball",
+			shape = "Cylinder",
 			p = { r4(c[1]), r4(c[2]), r4(c[3]) },
-			xv = { 1, 0, 0 },
+			xv = { r4(ox), 0, r4(oz) },
 			yv = { 0, 1, 0 },
-			size = { r4(d), r4(d), r4(d) },
+			size = { r4(depth), r4(d), r4(d) },
 		}
-		if HollowLayout.barkOver(tr, { pc }) <= 0 and knotGap(b, c, d / 2) >= C.burlGap then
+		if
+			HollowLayout.barkOver(tr, { pc }) <= 0 and not intrudes(boxes, surfacePoints(pc), nil, nil, nil, C.burlGap)
+		then
 			pc.tone = r4(b.rand() * 2 - 1)
 			table.insert(b.hollow.parts, pc)
 			return true
@@ -1351,7 +1356,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 	holeKnot(b, knotB, knotH + 0.85)
 	holeKnot(b, topB, top + 0.85)
 	-- knots on the wall the climb leaves free (clear of the holes)
-	wallKnots(b, 6, floorH + 1.5, top, function(hh: number): number
+	wallKnots(b, 10, floorH + 1.5, top, function(hh: number): number
 		return bearingAt(hh)
 	end)
 end
