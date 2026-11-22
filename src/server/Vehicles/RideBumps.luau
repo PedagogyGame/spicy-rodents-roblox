@@ -23,6 +23,9 @@
 --   * SQUIRRELS. A player's squirrel or the rodent it meets is knocked aside the same mild way (opts.knockHeld) and
 --     never run over (the traffic's fatal sweep is the AI fleet's: Traffic/TrafficService never sees a player's
 --     vehicle). The computer's squirrels in its way skitter off along their rails (Brains/Squirrel "startle").
+--   * STRUCK. Every person knocked (a player's or the computer's) is told to opts.struck(ride id, person id, speed)
+--     for the rider's reputation (owner D30: Boot/Game hands it to Reputation/ReputationService.runOver, whose rules,
+--     Reputation/Conduct, count only several people, or the same one again, at speed; never one accident).
 -- People another service has in hand (opts.busy: a patient, the crowd, the duel, the overhead watch; a person whose
 -- brain already has an order, someone fleeing or in a crowd), a rider on a bicycle and anyone hidden are left alone:
 -- at most the arms come up. Places are the AI world's (a held squirrel's is its validated place, never its root).
@@ -63,6 +66,8 @@ export type Opts = {
 	-- the knock's slide is already cut short of any wall
 	knockHeld: ((id: number, knock: Knock, squirrel: boolean, kind: string) -> ())?,
 	bump: ((rideId: string) -> ())?, -- the rider feels it
+	-- a person knocked by a ride going `speed` studs/s (the rider's reputation hears of it: Boot/Game)
+	struck: ((rideId: string, personId: number, speed: number) -> ())?,
 	serverTime: (() -> number)?,
 	rand: (() -> number)?,
 }
@@ -255,6 +260,14 @@ local function knockHeld(self: any, a: any, ride: Ride, squirrel: boolean): Knoc
 	return k
 end
 
+-- the rider's reputation hears of a person knocked
+local function struck(self: any, a: any, ride: Ride)
+	local f = self.opts.struck
+	if f then
+		f(ride.id, a.id, math.sqrt(ride.vx * ride.vx + ride.vz * ride.vz))
+	end
+end
+
 local function bumpPerson(self: any, a: any, ride: Ride)
 	local now = self.world.now
 	if not SharedRides.allow(self.knockBook, a.id, now, C.cooldown) then
@@ -262,6 +275,7 @@ local function bumpPerson(self: any, a: any, ride: Ride)
 	end
 	local bump = self.opts.bump
 	if self.world.possessed[a.id] then
+		struck(self, a, ride)
 		local k = knockHeld(self, a, ride, false)
 		self._stats.knocks += 1
 		if k.fall then
@@ -285,6 +299,7 @@ local function bumpPerson(self: any, a: any, ride: Ride)
 	if bump then
 		bump(ride.id)
 	end
+	struck(self, a, ride)
 	local k = SharedRides.knock(ride, a.x, a.z)
 	local tx, tz = clearTo(self, a.x, a.z, a.x + k.dx, a.z + k.dz)
 	local seq = order(self, a, { type = "medical", mode = "down", faceX = ride.x, faceZ = ride.z })

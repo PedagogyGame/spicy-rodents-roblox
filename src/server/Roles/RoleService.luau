@@ -19,6 +19,9 @@
 -- queue's money term) is read from the purse every time, whoever changed it (a shop, a pass, wages): the
 -- purse's `counted` when it has one (the wallet's: the balance less pocket money still unspent, because a
 -- hand-out buys no place in the queue), else its balance.
+-- Reputation: when deps.reputation is given (Reputation/ReputationService, owner D30), stats.reputation (the queue's
+-- reputation term) is read from it every time, as cents are from the purse, and a rule's reputation event goes to it
+-- (event); without it the member's own number is ticked as before.
 -- No side effects on require.
 -- Interface: new(deps) -> Roles; Roles:onJoin(player) -> JoinResult, onLeave(player), admittedCount(),
 --            report(event) -> {Transition}, roleOf(player) -> (rung?, subrole?), stats(player), queue(rung),
@@ -72,6 +75,9 @@ export type Deps = {
 	notify: ((player: any, kind: string, data: any) -> ())?, -- offers, idle warnings, toasts
 	onTransition: ((t: Transition) -> ())?, -- InfectionService, PoliceService, HUD hooks
 	purse: ((player: any) -> Purse)?, -- the town wallet's purse for a joining player (default: one of its own, at 0)
+	-- the server's reputation (Reputation/ReputationService): the queue's reputation term, and where the Ladder's
+	-- reputation events go
+	reputation: { get: (player: any) -> number, event: (player: any, name: string) -> () }?,
 }
 
 export type Member = LadderPlayer & { player: any, purse: Purse, jailedUntil: number? }
@@ -147,8 +153,12 @@ function RoleService.new(deps: Deps): Roles
 
 	local function players(self: Roles): { [any]: LadderPlayer }
 		-- the queue's money term is the purse as it stands now (money is spent and earned outside the Ladder too)
+		local rep = deps.reputation
 		for _, m in self.members do
 			m.stats.cents = queueCents(m.purse)
+			if rep then
+				m.stats.reputation = rep.get(m.player)
+			end
 		end
 		return self.members :: any
 	end
@@ -254,7 +264,13 @@ function RoleService.new(deps: Deps): Roles
 				end
 			end
 			if t.reputation then
-				m.stats.reputation = ReputationRules.tick(m.stats.reputation or 0, t.reputation)
+				local rep = deps.reputation
+				if rep then
+					rep.event(m.player, t.reputation)
+					m.stats.reputation = rep.get(m.player)
+				else
+					m.stats.reputation = ReputationRules.tick(m.stats.reputation or 0, t.reputation)
+				end
 			end
 			local pay = (t.pay or 0) + (t.tip or 0)
 			if pay > 0 then
@@ -330,7 +346,12 @@ function RoleService.new(deps: Deps): Roles
 			id = key,
 			player = player,
 			rung = "human",
-			stats = { activeMinutes = 0, activeGameDays = 0, cents = queueCents(purse), reputation = 0 },
+			stats = {
+				activeMinutes = 0,
+				activeGameDays = 0,
+				cents = queueCents(purse),
+				reputation = if deps.reputation then deps.reputation.get(player) else 0,
+			},
 			purse = purse,
 		} :: Member
 		self.members[key] = m
@@ -390,6 +411,9 @@ function RoleService.new(deps: Deps): Roles
 		local m = self.members[player.UserId]
 		if m then
 			m.stats.cents = queueCents(m.purse)
+			if deps.reputation then
+				m.stats.reputation = deps.reputation.get(m.player)
+			end
 		end
 		return if m then m.stats else nil
 	end

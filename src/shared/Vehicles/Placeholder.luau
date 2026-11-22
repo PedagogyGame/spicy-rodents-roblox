@@ -17,8 +17,11 @@
 -- car on the left (drive on the right, owner decision 9; DeviceService lets the driver out on that side) low enough
 -- for a seated R15's head to clear the roof. Each vehicle has ONE EyeSocket and ONE DriverSeat socket (the camera
 -- takes the first EyeSocket it finds): over the Seat, at a seated R15's eyes.
+-- A kind that seats two (VehicleKinds.seats: the golf cart, owner D30) has a hidden PassengerSeat (Seat) and a
+-- PassengerSeat socket beside the driver's, mirrored across the middle of the bench (`passenger`); DeviceService seats a
+-- passenger there (Seat:Sit). The camera never takes it (no second EyeSocket).
 -- Interface: build(kindId, name?) -> Model; look(kindId, name?) -> PartBuilder.ModelSpec?;
---   cockpit(kindId) -> Cockpit?; SEATED; eyeSocket(model) -> Attachment?
+--   cockpit(kindId) -> Cockpit?; passenger(kindId) -> Cockpit?; SEATED; eyeSocket(model) -> Attachment?
 -- No side effects on require.
 
 local PartBuilder = require("../Avatar/PartBuilder")
@@ -203,6 +206,19 @@ function Placeholder.cockpit(kindId: string): Cockpit?
 	return if spec then driverOn(kindId, spec) else nil
 end
 
+-- passenger(kindId): where the one beside the driver sits (a kind that seats two), mirrored across the vehicle's middle,
+-- or nil.
+function Placeholder.passenger(kindId: string): Cockpit?
+	if VehicleKinds.seats(kindId) < 2 then
+		return nil
+	end
+	local c = Placeholder.cockpit(kindId)
+	if c == nil then
+		return nil
+	end
+	return { seat = { -c.seat[1], c.seat[2], c.seat[3] }, eye = { -c.eye[1], c.eye[2], c.eye[3] } }
+end
+
 -- The drawn vehicle as a Model whose RootPart is the solid, queryable collider every vehicle had (the rest welded to
 -- it, massless, colliding with nothing).
 local function shaped(spec: PartBuilder.ModelSpec): Model
@@ -312,6 +328,27 @@ local function interior(model: Model, root: BasePart, k: VehicleKinds.Kind, kind
 	seatSocket.Name = "DriverSeat"
 	seatSocket.Position = seatAt
 	seatSocket.Parent = root
+	-- the seat beside the driver's (a kind that seats two: the golf cart, owner D30), hidden like it
+	if cockpit and VehicleKinds.seats(kindId) >= 2 then
+		local beside = Vector3.new(-seatAt.X, seatAt.Y, seatAt.Z)
+		local other = Instance.new("Seat")
+		other.Name = "PassengerSeat"
+		other.Size = seat.Size
+		other.CFrame = origin * CFrame.new(beside)
+		other.Color = seat.Color
+		other.CanCollide = false
+		other.CanQuery = false
+		other.CanTouch = false -- (nobody sits by walking into it: only DeviceService's Seat:Sit)
+		other.Massless = true
+		other.Transparency = 1
+		other.CastShadow = false
+		other.Parent = model
+		weld(root, other)
+		local otherSocket = Instance.new("Attachment")
+		otherSocket.Name = "PassengerSeat"
+		otherSocket.Position = beside
+		otherSocket.Parent = root
+	end
 	if kindId == "car" and not drawn then
 		-- the patrol car's beacon bar (a drawn patrol car has its own): bright red and blue Neon halves (review 2026-11-09)
 		for _, half in

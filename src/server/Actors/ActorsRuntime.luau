@@ -41,6 +41,7 @@ export type Opts = {
 	movement: any?, -- Movement/MovementService instance (onHandoff)
 	roles: any?, -- a RoleService constructor module (default Server/Roles/RoleService)
 	purse: ((player: any) -> any)?, -- the town wallet's purse for a joining player (Boot/Game.wallet's purse hook: join, then the face)
+	reputation: any?, -- Reputation/ReputationService: the human queue's reputation term (RoleService deps.reputation)
 	engine: any?, -- Possession.Engine override (engine tests drive PlayerLike stubs)
 }
 
@@ -366,7 +367,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		return opts.roles or require("../Roles/RoleService") :: any
 	end)
 	if okRoles and RoleService then
-		roles = RoleService.new({ possession = possession, pickBody = pickBody, purse = opts.purse })
+		roles = RoleService.new({
+			possession = possession,
+			pickBody = pickBody,
+			purse = opts.purse,
+			reputation = opts.reputation,
+		})
 	end
 
 	local devices: any? = nil

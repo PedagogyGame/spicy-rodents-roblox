@@ -1,6 +1,6 @@
 --!strict
 -- ReplicatedStorage.Shared.Items.ItemRules
--- The `Item` contract (BUILD_PLAN §1.4, §3.14; brief v2 §13a): the corner store's 22 items as data
+-- The `Item` contract (BUILD_PLAN §1.4, §3.14; brief v2 §13a): the corner store's 23 items as data
 -- (id, price in cents, effect kind) and a pure `use` that turns an item and a context into effects the
 -- server applies (Server/Items/ItemService). No lottery or gambling items, ever (a test enforces it).
 -- What each one does when its owner uses it (a click, a tap or the gamepad's trigger with it in hand):
@@ -9,6 +9,10 @@
 --   frisbee, football   thrown ahead in an arc; it stays its buyer's (owner, D16 #26): anyone else who catches or
 --               picks it up only borrows it to throw back, and it goes home to the buyer (Server/Items/Lending);
 --               the newspaper is thrown too, once read (litter, gone)
+--   kick ball   (owner D30) a click kicks it low and fast; held down it winds up and is thrown, harder the longer
+--               (Shared/Items/KickBall.launch: ctx.windup, the seconds the server timed the press); on the ground
+--               anyone kicks it with F; a hard hit knocks a person a little and may cost the thrower reputation
+--               (Shared/Reputation/Conduct); it stays its buyer's like the frisbee
 --   bubbles     a stream of bubbles for a few seconds (30 blows to a bottle)
 --   chalk       asks for up to 20 letters and writes them on the ground (filtered like any player's text)
 --   flashlight  on and off; a strong beam at night, hardly anything by day
@@ -37,6 +41,7 @@
 -- Pure; no side effects on require.
 
 local Tunables = require("../Config/Tunables")
+local KickBall = require("./KickBall")
 
 export type Def = { id: string, price: number, effect: string, [string]: any }
 export type Ctx = {
@@ -50,6 +55,7 @@ export type Ctx = {
 	text: string?, -- the chalk's words (already filtered by the server)
 	zone: string?, -- where its holder stands, for the kite: "park" | "beach" | nil
 	uses: number?, -- uses so far of the one in hand
+	windup: number?, -- the kick ball: seconds the press was held (timed by the server)
 }
 export type Effect = { kind: string, [string]: any }
 
@@ -69,6 +75,7 @@ ItemRules.CATALOG = {
 	{ id = "ice_cream_bar", price = 5, effect = "stamina", scale = 1.15 }, { id = "lawn_chair", price = 6, effect = "place_seat" },
 	{ id = "radio", price = 8, effect = "playlist" }, { id = "bike_horn", price = 3, effect = "sound" },
 	{ id = "kite", price = 60, effect = "ride", ride = "kite" },
+	{ id = "kick_ball", price = 7, effect = "throw", speed = KickBall.C.kickSpeed, lift = KickBall.C.kickLift }, -- D30
 } :: { Def }
 
 local byId: { [string]: Def } = {}
@@ -92,6 +99,7 @@ ItemRules.COOLDOWN = table.freeze({
 	water_gun = 0.6, frisbee = 0.5, football = 0.5, bubbles = 1.0, chalk = 2, flashlight = 0.3, umbrella = 0.5,
 	peanuts = 1, bird_seed = 1, dog_treats = 2, newspaper = 0.6, camera = 1.5, duct_tape = 1, whoopee_cushion = 1,
 	harmonica = 2.5, air_horn = 5, soda = 1, ice_cream_bar = 1, lawn_chair = 1, radio = 0.5, bike_horn = 0.8, kite = 2,
+	kick_ball = 0.5,
 } :: { [string]: number })
 
 -- Sound cue names (Sound instances with empty ids, never uploads: docs/AUDIO_BUDGET.md lists them).
@@ -117,6 +125,7 @@ ItemRules.CUES = table.freeze({
 	bird_seed = "Items.Scatter",
 	dog_treats = "Items.Crunch",
 	kite = "Items.KiteWind",
+	kick_ball = "Items.Throw",
 })
 
 -- The radio's playlist: stock-library tracks by cue name (the ids are chosen from Roblox's licensed library and
@@ -207,6 +216,12 @@ function ItemRules.use(d: Def, ctx: Ctx): { Effect }
 			}
 		end
 		return { { kind = "squirt", hit = true, wet = true, react = d.npcReaction } }
+	elseif id == "kick_ball" then
+		local l = KickBall.launch(ctx.windup)
+		return {
+			{ kind = "throw", item = id, speed = l.speed, lift = l.lift, style = l.style, windup = l.windup },
+			cue(d),
+		}
 	elseif d.effect == "throw" then
 		return { { kind = "throw", item = id, speed = d.speed, lift = d.lift }, cue(d) }
 	elseif id == "newspaper" then

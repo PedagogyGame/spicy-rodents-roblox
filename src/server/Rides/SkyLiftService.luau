@@ -1767,11 +1767,7 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 				return false, SkyLiftService.WORDS.animal
 			end
 			local devices = parts.devices
-			if
-				devices
-				and type(player.UserId) == "number"
-				and PlayerVehicles.vehicleOf(devices.fleet, player.UserId)
-			then
+			if devices and type(player.UserId) == "number" and PlayerVehicles.aboard(devices.fleet, player.UserId) then
 				return false, "Get out of the vehicle first (E)"
 			end
 			local a = parts.attractions and parts.attractions()
