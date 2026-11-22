@@ -97,9 +97,9 @@ local function write(e: Entry, t: number): boolean
 	local script = e.script
 	local ball = e.ball
 	if ball and ball.Parent then
-		local x, y, d, turn = RollScript.ball(script, t)
+		local x, y, d, turn, _, heading = RollScript.ball(script, t)
 		if x ~= nil then
-			ball.CFrame = PartPose.ball(e.place, e.lane, x, y, d, turn)
+			ball.CFrame = PartPose.ball(e.place, e.lane, x, y, d, turn, heading)
 		end
 	end
 	for n, pin in e.pins do

@@ -13,7 +13,7 @@
 -- Interface: new() -> Cycle; ready(c) -> bool; release(c, script, seat?) -> (ok, why?); step(c, dt) -> { event }
 --   ("impact" | "counted" | "ready"); take(c) -> Result { pins, seat, standing, flags }? (once); set(c, "full" |
 --   "keep", instant?) -> (ok, why?); reset(c); mask(c) -> { boolean }; standingCount(c); scriptTime(c) -> t?;
---   pose(c) -> Pose { ball = { where, x, y, d, turn, u }, pins[n] = { x, y, d, tilt, yaw, hidden }, sweep = { y,
+--   pose(c) -> Pose { ball = { where, x, y, d, turn, heading, u }, pins[n] = { x, y, d, tilt, yaw, hidden }, sweep = { y,
 --   d } }; sweepAt(tSet) -> (y, d, low); SETTLE, PAUSE, SET_TIME, RETURN_TIME, TURNAROUND
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
@@ -38,7 +38,7 @@ LaneCycle.SWEEP_D1 = AlleyLayout.CUSHION_D - 0.5
 export type Result = { pins: number, seat: number?, standing: { boolean }, flags: RollScript.Flags }
 export type PinPose = { x: number, y: number, d: number, tilt: number, yaw: number, hidden: boolean }
 export type Pose = {
-	ball: { where: string, x: number, y: number, d: number, turn: number, u: number },
+	ball: { where: string, x: number, y: number, d: number, turn: number, heading: number, u: number },
 	pins: { PinPose },
 	sweep: { y: number, d: number },
 }
@@ -248,7 +248,7 @@ end
 -- pose: where everything is right now.
 function LaneCycle.pose(c: Cycle): Pose
 	local pins: { PinPose } = {}
-	local ball = { where = "rack", x = 0, y = 0, d = 0, turn = 0, u = 0 }
+	local ball = { where = "rack", x = 0, y = 0, d = 0, turn = 0, heading = 0, u = 0 }
 	local sweepY, sweepD = LaneCycle.SWEEP_REST, LaneCycle.SWEEP_D0
 	if c.phase == "ready" then
 		for n = 1, 10 do
@@ -259,9 +259,9 @@ function LaneCycle.pose(c: Cycle): Pose
 		for n = 1, 10 do
 			pins[n] = pinAt(c, n, c.t)
 		end
-		local x, y, d, turn, where = RollScript.ball(script, c.t)
+		local x, y, d, turn, where, heading = RollScript.ball(script, c.t)
 		if x ~= nil then
-			ball.where, ball.x, ball.y, ball.d, ball.turn = where, x, y, d, turn
+			ball.where, ball.x, ball.y, ball.d, ball.turn, ball.heading = where, x, y, d, turn, heading
 		end
 	else
 		local tSet = c.t - LaneCycle.PAUSE

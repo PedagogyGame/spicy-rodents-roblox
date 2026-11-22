@@ -6,6 +6,9 @@
 -- it ploughs on and is deflected a little by every pin it meets; a pin that is hit hard enough topples and
 -- slides, and a toppled pin lying on its side reaches further than a standing one (its "tumbling reach"), which
 -- is what carries a pocket hit through the whole rack; pins bounce off the kickback walls and fall into the pit.
+-- The ball keeps its spin on the deck (BallPath.rub on the dry deck): knocked off line by the head pin, a ball
+-- that came in hooking is pulled back the way it was going and drives through to the 5 pin, so a pocket hit at
+-- an angle carries far more often than a straight one, and over a wider window (D32: the hook is worth it).
 -- A soft nudge leaves a pin standing. Seeded: the pins' exact spots and the bounciness vary a hair per throw,
 -- so the same line gives a realistic spread (the pocket strikes most of the time, a dead-centre hit often
 -- leaves a split, a thin hit never strikes).
@@ -22,13 +25,15 @@
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 local Rng = require("../../Util/Rng")
+local BallPath = require("./BallPath")
 
 local PinModel = {}
 
 PinModel.DT = 1 / 480
 PinModel.BALL_R = AlleyLayout.BALL_D / 2
 PinModel.PIN_R = 0.23 -- a standing pin's belly
-PinModel.REACH = 0.38 -- a toppled pin's reach (it lies on its side and tumbles)
+PinModel.REACH = 0.31 -- a toppled pin's reach (it lies on its side and tumbles; D32: 0.38 carried nearly every
+-- pocket hit whatever its angle, so the hook bought nothing)
 PinModel.GROW = 1.2 -- studs/s: how fast a hit pin's reach opens out as it falls
 PinModel.MASS_BALL = 4.6 -- in pins
 PinModel.E_BALL = 0.6 -- restitution ball to pin
@@ -42,12 +47,15 @@ PinModel.WALL_X = AlleyLayout.LANE_W / 2 + AlleyLayout.GUTTER_W -- kickback face
 PinModel.DECK_START = AlleyLayout.DECK_START
 PinModel.DECK_END = AlleyLayout.DECK_END
 PinModel.MAX_T = 4
+PinModel.GRIP = BallPath.GRIP_DRY -- the deck is dry: the ball's spin bites (studs/s^2 of sliding friction)
+PinModel.RUB_KEY_EVERY = 8 -- steps between the ball's key points while its spin is still bending it
 -- The most key points one piece can ever carry: one for each step of the model (a slow ball that pushes a pin
 -- along changes both velocities on every step they touch), and its first and its last. Whoever checks a
 -- script (RollScript.check) must allow this many, or a throw the server scored is refused by the clients.
 PinModel.MAX_KEYS = math.ceil(PinModel.MAX_T / PinModel.DT) + 4
 
-export type Entry = { x: number, vx: number, vd: number }
+-- rx, rd: the rolling velocity the ball's spin gives it (BallPath); left out, the ball is rolling (rx, rd = vx, vd)
+export type Entry = { x: number, vx: number, vd: number, rx: number?, rd: number? }
 export type Result = {
 	standing: { boolean },
 	down: number,
@@ -182,6 +190,11 @@ function PinModel.roll(entry: Entry, mask: { boolean }, seed: number): Result
 	local pitT = table.create(10, -1)
 	local ball: { number } = {}
 	local bx, bd, bvx, bvd = entry.x, PinModel.DECK_START, entry.vx, entry.vd
+	-- the ball's spin: the dry deck keeps rubbing it back toward the way its spin rolls it, so a hooking ball
+	-- deflected by the head pin drives on through the pocket
+	local brx, brd = entry.rx or entry.vx, entry.rd or entry.vd
+	local grip = PinModel.GRIP
+	local rubSteps = 0
 	local ballLive, ballDirty = true, false
 	local ballEnd = 0
 	local firstHit: number?, firstPin: number?, hitX: number? = nil, nil, nil
@@ -191,12 +204,21 @@ function PinModel.roll(entry: Entry, mask: { boolean }, seed: number): Result
 		t += dt
 		local moving = false
 		if ballLive then
+			if math.abs(bvx - brx) + math.abs(bvd - brd) > 1e-6 then
+				bvx, bvd, brx, brd = BallPath.rub(bvx, bvd, brx, brd, grip, dt)
+				-- (a key point every few steps while it bends: the drawing between them is a straight line)
+				rubSteps += 1
+				if rubSteps % PinModel.RUB_KEY_EVERY == 0 then
+					ballDirty = true
+				end
+			end
 			bx += bvx * dt
 			bd += bvd * dt
 			moving = true
 			if math.abs(bx) > wall - R then
 				bx = math.clamp(bx, -(wall - R), wall - R)
 				bvx = -bvx * 0.3
+				brx, brd = bvx, bvd -- the kickback takes the spin off it
 				ballDirty = true
 			end
 			if bd > PinModel.DECK_END + R or bd < PinModel.DECK_START - 2 then

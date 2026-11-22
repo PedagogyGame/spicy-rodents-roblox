@@ -97,7 +97,12 @@ return function(t)
 				else
 					changed += 1
 					t.near(tilt1, math.pi / 2, 1e-9, "a fallen pin lies flat")
-					t.truthy(y1 <= -RollScript.LIE_DROP + 1e-9)
+					local lift = RollScript.lifts(s)[n]
+					t.truthy(y1 <= -RollScript.LIE_DROP + lift + 1e-9, "lying (on the deck, or on the deadwood)")
+					t.truthy(
+						lift <= 4 * RollScript.STACK + 1e-9,
+						"a heap of deadwood is never more than four pins high"
+					)
 					local inPit = ((s.deck :: PinModel.Result).pitT[n] >= 0)
 					t.eq(hidden1, inPit, "in the pit means out of sight; deadwood stays in view")
 					if not inPit then
@@ -284,7 +289,7 @@ return function(t)
 		t.eq(RollScript.check("roll"), nil)
 		t.eq(
 			broken(function(w)
-				w.v = 2
+				w.v = 1 -- a script from before the spin (D32)
 			end),
 			"version"
 		)
@@ -324,6 +329,25 @@ return function(t)
 				w.path.samples[4] = -1
 			end),
 			"path sample"
+		)
+		-- the spin (D32): one heading and turn per sample, the turn never running backwards
+		t.eq(
+			broken(function(w)
+				table.remove(w.path.spin)
+			end),
+			"path spin"
+		)
+		t.eq(
+			broken(function(w)
+				w.path.spin[4] = -5
+			end),
+			"path spin sample"
+		)
+		t.eq(
+			broken(function(w)
+				w.path.spin[3] = 0 / 0
+			end),
+			"path spin sample"
 		)
 		t.eq(
 			broken(function(w)
@@ -460,4 +484,89 @@ return function(t)
 		t.eq(RollScript.fake(maskOf({ 4 }), 9).down, 1, "never more than stand")
 		t.eq(#RollScript.cues(s), 0)
 	end)
+	t.test(
+		"deadwood: no lying pin through a pin left standing or a kickback, none across another at its height",
+		function()
+			local function segDist(px: number, pd: number, ax: number, ad: number, bx: number, bd: number): number
+				local vx, vd = bx - ax, bd - ad
+				local f = math.clamp(((px - ax) * vx + (pd - ad) * vd) / (vx * vx + vd * vd), 0, 1)
+				return math.sqrt((px - (ax + vx * f)) ^ 2 + (pd - (ad + vd * f)) ^ 2)
+			end
+			local rng = Rng.new(3)
+			local lying, turned, wide, stacked = 0, 0, 0, 0
+			for seed = 1, 300 do
+				local params = {
+					offset = rng.range(-1, 1),
+					angle = rng.range(-0.08, 0.08),
+					power = rng.range(0.2, 1),
+					spin = rng.range(-1, 1),
+				}
+				local s = RollScript.build(params, PinModel.fullRack(), seed)
+				local deck = s.deck
+				if deck then
+					local segs: { { number } } = {}
+					for n = 1, 10 do
+						local x, y, d, _, yaw, hidden = RollScript.pin(s, n, s.tEnd)
+						if not s.standing[n] and not hidden then
+							lying += 1
+							local keys = deck.pins[n]
+							local turn = math.abs(yaw - math.atan2(keys[4], keys[5]))
+							if turn > 1e-6 then
+								turned += 1
+							end
+							if turn > math.pi / 4 + 1e-6 then
+								wide += 1
+							end
+							local ux, ud = math.sin(yaw), math.cos(yaw)
+							local seg = {
+								x - RollScript.LIE_BACK * ux,
+								d - RollScript.LIE_BACK * ud,
+								x + RollScript.LIE_AHEAD * ux,
+								d + RollScript.LIE_AHEAD * ud,
+								RollScript.lifts(s)[n],
+							}
+							t.truthy(y <= -RollScript.LIE_DROP + seg[5] + 1e-9, "it lies at its height")
+							t.truthy(
+								math.abs(seg[1]) <= PinModel.WALL_X and math.abs(seg[3]) <= PinModel.WALL_X,
+								`seed {seed}: pin {n} lies through a kickback`
+							)
+							for m = 1, 10 do
+								if s.standing[m] then
+									local sx, sd = PinModel.spot(m)
+									t.truthy(
+										segDist(sx, sd, seg[1], seg[2], seg[3], seg[4]) >= RollScript.LIE_CLEAR - 1e-9,
+										`seed {seed}: pin {n} lies through pin {m}, which stands`
+									)
+								end
+							end
+							table.insert(segs, seg)
+						end
+					end
+					for i = 1, #segs do
+						for k = i + 1, #segs do
+							local a, b = segs[i], segs[k]
+							if math.abs(a[5] - b[5]) < RollScript.STACK - 0.01 then
+								for q = 0, 4 do
+									local px = a[1] + (a[3] - a[1]) * q / 4
+									local pd = a[2] + (a[4] - a[2]) * q / 4
+									t.truthy(
+										segDist(px, pd, b[1], b[2], b[3], b[4]) >= RollScript.LIE_CROSS - 0.05,
+										`seed {seed}: two lying pins cross at the same height`
+									)
+								end
+							else
+								stacked += 1
+							end
+						end
+					end
+				end
+			end
+			-- most pins lie the way they were pushed; the rest mostly a little way round (along a kickback they slid
+			-- into, off a pin left standing), and a few rest on the deadwood
+			t.truthy(lying > 300, `{lying} lying pins`)
+			t.truthy(turned < lying * 0.45, `{turned} of {lying} turned from the way they were pushed`)
+			t.truthy(wide < lying * 0.08, `{wide} of {lying} turned more than an eighth of a turn`)
+			t.truthy(stacked > 0, "some pins rest on others")
+		end
+	)
 end

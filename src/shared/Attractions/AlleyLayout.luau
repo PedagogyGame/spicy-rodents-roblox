@@ -43,7 +43,9 @@ AlleyLayout.GUTTER_DEPTH = 0.32
 
 AlleyLayout.APPROACH_D = -15 -- back of the approach
 AlleyLayout.FOUL_D = 0
-AlleyLayout.ARROWS_D = 14 -- target arrows (15 ft)
+AlleyLayout.ARROWS_D = 14 -- target arrows (15 ft): the middle one's tip; the others stand nearer, in a V
+AlleyLayout.BOARDS = 39 -- a real lane's boards across the bed
+AlleyLayout.ARROW_STAGGER = 0.55 -- each arrow out from the middle is this much nearer the bowler
 AlleyLayout.HEAD_D = 56 -- head pin
 AlleyLayout.PIN_SPACING = 1.16 -- 12 in centre to centre
 AlleyLayout.ROW_D = AlleyLayout.PIN_SPACING * math.sqrt(3) / 2
@@ -117,6 +119,24 @@ AlleyLayout.GAME_ROOM_D0 = AlleyLayout.FRONT_D -- the fortune teller): the hall 
 AlleyLayout.GAME_ROOM_D1 = 30 -- front and back walls' inner faces
 AlleyLayout.PARTITION_T = 0.6
 AlleyLayout.SETTEE_D = -21
+-- The walkway (owner D32: "no room for the character to walk in between the lanes ... instead of having to hop over
+-- the parts before they bowl"). As in a real house, each pair's settee is a U facing its two approaches with the
+-- scorer's console in front, and between one pair's settee and the next there is an AISLE from the concourse down
+-- to the approaches (on the line where two pairs meet, where nothing stands: the ball returns are between the two
+-- lanes of a pair). Along the back of the approaches, behind the racks, a person walks from any lane to any other.
+-- A person is WALKER_R across each way (Roblox's default body is two studs across the torso; its arms swing and it
+-- needs a little room), and tests/unit/alley_walkway.spec.luau walks that body through the baked hall.
+AlleyLayout.SETTEE_HALF = 3.9 -- each settee's half width across X (it was 4.8: a 2.8 gap a body could barely pass)
+AlleyLayout.SETTEE_ARM = 1.3 -- the depth of its two side seats
+AlleyLayout.WALKER_R = 1.25
+AlleyLayout.AISLE_W = 2 * AlleyLayout.PITCH - 2 * AlleyLayout.SETTEE_HALF -- 4.6
+
+-- The aisle between pair p and pair p + 1 (p = 1 .. PAIRS - 1): its X span (the lanes' line between them runs down
+-- its middle). The two outer aisles of the hall (beside lanes 1 and 18) are ZONES left_aisle / right_aisle.
+function AlleyLayout.aisle(p: number): (number, number)
+	local mid = AlleyLayout.pairX(p) + AlleyLayout.PITCH
+	return mid - AlleyLayout.AISLE_W / 2, mid + AlleyLayout.AISLE_W / 2
+end
 
 function AlleyLayout.laneX(i: number): number
 	return AlleyLayout.LANE1_X + (i - 1) * AlleyLayout.PITCH
@@ -151,6 +171,21 @@ function AlleyLayout.pinSpots(): { { number } }
 		{ s / 2, 3 * r },
 		{ 1.5 * s, 3 * r },
 	}
+end
+
+-- The target arrows (k = 1..7, left to right as the bowler sees them; on boards 35, 30 .. 5 counted from the right
+-- as a right-hander counts): the tip of arrow k across the lane from its centre and down it. The bake draws them
+-- here and the aim (Minigames/Bowling/AimModel) rolls the ball over them.
+function AlleyLayout.arrow(k: number): (number, number)
+	local bw = AlleyLayout.LANE_W / AlleyLayout.BOARDS
+	return -AlleyLayout.LANE_W / 2 + (k * 5 - 0.5) * bw,
+		AlleyLayout.ARROWS_D - math.abs(k - 4) * AlleyLayout.ARROW_STAGGER
+end
+
+-- Where the line of arrows is at x across the lane (the V through their tips).
+function AlleyLayout.arrowsD(x: number): number
+	local step = 5 * AlleyLayout.LANE_W / AlleyLayout.BOARDS
+	return AlleyLayout.ARROWS_D - math.min(math.abs(x) / step, 3) * AlleyLayout.ARROW_STAGGER
 end
 
 function AlleyLayout.pinLocal(lane: number, n: number): (number, number)

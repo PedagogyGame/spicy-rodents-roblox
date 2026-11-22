@@ -53,15 +53,19 @@ local function board(kit: any, parent: any, lane: number)
 	local half = L.LANE_W / 2
 	-- collision bed (one smooth surface for the ball), boards drawn just above it
 	kit:box(parent, "Bed", x - half, x + half, L.DUCT_CEIL, -0.01, L.FOUL_D, L.DECK_START, MAPLE, "Wood")
-	-- the boards: one part per zone (maple heads, pine middle, maple at the pins) and a seam every other board
+	-- the boards: one part per zone (maple heads, pine middle, maple at the pins) and a seam every other board. The
+	-- heads and the pine are oiled (they shine a little: the ball skids there, Shared/Minigames/Bowling/BallPath
+	-- OIL_D); the back end before the deck is dry (D32: you can see where the hook will bite)
 	local strips = 13
 	local w = L.LANE_W / strips
-	local zones = { { L.FOUL_D, 16, MAPLE }, { 16, 40, PINE }, { 40, L.DECK_START, MAPLE2 } }
+	local zones = { { L.FOUL_D, 16, MAPLE, 0.1 }, { 16, 40, PINE, 0.1 }, { 40, L.DECK_START, MAPLE2, 0 } }
 	for _, z in zones do
+		local shine = z[4] :: number
 		kit:box(parent, "Boards", x - half + 0.006, x + half - 0.006, -0.012, 0, z[1], z[2], z[3], "Wood", {
 			collide = false,
 			query = false,
 			shadow = false,
+			reflectance = if shine > 0 then shine else nil,
 		})
 	end
 	for sIdx = 2, strips - 1, 2 do
@@ -103,9 +107,8 @@ local function board(kit: any, parent: any, lane: number)
 	)
 	-- target arrows: seven chevrons in a V pointing at the pins (boards 5..35)
 	for k = 1, 7 do
-		local ax = x - half + (k * 5 - 0.5) * (L.LANE_W / 39)
-		local depthBack = math.abs(k - 4)
-		local ad = L.ARROWS_D - depthBack * 0.55
+		local arrowX, ad = L.arrow(k)
+		local ax = x + arrowX
 		for side = -1, 1, 2 do
 			kit:at(
 				parent,
@@ -294,6 +297,45 @@ local function pins(kit: any, parent: any, lane: number)
 				w.Parent = body
 			end
 		end
+	end
+end
+
+-- The ball's thumb and two finger holes (D32: "spin is visible on the ball"; a plain sphere turning shows nothing):
+-- three dark plugs flush with its top, welded to it, so they turn with it about its spin's axis wherever the lane
+-- moves it (Shared/Minigames/Bowling/PartPose.ball). Three parts a ball; nothing collides, casts or is hit.
+Lanes.HOLES = {
+	{ 0, 0.94, -0.34, 0.13 }, -- the thumb: on top, toward the bowler (direction across, up, down-lane; diameter)
+	{ -0.19, 0.93, 0.31, 0.11 },
+	{ 0.19, 0.93, 0.31, 0.11 },
+}
+local function fingerHoles(kit: any, ball: any, x: number, y: number, d: number)
+	local r = L.BALL_D / 2
+	local CFrame = kit.roblox.CFrame
+	local Vector3 = kit.roblox.Vector3
+	for i, h in Lanes.HOLES do
+		local dir = Vector3.new(h[1], h[2], h[3]).Unit
+		-- a cylinder's axis is its X: turn X onto the hole's direction (the kit's frame has -D along +Z)
+		local look = Vector3.new(dir.X, dir.Y, -dir.Z)
+		local rot = CFrame.lookAt(Vector3.new(0, 0, 0), look) * CFrame.Angles(0, math.pi / 2, 0)
+		local depth = 0.06
+		local c = r - depth / 2 + 0.002 -- (its face just proud of the ball)
+		local hole = kit:cyl(
+			ball,
+			if i == 1 then "Thumb" else "Finger",
+			x + dir.X * c,
+			y + dir.Y * c,
+			d + dir.Z * c,
+			depth,
+			h[4],
+			"X",
+			{ 22, 22, 26 },
+			"SmoothPlastic",
+			{ rot = rot, collide = false, query = false, shadow = false, anchored = false, massless = true }
+		)
+		local w = kit.roblox.Instance.new("WeldConstraint")
+		w.Part0 = ball
+		w.Part1 = hole
+		w.Parent = hole
 	end
 end
 
@@ -865,20 +907,24 @@ end
 local function settees(kit: any, root: any)
 	local folder = kit:folder(root, "Settees")
 	local vinyl = { { 222, 104, 40 }, { 32, 140, 140 }, { 222, 104, 40 } }
+	-- D32: each settee is SETTEE_HALF each side of its pair's middle (it was 4.8), so between one pair's settee and
+	-- the next there is an aisle AISLE_W wide from the concourse to the approaches (AlleyLayout; the walk is
+	-- tests/unit/alley_walkway.spec.luau)
+	local hw, arm = L.SETTEE_HALF, L.SETTEE_ARM
 	for p = 1, L.PAIRS do
 		local m = kit:model(folder, `Settee{p}`)
 		local x = L.pairX(p)
 		local col = vinyl[(p - 1) % #vinyl + 1]
 		local back = L.SETTEE_D - 2.2
 		-- a U of bench: back row facing the lanes, two short sides
-		kit:box(m, "BenchBase", x - 4.8, x + 4.8, 0, 1.2, back, back + 1.6, { 40, 40, 46 }, "SmoothPlastic")
-		kit:box(m, "BenchSeat", x - 4.8, x + 4.8, 1.2, 1.55, back, back + 1.8, col, "Fabric")
-		kit:box(m, "BenchBack", x - 4.8, x + 4.8, 1.2, 3.4, back - 0.5, back, col, "Fabric")
+		kit:box(m, "BenchBase", x - hw, x + hw, 0, 1.2, back, back + 1.6, { 40, 40, 46 }, "SmoothPlastic")
+		kit:box(m, "BenchSeat", x - hw, x + hw, 1.2, 1.55, back, back + 1.8, col, "Fabric")
+		kit:box(m, "BenchBack", x - hw, x + hw, 1.2, 3.4, back - 0.5, back, col, "Fabric")
 		kit:box(
 			m,
 			"BenchBackTop",
-			x - 4.85,
-			x + 4.85,
+			x - hw - 0.05,
+			x + hw + 0.05,
 			3.4,
 			3.55,
 			back - 0.55,
@@ -887,14 +933,15 @@ local function settees(kit: any, root: any)
 			"SmoothPlastic"
 		)
 		for side = -1, 1, 2 do
-			local sx = x + side * 4.0
-			kit:box(m, "SideBase", sx - 0.8, sx + 0.8, 0, 1.2, back + 1.6, back + 4.4, { 40, 40, 46 }, "SmoothPlastic")
-			kit:box(m, "SideSeat", sx - 0.8, sx + 0.8, 1.2, 1.55, back + 1.6, back + 4.4, col, "Fabric")
+			local sx = x + side * (hw - arm / 2)
+			local h = arm / 2
+			kit:box(m, "SideBase", sx - h, sx + h, 0, 1.2, back + 1.6, back + 4.4, { 40, 40, 46 }, "SmoothPlastic")
+			kit:box(m, "SideSeat", sx - h, sx + h, 1.2, 1.55, back + 1.6, back + 4.4, col, "Fabric")
 			kit:box(
 				m,
 				"SideBack",
-				if side < 0 then sx - 0.8 else sx + 0.3,
-				if side < 0 then sx - 0.3 else sx + 0.8,
+				if side < 0 then sx - h else sx + h - 0.5,
+				if side < 0 then sx - h + 0.5 else sx + h,
 				1.2,
 				3.0,
 				back + 1.6,
@@ -1026,10 +1073,11 @@ function Lanes.build(kit: any, root: any)
 		sweepBar(kit, m, lane)
 		local rx, ry, rd = L.rackSlot(lane)
 		local ballCol = Lanes.BALL_COLORS[(lane - 1) % #Lanes.BALL_COLORS + 1]
-		kit:ball(m, "Ball", rx, ry, rd, L.BALL_D, ballCol, "SmoothPlastic", {
+		local ball = kit:ball(m, "Ball", rx, ry, rd, L.BALL_D, ballCol, "SmoothPlastic", {
 			reflectance = 0.15,
 			group = "BowlingPhysics",
 		})
+		fingerHoles(kit, ball, rx, ry, rd)
 	end
 	kickbacksAndMasking(kit, root)
 	hoods(kit, root)

@@ -8,7 +8,7 @@
 -- the pure helpers are tested), it just cannot call the CFrame builders.
 -- Lane frame: x across from the lane centre (bowler's right +), d down-lane from the foul line, y up.
 -- Interface: pin(place, home, n, x, y, d, tilt, yaw) -> CFrame (home = the pin model's pivot standing on its
---   spot); ball(place, lane, x, y, d, turn) -> CFrame; world(place, lane, x, y, d) -> Vector3; fallAxis(place,
+--   spot); ball(place, lane, x, y, d, turn, heading?) -> CFrame; world(place, lane, x, y, d) -> Vector3; fallAxis(place,
 --   yaw) -> (ax, az) (pure: the level axis a pin tips about, in world x/z); HOME, RACK (attribute names the
 --   server stamps on each pin model and ball so a client knows their resting poses)
 
@@ -54,9 +54,20 @@ function PartPose.pin(
 	return CFrame.new(at) * rot
 end
 
-function PartPose.ball(place: AlleyLayout.Place, lane: number, x: number, y: number, d: number, turn: number): CFrame
+-- The ball: at (x, y, d), turned `turn` radians about the level axis square to `heading` (the way its spin rolls
+-- it, radians from down-lane toward the bowler's right; 0 when left out): a hook ball's finger holes visibly
+-- turn about a tilted axis (D32 "spin is visible on the ball").
+function PartPose.ball(
+	place: AlleyLayout.Place,
+	lane: number,
+	x: number,
+	y: number,
+	d: number,
+	turn: number,
+	heading: number?
+): CFrame
 	return CFrame.new(PartPose.world(place, lane, x, y, d))
-		* CFrame.Angles(0, AlleyLayout.yawOf(place), 0)
+		* CFrame.Angles(0, AlleyLayout.yawOf(place) - (heading or 0), 0)
 		* CFrame.Angles(-turn, 0, 0)
 end
 

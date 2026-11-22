@@ -1,53 +1,68 @@
 --!strict
 -- ReplicatedStorage.Shared.Minigames.Bowling.AimModel
 -- The bowler's aiming, as pure state the client feeds with input (Client/Minigames/BowlingClient) so it can be
--- tested: where you stand along the foul line (A / D), the angle (mouse, or Left / Right, or the gamepad
--- stick), the hook in five notches (Z / X or the mouse wheel), and the power meter (hold Space or the mouse
--- button: the needle runs up and back; let go to bowl; the green band is the clean release, full power is
--- wild). It also owns the words: one HELP card and one status line, so the screen never says two different
--- things about the keys. A throw the server refuses puts you straight back to aiming (input is never
--- swallowed).
+-- tested. It aims the way a real bowler does (owner D32: "no way to put any angle or twist ... the aiming
+-- wasn't very good"): where you STAND along the foul line (A / D), the TARGET you roll the ball over at the
+-- lane's arrows (the mouse, Left / Right or the gamepad stick), and the line through the two is the throw's
+-- angle. A press of a step or aim key moves exactly one board (nudge: a board at the feet is three at the pins,
+-- so the keys must be that fine); held, it carries on smoothly after REPEAT_AFTER; the HOOK in four notches each way (Z / X, the mouse wheel, LB / RB); and the power
+-- meter (hold Space, the mouse button, R2 or A: the needle runs up and back; let go to bowl; the green band is
+-- the clean release, full power is wild). It also owns the words: one HELP card and one status line, so the
+-- screen never says two different things about the keys. A throw the server refuses puts you straight back to
+-- aiming (input is never swallowed).
 -- Pure; Lune-tested (tests/unit/bowling_aim.spec.luau).
--- Interface: new() -> Aim; step(aim, input, dt); hook(aim, dir); charge(aim, down) -> Params? (on let-go);
---   power(aim) -> 0..1; params(aim) -> Params; sent(aim); refused(aim); nextBall(aim); canAim(aim) -> bool;
---   preview(aim) -> { { x, d, hooked } }; spinText(aim); statusText(aim, touch); warning(turnLeft) -> text?;
---   HELP; SWEET; SWEET_TEXT; MAX_ANGLE; POWER_PERIOD
+-- Interface: new() -> Aim; step(aim, input, dt); nudge(aim, what "stand" | "target", dir) (one board); hook(aim,
+--   dir); charge(aim, down) -> Params? (on let-go);
+--   power(aim) -> 0..1; params(aim) -> Params; angleOf(offset, target) -> radians; sent(aim); refused(aim);
+--   nextBall(aim); canAim(aim) -> bool; preview(aim) -> { { x, d, hooked } }; standX(aim) -> x at the foul
+--   line; targetPoint(aim) -> (x, d) on the arrows; board(x) -> 1..39 (from the right, as a right-hander
+--   counts); targetText(aim); standText(aim); spinText(aim); statusText(aim, touch); warning(turnLeft) ->
+--   text?; HELP; SWEET; SWEET_TEXT; MAX_TARGET; POWER_PERIOD; NOTCHES
 
+local AlleyLayout = require("../../Attractions/AlleyLayout")
 local BallPath = require("./BallPath")
 
 local AimModel = {}
 
-AimModel.MAX_ANGLE = BallPath.RANGES.angle
 AimModel.POWER_PERIOD = 1.5 -- seconds for the needle to run from empty to full
 AimModel.STEP_RATE = 0.9 -- offset units a second along the foul line
-AimModel.AIM_RATE = 0.025 -- radians a second on the keys (fine: the pocket is about 0.003 radians wide)
-AimModel.MOUSE_SENS = 0.00012 -- radians per pixel of mouse travel (the whole range is about 830 pixels)
-AimModel.STICK_RATE = 0.05 -- radians a second at full stick
-AimModel.NOTCHES = 2 -- hook notches either side of straight
-AimModel.PREVIEW_D = 40 -- the aim line stops here: reading the rest of a hook is the bowler's skill
+AimModel.BOARD = AlleyLayout.LANE_W / AlleyLayout.BOARDS -- one board, in studs
+AimModel.MAX_TARGET = AlleyLayout.LANE_W / 2 - AimModel.BOARD / 2 -- the target stays on the outside boards
+AimModel.TARGET_RATE = 1.0 -- studs a second on the keys (about ten boards: a tap moves it one or two)
+AimModel.MOUSE_SENS = 0.004 -- studs of target per pixel of mouse travel (250 pixels is a stud: ten boards)
+AimModel.STICK_RATE = 1.6 -- studs a second at full stick
+AimModel.REPEAT_AFTER = 0.3 -- seconds a step or aim key is held before it moves smoothly (a press is one board)
+AimModel.NOTCHES = 4 -- hook notches either side of straight
+AimModel.PREVIEW_D = 42 -- the aim line runs over the arrows and on to where the back end starts to bite: how
+-- far a hook then bends is the bowler's to learn
+AimModel.PREVIEW_POWER = 0.7 -- the line is drawn for a clean release in the green until the meter runs
 AimModel.WARN_AT = 15 -- seconds left on the turn clock when the warning starts
 AimModel.SWEET = BallPath.RANGES.sweet
 AimModel.SWEET_TEXT = "POWER - let go in the green: the ball goes exactly where you aimed. Full power is wild."
+AimModel.HOOK_WORDS = { "a touch of", "some", "strong", "full" }
 
 AimModel.HELP = {
 	how = {
 		"Ten frames each. All ten pins with your first ball is a STRIKE, with two balls a SPARE.",
-		"Aim for the POCKET: just right (or left) of the front pin. Dead centre leaves splits.",
-		"The dotted line shows two thirds of your throw. Hook bends the ball late: the dots turn orange where it starts.",
+		"AIM like a real bowler: where you STAND, and the ARROW the ball rolls over.",
+		"HOOK spins the ball: it skids on the oily front and curls on the dry end. Hook it into the POCKET, beside the front pin.",
+		"Straight works too, but only dead on the pocket.",
 	},
 	keys = {
-		"A / D  step left / right along the line",
-		"Mouse or Left / Right arrows  aim",
+		"A / D  step a board left / right (hold to walk)",
+		"Mouse or Left / Right arrows  move your target arrow (a press: one board)",
 		"Z / X or mouse wheel  hook left / right",
 		"Hold Space or the mouse button  power meter",
 		"Let go in the green band to bowl",
+		"Gamepad: stick aims, D-pad steps, LB / RB hook, hold R2",
 		"Q  leave the lane",
 	},
 }
 
 export type Aim = {
-	offset: number,
-	angle: number,
+	offset: number, -- where you stand: -1 .. 1 along the foul line
+	target: number, -- the target across the lane at the arrows (studs from the lane's centre, bowler's right +)
+	angle: number, -- the line through the two (kept up to date by step)
 	notch: number, -- -NOTCHES .. NOTCHES (negative hooks left)
 	charging: boolean,
 	chargeT: number,
@@ -57,16 +72,24 @@ export type Aim = {
 export type Input = {
 	left: boolean?, -- step along the line
 	right: boolean?,
-	aimL: boolean?, -- turn the angle on the keys
+	aimL: boolean?, -- move the target on the keys
 	aimR: boolean?,
-	mouseDx: number?, -- pixels of mouse travel this frame (the client's normal way: relative, so the keys' fine aim is kept)
-	mouseX01: number?, -- or the cursor's place across the screen (0..1) as an absolute aim
+	mouseDx: number?, -- pixels of mouse travel this frame (relative, so the keys' fine aim is kept)
+	mouseX01: number?, -- or the cursor's place across the screen (0..1) as an absolute target
 	stickAim: number?, -- gamepad -1..1
 	stickStep: number?, -- gamepad -1..1
 }
 
+-- The angle of the line from where you stand through the target (both at their own d).
+function AimModel.angleOf(offset: number, target: number): number
+	local rx = BallPath.releaseX(offset)
+	local run = AlleyLayout.arrowsD(target) - BallPath.RELEASE_D
+	local lim = BallPath.RANGES.angle
+	return math.clamp(math.atan((target - rx) / run), -lim, lim)
+end
+
 function AimModel.new(): Aim
-	return { offset = 0, angle = 0, notch = 0, charging = false, chargeT = 0, phase = "aim" }
+	return { offset = 0, target = 0, angle = 0, notch = 0, charging = false, chargeT = 0, phase = "aim" }
 end
 
 function AimModel.canAim(aim: Aim): boolean
@@ -80,19 +103,34 @@ function AimModel.step(aim: Aim, input: Input, dt: number)
 	end
 	local step = (if input.right then 1 else 0) - (if input.left then 1 else 0) + (input.stickStep or 0)
 	aim.offset = math.clamp(aim.offset + math.clamp(step, -1, 1) * AimModel.STEP_RATE * dt, -1, 1)
-	local angle = aim.angle
+	local target = aim.target
 	if input.mouseX01 ~= nil then
-		angle = (math.clamp(input.mouseX01, 0, 1) - 0.5) * 2 * AimModel.MAX_ANGLE
+		target = (math.clamp(input.mouseX01, 0, 1) - 0.5) * 2 * AimModel.MAX_TARGET
 	end
 	if input.mouseDx ~= nil then
-		angle += input.mouseDx * AimModel.MOUSE_SENS
+		target += input.mouseDx * AimModel.MOUSE_SENS
 	end
-	angle += ((if input.aimR then 1 else 0) - (if input.aimL then 1 else 0)) * AimModel.AIM_RATE * dt
-	angle += (input.stickAim or 0) * AimModel.STICK_RATE * dt
-	aim.angle = math.clamp(angle, -AimModel.MAX_ANGLE, AimModel.MAX_ANGLE)
+	target += ((if input.aimR then 1 else 0) - (if input.aimL then 1 else 0)) * AimModel.TARGET_RATE * dt
+	target += (input.stickAim or 0) * AimModel.STICK_RATE * dt
+	aim.target = math.clamp(target, -AimModel.MAX_TARGET, AimModel.MAX_TARGET)
+	aim.angle = AimModel.angleOf(aim.offset, aim.target)
 	if aim.charging then
 		aim.chargeT += dt
 	end
+end
+
+-- One board left (dir < 0) or right: where you stand, or the target.
+function AimModel.nudge(aim: Aim, what: string, dir: number)
+	if aim.phase ~= "aim" then
+		return
+	end
+	local s = if dir < 0 then -1 else 1
+	if what == "stand" then
+		aim.offset = math.clamp(aim.offset + s * AimModel.BOARD / BallPath.releaseX(1), -1, 1)
+	else
+		aim.target = math.clamp(aim.target + s * AimModel.BOARD, -AimModel.MAX_TARGET, AimModel.MAX_TARGET)
+	end
+	aim.angle = AimModel.angleOf(aim.offset, aim.target)
 end
 
 -- One notch of hook left (dir < 0) or right.
@@ -112,7 +150,7 @@ end
 function AimModel.params(aim: Aim): BallPath.Params
 	return {
 		offset = aim.offset,
-		angle = aim.angle,
+		angle = AimModel.angleOf(aim.offset, aim.target),
 		power = AimModel.power(aim),
 		spin = aim.notch / AimModel.NOTCHES,
 	}
@@ -162,11 +200,47 @@ function AimModel.nextBall(aim: Aim)
 	aim.chargeT = 0
 end
 
--- The dotted aim line: the real path of this throw at a clean release, as far as PREVIEW_D. hooked marks the
--- dots where the hook has begun to bend it.
+-- Where you stand: the ball's line at the foul line.
+function AimModel.standX(aim: Aim): number
+	return BallPath.releaseX(aim.offset)
+end
+
+function AimModel.targetPoint(aim: Aim): (number, number)
+	return aim.target, AlleyLayout.arrowsD(aim.target)
+end
+
+-- The board under x, counted from the right edge (1) to the left (39), as a right-handed bowler counts them.
+function AimModel.board(x: number): number
+	local b = math.floor((AlleyLayout.LANE_W / 2 - x) / AimModel.BOARD) + 1
+	return math.clamp(b, 1, AlleyLayout.BOARDS)
+end
+
+local ORDINAL = { "1st", "2nd", "3rd" }
+
+-- The target in words: an arrow when it is on one ("the middle arrow", "2nd arrow from the right"), else the
+-- board.
+function AimModel.targetText(aim: Aim): string
+	local b = AimModel.board(aim.target)
+	if b % 5 == 0 and b >= 5 and b <= 35 then
+		local k = b // 5 -- 1..7 from the right
+		if k == 4 then
+			return "the middle arrow"
+		end
+		local n = if k < 4 then k else 8 - k
+		return `{ORDINAL[n]} arrow from the {if k < 4 then "right" else "left"}`
+	end
+	return `board {b}`
+end
+
+function AimModel.standText(aim: Aim): string
+	return `board {AimModel.board(AimModel.standX(aim))}`
+end
+
+-- The dotted aim line: the real path of this throw at a clean release (or the meter's power while it runs),
+-- as far as PREVIEW_D. hooked marks the dots where the back end has begun to bend a hook.
 function AimModel.preview(aim: Aim): { { x: number, d: number, hooked: boolean } }
 	local p = AimModel.params(aim)
-	p.power = if aim.charging then p.power else 0.7
+	p.power = if aim.charging then p.power else AimModel.PREVIEW_POWER
 	local path = BallPath.trace(p)
 	local out = {}
 	local d = 1.5
@@ -192,7 +266,8 @@ function AimModel.spinText(aim: Aim): string
 		return "straight"
 	end
 	local side = if aim.notch < 0 then "left" else "right"
-	return if math.abs(aim.notch) >= AimModel.NOTCHES then `full hook {side}` else `half hook {side}`
+	local n = math.abs(aim.notch)
+	return `{AimModel.HOOK_WORDS[n] or "full"} hook {side}`
 end
 
 -- The one status line for the bowler whose turn it is.
@@ -205,10 +280,11 @@ function AimModel.statusText(aim: Aim, touch: boolean): string
 	if aim.charging then
 		return "Let go in the green to bowl!"
 	end
+	local line = `stand {AimModel.standText(aim)}, aim at {AimModel.targetText(aim)}, {AimModel.spinText(aim)}`
 	if touch then
-		return `Your turn ({AimModel.spinText(aim)}): arrows step and aim, Hook buttons bend it. Hold BOWL and let go`
+		return `Your turn: {line}. Step and Aim buttons, Hook buttons curl it. Hold BOWL and let go`
 	end
-	return `Your turn ({AimModel.spinText(aim)}): A/D step, mouse aims, Z/X hook. Hold Space for power, let go to bowl`
+	return `Your turn: {line}. A/D step, mouse aims, Z/X hook. Hold Space, let go to bowl`
 end
 
 -- The turn clock's warning, once it is running low.

@@ -2,13 +2,18 @@
 -- tools/bowling/calibrate.luau: a developer's look at the bowling models (Shared/Minigames/Bowling/BallPath and
 -- PinModel) so their constants are tuned from numbers, not guesses. Prints, for a spread of lines into the pins,
 -- the strike rate, the mean count, how often a split is left and the commonest leaves; then what each kind of
--- throw (straight, hooked, soft, hard) does at the deck; then full games by each computer player.
+-- throw (straight, hooked, soft, hard) does at the deck; then whole throws at the pocket with a bowler's small
+-- errors (the hook against a straight ball, D32; tests/unit/bowling_feel.spec.luau holds the same comparison);
+-- then full games by each computer player.
 -- Usage, from the repo root: lune run tools/bowling/calibrate.luau [rolls per line, default 300]
 -- Interface: a script (prints a report); nothing is written.
 
 local process = require("@lune/process")
+local AlleyLayout = require("../../src/shared/Attractions/AlleyLayout")
 local BallPath = require("../../src/shared/Minigames/Bowling/BallPath")
 local PinModel = require("../../src/shared/Minigames/Bowling/PinModel")
+local RollScript = require("../../src/shared/Minigames/Bowling/RollScript")
+local Rng = require("../../src/shared/Util/Rng")
 
 local N = tonumber(process.args[1]) or 300
 
@@ -109,7 +114,7 @@ do
 			`{c[1]}: enters at x {fmt(e.x, 2)}, {fmt(math.deg(math.atan2(e.vx, e.vd)), 1)} deg, {fmt(
 				math.sqrt(e.vx * e.vx + e.vd * e.vd),
 				1
-			)} st/s, after {fmt(e.t, 2)} s`
+			)} st/s, after {fmt(e.t, 2)} s, rolling from d {fmt(path.rollD or -1, 1)}`
 		)
 	else
 		print(`{c[1]}: gutter at d {fmt(path.gutterD or 0, 1)} after {fmt(path.gutterT or 0, 2)} s`)
@@ -117,6 +122,34 @@ do
 end
 
 local okRef, Referee = pcall(require, "../../src/shared/Minigames/Bowling/Referee")
+if okRef and type(Referee) == "table" and Referee.aimAngle then
+	print(`== whole throws at the pocket, {N} each, with small errors (0.003 rad, 0.03 of the stand), power 0.7`)
+	for _, c in
+		{
+			{ "straight at the head pin", 0, 0, 0 },
+			{ "straight into the 1-3", 0.16, 0, 0.25 },
+			{ "half hook into the 1-3", 0.5, -0.5, 0.27 },
+			{ "full hook into the 1-3", 0.55, -1, 0.27 },
+			{ "full hook into the 1-2 (left-handed)", -0.55, 1, -0.27 },
+		}
+	do
+		local angle = Referee.aimAngle(c[2], 0.7, c[3], c[4], AlleyLayout.HEAD_D)
+		local rng = Rng.new(77)
+		local strikes, down = 0, 0
+		for seed = 1, N do
+			local a = (rng.next() + rng.next() - 1) * 0.003
+			local o = (rng.next() + rng.next() - 1) * 0.03
+			local s = RollScript.build(
+				{ offset = c[2] + o, angle = angle + a, power = 0.7, spin = c[3] },
+				PinModel.fullRack(),
+				seed
+			)
+			strikes += if s.down == 10 then 1 else 0
+			down += s.down
+		end
+		print(`{c[1]}: strike {fmt(strikes / N * 100)}%  mean {fmt(down / N, 2)}`)
+	end
+end
 if okRef and type(Referee) == "table" and Referee.playGame then
 	print("== computer players (30 seeded games each)")
 	for _, skill in { "easy", "normal", "sharp" } do

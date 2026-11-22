@@ -1,6 +1,7 @@
 --!strict
--- Minigames/Bowling/AimModel and Shots: the bowler's aiming state (keys, mouse, stick, hook notches, the power
--- meter, a refused throw handing the controls straight back) with the words on screen; and the camera's shots
+-- Minigames/Bowling/AimModel and Shots: the bowler's aiming state (where you stand, the target arrow and the angle
+-- through the two, keys, mouse, stick, hook notches, the power meter, a refused throw handing the controls straight
+-- back) with the words on screen; and the camera's shots
 -- (behind the bowler, behind the ball, one cut to the pins timed from the throw, then done) always inside
 -- the room.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -11,7 +12,7 @@ local RollScript = require("@shared/Minigames/Bowling/RollScript")
 local Shots = require("@shared/Minigames/Bowling/Shots")
 
 return function(t)
-	t.test("stepping and aiming: keys, mouse (locked or free) and stick all work and are clamped", function()
+	t.test("stepping and aiming: keys, mouse (locked or free) and stick move the target; all clamped", function()
 		local aim = AimModel.new()
 		t.truthy(AimModel.canAim(aim))
 		AimModel.step(aim, { right = true }, 0.5)
@@ -21,44 +22,123 @@ return function(t)
 		AimModel.step(aim, { stickStep = 1 }, 1)
 		t.near(aim.offset, -0.1, 1e-9)
 		AimModel.step(aim, { aimR = true }, 0.5)
-		t.near(aim.angle, 0.5 * AimModel.AIM_RATE, 1e-9)
+		t.near(aim.target, 0.5 * AimModel.TARGET_RATE, 1e-9)
 		AimModel.step(aim, { aimL = true }, 100)
-		t.eq(aim.angle, -AimModel.MAX_ANGLE)
-		-- a free cursor: its place across the screen is the angle
+		t.eq(aim.target, -AimModel.MAX_TARGET)
+		-- a free cursor: its place across the screen is the target
 		AimModel.step(aim, { mouseX01 = 0.75 }, 0.016)
-		t.near(aim.angle, AimModel.MAX_ANGLE * 0.5, 1e-9)
+		t.near(aim.target, AimModel.MAX_TARGET * 0.5, 1e-9)
 		AimModel.step(aim, { mouseX01 = 0.5 }, 0.016)
-		t.near(aim.angle, 0, 1e-9)
-		-- a locked cursor (first person): its travel turns the angle
+		t.near(aim.target, 0, 1e-9)
+		-- a locked cursor (first person): its travel moves the target
 		AimModel.step(aim, { mouseDx = 100 }, 0.016)
-		t.near(aim.angle, 100 * AimModel.MOUSE_SENS, 1e-9)
+		t.near(aim.target, 100 * AimModel.MOUSE_SENS, 1e-9)
 		AimModel.step(aim, { mouseDx = -1e6 }, 0.016)
-		t.eq(aim.angle, -AimModel.MAX_ANGLE)
+		t.eq(aim.target, -AimModel.MAX_TARGET)
 		AimModel.step(aim, { stickAim = 1 }, 1)
-		t.near(aim.angle, -AimModel.MAX_ANGLE + AimModel.STICK_RATE, 1e-9)
+		t.near(aim.target, -AimModel.MAX_TARGET + AimModel.STICK_RATE, 1e-9)
 		-- no input, no drift
-		local before = { aim.offset, aim.angle }
+		local before = { aim.offset, aim.target, aim.angle }
 		AimModel.step(aim, {}, 5)
-		t.deepEq({ aim.offset, aim.angle }, before)
+		t.deepEq({ aim.offset, aim.target, aim.angle }, before)
 	end)
 
-	t.test("hook notches: two each way, shown in words", function()
+	t.test("a press is one board: at the feet and at the target; nothing moves once the ball is away", function()
+		local aim = AimModel.new()
+		local board = AimModel.BOARD
+		AimModel.nudge(aim, "stand", 1)
+		t.near(AimModel.standX(aim), board, 1e-9)
+		t.eq(AimModel.standText(aim), "board 19")
+		AimModel.nudge(aim, "target", -1)
+		AimModel.nudge(aim, "target", -1)
+		t.near(aim.target, -2 * board, 1e-9)
+		t.eq(AimModel.board(aim.target), 22)
+		t.near(aim.angle, AimModel.angleOf(aim.offset, aim.target), 1e-12)
+		-- clamped at the edges
+		for _ = 1, 60 do
+			AimModel.nudge(aim, "stand", -1)
+			AimModel.nudge(aim, "target", 1)
+		end
+		t.eq(aim.offset, -1)
+		t.eq(aim.target, AimModel.MAX_TARGET)
+		AimModel.charge(aim, true)
+		AimModel.charge(aim, false)
+		local was = { aim.offset, aim.target }
+		AimModel.nudge(aim, "stand", 1)
+		AimModel.nudge(aim, "target", -1)
+		t.deepEq({ aim.offset, aim.target }, was)
+	end)
+
+	t.test("the line: where you stand and the arrow you aim at make the angle, as on a real lane", function()
+		-- stand in the middle, aim at the middle arrow: straight down the lane
+		t.eq(AimModel.angleOf(0, 0), 0)
+		-- the arrows are where the bake draws them, and the middle one is board 20
+		local mx = AlleyLayout.arrow(4)
+		t.near(mx, 0, 1e-9)
+		t.eq(AimModel.board(mx), 20)
+		for k = 1, 7 do
+			local ax, ad = AlleyLayout.arrow(k)
+			t.eq(AimModel.board(ax), 40 - 5 * k, `arrow {k} is on board {40 - 5 * k}`)
+			t.near(AlleyLayout.arrowsD(ax), ad, 1e-9, "the arrows' V runs through every tip")
+		end
+		-- stand right, aim at the 2nd arrow from the right
+		local aim = AimModel.new()
+		AimModel.step(aim, { right = true }, 0.6)
+		local ax = AlleyLayout.arrow(6)
+		AimModel.step(aim, { mouseDx = (ax - aim.target) / AimModel.MOUSE_SENS }, 0.01)
+		t.eq(AimModel.targetText(aim), "2nd arrow from the right")
+		local p = AimModel.params(aim)
+		local path = BallPath.trace({ offset = p.offset, angle = p.angle, power = 0.7, spin = 0 })
+		-- a straight ball really rolls over the arrow it was aimed at
+		local s = path.samples
+		local _, ad = AimModel.targetPoint(aim)
+		for k = 4, #s, 3 do
+			if s[k + 2] >= ad then
+				local f = (ad - s[k - 1]) / (s[k + 2] - s[k - 1])
+				t.near(s[k - 2] + (s[k + 1] - s[k - 2]) * f, ax, 0.01, "over the target arrow")
+				break
+			end
+		end
+		-- moving your feet with the target kept changes the angle (move left: the line points further right)
+		local a0 = aim.angle
+		AimModel.step(aim, { left = true }, 0.4)
+		t.truthy(aim.angle > a0 + 0.01, `angle {a0} -> {aim.angle}`)
+		-- the angle is wide enough to cross the lane from edge to far arrow, and never more than the range
+		t.truthy(math.abs(AimModel.angleOf(1, -AimModel.MAX_TARGET)) <= BallPath.RANGES.angle + 1e-9)
+		t.truthy(math.abs(AimModel.angleOf(-1, (AlleyLayout.arrow(7)))) > 0.15)
+		-- the words
+		t.eq(AimModel.targetText(AimModel.new()), "the middle arrow")
+		local left = AimModel.new()
+		AimModel.step(left, { mouseDx = (AlleyLayout.arrow(1)) / AimModel.MOUSE_SENS }, 0.01)
+		t.eq(AimModel.targetText(left), "1st arrow from the left")
+		AimModel.step(left, { aimR = true }, 0.12)
+		t.truthy(string.find(AimModel.targetText(left), "board ", 1, true) ~= nil)
+		t.eq(AimModel.standText(AimModel.new()), "board 20")
+	end)
+
+	t.test("hook notches: four each way, shown in words; the spin is the notch", function()
 		local aim = AimModel.new()
 		t.eq(AimModel.spinText(aim), "straight")
 		AimModel.hook(aim, -1)
 		t.eq(aim.notch, -1)
-		t.eq(AimModel.spinText(aim), "half hook left")
-		t.eq(AimModel.params(aim).spin, -0.5)
+		t.eq(AimModel.spinText(aim), "a touch of hook left")
+		t.eq(AimModel.params(aim).spin, -0.25)
 		AimModel.hook(aim, -1)
+		t.eq(AimModel.spinText(aim), "some hook left")
 		AimModel.hook(aim, -1)
-		t.eq(aim.notch, -2)
+		t.eq(AimModel.spinText(aim), "strong hook left")
+		for _ = 1, 4 do
+			AimModel.hook(aim, -1)
+		end
+		t.eq(aim.notch, -AimModel.NOTCHES)
 		t.eq(AimModel.spinText(aim), "full hook left")
 		t.eq(AimModel.params(aim).spin, -1)
-		for _ = 1, 6 do
+		for _ = 1, 12 do
 			AimModel.hook(aim, 1)
 		end
-		t.eq(aim.notch, 2)
+		t.eq(aim.notch, AimModel.NOTCHES)
 		t.eq(AimModel.spinText(aim), "full hook right")
+		t.eq(AimModel.params(aim).spin, 1)
 	end)
 
 	t.test("the power meter: a triangle wave; let go to bowl; the throw is what was aimed", function()
@@ -87,7 +167,7 @@ return function(t)
 		local p = AimModel.charge(aim, false) :: BallPath.Params
 		t.truthy(p ~= nil)
 		t.near(p.offset, 0.18, 1e-9)
-		t.eq(p.spin, 0.5)
+		t.eq(p.spin, 0.25)
 		t.eq(p.power, AimModel.power(aim))
 		t.eq(aim.phase, "sent")
 		t.falsy(AimModel.canAim(aim))
@@ -125,13 +205,14 @@ return function(t)
 		t.eq(aim.phase, "watch")
 	end)
 
-	t.test("the aim line is the real path two thirds of the way down, and shows a hook beginning to bend", function()
+	t.test("the aim line is the real path over the arrows to where the back end bites, a hook bending there", function()
 		local aim = AimModel.new()
 		AimModel.step(aim, { right = true }, 0.4)
-		AimModel.step(aim, { aimL = true }, 0.3)
+		AimModel.step(aim, { mouseDx = AlleyLayout.arrow(6) / AimModel.MOUSE_SENS }, 0.01) -- 2nd arrow from the right
 		local dots = AimModel.preview(aim)
 		t.truthy(#dots >= 12 and #dots <= 30, `{#dots} dots`)
-		local path = BallPath.trace({ offset = aim.offset, angle = aim.angle, power = 0.7, spin = 0 })
+		local p = AimModel.params(aim)
+		local path = BallPath.trace({ offset = p.offset, angle = p.angle, power = AimModel.PREVIEW_POWER, spin = 0 })
 		for i, dot in dots do
 			t.truthy(dot.d <= AimModel.PREVIEW_D + 0.5, "the line stops short of the pins")
 			if i > 1 then
@@ -148,8 +229,10 @@ return function(t)
 				end
 			end
 		end
-		AimModel.hook(aim, -1)
-		AimModel.hook(aim, -1)
+		t.truthy(dots[#dots].d > BallPath.HOOK_START, "the line reaches the back end")
+		for _ = 1, AimModel.NOTCHES do
+			AimModel.hook(aim, -1)
+		end
 		local hooked = AimModel.preview(aim)
 		local bent = 0
 		for i, dot in hooked do
@@ -158,14 +241,17 @@ return function(t)
 				t.truthy(dot.d > BallPath.HOOK_START)
 				t.truthy(dot.x <= dots[i].x + 1e-9, "a hook left never bends right")
 			else
-				t.near(dot.x, dots[i].x, 1e-6, "no bend on the oil")
+				-- on the oil a hook only skids: within a few boards of the straight line
+				t.truthy(math.abs(dot.x - dots[i].x) < 0.35, "only a skid on the oil")
 			end
 		end
-		t.truthy(bent >= 3)
+		t.truthy(bent >= 2)
 		t.truthy(hooked[#hooked].x < dots[#hooked].x - 0.2, "by the end of the line the bend shows")
 		-- a line that runs off the lane stops at the gutter
 		local wide = AimModel.new()
 		AimModel.step(wide, { right = true, aimR = true }, 5)
+		AimModel.step(wide, { left = true }, 1.8)
+		t.truthy(wide.angle > 0.05)
 		local w = AimModel.preview(wide)
 		t.truthy(#w < #dots)
 		for _, dot in w do
@@ -175,20 +261,25 @@ return function(t)
 
 	t.test("the words: one help card and one status line that agree; a countdown warning", function()
 		local keys = table.concat(AimModel.HELP.keys, " | ")
-		for _, word in { "A / D", "Mouse", "Left / Right", "Z / X", "wheel", "Space", "green", "Q" } do
+		for _, word in { "A / D", "Mouse", "Left / Right", "arrow", "Z / X", "wheel", "Space", "green", "Gamepad", "Q" } do
 			t.truthy(string.find(keys, word, 1, true) ~= nil, `the help card names {word}`)
 		end
 		t.truthy(#AimModel.HELP.how >= 3)
 		local aim = AimModel.new()
 		local status = AimModel.statusText(aim, false)
-		for _, word in { "Your turn", "A/D", "mouse", "Z/X", "Space", "straight" } do
+		for _, word in { "Your turn", "stand board 20", "the middle arrow", "A/D", "mouse", "Z/X", "Space", "straight" } do
 			t.truthy(string.find(status, word, 1, true) ~= nil, `the status line names {word}`)
 		end
 		local touch = AimModel.statusText(aim, true)
 		t.truthy(string.find(touch, "BOWL", 1, true) ~= nil and string.find(touch, "Hook", 1, true) ~= nil)
+		t.truthy(string.find(touch, "Step", 1, true) ~= nil and string.find(touch, "Aim", 1, true) ~= nil)
+		t.truthy(
+			string.find(table.concat(AimModel.HELP.how, " "), "HOOK", 1, true) ~= nil,
+			"the card explains the hook"
+		)
 		t.falsy(string.find(touch, "Space", 1, true), "no keyboard words on a phone")
 		AimModel.hook(aim, 1)
-		t.truthy(string.find(AimModel.statusText(aim, false), "half hook right", 1, true) ~= nil)
+		t.truthy(string.find(AimModel.statusText(aim, false), "a touch of hook right", 1, true) ~= nil)
 		AimModel.charge(aim, true)
 		t.truthy(string.find(AimModel.statusText(aim, false), "green", 1, true) ~= nil)
 		AimModel.charge(aim, false)

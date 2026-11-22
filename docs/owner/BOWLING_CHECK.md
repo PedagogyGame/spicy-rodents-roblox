@@ -13,11 +13,11 @@ Why: Roblox physics gives slightly different results on different computers and 
 1. Pick **Townsperson** or **Police** from the menu (only people can bowl) and walk into the bowling alley.
 2. Walk up to a lane. A prompt says **Bowl: Lane 3 - open**. Press **E**.
 3. You are in the lobby for 8 seconds so friends can join. **Space** starts at once. **Add a computer** gives you an opponent (press it up to three times: Bowlbot is average, Gutter Gus is weak, Strike Sally is good).
-4. On your turn:
-   - **A / D** step left and right along the line.
-   - **Mouse** (or **Left / Right** arrows) turns your aim. A dotted line on the lane shows where the ball will go, two thirds of the way down.
-   - **Z / X** or the **mouse wheel** add hook. The ball bends late; the dots turn orange where the bend begins.
-   - **Hold Space** (or the mouse button): the power meter runs up and down. **Let go in the green band** and the ball goes exactly where you aimed. Full power is fast but wild.
+4. On your turn (changed after your notes on 1.7; see `BOWLING_FEEL_CHECK.md`):
+   - **A / D** step along the line, one board a press.
+   - **Mouse** (or **Left / Right** arrows) moves your target arrow on the lane. Where you stand and the arrow make the angle. A glowing mark, a chevron on the arrow and a dotted line show the throw.
+   - **Z / X** or the **mouse wheel** add hook, four steps each way. The ball slides on the oiled front of the lane and curls on the dry end.
+   - **Hold Space** (or the mouse button): the power meter runs up and down. **Let go in the green band**: your person walks up, swings and bowls, and the ball goes exactly where you aimed. Full power is fast but wild.
 5. **Q** leaves at any time. **H** hides the help card.
 
 Aim just to the right (or left) of the front pin: that is the pocket, and it is where strikes come from. Dead centre often leaves a split.

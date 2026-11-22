@@ -521,6 +521,10 @@ function MinigameUI.hook(self: any, notch: number?, notches: number?)
 	local n = notches or 2
 	local pips = self.hookPips
 	if #pips ~= 2 * n + 1 then
+		-- the frame grows to hold the pips beside the label (bowling has four notches each way: nine pips)
+		local w = 160 + (2 * n + 1) * 26
+		frame.Size = UDim2.fromOffset(w, 26)
+		frame.Position = UDim2.new(0.5, -w / 2, 1, -226)
 		for _, p in pips do
 			p:Destroy()
 		end
@@ -544,7 +548,7 @@ function MinigameUI.hook(self: any, notch: number?, notches: number?)
 	end
 	self.hookLabel.Text = if notch == 0
 		then "HOOK: straight"
-		else `HOOK: {if math.abs(notch) >= n then "full" else "half"} {if notch < 0 then "left" else "right"}`
+		else `HOOK: {math.abs(notch)} of {n} {if notch < 0 then "left" else "right"}`
 end
 
 -- The end card: ranked rows in the game's own columns, who won, and what to press. nil hides it.

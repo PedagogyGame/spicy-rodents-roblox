@@ -419,7 +419,10 @@ return function(t)
 					local names = {}
 					for _, part in mb.parts do
 						t.falsy(part.collide, `pair {p} {mb.mouth}: {part.path} is solid`)
-						table.insert(names, part.path)
+						-- (a ball's finger holes are the ball's: welded to it, D32)
+						if not string.find(part.path, "%.Ball%.") then
+							table.insert(names, part.path)
+						end
 					end
 					table.sort(names)
 					-- the grille is clear; at the rack the body starts beside the pair's two balls resting at the hood (they do
