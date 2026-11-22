@@ -2459,6 +2459,15 @@ function Game.start(opts: Opts?): any
 						(model :: Model):SetAttribute("BumpAt", workspace:GetServerTimeNow())
 					end
 				end,
+				-- the rider's reputation hears of every person knocked (Reputation/Conduct: only several, or the same
+				-- one again, at speed ever counts; owner D30)
+				struck = function(rideId: string, personId: number, speed: number)
+					local v = if devices then PlayerVehicles.get(devices.fleet, rideId) else nil
+					local rider = if v and v.driver then Players:GetPlayerByUserId(v.driver) else nil
+					if rider then
+						reputation.runOver(rider, { victim = personId, speed = speed })
+					end
+				end,
 				serverTime = function(): number
 					return workspace:GetServerTimeNow()
 				end,
