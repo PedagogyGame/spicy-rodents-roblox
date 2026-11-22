@@ -304,23 +304,30 @@ for k, trunkId in picks do
 		local m = reg:pointAt(r, 0.5)
 		local b = reg:get(p.parent) :: any
 		local q = reg:pointAt(b, p.parentT)
-		local sx, sz = m.x - q.x, m.z - q.z
+		local e = reg:pointAt(r, 1)
+		local sx, sz = e.x - q.x, e.z - q.z
 		local sl = math.max(math.sqrt(sx * sx + sz * sz), 1e-3)
 		add(
 			`{tag}_spur`,
 			`{trunk.name}: a spur off the middle of a long bough (another place to go), twig and leaves at its tip`,
-			{ m.x - sz / sl * 9, m.y + 3, m.z + sx / sl * 9 },
-			{ m.x, m.y, m.z },
-			55
+			{ m.x + sx / sl * 6 - sz / sl * 5, m.y + 4.5, m.z + sz / sl * 6 + sx / sl * 5 },
+			{ q.x, q.y + 1, q.z },
+			60
 		)
 	end
-	-- the whole tree from a person's height, and a squirrel's eye down a bough over its knots
+	-- the whole tree from a person's height, aimed at its nooks, and a squirrel's eye down a bough over its knots
+	local midY, n = 0, 0
+	for _, p in nooks.tree(trunkId) do
+		midY += p.at[2]
+		n += 1
+	end
+	midY = if n > 0 then midY / n else foot.y + 12
 	add(
 		`{tag}_tree`,
 		`{trunk.name}: the tree with its nooks, hangout and spurs (stand-in bark)`,
-		{ foot.x + 26, foot.y + 14, foot.z + 18 },
-		{ foot.x, foot.y + 12, foot.z },
-		55
+		{ foot.x + 30, midY + 4, foot.z + 22 },
+		{ foot.x, midY, foot.z },
+		60
 	)
 	local longest = nil
 	for _, b in boughs do
@@ -329,12 +336,14 @@ for k, trunkId in picks do
 		end
 	end
 	if longest then
-		local a = reg:pointAt(longest, 0.12)
-		local e = reg:pointAt(longest, 0.45)
+		local L = longest.length
+		local first = BranchNooks.nodules(longest)[1] or L * 0.4
+		local a = reg:pointAt(longest, math.clamp((first - 3) / L, 0.3, 0.9))
+		local e = reg:pointAt(longest, math.clamp((first + 8) / L, 0.35, 1))
 		add(
 			`{tag}_knots`,
 			`{trunk.name}: a squirrel's eye down its longest bough: the knots in the run path (each a little settle)`,
-			{ a.x, a.y + lift + 1.2, a.z },
+			{ a.x, a.y + lift + 1.3, a.z },
 			{ e.x, e.y + lift + 0.2, e.z },
 			70
 		)

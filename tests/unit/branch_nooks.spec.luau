@@ -13,8 +13,11 @@
 --   * the stash's reach from the cup only, never from the bough or a trunk climber;
 --   * the nodules: along every branch's run path, felt as a settle of the drawn body that is gone in 0.15 s and never
 --     touches the motor (Shared/Movement/BranchFeel).
+local fs = require("@lune/fs")
 local Data = require("@shared/Data")
 local BakedWorld = require("@tests/lib/BakedWorld")
+local LiveRig = require("@tests/lib/LiveRig")
+local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local BranchFeel = require("@shared/Movement/BranchFeel")
 local BranchNooks = require("@shared/World/BranchNooks")
 local Curve = require("@shared/Routes/Curve")
@@ -362,6 +365,72 @@ return function(t)
 			t.eq(#bad, 0, `{#bad}: {table.concat(bad, " | ", 1, math.min(#bad, 12))}`)
 		end
 	)
+
+	t.test("the live server across the baked town: in, out, back and onto the bough, and Q off one: 0 snaps", function()
+		-- the real motor through a 300 ms link with jitter and loss (tests/lib/LiveRig), judged by the server with
+		-- enforcement on and the live wall, floor and cover rays over build/Town.rbxm (the trunk and bough colliders), on
+		-- a spread of the new routes (every kind, the whole town)
+		t.truthy(fs.isFile("build/Town.rbxm"), "build/Town.rbxm (lune run tools/bake/main.luau)")
+		Height.configure(d:module("TerrainExtensions"))
+		local town = BakedWorld.load("build/Town.rbxm")
+		local w = town:motorWorld(d)
+		local wall, down, cover = BakedWorld.validatorRays(town)
+		local vworld = ValidatorWorld.build(w, { wall = wall, down = down, cover = cover })
+		local link = { latency = 0.3, jitter = 0.15, loss = 0.02 }
+		local every = math.max(1, math.floor(#nooks.places / 30))
+		local runs, drops = 0, 0
+		for k = 1, #nooks.places, every do
+			local p = nooks.places[k]
+			local r = reg:get(p.route) :: Registry.Route
+			local bough = reg:get(p.parent) :: Registry.Route
+			-- in with E, W out, S back, E onto the bough
+			local rig = LiveRig.new({ world = w, vworld = vworld, link = link, seed = 70 + k })
+			local start = onRail(bough.id, p.parentT, 0)
+			local took = false
+			local tookAt = math.huge
+			local wasOn = false
+			rig:possess(start, function(now: number, st: SquirrelMotor.State): SquirrelMotor.Input
+				local on = st.routeId == r.id
+				if on and not took then
+					took, tookAt = true, now
+				end
+				-- (E pressed and let go every other frame until the route is taken: a press the hand-off ate is pressed
+				-- again)
+				local cam = along(r, if on then st.railT else 0.05, 1)
+				local since = now - tookAt
+				local press = not wasOn
+				wasOn = not wasOn
+				if not took then
+					return BakedWorld.keys(cam, { grab = press })
+				elseif since < 1.2 then
+					return BakedWorld.keys(cam, { fw = 1 })
+				elseif since < 2.6 then
+					return BakedWorld.keys(cam, { fw = -1 })
+				end
+				return BakedWorld.keys(cam, { grab = since > 2.7 and since < 2.73 })
+			end)
+			rig:run(4.5)
+			local res = rig:result()
+			for _, v in res.violations do
+				print(`      VIOLATION {v}`)
+			end
+			t.eq(res.snaps, 0, `{r.name}: in, out, back: {LiveRig.describe("run", res)}`)
+			t.truthy(took, `{r.name}: E took it`)
+			t.truthy(res.visited[r.id], `{r.name}: ran it`)
+			runs += 1
+			-- Q off it, half way out: down to whatever is under it, and still
+			local drop = LiveRig.new({ world = w, vworld = vworld, link = link, seed = 170 + k })
+			drop:possess(onRail(r.id, 0.6, 0), function(now: number): SquirrelMotor.Input
+				return BakedWorld.keys(math.sin(now) * 2, { drop = now > 0.4 and now < 0.5 })
+			end)
+			drop:run(4)
+			local dr = drop:result()
+			t.eq(dr.snaps, 0, `{r.name}: Q off it: {LiveRig.describe("drop", dr)}`)
+			drops += 1
+		end
+		Height.configure(nil)
+		print(`      {runs} of the new routes run in and out and {drops} dropped off under the live server: 0 snaps`)
+	end)
 
 	t.test(
 		"the stash: within reach in the cup only, never from the bough it leaves or a climber on the trunk",

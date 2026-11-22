@@ -5,8 +5,8 @@
 -- none queried, none touched, no shadows (the motor runs the routes; these are only seen), coloured as the tree's own
 -- stand-in bark (worldgen Builders/Trees' BARKS by trunk id), drawn so the feet on the route's line stand on them
 -- (Routes/Motion §14: the feet are BranchNooks.C.lift over a branch's line):
---   NOOK (6 parts)    a dark floor disc in a bark bowl, three bark walls round its far side (the way the route ran in:
---                     toward the trunk), and a soft low lip across the way in, stepped over into the cup
+--   NOOK (6 parts)    a dark floor disc in a bark bowl, three bark walls round its back (the trunk side, clear of the
+--                     way in; the front open to the view out), and a soft low lip across the way in, stepped over
 --   STASH (2)         a knot-hole: a pale bark ring with a dark hole in it, in the wood beside the cup; acorns (up to
 --                     C.acorns, one part each) are the viewer's own and added by Client/World/BranchNookView
 --   HANGOUT (9)       a flat crook: three bark discs along the ledge, moss on each, two twigs and a tuft of leaves
@@ -37,7 +37,7 @@ BranchNookArt.C = table.freeze({
 	wallWide = 1.35,
 	wallThick = 0.32,
 	wallTilt = math.rad(14),
-	wallAngle = 62, -- degrees either side of straight ahead
+	wallAngles = table.freeze({ -100, -50, 0, 50, 100 }), -- degrees round from the trunk side: the walls stand at 3
 	lipDia = 0.5,
 	lipLong = 2.0,
 	lipBack = 1.2, -- studs back along the way in
@@ -47,9 +47,9 @@ BranchNookArt.C = table.freeze({
 	moss = 2.35,
 	mossThick = 0.08,
 	hangoutAt = table.freeze({ 0.42, 0.68, 0.94 }),
-	spurBase = 0.55, -- radius
-	spurTip = 0.28,
-	tuft = 2.0,
+	spurBase = 0.8, -- radius
+	spurTip = 0.4,
+	tuft = 1.7,
 	knot = 0.5, -- a nodule's diameter
 	knotTop = 0.12, -- over the feet
 	acorns = 3,
@@ -195,9 +195,23 @@ local function buildNook(E: Engine, model: any, reg: any, p: Place, bark: { numb
 	local n = `Nook{p.route}`
 	disc(E, model, n .. "_bowl", fx, fy - 0.03, fz, C.bowl, C.bowlThick, bark, "Wood")
 	disc(E, model, n .. "_floor", fx, fy, fz, BranchNooks.C.cupRadius * 2, C.floorThick, COL.inner, "Wood")
-	-- the walls round the far side (straight ahead of the way in, and either side of it), leaning out a little
-	for k, deg in { 0, C.wallAngle, -C.wallAngle } do
-		local a = math.atan2(tx, tz) + math.rad(deg)
+	-- the walls round the back (toward the trunk), leaning out a little: the three of C.wallAngles (degrees round
+	-- from straight in at the trunk) furthest from the way in, so the front stays open and the way in clear
+	local back = math.atan2(-p.out[1], -p.out[2])
+	local entry = math.atan2(-tx, -tz)
+	local function off(a: number, b: number): number
+		return math.abs(math.atan2(math.sin(a - b), math.cos(a - b)))
+	end
+	local angles = table.clone(C.wallAngles)
+	table.sort(angles, function(a: number, b: number): boolean
+		local ea, eb = off(back + math.rad(a), entry), off(back + math.rad(b), entry)
+		if math.abs(ea - eb) > 1e-6 then
+			return ea > eb
+		end
+		return a < b
+	end)
+	for k = 1, 3 do
+		local a = back + math.rad(angles[k])
 		local ox, oz = math.sin(a), math.cos(a)
 		local rad = BranchNooks.C.cupRadius + C.wallThick / 2 - 0.05
 		local h = BranchNooks.C.cupWall
@@ -302,14 +316,15 @@ local function buildHangout(E: Engine, model: any, reg: any, p: Place, bark: { n
 		)
 		disc(E, model, `{n}_moss{k}`, x, y + 0.01, z, C.moss, C.mossThick, COL.moss, "Grass")
 	end
-	-- two twigs off the outer edge and a tuft of leaves on one
-	local ex, ey, ez = feetAt(reg, r, 1)
+	-- a twig off each end of the ledge, out along it and up, a small tuft of leaves on the far one
 	local ox, oz = p.out[1], p.out[2]
-	local sx, sz = -oz, ox
-	for k, s in { 1, -1 } do
-		local dx, dy, dz = unit(ox * 0.7 + sx * s * 0.35, 0.65, oz * 0.7 + sz * s * 0.35)
-		local bx, by, bz = ex + ox * 1.1 + sx * s * 0.6, ey - 0.1, ez + oz * 1.1 + sz * s * 0.6
-		local len = 2.2
+	for k, tt in { 1, 0.3 } do
+		local ex, ey, ez = feetAt(reg, r, tt)
+		local rx, rz = runAt(reg, r, tt)
+		local s = if k == 1 then 1 else -1
+		local dx, dy, dz = unit(rx * s * 0.8 + ox * 0.4, 0.55, rz * s * 0.8 + oz * 0.4)
+		local bx, by, bz = ex + rx * s * 1.1, ey - 0.15, ez + rz * s * 1.1
+		local len = 1.8
 		part(
 			E,
 			model,
@@ -326,7 +341,7 @@ local function buildHangout(E: Engine, model: any, reg: any, p: Place, bark: { n
 				model,
 				`{n}_leaves`,
 				"Ball",
-				{ 1.4, 1.4, 1.4 },
+				{ 1.1, 1.1, 1.1 },
 				E.CFrame.new(bx + dx * len, by + dy * len, bz + dz * len),
 				COL.leaves,
 				"LeafyGrass"
