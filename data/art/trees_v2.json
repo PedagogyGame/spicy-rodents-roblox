@@ -12,11 +12,11 @@
  },
  "count": 95,
  "totals": {
-  "bark": 785813,
-  "leaves": 518542,
+  "bark": 788718,
+  "leaves": 526286,
   "fruit": 16128,
-  "total": 1320483,
-  "fbxBytes": 266031476
+  "total": 1331132,
+  "fbxBytes": 266605172
  },
  "trees": [
   {
@@ -1162,7 +1162,12 @@
     337,
     338,
     339,
-    340
+    340,
+    9835,
+    9836,
+    9837,
+    9838,
+    9839
    ],
    "pivot": [
     272.739,
@@ -1170,42 +1175,42 @@
     -309.866
    ],
    "heightStuds": 89.4,
-   "assetId": "136704314284660",
+   "assetId": "95047693332177",
    "displayName": "SR tree v2 010 STREET ELM 6",
    "moderation": "Approved",
-   "sha": "fd3ac024ffc677a5",
-   "fbxBytes": 2734812,
+   "sha": "2f8bb6ec72995431",
+   "fbxBytes": 2754124,
    "tris": {
-    "bark": 7206,
-    "leaves": 5820,
+    "bark": 7475,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 13026
+    "total": 13415
    },
    "parts": {
     "Bark": {
      "center": [
-      -1.027,
-      43.944,
-      -24.221
+      -1.282,
+      38.478,
+      -25.122
      ],
      "size": [
-      81.537,
-      95.943,
-      114.38
+      68.319,
+      85.011,
+      112.577
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      2.194,
-      63.816,
-      -0.843
+      -2.531,
+      43.734,
+      -2.016
      ],
      "size": [
-      83.792,
-      45.098,
-      76.49
+      74.462,
+      71.574,
+      79.669
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1217,14 +1222,14 @@
     },
     "LeavesMid": {
      "center": [
-      0.88,
-      65.538,
-      -2.111
+      -3.03,
+      47.413,
+      -3.969
      ],
      "size": [
-      90.193,
-      48.679,
-      85.38
+      81.986,
+      78.745,
+      82.711
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1236,14 +1241,14 @@
     },
     "LeavesSun": {
      "center": [
-      -0.974,
-      68.592,
-      -4.813
+      -1.716,
+      49.514,
+      -5.959
      ],
      "size": [
-      91.427,
-      52.476,
-      94.229
+      87.275,
+      82.429,
+      97.087
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1257,110 +1262,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "2f8bb6ec72995431",
-    "fbxBytes": 2755596,
-    "tris": {
-     "bark": 7475,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13415
-    },
-    "routes": [
-     333,
-     334,
-     335,
-     336,
-     337,
-     338,
-     339,
-     340,
-     9835,
-     9836,
-     9837,
-     9838,
-     9839
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       -1.282,
-       38.478,
-       -25.122
-      ],
-      "size": [
-       68.319,
-       85.011,
-       112.577
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       -2.531,
-       43.734,
-       -2.016
-      ],
-      "size": [
-       74.462,
-       71.574,
-       79.669
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       -3.03,
-       47.413,
-       -3.969
-      ],
-      "size": [
-       81.986,
-       78.745,
-       82.711
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       -1.716,
-       49.514,
-       -5.959
-      ],
-      "size": [
-       87.275,
-       82.429,
-       97.087
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_010.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -1714,7 +1615,11 @@
     373,
     374,
     375,
-    376
+    376,
+    9822,
+    9823,
+    9824,
+    9825
    ],
    "pivot": [
     394.728,
@@ -1722,42 +1627,42 @@
     -74.887
    ],
    "heightStuds": 55.32,
-   "assetId": "73511424633378",
+   "assetId": "118630934064994",
    "displayName": "SR tree v2 014 STREET OAK 10",
    "moderation": "Approved",
-   "sha": "455e478d16d570ca",
-   "fbxBytes": 2771692,
+   "sha": "4f2cbdb55f47b3a9",
+   "fbxBytes": 2877292,
    "tris": {
-    "bark": 7104,
-    "leaves": 4248,
+    "bark": 7360,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 11352
+    "total": 13300
    },
    "parts": {
     "Bark": {
      "center": [
-      3.857,
-      24.166,
-      0.7
+      1.803,
+      24.17,
+      -0.914
      ],
      "size": [
-      65.553,
-      56.46,
-      66.23
+      61.867,
+      56.469,
+      61.228
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      2.834,
-      37.952,
-      -0.8
+      -4.816,
+      26.017,
+      -0.242
      ],
      "size": [
-      70.569,
-      25.126,
-      68.961
+      61.025,
+      38.031,
+      64.395
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1769,14 +1674,14 @@
     },
     "LeavesMid": {
      "center": [
-      3.255,
-      38.76,
-      0.638
+      0.556,
+      28.613,
+      0.866
      ],
      "size": [
-      76.213,
-      29.483,
-      74.05
+      77.742,
+      43.151,
+      69.735
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1788,14 +1693,14 @@
     },
     "LeavesSun": {
      "center": [
-      1.108,
-      43.614,
-      0.886
+      0.125,
+      32.64,
+      -2.317
      ],
      "size": [
-      74.73,
-      28.721,
-      75.717
+      76.844,
+      51.06,
+      71.829
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1809,108 +1714,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "4f2cbdb55f47b3a9",
-    "fbxBytes": 2878764,
-    "tris": {
-     "bark": 7360,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13300
-    },
-    "routes": [
-     370,
-     371,
-     372,
-     373,
-     374,
-     375,
-     376,
-     9822,
-     9823,
-     9824,
-     9825
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       1.803,
-       24.17,
-       -0.914
-      ],
-      "size": [
-       61.867,
-       56.469,
-       61.228
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       -4.816,
-       26.017,
-       -0.242
-      ],
-      "size": [
-       61.025,
-       38.031,
-       64.395
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.556,
-       28.613,
-       0.866
-      ],
-      "size": [
-       77.742,
-       43.151,
-       69.735
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       0.125,
-       32.64,
-       -2.317
-      ],
-      "size": [
-       76.844,
-       51.06,
-       71.829
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_014.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -1927,7 +1730,12 @@
     381,
     382,
     383,
-    384
+    384,
+    9817,
+    9818,
+    9819,
+    9820,
+    9821
    ],
    "pivot": [
     251.008,
@@ -1935,42 +1743,42 @@
     68.947
    ],
    "heightStuds": 95.53,
-   "assetId": "94802673658182",
+   "assetId": "94850604934617",
    "displayName": "SR tree v2 015 STREET ELM 11",
    "moderation": "Approved",
-   "sha": "7dabd871f3950127",
-   "fbxBytes": 2691196,
+   "sha": "5bbf9f8e9f7c24da",
+   "fbxBytes": 2754668,
    "tris": {
-    "bark": 7178,
-    "leaves": 5064,
+    "bark": 7492,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 12242
+    "total": 13432
    },
    "parts": {
     "Bark": {
      "center": [
-      2.668,
-      43.902,
-      -0.214
+      0.313,
+      42.782,
+      -1.647
      ],
      "size": [
-      70.642,
-      95.89,
-      71.33
+      69.882,
+      93.65,
+      58.751
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      1.787,
-      62.421,
-      2.648
+      2.057,
+      39.446,
+      -3.648
      ],
      "size": [
-      72.048,
-      36.947,
-      74.587
+      73.485,
+      61.676,
+      63.26
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -1982,14 +1790,14 @@
     },
     "LeavesMid": {
      "center": [
-      1.764,
-      65.389,
-      1.082
+      0.498,
+      47.343,
+      -1.28
      ],
      "size": [
-      78.219,
-      41.627,
-      83.949
+      78.694,
+      77.394,
+      72.27
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -2001,14 +1809,14 @@
     },
     "LeavesSun": {
      "center": [
-      -0.673,
-      72.78,
-      -0.3
+      0.47,
+      52.607,
+      -2.011
      ],
      "size": [
-      87.763,
-      54.287,
-      80.275
+      80.526,
+      87.803,
+      77.919
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -2022,110 +1830,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "5bbf9f8e9f7c24da",
-    "fbxBytes": 2756140,
-    "tris": {
-     "bark": 7492,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13432
-    },
-    "routes": [
-     377,
-     378,
-     379,
-     380,
-     381,
-     382,
-     383,
-     384,
-     9817,
-     9818,
-     9819,
-     9820,
-     9821
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       0.313,
-       42.782,
-       -1.647
-      ],
-      "size": [
-       69.882,
-       93.65,
-       58.751
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       2.057,
-       39.446,
-       -3.648
-      ],
-      "size": [
-       73.485,
-       61.676,
-       63.26
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.498,
-       47.343,
-       -1.28
-      ],
-      "size": [
-       78.694,
-       77.394,
-       72.27
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       0.47,
-       52.607,
-       -2.011
-      ],
-      "size": [
-       80.526,
-       87.803,
-       77.919
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_015.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -3258,7 +2962,12 @@
     475,
     476,
     477,
-    478
+    478,
+    9812,
+    9813,
+    9814,
+    9815,
+    9816
    ],
    "pivot": [
     -61.477,
@@ -3266,42 +2975,42 @@
     352.383
    ],
    "heightStuds": 75.85,
-   "assetId": "117279485134342",
+   "assetId": "120874674511873",
    "displayName": "SR tree v2 026 STREET SYCAMORE 22",
    "moderation": "Approved",
-   "sha": "66da5efa15067e11",
-   "fbxBytes": 2155372,
+   "sha": "167abc20469c6e94",
+   "fbxBytes": 2278252,
    "tris": {
-    "bark": 7157,
-    "leaves": 3680,
+    "bark": 7519,
+    "leaves": 5524,
     "fruit": 0,
-    "total": 10837
+    "total": 13043
    },
    "parts": {
     "Bark": {
      "center": [
-      -1.508,
-      35.514,
-      7.942
+      0.828,
+      35.322,
+      3.231
      ],
      "size": [
-      67.464,
-      79.201,
-      57.588
+      60.024,
+      78.817,
+      55.048
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      0.333,
-      54.401,
-      4.171
+      -0.036,
+      39.54,
+      2.427
      ],
      "size": [
-      70.903,
-      40.518,
-      58.285
+      63.161,
+      64.862,
+      61.533
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3313,14 +3022,14 @@
     },
     "LeavesMid": {
      "center": [
-      -0.905,
-      56.437,
-      5.06
+      0.855,
+      41.973,
+      2.023
      ],
      "size": [
-      79.651,
-      39.725,
-      70.538
+      75.439,
+      69.936,
+      68.526
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3332,14 +3041,14 @@
     },
     "LeavesSun": {
      "center": [
-      -0.724,
-      60.675,
-      4.905
+      0.876,
+      46.179,
+      1.636
      ],
      "size": [
-      84.159,
-      40.29,
-      73.211
+      80.112,
+      77.977,
+      74.799
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3353,111 +3062,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "167abc20469c6e94",
-    "fbxBytes": 2279724,
-    "tris": {
-     "bark": 7519,
-     "leaves": 5524,
-     "fruit": 0,
-     "total": 13043
-    },
-    "routes": [
-     470,
-     471,
-     472,
-     473,
-     474,
-     475,
-     476,
-     477,
-     478,
-     9812,
-     9813,
-     9814,
-     9815,
-     9816
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       0.828,
-       35.322,
-       3.231
-      ],
-      "size": [
-       60.024,
-       78.817,
-       55.048
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       -0.036,
-       39.54,
-       2.427
-      ],
-      "size": [
-       63.161,
-       64.862,
-       61.533
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       85,
-       127,
-       67
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.855,
-       41.973,
-       2.023
-      ],
-      "size": [
-       75.439,
-       69.936,
-       68.526
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       85,
-       127,
-       67
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       0.876,
-       46.179,
-       1.636
-      ],
-      "size": [
-       80.112,
-       77.977,
-       74.799
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       85,
-       127,
-       67
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_026.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -3476,7 +3080,12 @@
     485,
     486,
     487,
-    488
+    488,
+    9807,
+    9808,
+    9809,
+    9810,
+    9811
    ],
    "pivot": [
     60.811,
@@ -3484,42 +3093,42 @@
     257.578
    ],
    "heightStuds": 60.17,
-   "assetId": "116103140600669",
+   "assetId": "135371885522166",
    "displayName": "SR tree v2 027 STREET MAPLE 23",
    "moderation": "Approved",
-   "sha": "5842eb69df0ac242",
-   "fbxBytes": 2723212,
+   "sha": "836ebf5f4f0525a8",
+   "fbxBytes": 2754796,
    "tris": {
-    "bark": 7222,
-    "leaves": 5624,
+    "bark": 7503,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 12846
+    "total": 13443
    },
    "parts": {
     "Bark": {
      "center": [
-      -1.565,
-      27.12,
-      -1.687
+      -1.881,
+      28.421,
+      -2.705
      ],
      "size": [
-      57.89,
-      62.308,
-      59.532
+      51.162,
+      64.91,
+      49.408
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      4.218,
-      40.854,
-      0.819
+      0.343,
+      26.42,
+      0.477
      ],
      "size": [
-      50.531,
-      28.412,
-      58.269
+      52.266,
+      38.829,
+      53.104
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3531,14 +3140,14 @@
     },
     "LeavesMid": {
      "center": [
-      -0.568,
-      45.156,
-      -1.282
+      0.536,
+      31.403,
+      -1.803
      ],
      "size": [
-      65.905,
-      30.438,
-      67.625
+      57.123,
+      48.801,
+      60.184
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3550,14 +3159,14 @@
     },
     "LeavesSun": {
      "center": [
-      -1.831,
-      49.721,
-      -1.529
+      1.388,
+      36.47,
+      -2.395
      ],
      "size": [
-      72.469,
-      32.529,
-      70.769
+      62.534,
+      58.853,
+      67.03
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3571,112 +3180,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "836ebf5f4f0525a8",
-    "fbxBytes": 2756268,
-    "tris": {
-     "bark": 7503,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13443
-    },
-    "routes": [
-     479,
-     480,
-     481,
-     482,
-     483,
-     484,
-     485,
-     486,
-     487,
-     488,
-     9807,
-     9808,
-     9809,
-     9810,
-     9811
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       -1.881,
-       28.421,
-       -2.705
-      ],
-      "size": [
-       51.162,
-       64.91,
-       49.408
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       0.343,
-       26.42,
-       0.477
-      ],
-      "size": [
-       52.266,
-       38.829,
-       53.104
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       146,
-       168,
-       104
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.536,
-       31.403,
-       -1.803
-      ],
-      "size": [
-       57.123,
-       48.801,
-       60.184
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       146,
-       168,
-       104
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       1.388,
-       36.47,
-       -2.395
-      ],
-      "size": [
-       62.534,
-       58.853,
-       67.03
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       146,
-       168,
-       104
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_027.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -3696,7 +3199,11 @@
     496,
     497,
     498,
-    499
+    499,
+    9831,
+    9832,
+    9833,
+    9834
    ],
    "pivot": [
     231.525,
@@ -3704,42 +3211,42 @@
     292.112
    ],
    "heightStuds": 70.95,
-   "assetId": "131908517126600",
+   "assetId": "121755328987111",
    "displayName": "SR tree v2 028 STREET OAK 24",
    "moderation": "Approved",
-   "sha": "1a82d08f9366d6d1",
-   "fbxBytes": 2879612,
+   "sha": "cd347cc9a9bb8789",
+   "fbxBytes": 2890348,
    "tris": {
-    "bark": 7328,
+    "bark": 7573,
     "leaves": 5940,
     "fruit": 0,
-    "total": 13268
+    "total": 13513
    },
    "parts": {
     "Bark": {
      "center": [
-      -1.167,
-      34.027,
-      31.762
+      -1.111,
+      32.544,
+      31.67
      ],
      "size": [
-      70.002,
-      76.255,
-      119.994
+      59.533,
+      73.289,
+      120.178
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      0.618,
-      47.258,
-      -1.143
+      -1.173,
+      28.598,
+      2.551
      ],
      "size": [
-      64.609,
-      39.34,
-      58.953
+      67.228,
+      41.389,
+      55.035
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3751,14 +3258,14 @@
     },
     "LeavesMid": {
      "center": [
-      -2.312,
-      50.086,
-      0.215
+      -1.646,
+      34.218,
+      0.979
      ],
      "size": [
-      77.552,
-      44.035,
-      69.36
+      75.547,
+      52.527,
+      72.838
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3770,14 +3277,14 @@
     },
     "LeavesSun": {
      "center": [
-      -2.661,
-      56.218,
-      7.722
+      -1.191,
+      43.725,
+      9.744
      ],
      "size": [
-      85.422,
-      46.496,
-      96.142
+      84.432,
+      71.273,
+      95.141
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -3791,112 +3298,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "cd347cc9a9bb8789",
-    "fbxBytes": 2891820,
-    "tris": {
-     "bark": 7573,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13513
-    },
-    "routes": [
-     489,
-     490,
-     491,
-     492,
-     493,
-     494,
-     495,
-     496,
-     497,
-     498,
-     499,
-     9831,
-     9832,
-     9833,
-     9834
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       -1.111,
-       32.544,
-       31.67
-      ],
-      "size": [
-       59.533,
-       73.289,
-       120.178
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       -1.173,
-       28.598,
-       2.551
-      ],
-      "size": [
-       67.228,
-       41.389,
-       55.035
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       -1.646,
-       34.218,
-       0.979
-      ],
-      "size": [
-       75.547,
-       52.527,
-       72.838
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       -1.191,
-       43.725,
-       9.744
-      ],
-      "size": [
-       84.432,
-       71.273,
-       95.141
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_028.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -4022,7 +3423,12 @@
     510,
     511,
     512,
-    513
+    513,
+    9826,
+    9827,
+    9828,
+    9829,
+    9830
    ],
    "pivot": [
     -113.204,
@@ -4030,42 +3436,42 @@
     -312.739
    ],
    "heightStuds": 57.24,
-   "assetId": "136593934443309",
+   "assetId": "84697203007439",
    "displayName": "SR tree v2 030 STREET ELM 26",
    "moderation": "Approved",
-   "sha": "3ca06a48967f5a76",
-   "fbxBytes": 2695948,
+   "sha": "a794531136de99e3",
+   "fbxBytes": 2755084,
    "tris": {
-    "bark": 7186,
-    "leaves": 5140,
+    "bark": 7459,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 12326
+    "total": 13399
    },
    "parts": {
     "Bark": {
      "center": [
-      20.947,
-      25.688,
-      1.37
+      22.782,
+      24.982,
+      1.326
      ],
      "size": [
-      104.818,
-      59.386,
-      68.703
+      101.146,
+      57.974,
+      63.991
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      -0.122,
-      37.017,
-      1.624
+      0.858,
+      24.032,
+      -2.069
      ],
      "size": [
-      68.181,
-      21.345,
-      76.15
+      62.663,
+      34.061,
+      55.058
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4077,14 +3483,14 @@
     },
     "LeavesMid": {
      "center": [
-      -0.878,
-      38.007,
-      1.163
+      0.193,
+      28.319,
+      -0.207
      ],
      "size": [
-      70.878,
-      23.233,
-      78.696
+      66.848,
+      42.575,
+      77.306
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4096,14 +3502,14 @@
     },
     "LeavesSun": {
      "center": [
-      3.235,
-      42.352,
-      1.043
+      4.411,
+      32.283,
+      -0.829
      ],
      "size": [
-      82.75,
-      30.948,
-      76.945
+      82.79,
+      50.448,
+      78.751
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4117,110 +3523,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "a794531136de99e3",
-    "fbxBytes": 2756540,
-    "tris": {
-     "bark": 7459,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13399
-    },
-    "routes": [
-     506,
-     507,
-     508,
-     509,
-     510,
-     511,
-     512,
-     513,
-     9826,
-     9827,
-     9828,
-     9829,
-     9830
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       22.782,
-       24.982,
-       1.326
-      ],
-      "size": [
-       101.146,
-       57.974,
-       63.991
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       0.858,
-       24.032,
-       -2.069
-      ],
-      "size": [
-       62.663,
-       34.061,
-       55.058
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.193,
-       28.319,
-       -0.207
-      ],
-      "size": [
-       66.848,
-       42.575,
-       77.306
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       4.411,
-       32.283,
-       -0.829
-      ],
-      "size": [
-       82.79,
-       50.448,
-       78.751
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_030.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -4574,7 +3876,13 @@
     546,
     547,
     548,
-    549
+    549,
+    9801,
+    9802,
+    9803,
+    9804,
+    9805,
+    9806
    ],
    "pivot": [
     -244.341,
@@ -4582,42 +3890,42 @@
     39.334
    ],
    "heightStuds": 55.92,
-   "assetId": "132678099822817",
+   "assetId": "90946438606178",
    "displayName": "SR tree v2 034 STREET OAK 30",
    "moderation": "Approved",
-   "sha": "70dadcaaf2cc1ecc",
-   "fbxBytes": 2754476,
+   "sha": "6f5f1ab1b6430bf7",
+   "fbxBytes": 2883724,
    "tris": {
-    "bark": 7070,
-    "leaves": 3968,
+    "bark": 7441,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 11038
+    "total": 13381
    },
    "parts": {
     "Bark": {
      "center": [
-      0.242,
-      25.671,
-      3.84
+      0.017,
+      25.595,
+      5.981
      ],
      "size": [
-      59.643,
-      59.377,
-      52.213
+      59.284,
+      59.224,
+      55.344
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      0.858,
-      38.5,
-      3.302
+      -1.188,
+      26.452,
+      4.795
      ],
      "size": [
-      68.649,
-      31.419,
-      55.011
+      57.774,
+      37.807,
+      60.263
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4629,14 +3937,14 @@
     },
     "LeavesMid": {
      "center": [
-      -0.101,
-      39.102,
-      4.047
+      -1.793,
+      31.096,
+      4.667
      ],
      "size": [
-      70.033,
-      32.128,
-      60.647
+      66.606,
+      47.012,
+      63.956
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4648,14 +3956,14 @@
     },
     "LeavesSun": {
      "center": [
-      -0.362,
-      45.059,
-      2.164
+      0.264,
+      34.156,
+      3.894
      ],
      "size": [
-      69.95,
-      33.993,
-      62.444
+      73.835,
+      53.233,
+      67.802
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -4669,110 +3977,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "6f5f1ab1b6430bf7",
-    "fbxBytes": 2885196,
-    "tris": {
-     "bark": 7441,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13381
-    },
-    "routes": [
-     543,
-     544,
-     545,
-     546,
-     547,
-     548,
-     549,
-     9801,
-     9802,
-     9803,
-     9804,
-     9805,
-     9806
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       0.017,
-       25.595,
-       5.981
-      ],
-      "size": [
-       59.284,
-       59.224,
-       55.344
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       -1.188,
-       26.452,
-       4.795
-      ],
-      "size": [
-       57.774,
-       37.807,
-       60.263
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       -1.793,
-       31.096,
-       4.667
-      ],
-      "size": [
-       66.606,
-       47.012,
-       63.956
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       0.264,
-       34.156,
-       3.894
-      ],
-      "size": [
-       73.835,
-       53.233,
-       67.802
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_034.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -6581,7 +5785,13 @@
     708,
     709,
     710,
-    711
+    711,
+    9840,
+    9841,
+    9842,
+    9843,
+    9844,
+    9845
    ],
    "pivot": [
     35.0,
@@ -6589,42 +5799,42 @@
     987.5
    ],
    "heightStuds": 68.34,
-   "assetId": "103670800077026",
+   "assetId": "123079957660273",
    "displayName": "SR tree v2 051 PARK OAK 94",
    "moderation": "Approved",
-   "sha": "97998998a27fba7f",
-   "fbxBytes": 2877452,
+   "sha": "f690a6151e26c218",
+   "fbxBytes": 2892684,
    "tris": {
-    "bark": 7338,
+    "bark": 7609,
     "leaves": 5940,
     "fruit": 0,
-    "total": 13278
+    "total": 13549
    },
    "parts": {
     "Bark": {
      "center": [
-      6.764,
-      32.239,
-      4.955
+      2.09,
+      29.615,
+      -3.735
      ],
      "size": [
-      63.498,
-      72.679,
-      61.328
+      65.583,
+      67.431,
+      60.503
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      1.566,
-      46.049,
-      0.086
+      0.377,
+      25.301,
+      4.582
      ],
      "size": [
-      61.559,
-      38.848,
-      57.765
+      71.69,
+      36.583,
+      63.129
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -6636,14 +5846,14 @@
     },
     "LeavesMid": {
      "center": [
-      3.903,
-      48.895,
-      4.85
+      1.13,
+      32.496,
+      0.184
      ],
      "size": [
-      72.403,
-      40.676,
-      69.418
+      78.228,
+      50.966,
+      73.014
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -6655,14 +5865,14 @@
     },
     "LeavesSun": {
      "center": [
-      4.658,
-      53.652,
-      3.231
+      1.402,
+      39.862,
+      -1.028
      ],
      "size": [
-      78.818,
-      44.026,
-      76.899
+      81.929,
+      65.68,
+      90.97
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -6676,113 +5886,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "f690a6151e26c218",
-    "fbxBytes": 2894156,
-    "tris": {
-     "bark": 7609,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13549
-    },
-    "routes": [
-     702,
-     703,
-     704,
-     705,
-     706,
-     707,
-     708,
-     709,
-     710,
-     711,
-     9840,
-     9841,
-     9842,
-     9843,
-     9844,
-     9845
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       2.09,
-       29.615,
-       -3.735
-      ],
-      "size": [
-       65.583,
-       67.431,
-       60.503
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       0.377,
-       25.301,
-       4.582
-      ],
-      "size": [
-       71.69,
-       36.583,
-       63.129
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       1.13,
-       32.496,
-       0.184
-      ],
-      "size": [
-       78.228,
-       50.966,
-       73.014
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       1.402,
-       39.862,
-       -1.028
-      ],
-      "size": [
-       81.929,
-       65.68,
-       90.97
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       103,
-       143,
-       78
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_051.fbx",
-    "state": "not uploaded"
    }
   },
   {
@@ -6908,7 +6011,11 @@
     721,
     722,
     723,
-    724
+    724,
+    9846,
+    9847,
+    9848,
+    9849
    ],
    "pivot": [
     -37.5,
@@ -6916,42 +6023,42 @@
     1065.0
    ],
    "heightStuds": 62.58,
-   "assetId": "128747756246684",
+   "assetId": "107325461949693",
    "displayName": "SR tree v2 053 PARK ELM 96",
    "moderation": "Approved",
-   "sha": "ee0394919d27128e",
-   "fbxBytes": 2732444,
+   "sha": "dc11ff1b50facbd0",
+   "fbxBytes": 2748940,
    "tris": {
-    "bark": 7097,
-    "leaves": 5816,
+    "bark": 7360,
+    "leaves": 5940,
     "fruit": 0,
-    "total": 12913
+    "total": 13300
    },
    "parts": {
     "Bark": {
      "center": [
-      0.334,
-      28.605,
-      1.458
+      0.964,
+      28.592,
+      -0.734
      ],
      "size": [
-      66.606,
-      65.301,
-      65.482
+      60.934,
+      65.275,
+      58.8
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
     },
     "LeavesShade": {
      "center": [
-      0.371,
-      44.622,
-      4.763
+      3.469,
+      29.038,
+      -0.965
      ],
      "size": [
-      71.011,
-      31.649,
-      67.065
+      61.724,
+      44.072,
+      60.958
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -6963,14 +6070,14 @@
     },
     "LeavesMid": {
      "center": [
-      -0.186,
-      46.56,
-      1.14
+      0.454,
+      31.899,
+      0.151
      ],
      "size": [
-      74.335,
-      34.295,
-      72.743
+      68.352,
+      49.736,
+      70.595
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -6982,14 +6089,14 @@
     },
     "LeavesSun": {
      "center": [
-      0.581,
-      48.963,
-      1.66
+      -0.219,
+      36.185,
+      -0.71
      ],
      "size": [
-      73.078,
-      34.571,
-      75.059
+      69.896,
+      57.983,
+      73.117
      ],
      "doubleSided": true,
      "alphaMode": "Transparency",
@@ -7003,108 +6110,6 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
-   },
-   "pending": {
-    "sha": "dc11ff1b50facbd0",
-    "fbxBytes": 2750396,
-    "tris": {
-     "bark": 7360,
-     "leaves": 5940,
-     "fruit": 0,
-     "total": 13300
-    },
-    "routes": [
-     718,
-     719,
-     720,
-     721,
-     722,
-     723,
-     724,
-     9846,
-     9847,
-     9848,
-     9849
-    ],
-    "parts": {
-     "Bark": {
-      "center": [
-       0.964,
-       28.592,
-       -0.734
-      ],
-      "size": [
-       60.934,
-       65.275,
-       58.8
-      ],
-      "doubleSided": false,
-      "alphaMode": "Overlay"
-     },
-     "LeavesShade": {
-      "center": [
-       3.469,
-       29.038,
-       -0.965
-      ],
-      "size": [
-       61.724,
-       44.072,
-       60.958
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesMid": {
-      "center": [
-       0.454,
-       31.899,
-       0.151
-      ],
-      "size": [
-       68.352,
-       49.736,
-       70.595
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     },
-     "LeavesSun": {
-      "center": [
-       -0.219,
-       36.185,
-       -0.71
-      ],
-      "size": [
-       69.896,
-       57.983,
-       73.117
-      ],
-      "doubleSided": true,
-      "alphaMode": "Transparency",
-      "color": [
-       122,
-       156,
-       86
-      ]
-     }
-    },
-    "checks": {
-     "promisesBroken": 0,
-     "promiseWarnings": 1
-    },
-    "fbx": "build/art/tree_shapes/tree_053.fbx",
-    "state": "not uploaded"
    }
   },
   {
