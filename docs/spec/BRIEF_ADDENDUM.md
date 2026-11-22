@@ -158,3 +158,4 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   - Ten shared vehicles scattered round the town: 3 golf carts, 2 mopeds, 5 electric scooters; any player in a human body may take one; no police trouble for using them.
   - The lead's reading of the garbled part: being hit by one of these is prepared carefully and kept mild: people (AI and players) try to dodge out of the way of an oncoming one; one that is hit is knocked aside, stumbles or falls and gets back up; no gore.
   - Bugs: a blank grey screen inside the pickup truck; no hand holding the whack-a-mole mallet. (Seen in the same screenshots: the opened keys panel showed through under the whack-a-mole card.)
+  - And: "the green on green background for the pool tables doesn't work, make the floor a deep purple navy blue": the green floor rugs under the pool tables become a deep purple-navy blue.
