@@ -1629,11 +1629,19 @@ return function(t)
 				table.insert(bitten, p3[i])
 				h3.step(25)
 			end
+			-- (a case may already be cured before the switch-off, e.g. by a doctor nearby: only the switch-off may cure nobody)
+			local curedBefore = h3.svc:stats().cured
+			local openBefore: { [any]: boolean } = {}
+			for _, p in bitten do
+				openBefore[p] = p.infected == true
+			end
 			h3.svc:shutdown()
 			h3.step(120)
-			t.eq(h3.svc:stats().cured, 0, "switching off cures nobody")
+			t.eq(h3.svc:stats().cured, curedBefore, "switching off cures nobody")
 			for _, p in bitten do
-				t.truthy(p.infected, "still infected (nobody is tracking it any more)")
+				if openBefore[p] then
+					t.truthy(p.infected, "still infected (nobody is tracking it any more)")
+				end
 				p.infected = nil
 			end
 			clean(h3, "after the switch-off")
