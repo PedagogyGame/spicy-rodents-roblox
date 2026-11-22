@@ -750,13 +750,13 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 		if m.chunked then
 			-- an array module over the chunk size (the branch nooks' routes): chunks <name>_01.. as the harvest's routes
 			local parts = LuauEmit.chunk(m.value, o.chunkKb * 1024, { keyOrder = Migrate.KEY_ORDER })
-			local names = {}
+			local chunkNames = {}
 			for i, chunk in parts do
 				local cname = string.format("%s_%02d", m.name, i)
-				table.insert(names, cname)
+				table.insert(chunkNames, cname)
 				emitModule(cname, chunk, #chunk, string.format("%s (chunk %d of %d)", m.source, i, #parts), m.header)
 			end
-			index.modules[m.name] = { count = #m.value, chunks = names }
+			index.modules[m.name] = { count = #m.value, chunks = chunkNames }
 		else
 			emitModule(m.name, m.value, m.records, m.source, m.header)
 			generated[#generated].map = m.map

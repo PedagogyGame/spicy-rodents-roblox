@@ -40,66 +40,69 @@ return function(t)
 		table.insert(byKind[p.kind], p)
 	end
 
-	t.test("every climbable tree: a nook with a stash, hangouts at the wider forks, spurs; the plan is the rules'", function()
-		local climbable = 0
-		local have: { [number]: { nook: number, hangout: number, spur: number, stash: number } } = {}
-		for _, p in nooks.places do
-			local h = have[p.trunk] or { nook = 0, hangout = 0, spur = 0, stash = 0 }
-			have[p.trunk] = h
-			h[p.kind] += 1
-			if p.stash then
-				h.stash += 1
+	t.test(
+		"every climbable tree: a nook with a stash, hangouts at the wider forks, spurs; the plan is the rules'",
+		function()
+			local climbable = 0
+			local have: { [number]: { nook: number, hangout: number, spur: number, stash: number } } = {}
+			for _, p in nooks.places do
+				local h = have[p.trunk] or { nook = 0, hangout = 0, spur = 0, stash = 0 }
+				have[p.trunk] = h
+				h[p.kind] += 1
+				if p.stash then
+					h.stash += 1
+				end
 			end
-		end
-		for _, rec in d:forks() do
-			local trunk = reg:get(rec.trunk)
-			if trunk and trunk.kind == "trunk" then
-				climbable += 1
-				local h = have[rec.trunk]
-				t.truthy(h ~= nil and h.nook >= 1 and h.stash >= 1, `{trunk.name}: a nook with a stash`)
+			for _, rec in d:forks() do
+				local trunk = reg:get(rec.trunk)
+				if trunk and trunk.kind == "trunk" then
+					climbable += 1
+					local h = have[rec.trunk]
+					t.truthy(h ~= nil and h.nook >= 1 and h.stash >= 1, `{trunk.name}: a nook with a stash`)
+				end
 			end
-		end
-		t.truthy(climbable >= 95, `{climbable} climbable trees`)
-		t.eq(#compiled.trees, climbable)
-		t.truthy(#byKind.hangout >= climbable / 2, `{#byKind.hangout} hangouts`)
-		t.truthy(#byKind.spur >= climbable, `{#byKind.spur} spurs`)
-		for _, p in byKind.nook do
-			t.truthy(p.stash ~= nil, `nook {p.route}: its stash`)
-		end
-		t.eq(#routeRecs, #nooks.places)
-		print(
-			`      {climbable} trees: {#byKind.nook} nooks (each a stash), {#byKind.hangout} hangouts, {#byKind.spur} spurs; {#routeRecs} routes`
-		)
-		-- the compiled plan is what the rules make of the routes before it (the same everywhere: seeded per trunk), over
-		-- the records as compiled (an enclosed run's record is its own module's)
-		local recs: { any } = table.clone(d:module("Routes"))
-		for _, name in { "Attractions", "Sewers", "HollowTrees", "TreeShapes" } do
-			local m = d:module(name) :: any
-			for _, r in (m and m.routes) or {} do
-				table.insert(recs, r)
+			t.truthy(climbable >= 95, `{climbable} climbable trees`)
+			t.eq(#compiled.trees, climbable)
+			t.truthy(#byKind.hangout >= climbable / 2, `{#byKind.hangout} hangouts`)
+			t.truthy(#byKind.spur >= climbable, `{#byKind.spur} spurs`)
+			for _, p in byKind.nook do
+				t.truthy(p.stash ~= nil, `nook {p.route}: its stash`)
 			end
-		end
-		local clear = TreeClear.new(d)
-		local again = BranchNooks.plan(
-			Registry.fromRecords(recs) :: any,
-			d:forks(),
-			Height.at,
-			function(x: number, y: number, z: number): boolean
-				return clear:boxAt(x, y, z, C.buildingPad) ~= nil
+			t.eq(#routeRecs, #nooks.places)
+			print(
+				`      {climbable} trees: {#byKind.nook} nooks (each a stash), {#byKind.hangout} hangouts, {#byKind.spur} spurs; {#routeRecs} routes`
+			)
+			-- the compiled plan is what the rules make of the routes before it (the same everywhere: seeded per trunk), over
+			-- the records as compiled (an enclosed run's record is its own module's)
+			local recs: { any } = table.clone(d:module("Routes"))
+			for _, name in { "Attractions", "Sewers", "HollowTrees", "TreeShapes" } do
+				local m = d:module(name) :: any
+				for _, r in (m and m.routes) or {} do
+					table.insert(recs, r)
+				end
 			end
-		)
-		t.eq(#again.routes, #routeRecs)
-		for i, r in again.routes do
-			local c = routeRecs[i]
-			t.eq(r.id, c.id)
-			t.eq(r.name, c.name)
-			for k, p in r.points do
-				for j = 1, 3 do
-					t.near(p[j], c.points[k][j], 1e-6)
+			local clear = TreeClear.new(d)
+			local again = BranchNooks.plan(
+				Registry.fromRecords(recs) :: any,
+				d:forks(),
+				Height.at,
+				function(x: number, y: number, z: number): boolean
+					return clear:boxAt(x, y, z, C.buildingPad) ~= nil
+				end
+			)
+			t.eq(#again.routes, #routeRecs)
+			for i, r in again.routes do
+				local c = routeRecs[i]
+				t.eq(r.id, c.id)
+				t.eq(r.name, c.name)
+				for k, p in r.points do
+					for j = 1, 3 do
+						t.near(p[j], c.points[k][j], 1e-6)
+					end
 				end
 			end
 		end
-	end)
+	)
 
 	t.test("every new route leaves a sample of its bough; smooth, outside the bark, over the ground, clear", function()
 		local clear = TreeClear.new(d)
@@ -160,7 +163,10 @@ return function(t)
 			local walked = 0
 			local trunkSamples = reg:samples(trunk)
 			for i, s in samples do
-				t.truthy(s.y - Height.at(s.x, s.z) >= C.overGround, `{r.name}: {s.y - Height.at(s.x, s.z)} over the ground`)
+				t.truthy(
+					s.y - Height.at(s.x, s.z) >= C.overGround,
+					`{r.name}: {s.y - Height.at(s.x, s.z)} over the ground`
+				)
 				t.eq(clear:boxAt(s.x, s.y, s.z, 1), nil, `{r.name}: in a building`)
 				if i > 1 then
 					local a = samples[i - 1]
@@ -236,255 +242,264 @@ return function(t)
 		return BakedWorld.cameraYawToward(tg.x * dir, tg.z * dir)
 	end
 
-	t.test("the real motor on EVERY new route: in from the bough without a jump, out to its end, back, onto the bough", function()
-		local byE, byChoice, frames, worstStep = 0, 0, 0, 0
-		local bad: { string } = {}
-		-- one route's run; nil when all is well, else what went wrong
-		local function runOne(p: BranchNooks.Place): string?
-			local r = reg:get(p.route) :: Registry.Route
-			local bough = reg:get(p.parent) :: Registry.Route
-			local cam = along(r, 0.05, 1)
-			local face = math.atan2(-math.sin(cam), -math.cos(cam))
-			local s = onRail(bough.id, p.parentT, face)
-			-- in: E alone where the new route is the nearest; else A/D picks it (either way round), then E
-			local inTrace = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
-				return BakedWorld.keys(cam, { grab = true })
-			end, { validator = true })
-			if inTrace.violations > 0 then
-				return `in: {inTrace.violations} violations`
-			end
-			if s.routeId == r.id then
-				byE += 1
-			else
-				s = onRail(bough.id, p.parentT, face)
-				local picked = false
-				for _, side in { 1, -1 } do
-					for _ = 1, 6 do
-						BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
-							return BakedWorld.keys(cam, { choose = side })
-						end)
-						if s.selectedJunction == r.id then
-							picked = true
+	t.test(
+		"the real motor on EVERY new route: in from the bough without a jump, out to its end, back, onto the bough",
+		function()
+			local byE, byChoice, frames, worstStep = 0, 0, 0, 0
+			local bad: { string } = {}
+			-- one route's run; nil when all is well, else what went wrong
+			local function runOne(p: BranchNooks.Place): string?
+				local r = reg:get(p.route) :: Registry.Route
+				local bough = reg:get(p.parent) :: Registry.Route
+				local cam = along(r, 0.05, 1)
+				local face = math.atan2(-math.sin(cam), -math.cos(cam))
+				local s = onRail(bough.id, p.parentT, face)
+				-- in: E alone where the new route is the nearest; else A/D picks it (either way round), then E
+				local inTrace = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
+					return BakedWorld.keys(cam, { grab = true })
+				end, { validator = true })
+				if inTrace.violations > 0 then
+					return `in: {inTrace.violations} violations`
+				end
+				if s.routeId == r.id then
+					byE += 1
+				else
+					s = onRail(bough.id, p.parentT, face)
+					local picked = false
+					for _, side in { 1, -1 } do
+						for _ = 1, 6 do
+							BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
+								return BakedWorld.keys(cam, { choose = side })
+							end)
+							if s.selectedJunction == r.id then
+								picked = true
+								break
+							end
+						end
+						if picked then
 							break
 						end
 					end
-					if picked then
-						break
+					if not picked then
+						return "A/D does not offer it on its bough"
+					end
+					local tr = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
+						return BakedWorld.keys(cam, { grab = true })
+					end, { validator = true })
+					if tr.violations > 0 or s.routeId ~= r.id then
+						return `A/D then E: on {s.routeId}, {tr.violations} violations`
+					end
+					byChoice += 1
+				end
+				-- out to its end with W, the camera along it
+				local out = BakedWorld.drive(world, s, 60 * 6, function(_f: number, st: SquirrelMotor.State)
+					return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
+				end, {
+					validator = true,
+					stop = function(st: SquirrelMotor.State): boolean
+						return st.routeId ~= r.id or st.railT >= 0.999
+					end,
+				})
+				frames += #out.frames
+				worstStep = math.max(worstStep, out.maxStep)
+				if out.violations > 0 then
+					return `out: {out.violations} violations`
+				end
+				for _, f in out.frames do
+					if f.routeId ~= r.id then
+						return `out: left it for {f.routeId}`
 					end
 				end
-				if not picked then
-					return "A/D does not offer it on its bough"
+				if s.railT < 0.999 then
+					return `out: stopped at {s.railT}`
 				end
-				local tr = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
-					return BakedWorld.keys(cam, { grab = true })
+				if out.maxStep >= 0.6 then
+					return `out: a step of {out.maxStep} studs`
+				end
+				-- a few frames pressing on at the end: it stays there (its end leads nowhere)
+				BakedWorld.drive(world, s, 20, function(_f: number, st: SquirrelMotor.State)
+					return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
+				end)
+				if s.routeId ~= r.id then
+					return `its end switched onto {s.routeId}`
+				end
+				-- back with S to its start
+				local back = BakedWorld.drive(world, s, 60 * 6, function(_f: number, st: SquirrelMotor.State)
+					return BakedWorld.keys(along(r, st.railT, 1), { fw = -1 })
+				end, {
+					validator = true,
+					stop = function(st: SquirrelMotor.State): boolean
+						return st.routeId ~= r.id or st.railT <= 0.001
+					end,
+				})
+				frames += #back.frames
+				if back.violations > 0 then
+					return `back: {back.violations} violations`
+				end
+				if s.routeId ~= r.id or s.railT > 0.001 then
+					return `back: on {s.routeId} at {s.railT}`
+				end
+				-- E: onto the bough
+				local onto = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
+					return BakedWorld.keys(along(r, 0, -1), { grab = true })
 				end, { validator = true })
-				if tr.violations > 0 or s.routeId ~= r.id then
-					return `A/D then E: on {s.routeId}, {tr.violations} violations`
+				if onto.violations > 0 or s.routeId ~= bough.id then
+					return `E at its start: on {s.routeId}, {onto.violations} violations`
 				end
-				byChoice += 1
+				return nil
 			end
-			-- out to its end with W, the camera along it
-			local out = BakedWorld.drive(world, s, 60 * 6, function(_f: number, st: SquirrelMotor.State)
-				return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
-			end, {
-				validator = true,
-				stop = function(st: SquirrelMotor.State): boolean
-					return st.routeId ~= r.id or st.railT >= 0.999
-				end,
-			})
-			frames += #out.frames
-			worstStep = math.max(worstStep, out.maxStep)
-			if out.violations > 0 then
-				return `out: {out.violations} violations`
-			end
-			for _, f in out.frames do
-				if f.routeId ~= r.id then
-					return `out: left it for {f.routeId}`
+			for _, p in nooks.places do
+				local why = runOne(p)
+				if why then
+					table.insert(bad, `{p.kind} {p.route} off {p.parent}: {why}`)
 				end
 			end
-			if s.railT < 0.999 then
-				return `out: stopped at {s.railT}`
-			end
-			if out.maxStep >= 0.6 then
-				return `out: a step of {out.maxStep} studs`
-			end
-			-- a few frames pressing on at the end: it stays there (its end leads nowhere)
-			BakedWorld.drive(world, s, 20, function(_f: number, st: SquirrelMotor.State)
-				return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
-			end)
-			if s.routeId ~= r.id then
-				return `its end switched onto {s.routeId}`
-			end
-			-- back with S to its start
-			local back = BakedWorld.drive(world, s, 60 * 6, function(_f: number, st: SquirrelMotor.State)
-				return BakedWorld.keys(along(r, st.railT, 1), { fw = -1 })
-			end, {
-				validator = true,
-				stop = function(st: SquirrelMotor.State): boolean
-					return st.routeId ~= r.id or st.railT <= 0.001
-				end,
-			})
-			frames += #back.frames
-			if back.violations > 0 then
-				return `back: {back.violations} violations`
-			end
-			if s.routeId ~= r.id or s.railT > 0.001 then
-				return `back: on {s.routeId} at {s.railT}`
-			end
-			-- E: onto the bough
-			local onto = BakedWorld.drive(world, s, 1, function(): SquirrelMotor.Input
-				return BakedWorld.keys(along(r, 0, -1), { grab = true })
-			end, { validator = true })
-			if onto.violations > 0 or s.routeId ~= bough.id then
-				return `E at its start: on {s.routeId}, {onto.violations} violations`
-			end
-			return nil
+			print(
+				`      {#nooks.places} routes run: {byE} taken with E alone, {byChoice} with A/D then E; {frames} frames judged, largest step {math.floor(
+					worstStep * 1000
+				) / 1000} studs`
+			)
+			t.eq(#bad, 0, `{#bad}: {table.concat(bad, " | ", 1, math.min(#bad, 12))}`)
 		end
-		for _, p in nooks.places do
-			local why = runOne(p)
-			if why then
-				table.insert(bad, `{p.kind} {p.route} off {p.parent}: {why}`)
-			end
-		end
-		print(
-			`      {#nooks.places} routes run: {byE} taken with E alone, {byChoice} with A/D then E; {frames} frames judged, largest step {math.floor(
-				worstStep * 1000
-			) / 1000} studs`
-		)
-		t.eq(#bad, 0, `{#bad}: {table.concat(bad, " | ", 1, math.min(#bad, 12))}`)
-	end)
+	)
 
-	t.test("the stash: within reach in the cup only, never from the bough it leaves or a climber on the trunk", function()
-		for _, p in byKind.nook do
-			local r = reg:get(p.route) :: Registry.Route
-			local e = reg:pointAt(r, 1)
-			t.eq(nooks.stashNear(e.x, e.y, e.z), p, `{r.name}: from the cup`)
-			local a = reg:pointAt(r, 0)
-			t.truthy(nooks.stashNear(a.x, a.y, a.z) ~= p, `{r.name}: not from its bough`)
-			-- a climber on the trunk: the axis at the cup's height
-			local trunk = reg:get(p.trunk) :: Registry.Route
-			local best, bd = nil, math.huge
-			for _, s in reg:samples(trunk) do
-				if math.abs(s.y - e.y) < bd then
-					best, bd = s, math.abs(s.y - e.y)
-				end
-			end
-			local ax = best :: any
-			t.eq(nooks.stashNear(ax.x, ax.y, ax.z), nil, `{r.name}: not from the trunk`)
-			-- the knot-hole sits in wood near the cup
-			local h = p.stash :: { number }
-			local dd = math.sqrt((h[1] - e.x) ^ 2 + (h[2] - e.y - C.lift) ^ 2 + (h[3] - e.z) ^ 2)
-			t.truthy(dd <= 3.5, `{r.name}: its knot-hole {dd} studs from the cup`)
-			-- where it may sit: the cup's last stretch
-			t.eq(nooks.seatAt(r.id, 0.95), p)
-			t.eq(nooks.seatAt(r.id, 0.1), nil)
-		end
-	end)
-
-	t.test("the nodules: along every branch's run path; a quick settle of the drawn body, the motor untouched", function()
-		local boughs, knots = 0, 0
-		for _, r in reg:all() do
-			if r.kind == "branch" and r.enclosure == nil then
-				local n = BranchNooks.nodules(r)
-				local name = r.name
-				if string.sub(name, 1, 5) == "nook " or string.sub(name, 1, 8) == "hangout " then
-					t.eq(#n, 0, `{name}: a cup or a ledge has no knots`)
-					continue
-				end
-				boughs += 1
-				knots += #n
-				local last = -math.huge
-				for _, s in n do
-					t.truthy(s >= C.noduleStart and s <= r.length - C.noduleEnd, `{name}: a knot at {s}`)
-					t.truthy(s - last >= C.noduleGap[1] - 1e-6, `{name}: knots {s - last} apart`)
-					last = s
-				end
-				if r.length >= C.noduleStart + (r.trunkClearance or 0) + C.noduleGap[1] * 1.5 + C.noduleEnd then
-					t.truthy(#n >= 1, `{name}: {r.length} studs and no knot`)
-				end
-			end
-		end
-		print(`      {knots} nodules on {boughs} branches`)
-		-- one nodule: up and settled in BranchFeel.C.life, a few studs a second at most
-		local F = BranchFeel.C
-		local peak, fastest = 0, 0
-		local prev = 0
-		local dt = 1 / 240
-		for k = 1, math.floor(0.3 / dt) do
-			local age = k * dt
-			local y = BranchFeel.bump(age, F.amp * F.maxScale)
-			peak = math.max(peak, math.abs(y))
-			fastest = math.max(fastest, math.abs(y - prev) / dt)
-			prev = y
-			if age >= F.life then
-				t.eq(y, 0)
-				t.eq(BranchFeel.rollAt(age, F.roll), 0)
-			end
-		end
-		t.truthy(peak <= 0.16 and peak >= 0.1, `peak {peak}`)
-		t.truthy(fastest <= 8 and fastest >= 2, `a few studs a second: {fastest}`)
-		t.truthy(F.life <= 0.15 + 1e-9, "eased out in 0.15 s")
-		-- the motor down a long bough with knots: the same steps with the feel as without (it reads, never writes), every
-		-- knot felt once, nothing left once past
-		local long: Registry.Route? = nil
-		for _, r in reg:all() do
-			if r.kind == "branch" and r.origin == "harvest" and #BranchNooks.nodules(r) >= 3 then
-				if long == nil or r.length > (long :: Registry.Route).length then
-					long = r
-				end
-			end
-		end
-		local r = long :: Registry.Route
-		local function run(withFeel: boolean): ({ { number } }, number, number)
-			local s = onRail(r.id, 0.05, 0)
-			local feel = BranchFeel.new()
-			local felt, most = 0, 0
-			local track = {}
-			local tr = BakedWorld.drive(world, s, 60 * 20, function(_f: number, st: SquirrelMotor.State)
-				return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
-			end, {
-				stop = function(st: SquirrelMotor.State): boolean
-					if withFeel then
-						local before = #feel.bumps
-						local lift = BranchFeel.step(feel, reg:get(st.routeId or -1), st.railT, 1 / 60)
-						if #feel.bumps > before then
-							felt += #feel.bumps - before
-						end
-						most = math.max(most, math.abs(lift))
+	t.test(
+		"the stash: within reach in the cup only, never from the bough it leaves or a climber on the trunk",
+		function()
+			for _, p in byKind.nook do
+				local r = reg:get(p.route) :: Registry.Route
+				local e = reg:pointAt(r, 1)
+				t.eq(nooks.stashNear(e.x, e.y, e.z), p, `{r.name}: from the cup`)
+				local a = reg:pointAt(r, 0)
+				t.truthy(nooks.stashNear(a.x, a.y, a.z) ~= p, `{r.name}: not from its bough`)
+				-- a climber on the trunk: the axis at the cup's height
+				local trunk = reg:get(p.trunk) :: Registry.Route
+				local best, bd = nil, math.huge
+				for _, s in reg:samples(trunk) do
+					if math.abs(s.y - e.y) < bd then
+						best, bd = s, math.abs(s.y - e.y)
 					end
-					table.insert(track, { st.x, st.y, st.z, st.railT })
-					return st.routeId ~= r.id or st.railT >= 0.999
-				end,
-			})
-			local _ = tr
-			return track, felt, most
-		end
-		local plain = run(false)
-		local felt, nFelt, most = run(true)
-		t.eq(#felt, #plain)
-		for i, p in plain do
-			for j = 1, 4 do
-				t.eq(felt[i][j], p[j])
+				end
+				local ax = best :: any
+				t.eq(nooks.stashNear(ax.x, ax.y, ax.z), nil, `{r.name}: not from the trunk`)
+				-- the knot-hole sits in wood near the cup
+				local h = p.stash :: { number }
+				local dd = math.sqrt((h[1] - e.x) ^ 2 + (h[2] - e.y - C.lift) ^ 2 + (h[3] - e.z) ^ 2)
+				t.truthy(dd <= 3.5, `{r.name}: its knot-hole {dd} studs from the cup`)
+				-- where it may sit: the cup's last stretch
+				t.eq(nooks.seatAt(r.id, 0.95), p)
+				t.eq(nooks.seatAt(r.id, 0.1), nil)
 			end
 		end
-		local passed = 0
-		local endS = plain[#plain][4] * r.length
-		for _, n in BranchNooks.nodules(r) do
-			if n > 0.05 * r.length and n < endS then
-				passed += 1
+	)
+
+	t.test(
+		"the nodules: along every branch's run path; a quick settle of the drawn body, the motor untouched",
+		function()
+			local boughs, knots = 0, 0
+			for _, r in reg:all() do
+				if r.kind == "branch" and r.enclosure == nil then
+					local n = BranchNooks.nodules(r)
+					local name = r.name
+					if string.sub(name, 1, 5) == "nook " or string.sub(name, 1, 8) == "hangout " then
+						t.eq(#n, 0, `{name}: a cup or a ledge has no knots`)
+						continue
+					end
+					boughs += 1
+					knots += #n
+					local last = -math.huge
+					for _, s in n do
+						t.truthy(s >= C.noduleStart and s <= r.length - C.noduleEnd, `{name}: a knot at {s}`)
+						t.truthy(s - last >= C.noduleGap[1] - 1e-6, `{name}: knots {s - last} apart`)
+						last = s
+					end
+					if r.length >= C.noduleStart + (r.trunkClearance or 0) + C.noduleGap[1] * 1.5 + C.noduleEnd then
+						t.truthy(#n >= 1, `{name}: {r.length} studs and no knot`)
+					end
+				end
 			end
+			print(`      {knots} nodules on {boughs} branches`)
+			-- one nodule: up and settled in BranchFeel.C.life, a few studs a second at most
+			local F = BranchFeel.C
+			local peak, fastest = 0, 0
+			local prev = 0
+			local dt = 1 / 240
+			for k = 1, math.floor(0.3 / dt) do
+				local age = k * dt
+				local y = BranchFeel.bump(age, F.amp * F.maxScale)
+				peak = math.max(peak, math.abs(y))
+				fastest = math.max(fastest, math.abs(y - prev) / dt)
+				prev = y
+				if age >= F.life then
+					t.eq(y, 0)
+					t.eq(BranchFeel.rollAt(age, F.roll), 0)
+				end
+			end
+			t.truthy(peak <= 0.16 and peak >= 0.1, `peak {peak}`)
+			t.truthy(fastest <= 8 and fastest >= 2, `a few studs a second: {fastest}`)
+			t.truthy(F.life <= 0.15 + 1e-9, "eased out in 0.15 s")
+			-- the motor down a long bough with knots: the same steps with the feel as without (it reads, never writes), every
+			-- knot felt once, nothing left once past
+			local long: Registry.Route? = nil
+			for _, r in reg:all() do
+				if r.kind == "branch" and r.origin == "harvest" and #BranchNooks.nodules(r) >= 3 then
+					if long == nil or r.length > (long :: Registry.Route).length then
+						long = r
+					end
+				end
+			end
+			local r = long :: Registry.Route
+			local function run(withFeel: boolean): ({ { number } }, number, number)
+				local s = onRail(r.id, 0.05, 0)
+				local feel = BranchFeel.new()
+				local felt, most = 0, 0
+				local track = {}
+				local tr = BakedWorld.drive(world, s, 60 * 20, function(_f: number, st: SquirrelMotor.State)
+					return BakedWorld.keys(along(r, st.railT, 1), { fw = 1 })
+				end, {
+					stop = function(st: SquirrelMotor.State): boolean
+						if withFeel then
+							local before = #feel.bumps
+							local lift = BranchFeel.step(feel, reg:get(st.routeId or -1), st.railT, 1 / 60)
+							if #feel.bumps > before then
+								felt += #feel.bumps - before
+							end
+							most = math.max(most, math.abs(lift))
+						end
+						table.insert(track, { st.x, st.y, st.z, st.railT })
+						return st.routeId ~= r.id or st.railT >= 0.999
+					end,
+				})
+				local _ = tr
+				return track, felt, most
+			end
+			local plain = run(false)
+			local felt, nFelt, most = run(true)
+			t.eq(#felt, #plain)
+			for i, p in plain do
+				for j = 1, 4 do
+					t.eq(felt[i][j], p[j])
+				end
+			end
+			local passed = 0
+			local endS = plain[#plain][4] * r.length
+			for _, n in BranchNooks.nodules(r) do
+				if n > 0.05 * r.length and n < endS then
+					passed += 1
+				end
+			end
+			t.eq(nFelt, passed, `{r.name}: every knot passed is felt once`)
+			t.truthy(most > 0.05 and most <= 0.16, `the lift {most}`)
+			-- off the branch: what is under way eases out and nothing new starts
+			local feel = BranchFeel.new()
+			BranchFeel.step(feel, r, 0.1, 1 / 60)
+			BranchFeel.step(feel, r, 0.1 + 6 / r.length, 1 / 60)
+			local l = 1
+			for _ = 1, 20 do
+				l = BranchFeel.step(feel, nil, nil, 1 / 60)
+			end
+			t.eq(l, 0)
+			local _ = Motion
 		end
-		t.eq(nFelt, passed, `{r.name}: every knot passed is felt once`)
-		t.truthy(most > 0.05 and most <= 0.16, `the lift {most}`)
-		-- off the branch: what is under way eases out and nothing new starts
-		local feel = BranchFeel.new()
-		BranchFeel.step(feel, r, 0.1, 1 / 60)
-		BranchFeel.step(feel, r, 0.1 + 6 / r.length, 1 / 60)
-		local l = 1
-		for _ = 1, 20 do
-			l = BranchFeel.step(feel, nil, nil, 1 / 60)
-		end
-		t.eq(l, 0)
-		local _ = Motion
-	end)
+	)
 end
