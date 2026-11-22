@@ -168,7 +168,7 @@ function WoodsArt.build(tree: Tree, kind: Kind, template: { any }?, env: Env?): 
 		local pine = kind.family == "pine"
 		local leaf =
 			rgb(e, if kind.art and kind.art.leaf then kind.art.leaf elseif pine then WoodsArt.PINE else WoodsArt.LEAF)
-		local crowns = if pine then { { 0.42, 0.95 }, { 0.72, 0.6 } } else { { 0.66, 1.0 } }
+		local crowns: { { number } } = if pine then { { 0.42, 0.95 }, { 0.72, 0.6 } } else { { 0.66, 1.0 } }
 		for i, c in crowns do
 			local d = 2 * kind.crown * s * c[2]
 			local ball = e.Instance.new("Part")
@@ -246,7 +246,7 @@ function WoodsArt.run(root: Instance, opts: Opts?): Report
 			return game:GetService("InsertService"):LoadAsset(assetId)
 		end
 	local trees, kinds = WoodsArt.trees(data)
-	local folder = root:FindFirstChild(WoodsArt.FOLDER)
+	local folder: any = root:FindFirstChild(WoodsArt.FOLDER)
 	if not folder then
 		folder = e.Instance.new("Folder")
 		folder.Name = WoodsArt.FOLDER

@@ -362,7 +362,8 @@ function TreeShapes.grow(spec: ClimbSpec): Template
 	local samples = curveOf(pts):getSpacedPoints(trunk.sampleCount - 1)
 	local routes: { { [string]: any } } = { trunk }
 	local forks: { ForkEntry } = {}
-	for k, b in spec.boughs or {} do
+	local boughs: { BoughSpec } = spec.boughs or {}
+	for k, b in boughs do
 		local best, bd = 1, math.huge
 		for i, s in samples do
 			local d = math.abs(s.y - (W.footLift + b.at))

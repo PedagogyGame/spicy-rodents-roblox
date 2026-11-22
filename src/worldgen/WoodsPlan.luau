@@ -339,25 +339,30 @@ function WoodsPlan.build(data: any, plans: { any }, heightAt: (number, number) -
 			end
 		end
 	end
-	for _, b in extra.colliders or {} do
+	local colliders: { any } = extra.colliders or {}
+	for _, b in colliders do
 		insert(w, rect("box " .. b.id, b.cx - b.hw, b.cx + b.hw, b.cz - b.hd, b.cz + b.hd, C.BOX, true))
 	end
-	for _, line in extra.wires or {} do
+	local wires: { { { number } } } = extra.wires or {}
+	for _, line in wires do
 		for k = 1, #line - 1 do
 			local a, b = line[k], line[k + 1]
 			insert(w, seg("wire", a[1], a[2], b[1], b[2], 0, C.WIRE, true))
 		end
 	end
-	for _, line in extra.rides or {} do
+	local rides: { { { number } } } = extra.rides or {}
+	for _, line in rides do
 		for k = 1, #line - 1 do
 			local a, b = line[k], line[k + 1]
 			insert(w, seg("ride cable", a[1], a[2], b[1], b[2], 6, C.WIRE, true))
 		end
 	end
-	for _, s in extra.nutSpots or {} do
+	local spots: { any } = extra.nutSpots or {}
+	for _, s in spots do
 		insert(w, disc("nut spot " .. s.id, s.x, s.z, 0, C.NUT, false))
 	end
-	for _, t in extra.trees or {} do
+	local trees: { { number } } = extra.trees or {}
+	for _, t in trees do
 		local it = disc("route tree", t[1], t[2], 0, C.TREE_MIN, false)
 		it.tree = true
 		it.r = 0
@@ -409,7 +414,8 @@ function WoodsPlan.check(w: World, x: number, z: number, crown: number, others: 
 			end
 		end
 	end
-	for _, o in others or {} do
+	local near: { { number } } = others or {}
+	for _, o in near do
 		local need = math.max(C.WOODS_MIN, C.WOODS_SHARE * (o[3] + crown))
 		local dx, dz = o[1] - x, o[2] - z
 		if dx * dx + dz * dz < need * need then
