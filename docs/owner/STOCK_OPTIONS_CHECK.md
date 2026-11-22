@@ -43,10 +43,12 @@ This is now built. Every buying and withdrawing case has been tested without a s
 ## Withdrawing
 - **The limit:** at most **S$100 per server**, in total. Leaving and coming back to the same server does not reset it. On a new server you can withdraw another S$100.
 - **The order is always:**
-  1. The options are taken off your saved profile.
+  1. The options are taken off your saved count and marked "on their way out" in your saved profile.
   2. The profile is **saved**.
-  3. Only then are the Spicy Dollars put in your wallet.
-- **If the save fails:** nothing is taken, nothing is paid, and the player reads "Saving is slow right now, so nothing was taken. Try again in a minute."
+  3. Only once that save is confirmed are the Spicy Dollars put in your wallet, and the options counted as withdrawn.
+- **If the save fails:** nothing is taken, nothing is paid, and the player reads "Saving did not work just now, so nothing was taken. Try again in a minute."
+- **If the save is slow:** the player reads "Saving is slow right now. Your withdrawal finishes when it is saved: the money comes, or your options go back." The game waits for the save to finish: if it went through, the money is paid; if not, the options go back. Nothing is paid twice and nothing is lost.
+- **One withdrawal every 6 seconds** per player. When the server's saving allowance is used up, a withdrawal is refused with "The bank is busy, try again in a moment." (purchases always go first).
 - **Withdrawn Spicy Dollars belong to that server**, like all wallet money. They are not saved when you leave (your earlier call: only clothing and options are saved). The screen says so before anyone withdraws: "take out only what you will use".
 
 ## How a purchase is made safe (real money)
@@ -59,7 +61,8 @@ This is now built. Every buying and withdrawing case has been tested without a s
   - the player has left;
   - the switch is off.
 - **Never granted twice:** each purchase's receipt is kept inside the player's profile, so the same purchase is never granted twice, even if it arrives again on another server.
-- **Still loading:** if a player buys while their profile is still loading, the game waits up to 15 seconds for it.
+- **Still loading:** if a player buys while their profile is still loading (or they have only just joined, or another server is still letting go of it), the game waits up to 30 seconds for it.
+- **Studio:** test purchases in Studio are free, so they add no options (the player is told). A developer can turn on `stockOptionsStudio` in `Shared/Config/Flags` to test the grant in Studio on purpose; never leave it on for a live server.
 
 **The switch:** `stockOptions` in `Shared/Config/Flags` (on by default). Turning it off stops buying and withdrawing at once. Purchases made meanwhile are held by Roblox and granted once it is back on, so nothing paid for is lost.
 
@@ -69,7 +72,7 @@ This is now built. Every buying and withdrawing case has been tested without a s
    - **Description** (suggested): `In-game play money for Spicy Rodent. 4 options for each Robux; 1 option = S$1 to spend in the game. Saved with your profile. Withdraw up to S$100 per server at your home computer. No value outside the game.`
    - Keep whatever price you like.
 2. **When you publish this,** use **"Migrate to Latest Update"** (or shut down the old servers). The saved profile now has a new version. An old server that meets a new profile leaves it alone and does not load the player's clothes there, so no old servers should keep running next to new ones.
-3. **Test one real purchase** in a live server. Studio test purchases are free and may report 0 Robux spent. The game refuses to guess an amount, so in Studio the count may not go up.
+3. **Test one real purchase** in a live server. Studio test purchases add no options (see "Studio" above).
 
    In the live server:
    1. Open the menu (M), then Stock options, then Buy with Robux.
@@ -85,7 +88,7 @@ This is now built. Every buying and withdrawing case has been tested without a s
 - **Wallet money does not last:** players should not lose something they paid for without being told. The screen says plainly that withdrawn dollars stay on that server, and the S$100 cap keeps any such loss small. You may want to save the wallet too one day; say so if you do.
 
 ## One known edge (written down, rare)
-Sometimes a save is reported as failed even though it actually went through. If that happens during a withdrawal and the server then shuts down before its next save, the player loses that one withdrawal's options without getting the dollars. The game cannot tell the two kinds of failure apart. A purchase never has this problem, because its receipt is kept and checked.
+If a server pays a withdrawal and then shuts down (or every save after it fails) before it can save that it paid, the next server finds the options still "on their way out" and gives them back. The player keeps the options and has had the dollars on the old server once (at most S$100, which went with that server). The other way round, losing options without being paid, can no longer happen.
 
 ## Questions for you (my defaults in brackets)
 1. **Home:** nearest of the four furnished houses, shared when needed (built that way). Would you rather everyone had their own house? Most of the town's other houses cannot be entered yet.
