@@ -55,6 +55,7 @@ local LET_GO = {
 	["src/server/Items/ItemWorld.luau"] = "items",
 	["src/server/Items/CornerStore.luau"] = "the store's props",
 	["src/server/Minigames/BowlingLane.luau"] = "bowling balls",
+	["src/server/Work/ErrandService.luau"] = "the errand's parcel, welded to a person's hand (owner D30)",
 }
 
 local function letGoLines(src: string): { string }

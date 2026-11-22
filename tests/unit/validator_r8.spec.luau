@@ -334,6 +334,10 @@ return function(t)
 			-- (14th, 2026-11-22, owner D30: F by the kick ball on the ground reads the kicker's root: a person's, checked
 			-- human first, never a held squirrel's)
 			["Items/ItemWorld.luau"] = 14,
+			-- (owner D30: a townsperson's place for a job post and an errand's door, and the hand a parcel is welded to:
+			-- people's bodies, which the validator does not watch)
+			["Jobs/JobService.luau"] = 1,
+			["Work/ErrandService.luau"] = 2,
 			["Minigames/BowlingLane.luau"] = 2,
 			["Minigames/FortuneCabinet.luau"] = 1,
 			["Minigames/Games/AirHockey.luau"] = 1,
