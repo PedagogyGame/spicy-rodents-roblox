@@ -584,6 +584,18 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 			if type(v) == "table" and type(v.forks) == "table" and #v.forks > 0 then
 				allForks = SharedTreeShapes.mergeForks(allForks :: any, v.forks) :: any
 			end
+			-- (the D34/D35 woods and climbs, kept compact in TreeShapes' `woods`: expanded here as Shared/Data expands them,
+			-- so the woods trees get their nooks too)
+			if type(v) == "table" and type(v.woods) == "table" then
+				local wr, wf = SharedTreeShapes.expandWoods(v.woods)
+				for _, r in wr do
+					table.insert(allRoutes, r)
+					ids[r.id] = true
+				end
+				if #wf > 0 then
+					allForks = SharedTreeShapes.mergeForks(allForks :: any, wf) :: any
+				end
+			end
 		end
 		-- (the buildings' boxes: World/Colliders reads them through a Shared/Data over what is compiled so far)
 		local values: { [string]: any } = { Lots = lots }

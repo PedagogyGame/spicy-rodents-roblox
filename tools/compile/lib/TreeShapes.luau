@@ -34,6 +34,116 @@ local function hollowTrunks(repo: string): { [number]: string }
 	return out
 end
 
+-- The D35 climbs: the town's trees that had no route, where their own bakes stand them. Lookout Hill's conifers
+-- (Shared/Rides/LookoutHill.dressing: a trunk of diameter max(0.6, w 0.12) to 0.22 h + 1, the crown's wedges to h):
+-- a trunk to three quarters of the height, up into the crown; the sky lift's hedgerow oaks and orchard apples
+-- (Shared/Rides/SkyLiftCountry OAKS, ORCHARD; tools/bake/skylift/Countryside draws a trunk to at least 0.6 x the
+-- shortest seeded height and a ball crown over it): a trunk to the crown. `reach`: the crown's half width (the woods
+-- keep clear of it: WorldGen/WoodsPlan). Ground: World/Height with the extensions, as their bakes stand them.
+local function climbs(): { any }
+	local LookoutHill = require("../../../src/shared/Rides/LookoutHill")
+	local SkyLiftCountry = require("../../../src/shared/Rides/SkyLiftCountry")
+	local out = {}
+	local function r3(v: number): number
+		return math.floor(v * 1000 + 0.5) / 1000
+	end
+	for _, d in LookoutHill.dressing() do
+		if d.kind == "conifer" then
+			local h, w = d.h :: number, d.w :: number
+			table.insert(out, {
+				label = "LOOKOUT CONIFER",
+				what = "a conifer on Lookout Hill (tools/bake/skylift/Approach)",
+				x = r3(d.x),
+				y = r3(Height.at(d.x, d.z)),
+				z = r3(d.z),
+				reach = r3(w / 2),
+				climb = { trunk = { height = r3(0.75 * h), radius = 1.0 } },
+			})
+		end
+	end
+	for _, p in SkyLiftCountry.OAKS do
+		local x, z = SkyLiftCountry.at(p[1], p[2])
+		table.insert(out, {
+			label = "HEDGEROW OAK",
+			what = "a hedgerow oak under the sky lift (tools/bake/skylift/Countryside)",
+			x = r3(x),
+			y = r3(Height.at(x, z)),
+			z = r3(z),
+			reach = 8,
+			climb = { trunk = { height = 10.5, radius = 1.2 } },
+		})
+	end
+	for _, p in SkyLiftCountry.ORCHARD do
+		local x, z = SkyLiftCountry.at(p[1], p[2])
+		table.insert(out, {
+			label = "ORCHARD APPLE",
+			what = "an apple tree in the sky lift's orchard (tools/bake/skylift/Countryside)",
+			x = r3(x),
+			y = r3(Height.at(x, z)),
+			z = r3(z),
+			reach = 4.3,
+			climb = { trunk = { height = 5.0, radius = 1.0 } },
+		})
+	end
+	return out
+end
+
+-- Lib.woods(ctx): data/woods.json (kinds) and data/woods_placed.json (tools/blender/trees/place_woods.luau) and the
+-- climbs, as TreeShapes.Woods; nil when data/woods.json is absent
+function Lib.woods(ctx: any): any?
+	local path = ctx.repo .. "/data/woods.json"
+	if not fs.isFile(path) then
+		return nil
+	end
+	local doc = Json.decodeFile(path)
+	-- the uploaded Models (data/art/woods.json, tools/blender/trees/publish_woods.py): per kind its asset id (nil until
+	-- the lead uploads it), its leaf sprays' part colour and its triangles
+	local art: { [string]: any } = {}
+	local artPath = ctx.repo .. "/data/art/woods.json"
+	if fs.isFile(artPath) then
+		for _, a in Json.decodeFile(artPath).kinds do
+			local id = a.assetId
+			if id == "" then
+				id = nil
+			end
+			ctx.invariant(
+				`woods art {a.kind}: an asset id is digits`,
+				id == nil or string.match(tostring(id), "^%d+$") ~= nil
+			)
+			ctx.invariant(`woods art {a.kind}: uploaded only with every promise kept`, id == nil or a.checks.ok == true)
+			art[a.kind] = {
+				assetId = if id then tostring(id) else nil,
+				leaf = a.parts.Leaves.color,
+				tris = a.tris.total,
+			}
+		end
+	end
+	local kinds = {}
+	for id, k in doc.kinds do
+		kinds[id] = {
+			label = k.label,
+			family = k.family,
+			species = k.species,
+			height = k.height,
+			crown = k.crown,
+			climb = k.climb,
+			art = art[id],
+		}
+	end
+	local trees = {}
+	local placed = ctx.repo .. "/data/woods_placed.json"
+	if fs.isFile(placed) then
+		for _, t in Json.decodeFile(placed).trees do
+			ctx.invariant(`woods: a placed tree's kind {t[1]} is in data/woods.json`, kinds[t[1]] ~= nil)
+			table.insert(trees, { kind = t[1], x = t[2], y = t[3], z = t[4], yaw = t[5], scale = t[6] })
+		end
+	end
+	Height.configure(ctx.terrainExtensions)
+	local cl = climbs()
+	Height.configure(nil)
+	return { idBase = doc.idBase, climbBase = doc.climbBase, kinds = kinds, trees = trees, climbs = cl }
+end
+
 function Lib.compile(ctx: any): any?
 	local rel = "data/tree_shapes.json"
 	local path = ctx.repo .. "/" .. rel
@@ -129,6 +239,17 @@ function Lib.compile(ctx: any): any?
 				nc.covers = table.clone(tree.routes)
 				table.insert(ctx.treeArtNext, nc)
 			end
+		end
+	end
+	-- the D34/D35 woods and climbs, compact (Shared/World/TreeShapes WOODS AND CLIMBS; Shared/Data expands them)
+	compiled.woods = Lib.woods(ctx)
+	if compiled.woods then
+		local routes = TreeShapes.expandWoods(compiled.woods)
+		for _, r in routes do
+			ctx.invariant("woods route id unique: " .. r.id, not seen[r.id])
+			ctx.invariant("woods route id clear of the harvest: " .. r.id, not ctx.routeIds[r.id])
+			ctx.invariant("woods route id clear of the other compiled routes: " .. r.id, not ctx.otherIds[r.id])
+			seen[r.id] = true
 		end
 	end
 	return {

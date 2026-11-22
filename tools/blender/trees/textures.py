@@ -401,12 +401,13 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
 
 # ---- leaf sprays (alpha cards) --------------------------------------------------------------------
 
-SPRAY_SHAPES = ("oak", "elm", "palmate", "maple", "willow", "apple")
+SPRAY_SHAPES = ("oak", "elm", "palmate", "maple", "willow", "apple", "pinnate", "needle", "longneedle")
 SPRAY_PAINT = 1024  # the atlas is painted at this size (the px in SPRAY_PLAN) ...
 SPRAY_N = 512  # ... and written at this one (spray_maps: a quarter of the GPU memory of 1024)
 # leaves in the atlas against SPRAY_PLAN, per shape: smaller and more of them, as the cards are larger (1 / treegen
 # SPRAY_SCALE of the species with that shape), so a leaf on the tree stays its size
-SPRAY_LEAF = {"oak": 0.69, "elm": 0.69, "palmate": 0.69, "maple": 0.69, "willow": 0.77, "apple": 1.0}
+SPRAY_LEAF = {"oak": 0.69, "elm": 0.69, "palmate": 0.69, "maple": 0.69, "willow": 0.77, "apple": 1.0,
+              "pinnate": 0.8, "needle": 1.0, "longneedle": 1.0}
 
 # leaf length px, width / length, leaves on the main twig, side twigs, leaves per side twig, angle off the twig
 SPRAY_PLAN = {
@@ -416,6 +417,11 @@ SPRAY_PLAN = {
     "maple": dict(L=100, wr=1.0, main=8, twigs=4, per=4, ang=(40, 70), petiole=26, step=46),
     "apple": dict(L=112, wr=0.56, main=9, twigs=4, per=4, ang=(40, 70), petiole=12, step=44),
     "willow": dict(L=116, wr=0.16, main=30, twigs=1, per=14, ang=(16, 30), petiole=4, step=24),
+    # D34 (tools/blender/trees/grove.py): the walnut's and hickory's compound leaves (long leaflets in pairs along a
+    # rachis), and the conifers' needles: short and bristling (spruce, fir), long and soft (white and red pine)
+    "pinnate": dict(L=96, wr=0.30, main=13, twigs=4, per=7, ang=(62, 82), petiole=3, step=30),
+    "needle": dict(L=42, wr=0.13, main=56, twigs=7, per=26, ang=(50, 75), petiole=1, step=8),
+    "longneedle": dict(L=80, wr=0.09, main=40, twigs=7, per=22, ang=(22, 40), petiole=1, step=10),
 }
 
 
@@ -433,6 +439,11 @@ def _leaf_half_width(shape, s, k):
         return np.sin(math.pi * s ** 0.8) ** 0.62 * (1 - s ** 9) * (0.96 + 0.04 * np.sin(s * 60 + k))
     if shape == "willow":
         return np.sin(math.pi * s ** 0.8) ** 1.05
+    if shape == "pinnate":
+        saw = 1.0 - 0.06 * ((s * 11.0 + k) % 1.0)
+        return np.sin(math.pi * s ** 0.85) ** 0.8 * saw
+    if shape in ("needle", "longneedle"):
+        return np.clip(1.0 - s ** 6, 0.0, 1.0) * np.clip(s * 12.0, 0.0, 1.0)
     return np.sin(math.pi * s)
 
 

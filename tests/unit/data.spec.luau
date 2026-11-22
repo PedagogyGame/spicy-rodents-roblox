@@ -19,6 +19,7 @@ return function(t)
 		local hollows = (d:module("HollowTrees") :: any).routes
 		-- and the D32 grown boughs and planted trees (data/tree_shapes.json)
 		local shapes = (d:module("TreeShapes") :: any).routes
+		-- and the D34/D35 woods and climbs (data/woods.json: compact in TreeShapes, expanded by Data:woods())
 		-- and the D35 lamp-post climbs and arms (data/lamp_posts.json)
 		local lamps = (d:module("LampPosts") :: any).routes
 		-- and the D34 branch nooks, hangouts and spurs (Shared/World/BranchNooks: chunks BranchNookRoutes_NN)
@@ -27,6 +28,7 @@ return function(t)
 			+ (if sewers then #sewers else 0)
 			+ (if hollows then #hollows else 0)
 			+ (if shapes then #shapes else 0)
+			+ #d:woods().routes
 			+ (if lamps then #lamps else 0)
 			+ nooks
 		t.eq(d:routes():count(), idx.modules.Routes.count + extra)

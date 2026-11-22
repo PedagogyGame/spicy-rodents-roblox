@@ -85,7 +85,8 @@ export type Tree = {
 	source: number?,
 	offset: { number }?,
 }
-export type Compiled = { routes: { any }, forks: { ForkRecord }, trees: { Tree } }
+-- (woods: the compact D34/D35 woods and climbs, `Woods` below; tools/compile lib/TreeShapes adds it)
+export type Compiled = { routes: { any }, forks: { ForkRecord }, trees: { Tree }, woods: any? }
 
 local function r4(v: number): number
 	return math.floor(v * 10000 + 0.5) / 10000
@@ -304,6 +305,208 @@ function TreeShapes.build(doc: Doc, harvest: any, forks: { ForkRecord }, heightA
 		table.insert(trees, tree)
 	end
 	return { routes = routes, forks = newForks, trees = trees }
+end
+
+-- WOODS AND CLIMBS (owner D34 "many more trees, taller ones, pines and nut trees", D35 "make all trees climbable").
+-- Every tree that is not a harvested one is climbed on routes grown here by one rule, kept compact in
+-- generated/TreeShapes (`woods`: a template per kind and a place per tree, so ~1,000 routes cost a few kilobytes) and
+-- expanded by Shared/Data at load (expandWoods), never drawn by the town bake (their generator "woods@..." is no
+-- routeProps generator: no proxy parts; Server/Assets/WoodsArt puts the trees' meshes and one trunk collider each
+-- in Workspace.Woods at runtime):
+--   * a KIND (data/woods.json `kinds`: the D34 giants, pines and nut trees) is grown once round its foot at the
+--     origin from a ClimbSpec: a trunk `height` studs tall (its route from 0.25 over the ground to the top) of
+--     surfaceRadius `radius`, leaning `lean` studs at the top toward `leanBearing`, and boughs (BoughSpec, as the
+--     reshaped trees': `at` above the foot, snapped to the trunk's nearest sample; a pine's whorls are short level
+--     boughs, its ladder's rungs). Its Blender model is built round exactly this template (tools/blender/trees).
+--   * a WOODS TREE is its kind's template turned `yaw` (radians, clockwise from above, as the model's CFrame.Angles(0,
+--     yaw, 0)), scaled `scale` (the trunk's radius, a bough's feet lift and every length with it; the curves keep their
+--     sample counts, so every fork stays on a trunk sample) and stood at (x, y + 0.25, z), y the ground.
+--   * a CLIMB is one of the town's trees that had no route (the Lookout Hill conifers, the sky lift's hedgerow oaks
+--     and orchard, the alley yard's tree: their bakes draw them), grown alone from its own ClimbSpec where its bake
+--     stands it (tools/compile lib/TreeShapes reads their layouts).
+-- Route ids: a woods tree i takes woods.idBase + (i - 1) * WOODS.stride + k (k = 0 the trunk, 1.. its boughs), a climb
+-- j woods.climbBase + (j - 1) * WOODS.stride + k. Names: "<LABEL> woods <i> trunk" / "... bough <k>", "<LABEL> climb
+-- <j> trunk" / "... bough <k>".
+TreeShapes.WOODS = table.freeze({ stride = 16, footLift = 0.25, lift = 0.5 * 2.5 })
+
+export type TrunkSpec = { height: number, radius: number, lean: number?, leanBearing: number? }
+export type ClimbSpec = { trunk: TrunkSpec, boughs: { BoughSpec }? }
+export type WoodsTree = { kind: string, x: number, y: number, z: number, yaw: number, scale: number }
+export type Climb = { label: string, what: string?, x: number, y: number, z: number, climb: ClimbSpec }
+export type Woods = {
+	idBase: number,
+	climbBase: number,
+	kinds: { [string]: { label: string, climb: ClimbSpec } },
+	trees: { WoodsTree },
+	climbs: { Climb },
+}
+-- a template: route records round a foot at the origin (`k` in place of an id), and the forks with `k` branches
+export type Template = { routes: { { [string]: any } }, forks: { ForkEntry } }
+
+-- grow(spec): the template of a ClimbSpec (studs, the foot on the ground at the origin)
+function TreeShapes.grow(spec: ClimbSpec): Template
+	local W = TreeShapes.WOODS
+	local tr = spec.trunk
+	local lx, lz = dirOf(tr.leanBearing or 0)
+	local lean = tr.lean or 0
+	local pts = {}
+	for i = 0, 5 do
+		local u = i / 5
+		local off = lean * u ^ 1.6
+		table.insert(pts, { r4(lx * off), r4(W.footLift + tr.height * u), r4(lz * off) })
+	end
+	local trunk = record(0, "trunk", "trunk", pts)
+	trunk.surfaceRadius = tr.radius
+	trunk.k = 0
+	trunk.id = nil
+	local samples = curveOf(pts):getSpacedPoints(trunk.sampleCount - 1)
+	local routes: { { [string]: any } } = { trunk }
+	local forks: { ForkEntry } = {}
+	local boughs: { BoughSpec } = spec.boughs or {}
+	for k, b in boughs do
+		local best, bd = 1, math.huge
+		for i, s in samples do
+			local d = math.abs(s.y - (W.footLift + b.at))
+			if d < bd then
+				best, bd = i, d
+			end
+		end
+		local s = samples[best]
+		local bp = TreeShapes.boughPoints({ 0, 0, 0 }, { s.x, s.y, s.z }, b)
+		bp[1] = { s.x, s.y, s.z }
+		local rec = record(0, `bough {k}`, "branch", bp)
+		rec.k = k
+		rec.id = nil
+		rec.trunkClearance = tr.radius
+		rec.visualOffset = W.lift
+		rec.tier = b.tier
+		table.insert(routes, rec)
+		local curve = curveOf(bp)
+		local o = curve:getPointAt(0)
+		local ahead = curve:getPointAt(TreeShapes.C.forkOut)
+		local ox, oz = ahead.x - o.x, ahead.z - o.z
+		local l = math.sqrt(ox * ox + oz * oz)
+		table.insert(forks, {
+			branch = k,
+			t = (best - 1) / (#samples - 1),
+			height = s.y,
+			origin = { o.x, o.y, o.z },
+			outward = { ox / l, 0, oz / l },
+			trunkClearance = tr.radius,
+		})
+	end
+	return { routes = routes, forks = forks }
+end
+
+-- place(template, ...): the template's routes and forks turned, scaled and stood at a foot, ids from `first`
+local function place(
+	tpl: Template,
+	first: number,
+	prefix: string,
+	generator: string,
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	scale: number
+): ({ any }, ForkRecord)
+	local c, s = math.cos(yaw), math.sin(yaw)
+	local function move(p: { number }): { number }
+		local px, py, pz = p[1] * scale, p[2] * scale, p[3] * scale
+		return { r4(x + px * c + pz * s), r4(y + py), r4(z - px * s + pz * c) }
+	end
+	local routes = {}
+	for _, r in tpl.routes do
+		local pts = {}
+		for i, p in r.points do
+			pts[i] = move(p)
+		end
+		local rec: { [string]: any } = {
+			id = first + r.k,
+			name = `{prefix} {r.name}`,
+			kind = r.kind,
+			speedMult = 1,
+			sprintMult = 1,
+			surfaceRadius = if r.kind == "trunk" then r4(r.surfaceRadius * scale) else r.surfaceRadius,
+			length = r4(r.length * scale),
+			sampleCount = r.sampleCount,
+			points = pts,
+			origin = "treeShape",
+			generator = generator,
+			flags = flags(r.kind),
+		}
+		if r.kind ~= "trunk" then
+			rec.trunkClearance = r4(r.trunkClearance * scale)
+			rec.visualOffset = r4(r.visualOffset * scale)
+		end
+		table.insert(routes, rec)
+	end
+	local fr: ForkRecord = { trunk = first, forks = {} }
+	for _, f in tpl.forks do
+		local o = move(f.origin)
+		table.insert(fr.forks, {
+			branch = first + f.branch,
+			t = f.t,
+			height = r4(y + f.height * scale),
+			origin = o,
+			outward = { f.outward[1] * c + f.outward[3] * s, 0, -f.outward[1] * s + f.outward[3] * c },
+			trunkClearance = r4((f.trunkClearance or 0) * scale),
+		})
+	end
+	return routes, fr
+end
+
+export type WoodsTreeOut = {
+	trunk: number,
+	kind: string,
+	label: string,
+	routes: { number },
+	index: number,
+	climb: boolean,
+}
+
+-- expandWoods(woods) -> routes, forks, trees: every woods tree and climb as route records (world studs), their
+-- canopy forks (one record per trunk) and a list of the trees (trunk id, kind or "climb", label, route ids).
+function TreeShapes.expandWoods(woods: Woods): ({ any }, { ForkRecord }, { WoodsTreeOut })
+	local W = TreeShapes.WOODS
+	local routes, forks, trees = {}, {}, {}
+	local templates: { [string]: Template } = {}
+	for i, t in woods.trees do
+		local kind = woods.kinds[t.kind]
+		assert(kind, `woods: no kind {t.kind}`)
+		local tpl = templates[t.kind]
+		if not tpl then
+			tpl = TreeShapes.grow(kind.climb)
+			templates[t.kind] = tpl
+		end
+		local first = woods.idBase + (i - 1) * W.stride
+		local rs, fr = place(tpl, first, `{kind.label} woods {i}`, `woods@{t.kind}`, t.x, t.y, t.z, t.yaw, t.scale)
+		local ids = {}
+		for _, r in rs do
+			table.insert(routes, r)
+			table.insert(ids, r.id)
+		end
+		table.insert(forks, fr)
+		table.insert(
+			trees,
+			{ trunk = first, kind = t.kind, label = kind.label, routes = ids, index = i, climb = false }
+		)
+	end
+	for j, cl in woods.climbs do
+		local first = woods.climbBase + (j - 1) * W.stride
+		local rs, fr =
+			place(TreeShapes.grow(cl.climb), first, `{cl.label} climb {j}`, "woods@climb", cl.x, cl.y, cl.z, 0, 1)
+		local ids = {}
+		for _, r in rs do
+			table.insert(routes, r)
+			table.insert(ids, r.id)
+		end
+		if #fr.forks > 0 then
+			table.insert(forks, fr)
+		end
+		table.insert(trees, { trunk = first, kind = "climb", label = cl.label, routes = ids, index = j, climb = true })
+	end
+	return routes, forks, trees
 end
 
 -- mergeForks(base, extra): the canopy forks of `base` with `extra`'s added (a trunk in both keeps base's forks and

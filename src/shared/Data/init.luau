@@ -8,7 +8,8 @@
 -- Pure apart from the loader: Data.new(loader) takes any `name -> module?`; Data.default() picks the
 -- engine folder or the Lune path. No side effects on require.
 -- Interface: new(loader) -> Data; default() -> Data; Data:index(); lots(); lot(id); lotType(t); routes()
---            (Routes/Registry); lanes(); roads(); cast(); forks(); wildlife(); nav(); colliders(); forage();
+--            (Routes/Registry); lanes(); roads(); cast(); forks(); woods() (the D34/D35 woods and climbs:
+--            { routes, forks, trees }); wildlife(); nav(); colliders(); forage();
 --            hollows(); quests(); markers(); assets(); population(); buildings(); bakeHash(); has(name);
 --            missing(); module(name) for any other compiled module
 
@@ -34,6 +35,7 @@ export type Data = {
 	roads: (self: Data) -> { any },
 	cast: (self: Data) -> { any },
 	forks: (self: Data) -> { any },
+	woods: (self: Data) -> { routes: { any }, forks: { any }, trees: { any } },
 	wildlife: (self: Data) -> any,
 	nav: (self: Data) -> any,
 	colliders: (self: Data) -> { any },
@@ -175,6 +177,10 @@ function Data.new(loader: Loader): Data
 					local s = loadName(self, "TreeShapes")
 					return if s and s.routes then s.routes else {}
 				end)
+				-- and the D34/D35 woods and climbs (every other tree climbable), expanded from their compact form, 10001-
+				table.insert(loaders, function()
+					return (data.woods(self)).routes
+				end)
 			end
 			-- the D35 lamp-post climbs (data/lamp_posts.json, Shared/World/LampPosts): a climb per post, an arm where it has one
 			if self:index().modules.LampPosts then
@@ -217,6 +223,10 @@ function Data.new(loader: Loader): Data
 			if s and s.forks and #s.forks > 0 then
 				merged = TreeShapes.mergeForks(merged :: any, s.forks) :: any
 			end
+			local w = data.woods(self)
+			if #w.forks > 0 then
+				merged = TreeShapes.mergeForks(merged :: any, w.forks) :: any
+			end
 		end
 		-- and each lamp post's arm, a fork on its climb (Shared/World/LampPosts)
 		if self:index().modules.LampPosts then
@@ -227,6 +237,22 @@ function Data.new(loader: Loader): Data
 		end
 		self._cache["forks:merged"] = merged
 		return merged
+	end
+	-- the D34/D35 woods and climbs (generated/TreeShapes `woods`, Shared/World/TreeShapes.expandWoods), expanded once:
+	-- { routes, forks, trees } (empty when the compiled data has none)
+	function data.woods(self: Data): { routes: { any }, forks: { any }, trees: { any } }
+		local cached = self._cache["woods:expanded"]
+		if cached ~= nil then
+			return cached
+		end
+		local out = { routes = {}, forks = {}, trees = {} }
+		local s = if self:index().modules.TreeShapes then loadName(self, "TreeShapes") else nil
+		if s and s.woods then
+			local routes, forks, trees = TreeShapes.expandWoods(s.woods)
+			out = { routes = routes, forks = forks :: { any }, trees = trees :: { any } }
+		end
+		self._cache["woods:expanded"] = out
+		return out
 	end
 	function data.wildlife(self: Data)
 		return self:module("Wildlife")

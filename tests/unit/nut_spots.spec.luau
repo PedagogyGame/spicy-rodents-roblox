@@ -3,7 +3,7 @@
 -- town (build/Town.rbxm and build/Attractions.rbxm: lune run tools/bake/main.luau and attractions.luau), its ground
 -- the terrain's (the server lays the acorns at World/Height), nothing standing on it or low over it, clear of every
 -- building and venue (World/Colliders), road, path, tree trunk, hollow hole and river; the tree spots under the acorn
--- oaks; ids unique; every kind known; spread over the town.
+-- oaks and the D34 woods' nut trees (Shared/Data:woods()); ids unique; every kind known; spread over the town.
 local fs = require("@lune/fs")
 local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")
@@ -27,8 +27,21 @@ end
 
 return function(t)
 	local trees = (Wildlife :: any).studs.trees.trees
+	-- the D34 woods' nut trees, as the spots name them ("<LABEL> woods <i>"), and every woods trunk
+	local woodsTrees: { [string]: any } = {}
+	do
+		local d = Data.default()
+		local reg = d:routes()
+		for _, w in d:woods().trees do
+			if not w.climb then
+				local r = reg:get(w.trunk) :: any
+				local f = r.points[1]
+				woodsTrees[`{w.label} woods {w.index}`] = { x = f.x, z = f.z, r = r.surfaceRadius, name = w.label }
+			end
+		end
+	end
 
-	t.test("ids unique, kinds known, every kind stocked and growing back; 49 spots spread over the town", function()
+	t.test("ids unique, kinds known, every kind stocked and growing back; 61 spots spread over the town", function()
 		local ids = {}
 		local per: { [string]: number } = {}
 		local stock = 0
@@ -41,12 +54,12 @@ return function(t)
 			stock += NutSpots.stockOf(s)
 			t.truthy(NutSpots.regrowDaysOf(s) > 0 and NutSpots.regrowDaysOf(s) < 2, `{s.id}: grows back`)
 		end
-		t.eq(#NutSpots.SPOTS, 49)
-		t.eq(per.tree, 18)
+		t.eq(#NutSpots.SPOTS, 61)
+		t.eq(per.tree, 30)
 		t.eq(per.yard, 17)
 		t.eq(per.park, 11)
 		t.eq(per.premium, 3)
-		t.eq(stock, 128, "nuts in the town when every spot is full")
+		t.eq(stock, 164, "nuts in the town when every spot is full")
 		-- spread: spots in every quarter of the town, and none closer than 3.5 studs to another
 		local quarters = {}
 		for i, a in NutSpots.SPOTS do
@@ -61,9 +74,19 @@ return function(t)
 		end
 	end)
 
-	t.test("the tree spots lie under acorn oaks, a few studs off the bark", function()
+	t.test("the tree spots lie under acorn oaks and the woods' nut trees, a few studs off the bark", function()
 		for _, s in NutSpots.SPOTS do
 			if s.kind ~= "tree" then
+				continue
+			end
+			local w = woodsTrees[s.near]
+			if w then
+				t.truthy(
+					string.find("SHAGBARK HICKORY|PIN OAK|HAZEL|SWEET CHESTNUT|WHITE OAK|BLACK WALNUT", w.name, 1, true),
+					s.near
+				)
+				local d = math.sqrt((s.x - w.x) ^ 2 + (s.z - w.z) ^ 2)
+				t.truthy(d > w.r + 1.5 and d < w.r + 8, `{s.id}: {d} from the axis`)
 				continue
 			end
 			local oak: any = nil
@@ -130,6 +153,10 @@ return function(t)
 			for _, tr in trees do
 				local d = math.sqrt((x - tr.x) ^ 2 + (z - tr.z) ^ 2)
 				t.truthy(d >= (tr.trunkBaseRadius or 2) + 1.2, `{s.id} at the trunk of {tr.name}`)
+			end
+			for name, w in woodsTrees do
+				local d = math.sqrt((x - w.x) ^ 2 + (z - w.z) ^ 2)
+				t.truthy(d >= w.r + 1.2, `{s.id} at the trunk of {name}`)
 			end
 			for _, hl in layout.hollows do
 				for _, m in hl.mouths do

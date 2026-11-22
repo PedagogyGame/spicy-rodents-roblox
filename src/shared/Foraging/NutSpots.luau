@@ -1,13 +1,15 @@
 --!strict
 -- ReplicatedStorage.Shared.Foraging.NutSpots
 -- Where squirrels find nuts in the town (brief v2 §7 "Foraging and territory"; owner D16 #22 "build next"; BUILD_PLAN
--- §1.4 Foraging): 49 spots on open ground, each holding a few nuts that grow back on the game clock. Every spot is a
+-- §1.4 Foraging): 61 spots on open ground, each holding a few nuts that grow back on the game clock. Every spot is a
 -- data entry (id, kind, x, z in studs, what it is near); its ground height is the terrain's (World/Height), which the
 -- spec holds to the baked town's ground there. Four kinds (KINDS: how many nuts a spot holds when full, and the game
 -- days one nut takes to grow back):
 --   tree     under the town's acorn oaks (v5.4's ten oaks with acorns, wildlife_foraging §6.2): three spots round each
 --            of the six with open ground under them (BUR OAK, Villa Oak South, the four Westside shade oaks; the two
---            Shop Oaks stand in sidewalks, Estate Oak South 1 inside the mansion, the Treehouse Oak under its house)
+--            Shop Oaks stand in sidewalks, Estate Oak South 1 inside the mansion, the Treehouse Oak under its house);
+--            and one under each of twelve of the D34 woods' nut trees in the town (data/woods.json: two walnuts,
+--            chestnuts, hickories, hazels, white and pin oaks; near = "<LABEL> woods <i>", the woods tree's index)
 --   yard     the yards: v4.1's five gardens and five bird feeders, v5.4's three garden plots, two feeders and two
 --            compost bins (wildlife_foraging §11.4, §11.6; the places, not the props)
 --   park     v4.1's ten nut caches (§11.2) and the Tabasco garden in the park
@@ -51,6 +53,20 @@ NutSpots.SPOTS = table.freeze({
 	{ id = "tree_westside_6_shade_oak_1", kind = "tree", x = -1007.5, z = 325.25, near = "Westside 6 shade oak" },
 	{ id = "tree_westside_6_shade_oak_2", kind = "tree", x = -1003.75, z = 323.75, near = "Westside 6 shade oak" },
 	{ id = "tree_westside_6_shade_oak_3", kind = "tree", x = -1002.25, z = 320, near = "Westside 6 shade oak" },
+	-- the D34 woods' nut trees in the town (Shared/World/TreeShapes woods: the walnuts, chestnuts, hickories, hazels,
+	-- white and pin oaks nearest the middle, two of each): one spot under each, a few studs off its bark
+	{ id = "tree_shagbark_hickory_1", kind = "tree", x = -263.25, z = 116, near = "SHAGBARK HICKORY woods 67" },
+	{ id = "tree_pin_oak_1", kind = "tree", x = 143.75, z = 266.25, near = "PIN OAK woods 41" },
+	{ id = "tree_pin_oak_2", kind = "tree", x = 176.5, z = 248.25, near = "PIN OAK woods 92" },
+	{ id = "tree_hazel_1", kind = "tree", x = 270.5, z = 167.5, near = "HAZEL woods 84" },
+	{ id = "tree_sweet_chestnut_1", kind = "tree", x = -144.5, z = 344.5, near = "SWEET CHESTNUT woods 77" },
+	{ id = "tree_white_oak_1", kind = "tree", x = -198, z = -479, near = "WHITE OAK woods 22" },
+	{ id = "tree_hazel_2", kind = "tree", x = -328, z = -575.75, near = "HAZEL woods 33" },
+	{ id = "tree_black_walnut_1", kind = "tree", x = 357.75, z = -583.25, near = "BLACK WALNUT woods 27" },
+	{ id = "tree_white_oak_2", kind = "tree", x = 162, z = 667, near = "WHITE OAK woods 29" },
+	{ id = "tree_shagbark_hickory_2", kind = "tree", x = -649.75, z = -380.25, near = "SHAGBARK HICKORY woods 78" },
+	{ id = "tree_sweet_chestnut_2", kind = "tree", x = -524, z = -627.25, near = "SWEET CHESTNUT woods 35" },
+	{ id = "tree_black_walnut_2", kind = "tree", x = -1112.25, z = -493.75, near = "BLACK WALNUT woods 53" },
 	{ id = "yard_garden_1", kind = "yard", x = 180, z = 155, near = "a garden" },
 	{ id = "yard_garden_2", kind = "yard", x = -279, z = 180, near = "a garden" },
 	{ id = "yard_garden_3", kind = "yard", x = 267.5, z = 660, near = "a garden" },

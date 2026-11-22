@@ -1,0 +1,1106 @@
+{
+ "$schema": "woods art v1 (tools/blender/trees/publish_woods.py; tools/compile lib/TreeShapes reads it)",
+ "src": "BRIEF_ADDENDUM D34/D35: the woods' kinds built round their climbing templates by tools/blender/trees/grove.py (data/woods.json kinds). One Model per kind, parts Bark (tiling bark) and Leaves (two-faced spray cards, the fruit in a swatch of the atlas; AlphaMode Transparency or the colour map on TextureID). pivot = the ground under the trunk's foot; WoodsArt turns, scales and stands it at every woods tree of the kind. Ids empty until the lead uploads (assetId null).",
+ "count": 13,
+ "held": [],
+ "totals": {
+  "bark": 40306,
+  "leaves": 50072,
+  "total": 90378,
+  "fbxBytes": 24436044
+ },
+ "kinds": [
+  {
+   "kind": "balsam_fir",
+   "label": "BALSAM FIR",
+   "species": "fir",
+   "family": "pine",
+   "assetId": null,
+   "displayName": "SR woods BALSAM FIR",
+   "moderation": "not uploaded",
+   "sha": "5b78dca4dacef173",
+   "fbxBytes": 1650812,
+   "tris": {
+    "bark": 1414,
+    "leaves": 2244,
+    "total": 3658
+   },
+   "heightStuds": 59.97,
+   "crownMeasured": 12.89,
+   "parts": {
+    "Bark": {
+     "center": [
+      0.458,
+      27.536,
+      0.694
+     ],
+     "size": [
+      16.084,
+      61.072,
+      15.878
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      0.414,
+      30.278,
+      -0.126
+     ],
+     "size": [
+      24.959,
+      59.378,
+      25.007
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      60,
+      90,
+      56
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 16,
+     "mean": -0.072,
+     "p95_abs": 0.108,
+     "max_abs": 0.109,
+     "min": -0.109,
+     "max": 0.0
+    },
+    "trunk_near_boughs": {
+     "n": 392,
+     "mean": -0.068,
+     "p95_abs": 0.105,
+     "max_abs": 0.484,
+     "min": -0.484,
+     "max": 0.006
+    },
+    "feet_to_bark_under_st": {
+     "n": 11,
+     "mean": 0.001,
+     "p95_abs": 0.003,
+     "max_abs": 0.004,
+     "min": -0.001,
+     "max": 0.004
+    },
+    "feet_samples": 11,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.104,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "black_walnut",
+   "label": "BLACK WALNUT",
+   "species": "walnut",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods BLACK WALNUT",
+   "moderation": "not uploaded",
+   "sha": "37bd5a715e99fdf3",
+   "fbxBytes": 1721388,
+   "tris": {
+    "bark": 2208,
+    "leaves": 2800,
+    "total": 5008
+   },
+   "heightStuds": 72.5,
+   "crownMeasured": 31.56,
+   "parts": {
+    "Bark": {
+     "center": [
+      1.573,
+      31.07,
+      -3.722
+     ],
+     "size": [
+      41.295,
+      68.14,
+      45.565
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      0.12,
+      43.836,
+      -3.514
+     ],
+     "size": [
+      52.943,
+      57.331,
+      56.087
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      107,
+      143,
+      59
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 88,
+     "mean": -0.075,
+     "p95_abs": 0.115,
+     "max_abs": 0.119,
+     "min": -0.119,
+     "max": 0.001
+    },
+    "trunk_near_boughs": {
+     "n": 256,
+     "mean": -0.086,
+     "p95_abs": 0.104,
+     "max_abs": 1.235,
+     "min": -1.235,
+     "max": 0.0
+    },
+    "feet_to_bark_under_st": {
+     "n": 27,
+     "mean": 0.032,
+     "p95_abs": 0.048,
+     "max_abs": 0.049,
+     "min": 0.019,
+     "max": 0.049
+    },
+    "feet_samples": 27,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.125,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "great_elm",
+   "label": "GREAT ELM",
+   "species": "elm",
+   "family": "giant",
+   "assetId": null,
+   "displayName": "SR woods GREAT ELM",
+   "moderation": "not uploaded",
+   "sha": "0e2cd8a75e4cce08",
+   "fbxBytes": 2263180,
+   "tris": {
+    "bark": 7206,
+    "leaves": 8000,
+    "total": 15206
+   },
+   "heightStuds": 254.83,
+   "crownMeasured": 72.71,
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.47,
+      117.93,
+      -5.438
+     ],
+     "size": [
+      105.33,
+      241.861,
+      106.976
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -0.796,
+      137.213,
+      -4.856
+     ],
+     "size": [
+      137.718,
+      235.234,
+      135.703
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      103,
+      143,
+      68
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 144,
+     "mean": -0.072,
+     "p95_abs": 0.119,
+     "max_abs": 0.121,
+     "min": -0.121,
+     "max": 0.002
+    },
+    "trunk_near_boughs": {
+     "n": 1224,
+     "mean": -0.186,
+     "p95_abs": 0.84,
+     "max_abs": 4.518,
+     "min": -4.518,
+     "max": 0.0
+    },
+    "feet_to_bark_under_st": {
+     "n": 104,
+     "mean": 0.084,
+     "p95_abs": 0.121,
+     "max_abs": 0.128,
+     "min": 0.034,
+     "max": 0.128
+    },
+    "feet_samples": 104,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.191,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "hazel",
+   "label": "HAZEL",
+   "species": "hazel",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods HAZEL",
+   "moderation": "not uploaded",
+   "sha": "dde31a1b5bb656cf",
+   "fbxBytes": 1676748,
+   "tris": {
+    "bark": 468,
+    "leaves": 1464,
+    "total": 1932
+   },
+   "heightStuds": 24.17,
+   "crownMeasured": 15.6,
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.522,
+      8.203,
+      1.123
+     ],
+     "size": [
+      16.575,
+      22.407,
+      17.36
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      0.314,
+      13.27,
+      0.746
+     ],
+     "size": [
+      22.721,
+      21.792,
+      29.708
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      108,
+      149,
+      63
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 24,
+     "mean": -0.067,
+     "p95_abs": 0.14,
+     "max_abs": 0.17,
+     "min": -0.17,
+     "max": -0.0
+    },
+    "trunk_near_boughs": {
+     "n": 104,
+     "mean": -0.051,
+     "p95_abs": 0.079,
+     "max_abs": 0.119,
+     "min": -0.119,
+     "max": 0.006
+    },
+    "feet_to_bark_under_st": {
+     "n": 8,
+     "mean": 0.002,
+     "p95_abs": 0.002,
+     "max_abs": 0.002,
+     "min": -0.0,
+     "max": 0.002
+    },
+    "feet_samples": 8,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.108,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "king_oak",
+   "label": "KING OAK",
+   "species": "oak",
+   "family": "giant",
+   "assetId": null,
+   "displayName": "SR woods KING OAK",
+   "moderation": "not uploaded",
+   "sha": "915d788108387d64",
+   "fbxBytes": 2281996,
+   "tris": {
+    "bark": 7234,
+    "leaves": 8000,
+    "total": 15234
+   },
+   "heightStuds": 248.87,
+   "crownMeasured": 78.83,
+   "parts": {
+    "Bark": {
+     "center": [
+      0.318,
+      113.115,
+      3.545
+     ],
+     "size": [
+      117.136,
+      232.23,
+      110.384
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -2.504,
+      130.049,
+      -0.698
+     ],
+     "size": [
+      152.658,
+      237.65,
+      140.556
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      105,
+      142,
+      62
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 96,
+     "mean": -0.079,
+     "p95_abs": 0.129,
+     "max_abs": 0.131,
+     "min": -0.131,
+     "max": 0.006
+    },
+    "trunk_near_boughs": {
+     "n": 1112,
+     "mean": -0.195,
+     "p95_abs": 1.12,
+     "max_abs": 4.433,
+     "min": -4.433,
+     "max": 0.001
+    },
+    "feet_to_bark_under_st": {
+     "n": 124,
+     "mean": 0.071,
+     "p95_abs": 0.105,
+     "max_abs": 0.121,
+     "min": 0.023,
+     "max": 0.121
+    },
+    "feet_samples": 124,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.296,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "norway_spruce",
+   "label": "NORWAY SPRUCE",
+   "species": "spruce",
+   "family": "pine",
+   "assetId": null,
+   "displayName": "SR woods NORWAY SPRUCE",
+   "moderation": "not uploaded",
+   "sha": "b9f1c43693abe121",
+   "fbxBytes": 1754124,
+   "tris": {
+    "bark": 2032,
+    "leaves": 2800,
+    "total": 4832
+   },
+   "heightStuds": 78.07,
+   "crownMeasured": 19.02,
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.383,
+      37.536,
+      0.968
+     ],
+     "size": [
+      24.201,
+      81.072,
+      24.104
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -0.501,
+      37.309,
+      1.105
+     ],
+     "size": [
+      34.695,
+      81.155,
+      35.835
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      58,
+      86,
+      52
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 32,
+     "mean": -0.0,
+     "p95_abs": 0.0,
+     "max_abs": 0.0,
+     "min": -0.0,
+     "max": 0.0
+    },
+    "trunk_near_boughs": {
+     "n": 520,
+     "mean": -0.018,
+     "p95_abs": 0.004,
+     "max_abs": 0.98,
+     "min": -0.98,
+     "max": 0.005
+    },
+    "feet_to_bark_under_st": {
+     "n": 17,
+     "mean": 0.001,
+     "p95_abs": 0.003,
+     "max_abs": 0.004,
+     "min": -0.001,
+     "max": 0.004
+    },
+    "feet_samples": 17,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.115,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "old_beech",
+   "label": "OLD BEECH",
+   "species": "beech",
+   "family": "giant",
+   "assetId": null,
+   "displayName": "SR woods OLD BEECH",
+   "moderation": "not uploaded",
+   "sha": "f0b311d9d2892c0e",
+   "fbxBytes": 2355548,
+   "tris": {
+    "bark": 7207,
+    "leaves": 8000,
+    "total": 15207
+   },
+   "heightStuds": 243.84,
+   "crownMeasured": 77.55,
+   "parts": {
+    "Bark": {
+     "center": [
+      -7.179,
+      112.479,
+      0.086
+     ],
+     "size": [
+      120.948,
+      230.958,
+      122.099
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -1.385,
+      126.383,
+      -2.52
+     ],
+     "size": [
+      152.036,
+      234.905,
+      150.066
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      107,
+      150,
+      59
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 64,
+     "mean": -0.077,
+     "p95_abs": 0.125,
+     "max_abs": 0.125,
+     "min": -0.125,
+     "max": 0.006
+    },
+    "trunk_near_boughs": {
+     "n": 1128,
+     "mean": -0.169,
+     "p95_abs": 0.846,
+     "max_abs": 4.439,
+     "min": -4.439,
+     "max": 0.002
+    },
+    "feet_to_bark_under_st": {
+     "n": 113,
+     "mean": 0.062,
+     "p95_abs": 0.095,
+     "max_abs": 0.098,
+     "min": 0.019,
+     "max": 0.098
+    },
+    "feet_samples": 113,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.766,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "pin_oak",
+   "label": "PIN OAK",
+   "species": "pin_oak",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods PIN OAK",
+   "moderation": "not uploaded",
+   "sha": "8a4f3e2bbf669464",
+   "fbxBytes": 1754268,
+   "tris": {
+    "bark": 2200,
+    "leaves": 2800,
+    "total": 5000
+   },
+   "heightStuds": 81.78,
+   "crownMeasured": 26.78,
+   "parts": {
+    "Bark": {
+     "center": [
+      0.767,
+      35.52,
+      2.158
+     ],
+     "size": [
+      34.683,
+      77.04,
+      32.696
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      1.632,
+      45.99,
+      2.682
+     ],
+     "size": [
+      50.291,
+      71.581,
+      46.153
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      83,
+      123,
+      54
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 120,
+     "mean": -0.0,
+     "p95_abs": 0.0,
+     "max_abs": 0.0,
+     "min": -0.0,
+     "max": 0.0
+    },
+    "trunk_near_boughs": {
+     "n": 384,
+     "mean": -0.013,
+     "p95_abs": 0.0,
+     "max_abs": 1.302,
+     "min": -1.302,
+     "max": 0.0
+    },
+    "feet_to_bark_under_st": {
+     "n": 20,
+     "mean": 0.02,
+     "p95_abs": 0.028,
+     "max_abs": 0.03,
+     "min": 0.006,
+     "max": 0.03
+    },
+    "feet_samples": 20,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.102,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "red_pine",
+   "label": "RED PINE",
+   "species": "red_pine",
+   "family": "pine",
+   "assetId": null,
+   "displayName": "SR woods RED PINE",
+   "moderation": "not uploaded",
+   "sha": "90732fd1eac850bd",
+   "fbxBytes": 1808396,
+   "tris": {
+    "bark": 1618,
+    "leaves": 2764,
+    "total": 4382
+   },
+   "heightStuds": 108.16,
+   "crownMeasured": 22.25,
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.709,
+      51.034,
+      -0.223
+     ],
+     "size": [
+      28.062,
+      108.068,
+      27.719
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -1.162,
+      61.758,
+      -0.654
+     ],
+     "size": [
+      42.172,
+      92.811,
+      39.91
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      68,
+      102,
+      52
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 168,
+     "mean": 0.0,
+     "p95_abs": 0.0,
+     "max_abs": 0.001,
+     "min": -0.0,
+     "max": 0.001
+    },
+    "trunk_near_boughs": {
+     "n": 576,
+     "mean": -0.02,
+     "p95_abs": 0.0,
+     "max_abs": 1.5,
+     "min": -1.5,
+     "max": 0.0
+    },
+    "feet_to_bark_under_st": {
+     "n": 20,
+     "mean": 0.001,
+     "p95_abs": 0.003,
+     "max_abs": 0.003,
+     "min": -0.001,
+     "max": 0.003
+    },
+    "feet_samples": 20,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.175,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "shagbark_hickory",
+   "label": "SHAGBARK HICKORY",
+   "species": "hickory",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods SHAGBARK HICKORY",
+   "moderation": "not uploaded",
+   "sha": "c957c6d987afa96b",
+   "fbxBytes": 1769276,
+   "tris": {
+    "bark": 2212,
+    "leaves": 2800,
+    "total": 5012
+   },
+   "heightStuds": 83.59,
+   "crownMeasured": 23.34,
+   "parts": {
+    "Bark": {
+     "center": [
+      4.226,
+      36.971,
+      -0.797
+     ],
+     "size": [
+      30.591,
+      79.941,
+      34.859
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      1.502,
+      55.359,
+      0.296
+     ],
+     "size": [
+      43.433,
+      56.458,
+      46.091
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      98,
+      136,
+      57
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 200,
+     "mean": -0.0,
+     "p95_abs": 0.0,
+     "max_abs": 0.001,
+     "min": -0.001,
+     "max": 0.001
+    },
+    "trunk_near_boughs": {
+     "n": 304,
+     "mean": -0.014,
+     "p95_abs": 0.0,
+     "max_abs": 1.149,
+     "min": -1.149,
+     "max": 0.001
+    },
+    "feet_to_bark_under_st": {
+     "n": 22,
+     "mean": 0.029,
+     "p95_abs": 0.036,
+     "max_abs": 0.036,
+     "min": 0.022,
+     "max": 0.036
+    },
+    "feet_samples": 22,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.112,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "sweet_chestnut",
+   "label": "SWEET CHESTNUT",
+   "species": "chestnut",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods SWEET CHESTNUT",
+   "moderation": "not uploaded",
+   "sha": "0b77465be4e2e238",
+   "fbxBytes": 1767068,
+   "tris": {
+    "bark": 2211,
+    "leaves": 2800,
+    "total": 5011
+   },
+   "heightStuds": 74.91,
+   "crownMeasured": 32.04,
+   "parts": {
+    "Bark": {
+     "center": [
+      0.528,
+      32.103,
+      2.853
+     ],
+     "size": [
+      53.761,
+      70.207,
+      44.38
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -0.831,
+      44.097,
+      0.969
+     ],
+     "size": [
+      62.421,
+      61.634,
+      60.783
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      91,
+      132,
+      54
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 80,
+     "mean": -0.09,
+     "p95_abs": 0.138,
+     "max_abs": 0.145,
+     "min": -0.145,
+     "max": 0.003
+    },
+    "trunk_near_boughs": {
+     "n": 248,
+     "mean": -0.097,
+     "p95_abs": 0.152,
+     "max_abs": 1.319,
+     "min": -1.319,
+     "max": 0.003
+    },
+    "feet_to_bark_under_st": {
+     "n": 31,
+     "mean": 0.034,
+     "p95_abs": 0.045,
+     "max_abs": 0.046,
+     "min": 0.022,
+     "max": 0.046
+    },
+    "feet_samples": 31,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.103,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "white_oak",
+   "label": "WHITE OAK",
+   "species": "white_oak",
+   "family": "nut",
+   "assetId": null,
+   "displayName": "SR woods WHITE OAK",
+   "moderation": "not uploaded",
+   "sha": "50ae571f21d4306a",
+   "fbxBytes": 1783964,
+   "tris": {
+    "bark": 2200,
+    "leaves": 2800,
+    "total": 5000
+   },
+   "heightStuds": 69.43,
+   "crownMeasured": 31.29,
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.775,
+      29.102,
+      4.853
+     ],
+     "size": [
+      55.88,
+      64.204,
+      52.748
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      0.301,
+      41.448,
+      2.382
+     ],
+     "size": [
+      60.814,
+      55.964,
+      57.821
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      96,
+      136,
+      55
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 72,
+     "mean": -0.091,
+     "p95_abs": 0.138,
+     "max_abs": 0.145,
+     "min": -0.145,
+     "max": 0.002
+    },
+    "trunk_near_boughs": {
+     "n": 224,
+     "mean": -0.101,
+     "p95_abs": 0.128,
+     "max_abs": 1.301,
+     "min": -1.301,
+     "max": 0.002
+    },
+    "feet_to_bark_under_st": {
+     "n": 34,
+     "mean": 0.028,
+     "p95_abs": 0.036,
+     "max_abs": 0.037,
+     "min": 0.016,
+     "max": 0.037
+    },
+    "feet_samples": 34,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.13,
+    "ok": true,
+    "fail": []
+   }
+  },
+  {
+   "kind": "white_pine",
+   "label": "WHITE PINE",
+   "species": "white_pine",
+   "family": "pine",
+   "assetId": null,
+   "displayName": "SR woods WHITE PINE",
+   "moderation": "not uploaded",
+   "sha": "94823fde7db77dd4",
+   "fbxBytes": 1849276,
+   "tris": {
+    "bark": 2096,
+    "leaves": 2800,
+    "total": 4896
+   },
+   "heightStuds": 96.07,
+   "crownMeasured": 19.4,
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.271,
+      46.535,
+      0.0
+     ],
+     "size": [
+      25.888,
+      99.07,
+      26.107
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "Leaves": {
+     "center": [
+      -0.165,
+      52.609,
+      0.521
+     ],
+     "size": [
+      38.465,
+      80.756,
+      37.331
+     ],
+     "doubleSided": false,
+     "alphaMode": "Transparency",
+     "color": [
+      78,
+      116,
+      76
+     ]
+    }
+   },
+   "checks": {
+    "trunk_bark_minus_radius_st": {
+     "n": 88,
+     "mean": -0.0,
+     "p95_abs": 0.0,
+     "max_abs": 0.0,
+     "min": -0.0,
+     "max": 0.0
+    },
+    "trunk_near_boughs": {
+     "n": 592,
+     "mean": -0.02,
+     "p95_abs": 0.0,
+     "max_abs": 1.009,
+     "min": -1.009,
+     "max": 0.0
+    },
+    "feet_to_bark_under_st": {
+     "n": 26,
+     "mean": 0.001,
+     "p95_abs": 0.002,
+     "max_abs": 0.002,
+     "min": -0.001,
+     "max": 0.002
+    },
+    "feet_samples": 26,
+    "feet_with_bark_over": 0,
+    "leaf_min_clearance_st": 0.154,
+    "ok": true,
+    "fail": []
+   }
+  }
+ ]
+}

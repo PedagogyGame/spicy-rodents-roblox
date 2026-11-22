@@ -192,7 +192,7 @@ function Countryside.build(roblox: any, parent: any): any
 	for _, l in SkyLiftCountry.HEDGES do
 		strip(hedges, "Hedge", l.u0, l.v0, l.u1, l.v1, l.w, l.h, l.lift, HEDGE, "Grass")
 	end
-	for _, p in { { 108, -32 }, { 193, -32 }, { 265, -32 }, { 340, -96 }, { 108, -150 } } do
+	for _, p in SkyLiftCountry.OAKS do
 		tree(hedges, p[1], p[2], 18 + rnd() * 6, 12 + rnd() * 4, OAK)
 	end
 
@@ -237,10 +237,8 @@ function Countryside.build(roblox: any, parent: any): any
 
 	-- the orchard beyond the trail: three rows of four
 	local orchard = kit0:folder(m, "Orchard")
-	for i = 0, 3 do
-		for j = 0, 2 do
-			tree(orchard, 205 + i * 22 + (j % 2) * 8, 112 + j * 20, 9 + rnd() * 2, 7 + rnd() * 1.5, APPLE)
-		end
+	for _, p in SkyLiftCountry.ORCHARD do
+		tree(orchard, p[1], p[2], 9 + rnd() * 2, 7 + rnd() * 1.5, APPLE)
 	end
 
 	-- the brook: from a spring on the left, under the line, under the footbridge on the trail, into the pond
