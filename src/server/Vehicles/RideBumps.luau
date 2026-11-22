@@ -372,11 +372,10 @@ function RideBumps.step(self: any, _dt: number)
 	for id, o in self.orders do
 		local a = world.actorsById[id]
 		if a == nil or world.possessed[id] then
-			-- (taken by a player mid-knock: theirs now)
+			-- (taken by a player mid-knock: theirs now, and the order is cleared so the brain does not keep it for when
+			-- they let go: AI/TownAI.resume snapshots the brain as it is then)
 			self.orders[id] = nil
-			if o.tumble then
-				setAttr(self, id, "Tumble", nil)
-			end
+			release(self, id, o)
 			continue
 		end
 		if o.toX ~= o.fromX or o.toZ ~= o.fromZ then
