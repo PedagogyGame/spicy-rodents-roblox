@@ -43,7 +43,8 @@
 -- the motor's landingSpot, which counts what is left of it, and the turn asked goes to the pose (KinematicPose
 -- trickTurn).
 -- Inside a hollow tree the camera's look turns freely (Camera/CameraRig, the hollow look), so the keys steer by the
--- body's own heading there (CameraRig.steerYaw), never by where the player is looking.
+-- body's own heading there (CameraRig.steerYaw), never by where the player is looking; at each hole up its trunk a
+-- toast says how to get out onto the branch outside (holeHint, once each time the hole is reached).
 -- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
 -- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- The Spicy Rodent's pounce has a wind-up (brief v2 §8; Tunables pounce.windup): the click is sent to the duel at once
@@ -59,7 +60,8 @@
 --   cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
 --   string (pure); launch(events, vy) -> action?, airSeconds? (pure); stunned(untilTime, now) -> boolean (pure);
---   aimOf(yaw0, pitch0, yaw, pitch) -> (aimYaw, aimReach) (pure); AIM_PITCH
+--   aimOf(yaw0, pitch0, yaw, pitch) -> (aimYaw, aimReach) (pure); AIM_PITCH; holeHint(mouth?) -> string? (pure);
+--   HOLE_HINT, TOP_HINT
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -79,6 +81,7 @@ local NightVision = require("../World/NightVision")
 local AirTrickButton = require("../UI/AirTrickButton")
 local AimMarker = require("../UI/AimMarker")
 local AirTrick = Import.shared("Movement/AirTrick") :: typeof(require("../../shared/Movement/AirTrick"))
+local HollowLayout = Import.shared("World/HollowLayout") :: typeof(require("../../shared/World/HollowLayout"))
 
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 
@@ -141,6 +144,18 @@ end
 -- elsewhere.
 function Squirrel.cameraZone(route: any?): string?
 	return if Enclosure.zone(route) ~= nil then "tunnel" else nil
+end
+
+-- What to tell the player arriving at a hole up a hollow tree's trunk (owner D33: "the option to run out on those
+-- branches"; pure; nil for no hole, or the ground hole): Space hops out onto the branch outside it, and out of the top
+-- one W also runs on out (onto the trunk or the bough it opens on).
+Squirrel.HOLE_HINT = "Space: out onto the branch"
+Squirrel.TOP_HINT = "Space: out onto the branch · W: on out of the top"
+function Squirrel.holeHint(mouth: { opens: string, t: number }?): string?
+	if mouth == nil or mouth.opens == "ground" then
+		return nil
+	end
+	return if mouth.t >= 1 then Squirrel.TOP_HINT else Squirrel.HOLE_HINT
 end
 
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
@@ -341,6 +356,9 @@ function Squirrel.start(
 	end
 	-- the re-aim: the camera at the wiggle's press (nil: no aim live), and its marker
 	local aimFrom: { yaw: number, pitch: number }? = nil
+	-- the hollow trees (nil until compiled) and the hole up a trunk the body is at, if any (Squirrel.holeHint)
+	local hollows = HollowLayout.default()
+	local atHole: any = nil
 	local marker = AimMarker.start()
 	local function cameraPitch(): number
 		return math.asin(math.clamp(workspace.CurrentCamera.CFrame.LookVector.Y, -1, 1))
@@ -484,6 +502,20 @@ function Squirrel.start(
 			then Squirrel.feedback(f :: any, events :: any, wasOnRoute, state.railT, routeOf)
 			else nil
 		local t = os.clock()
+		-- at a hole up a hollow tree's trunk, once each time it is reached: the way out onto its branch
+		local hole: any = nil
+		if hollows and state.routeId and hollows.spaceOf(state.routeId) then
+			hole = hollows.peekAt(state.x, state.y, state.z)
+		end
+		if hole ~= atHole then
+			atHole = hole
+			local said = Squirrel.holeHint(hole)
+			if said and ctx.toast then
+				lastSaid, lastText = t, said
+				ctx.toast(said, 2.5)
+				say = nil
+			end
+		end
 		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
 			lastSaid, lastText = t, say
 			ctx.toast(say, 2.5)

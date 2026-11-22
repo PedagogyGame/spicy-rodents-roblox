@@ -55,7 +55,8 @@
 --   contains(x, y, z) -> string?     the space whose cavity holds the point (the server's refuge test)
 --   within(hollow, x, y, z) -> boolean   that hollow's cavity holds the point (its Combat/Cover shape)
 --   keepCamera(x, y, z, hx, hy, hz) -> (x, y, z)   a camera point held inside the cavity round a head inside a
---                                    hollow (C.cameraIn inside its wall, floor and roof); unchanged for a head outside
+--                                    hollow (C.cameraIn inside its wall, floor and roof) and inside its staves (its
+--                                    `view`); unchanged for a head outside
 --   peekAt(x, y, z) -> Mouth?        the hole up a trunk (a mouth that is not a ground hole) whose point is within
 --                                    C.peekReach of the body's feet: the inside camera looks out of it
 --   nearest(x, z, maxDist?) -> (Hollow?, number)   level distance to the trunk's foot (the log's middle)
@@ -69,7 +70,8 @@
 --   cavities { Cavity } (each a vertical cylinder: x, z, radius, bottom, top; the log's is along its axis: a, b,
 --   radius), meter { capacity, ownAt }, parts { Piece } (the shell the server builds: Piece = role, shape "Block" |
 --   "Cylinder" | "Ball", p {x, y, z} centre, xv / yv the frame's right and up (unit), size {x, y, z}, tone? -1..1 a
---   shade either side of the role's colour).
+--   shade either side of the role's colour), view? { {x, z, radius, bottom, top} } (a tree's: where the camera may be,
+--   slices up its cavities round the trunk's own axis, inside its staves).
 
 local Curve = require("../Routes/Curve")
 local Enclosure = require("../Routes/Enclosure")
@@ -95,6 +97,8 @@ HollowLayout.C = {
 	treadStep = 30, -- degrees of the spiral per tread
 	treadDrop = 0.08, -- studs: a tread's top under the run's line
 	treadLength = 0.92, -- of the chord between its ends
+	shelfMax = 2.3, -- studs: the most a round shelf under the winding climb is across
+	shelfDeep = { 1.0, 1.4 }, -- its thickness under its top, in the board's 0.3 (seeded)
 	post = 0.55, -- studs: the spiral's heartwood post's clearance inside the ramp's inner edge
 	shelf = 1.5, -- studs: a hideout shelf's length across the shaft
 	logWall = 0.3,
@@ -104,6 +108,7 @@ HollowLayout.C = {
 	logThreshold = 1.2,
 	logOpen = 1.0, -- studs: a body nearer an open end of the log than this is in its opening, seen (not in the cavity)
 	cameraIn = 0.3, -- studs: the tunnel camera kept this far inside a cavity's wall (the liner boards stand outside it)
+	viewSlice = 2, -- studs: the height of a slice of where the camera may be (a hollow's `view`)
 	-- the bark mesh has 14 flats (Builders/Trees, the Blender trees): between its corners it is this much of the
 	-- nominal radius; every corner of the shell stays C.barkClear inside that at its height, lean included
 	barkFace = math.cos(math.pi / 14),
@@ -130,6 +135,27 @@ HollowLayout.C = {
 	burlRoom = 0.4, -- studs between the body's side and the wall a knot needs to bulge into
 	burlGap = 0.15, -- studs left between a knot and the body's side
 	burlMax = 1.9, -- studs: a knot's largest diameter
+	burlCrown = 1.0, -- studs: a knot this wide or wider is rounded by a crown
+	-- THE WALL (owner D33): the closed ring of staves round a cavity (HollowLayout.staves)
+	stave = {
+		width = 1.3, -- studs: a stave's share of the ring's inside (at least minN staves round)
+		minN = 10,
+		thick = 0.3, -- studs
+		lap = 0.12, -- a stave is this much wider than its share, so neighbours overlap and no seam opens
+		joint = 0.15, -- studs each board reaches past a joint up its column into the next
+		length = { 10, 17 }, -- studs: a board's length up its column (seeded; the first of each column cut shorter)
+		jitter = 0.06, -- studs: the most a stave stands in from the ring
+		bend = 0.2, -- studs: the most the trunk's axis strays from a straight board up it
+		streak = 0.18, -- the share of staves that are a dark streak
+		door = 2.1, -- studs over the floor the ground hole's opening reaches (the body's section and a margin)
+		doorWide = 2.4, -- studs: the chord it keeps clear at the staves (the body is 1.6 wide; the run in is not
+		-- square to a leaning wall)
+		window = 1.8, -- studs: the chord of a hole's opening up the trunk at the staves
+		sill = -0.15, -- studs over the climb's line at the hole: the opening's bottom
+		head = 1.95, -- and its top (the oval on the bark is 2 studs tall, its middle 0.85 over the line)
+		rim = 0.25, -- studs: the thickness of a hole's lining back to the bark
+		lip = 0.12, -- studs the lining stands proud of the staves
+	},
 	-- GETTING OUT ABOVE THE GROUND
 	hopSpeed = 9, -- st/s: a hole's hop out (Space): level speed (its rise is Enclosure.C.hopUp)
 	perchUnder = 0.35, -- studs: a perch's line under the hop's path where the air-catch takes it
@@ -220,6 +246,7 @@ export type Hollow = {
 	cavities: { Cavity },
 	meter: { capacity: number, ownAt: number },
 	parts: { Piece },
+	view: { { number } }?,
 }
 export type Compiled = { routes: { any }, hollows: { Hollow } }
 export type Layout = {
@@ -707,6 +734,7 @@ type Build = {
 	hollow: Hollow,
 	base: number,
 	routes: { any },
+	wallIn: ((h: number) -> number)?, -- the staves' inner radius at a height (wallOf), once the floor is known
 }
 
 -- The highest ground under a disc of `radius` round the trunk's foot and at the hole: the floor sits on it.
@@ -784,21 +812,6 @@ local function ringNear(rings: { Tier }, h: number): number
 		end
 	end
 	return rc
-end
-
--- the rings of liner boards from h0 to h1 (tierRings); `gaps` = { {h, bearing} } passages through a ring at
--- those heights
-local function tiers(b: Build, h0: number, h1: number, gaps: { { number } })
-	local tr = b.trunk
-	for _, r in tierRings(tr, h0, h1) do
-		local open = {}
-		for _, g in gaps do
-			if g[1] >= r.h - 1.0 and g[1] <= r.top + 1.0 then
-				table.insert(open, g[2])
-			end
-		end
-		ring(b.hollow.parts, "liner", r.a0, r.a1, r.rc, open, b.rand)
-	end
 end
 
 local function caps(b: Build, floorH: number, rcFloor: number, roofH: number, rcRoof: number)
@@ -931,31 +944,43 @@ local function surfacePoints(pc: Piece): { { number } }
 end
 
 -- A knot (burl) bulging from the inside wall at (bearing, h): a round boss whose face, `size` across (at most
--- C.burlMax), stands `inner` studs from the axis and which reaches back into the wall (a cylinder along the level
--- radial, as deep as 0.6 of its width: a few dozen triangles, where a ball is hundreds), shrunk until no point of it
--- passes the bark's flats (HollowLayout.barkOver) and it keeps C.burlGap off every run's body. Whether one of at
--- least 0.5 studs fits.
+-- C.burlMax), stands `inner` studs from the axis and which reaches back into the staves (a cylinder along the level
+-- radial, at least 0.6 of its width deep: a few dozen triangles, where a ball is hundreds), shrunk until no point of it
+-- passes the bark's flats (HollowLayout.barkOver) and it keeps C.burlGap off every run's body; a knot of C.burlCrown
+-- or more is rounded by a crown (a smaller boss standing proud of its middle, owner D33: "rounded bulges and burls",
+-- not flat discs) where that keeps clear too. Whether one of at least 0.5 studs fits.
 local function burl(b: Build, bearing: number, inner: number, h: number, size: number): boolean
 	local tr = b.trunk
 	local boxes = boxesOf(b)
 	local d = math.min(size, C.burlMax)
-	while d >= 0.5 do
-		local depth = d * 0.6
-		local c = tr.toWorld(bearing, inner + depth / 2, h)
-		local ox, oz = dirOf(bearing)
-		local pc: Piece = {
+	-- (its back into the staves, so it grows out of the wall rather than standing off it)
+	local back = if b.wallIn then b.wallIn(h) + 0.12 else 0
+	local ox, oz = dirOf(bearing)
+	local function boss(face: number, depth: number, across: number): Piece
+		local c = tr.toWorld(bearing, face + depth / 2, h)
+		return {
 			role = "burl",
 			shape = "Cylinder",
 			p = { r4(c[1]), r4(c[2]), r4(c[3]) },
 			xv = { r4(ox), 0, r4(oz) },
 			yv = { 0, 1, 0 },
-			size = { r4(depth), r4(d), r4(d) },
+			size = { r4(depth), r4(across), r4(across) },
 		}
+	end
+	while d >= 0.5 do
+		local pc = boss(inner, math.max(d * 0.6, back - inner), d)
 		if
 			HollowLayout.barkOver(tr, { pc }) <= 0 and not intrudes(boxes, surfacePoints(pc), nil, nil, nil, C.burlGap)
 		then
 			pc.tone = r4(b.rand() * 2 - 1)
 			table.insert(b.hollow.parts, pc)
+			if d >= C.burlCrown then
+				local crown = boss(inner - 0.16 * d, 0.3 * d, 0.55 * d)
+				if not intrudes(boxes, surfacePoints(crown), nil, nil, nil, C.burlGap) then
+					crown.tone = r4(math.clamp((pc.tone :: number) + 0.35, -1, 1))
+					table.insert(b.hollow.parts, crown)
+				end
+			end
 			return true
 		end
 		d -= 0.1
@@ -973,6 +998,265 @@ local function wallKnots(b: Build, count: number, h0: number, h1: number, away: 
 		local rc = tr.bark(h + 1) - C.wall
 		local d = 0.7 + 0.8 * b.rand()
 		burl(b, bearing, rc - d * 0.45, h, d)
+	end
+end
+
+-- THE WALL (owner D33, inside H1: "patch stuff together with more textured gnarliness inside the hollow part, but also
+-- grainularity"; his screenshot showed a few flat boards with wide gaps to the lawn and the sky). From within, the
+-- tree's bark mesh is not drawn at all, so the wall is all that closes the hollow: a ring of narrow staves round the
+-- cavity from its floor to its roof. Each stave is a straight board up its column on the trunk's own leaning axis, its
+-- outer corners just inside the bark's flats (it follows the trunk's taper: never nearer the axis than the planning
+-- rings, tierRings, so it is never in a body's way); C.stave.width a stave round the ring (at least C.stave.minN), a
+-- little wider than its share (C.stave.lap) so neighbours overlap and no seam opens from any angle; the joints up a
+-- column at seeded heights (no ring of joints across the wall), the boards lapping C.stave.joint past each; a seeded
+-- shade a stave, standing in from the ring by up to C.stave.jitter, now and then a dark streak.
+-- The only openings are the holes: at the ground hole the staves within a body's passage either side of its bearing
+-- (C.stave.doorWide) are left out from the floor to C.stave.door over it; at a hole up the trunk those within
+-- C.stave.window of its bearing, from C.stave.sill to C.stave.head over the climb's line there, and the hole is
+-- lined back to the bark (role "rim": a sill, a lintel and two jambs, standing C.stave.lip proud of the staves): a dark
+-- recess with a lip, the light of the town in it. Where the trunk's axis bends, a board is cut shorter (C.stave.bend).
+-- The inner radius of the staves at a height (their faces' distance from the axis), and how many go round (pure).
+local function wallOf(tr: Trunk, h0: number): (number, (h: number) -> number)
+	local S = C.stave
+	local function innerAt(n: number, h: number): number
+		-- a board of its share's width (lap included) at inner radius r: its outer corners at (r + thick) * sqrt(1 + k^2)
+		local k = math.tan(math.pi / n) * (1 + S.lap)
+		local R = tr.bark(h) * C.barkFace - C.barkClear - 0.02
+		return R / math.sqrt(1 + k * k) - S.thick
+	end
+	local n = math.max(S.minN, math.ceil(2 * math.pi * innerAt(S.minN, h0) / S.width))
+	return n, function(h: number): number
+		return innerAt(n, h)
+	end
+end
+
+-- a plate (a Block) at `bearing` round the trunk: from radius r0 to r1 out along the level radial, `wide` across it
+-- (square to the radial, level), from height y0 to y1 (tree-local), centred `shift` studs across
+local function plate(
+	tr: Trunk,
+	bearing: number,
+	r0: number,
+	r1: number,
+	wide: number,
+	y0: number,
+	y1: number,
+	shift: number
+): Piece
+	local c = tr.toWorld(bearing, (r0 + r1) / 2, (y0 + y1) / 2)
+	local ox, oz = dirOf(bearing)
+	-- (x across, y up, z out: right-handed, x = y cross z)
+	local xv = { oz, 0, -ox }
+	return {
+		role = "rim",
+		shape = "Block",
+		p = { r4(c[1] + xv[1] * shift), r4(c[2]), r4(c[3] + xv[3] * shift) },
+		xv = { r4(xv[1]), 0, r4(xv[3]) },
+		yv = { 0, 1, 0 },
+		size = { r4(wide), r4(y1 - y0), r4(r1 - r0) },
+	}
+end
+
+-- The closed wall of a hollow from h0 to h1 (tree-local heights); `gaps` = { {h, bearing} }: the ground hole first
+-- (h its floor), then each hole up the trunk (h the climb's line there). The rims are laid against the runs already
+-- in b.routes (every run of the hollow), each kept out of every body's box or left out.
+local function staves(b: Build, h0: number, h1: number, gaps: { { number } })
+	local tr, S, parts = b.trunk, C.stave, b.hollow.parts
+	local rand = HollowLayout.rngOf("hollow wall " .. b.hollow.id)
+	local n, inner = wallOf(tr, h0)
+	local step = 360 / n
+	local turn = rand() * step
+	local halfRad = math.pi / n
+	type Opening = { b: number, lo: number, hi: number, half: number, up: boolean, cols: { number } }
+	local opens: { Opening } = {}
+	for i, g in gaps do
+		if i == 1 then
+			-- the ground hole: every stave whose span meets the body's passage (C.stave.doorWide) at the staves
+			local ri = inner(g[1] + 1)
+			local pass = math.asin(math.min(1, (S.doorWide / 2) / ri))
+			table.insert(
+				opens,
+				{ b = g[2], lo = h0 - 1, hi = g[1] + S.door, half = math.deg(halfRad + pass), up = false, cols = {} }
+			)
+		else
+			-- a hole up the trunk: every stave whose middle is within the window's chord and half a stave
+			local ri = inner(g[1] + 1)
+			local w = math.asin(math.min(1, (S.window / 2) / ri))
+			table.insert(opens, {
+				b = g[2],
+				lo = g[1] + S.sill,
+				hi = g[1] + S.head,
+				half = math.deg(w + halfRad * 0.5),
+				up = true,
+				cols = {},
+			})
+		end
+	end
+	local function off(a: number, z: number): number
+		return (a - z + 180) % 360 - 180
+	end
+	-- one board up column `a` from e0 to e1, standing `jit` in from the ring
+	local function board(a: number, e0: number, e1: number, jit: number, tone: number)
+		local width = 2 * (inner(e0) + S.thick) * math.tan(halfRad) * (1 + S.lap)
+		for _ = 1, 30 do
+			local p0 = tr.toWorld(a, inner(e0) - jit + S.thick / 2, e0)
+			local p1 = tr.toWorld(a, inner(e1) - jit + S.thick / 2, e1)
+			local d = { p1[1] - p0[1], p1[2] - p0[2], p1[3] - p0[3] }
+			local u = unit(d)
+			local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
+			local dx, dz = dirOf(a)
+			local along = dx * u[1] + dz * u[3]
+			local rad = unit({ dx - u[1] * along, -u[2] * along, dz - u[3] * along })
+			local xv = cross(u, rad)
+			local pc: Piece = {
+				role = "liner",
+				shape = "Block",
+				p = { r4((p0[1] + p1[1]) / 2), r4((p0[2] + p1[2]) / 2), r4((p0[3] + p1[3]) / 2) },
+				xv = { r4(xv[1]), r4(xv[2]), r4(xv[3]) },
+				yv = { r4(u[1]), r4(u[2]), r4(u[3]) },
+				size = { r4(width), r4(len), S.thick },
+				tone = r4(tone),
+			}
+			local over = HollowLayout.barkOver(tr, { pc })
+			if over <= 0 then
+				table.insert(parts, pc)
+				return
+			end
+			jit += over + 0.002
+		end
+	end
+	for k = 0, n - 1 do
+		local a = turn + (k + 0.5) * step
+		-- the column's runs: h0 to h1 less the openings it meets
+		local runs = { { h0, h1 } }
+		for _, o in opens do
+			if math.abs(off(a, o.b)) < o.half then
+				table.insert(o.cols, off(a, o.b))
+				local nextRuns = {}
+				for _, r in runs do
+					if o.hi <= r[1] or o.lo >= r[2] then
+						table.insert(nextRuns, r)
+					else
+						if o.lo > r[1] then
+							table.insert(nextRuns, { r[1], o.lo })
+						end
+						if o.hi < r[2] then
+							table.insert(nextRuns, { o.hi, r[2] })
+						end
+					end
+				end
+				runs = nextRuns
+			end
+		end
+		local jit = rand() * S.jitter
+		local tone = if rand() < S.streak then -1 else rand() * 1.6 - 0.6
+		for _, r in runs do
+			if r[2] - r[1] < 0.2 then
+				continue
+			end
+			-- the boards up this run: the first cut short by a seeded share (the joints stagger round the ring)
+			-- (and a board is cut shorter where the trunk's axis bends: a straight board follows it within C.stave.bend)
+			local function bent(a0: number, a1: number): boolean
+				local x0, _, z0 = tr.axisAt(a0)
+				local x1, _, z1 = tr.axisAt(a1)
+				local xm, _, zm = tr.axisAt((a0 + a1) / 2)
+				return math.sqrt((xm - (x0 + x1) / 2) ^ 2 + (zm - (z0 + z1) / 2) ^ 2) > S.bend
+			end
+			local seeded = { r[1] }
+			local at = r[1] + between(rand, S.length) * (0.3 + 0.7 * rand())
+			while at < r[2] - 2.5 do
+				table.insert(seeded, at)
+				at += between(rand, S.length)
+			end
+			table.insert(seeded, r[2])
+			local cuts = { r[1] }
+			for i = 2, #seeded do
+				-- (halved until straight enough, each half in turn)
+				local stack = { seeded[i] }
+				while #stack > 0 do
+					local from, to = cuts[#cuts], stack[#stack]
+					if to - from > 2 and bent(from, to) then
+						table.insert(stack, (from + to) / 2)
+					else
+						table.insert(cuts, to)
+						table.remove(stack)
+					end
+				end
+			end
+			for i = 2, #cuts do
+				local e0 = cuts[i - 1] - (if i > 2 then S.joint else 0)
+				local e1 = cuts[i] + (if i < #cuts then S.joint else 0)
+				board(a, e0, e1, jit, tone)
+				-- (each board of a column a shade of its own, near the column's)
+				tone = math.clamp(tone + (rand() - 0.5) * 0.5, -1, 1)
+			end
+		end
+	end
+	-- the lining of each hole up the trunk: a sill, a lintel and the two jambs, from C.stave.lip proud of the staves back
+	-- to the bark; each narrowed off the bark's flats, kept out of every body's box (a sill lowered first) or left out
+	local boxes = boxesOf(b)
+	for _, o in opens do
+		if not o.up or #o.cols == 0 then
+			continue
+		end
+		local lo, hi = math.huge, -math.huge
+		for _, c in o.cols do
+			lo, hi = math.min(lo, c - step / 2), math.max(hi, c + step / 2)
+		end
+		local hc = (o.lo + o.hi) / 2
+		local ri = inner(hc) - S.lip
+		local outer = tr.bark(hc) * C.barkFace - C.barkClear
+		local chord = 2 * inner(hc) * math.sin(math.rad(hi - lo) / 2)
+		local mid = o.b + (lo + hi) / 2
+		-- (each piece's maker, and the drops to try it at: a sill may sink a little under the climb's line)
+		type Try = { make: (drop: number, r1: number) -> Piece, drops: { number } }
+		local tries: { Try } = {
+			{
+				make = function(drop: number, r1: number): Piece
+					return plate(tr, mid, ri, r1, chord + 2 * S.rim, o.lo - S.rim - drop, o.lo - drop, 0)
+				end,
+				drops = { 0, 0.1, 0.2, 0.3 },
+			},
+			{
+				make = function(_drop: number, r1: number): Piece
+					return plate(tr, mid, ri, r1, chord + 2 * S.rim, o.hi, o.hi + S.rim, 0)
+				end,
+				drops = { 0 },
+			},
+		}
+		for _, side in { -1, 1 } do
+			local edge = o.b + (if side < 0 then lo else hi)
+			table.insert(tries, {
+				make = function(_drop: number, r1: number): Piece
+					-- (its face on the opening's edge: shifted half its thickness into the opening)
+					return plate(tr, edge, ri, r1, S.rim, o.lo, o.hi, -side * S.rim / 2)
+				end,
+				drops = { 0 },
+			})
+		end
+		for _, try in tries do
+			local make, drops = try.make, try.drops
+			for _, drop in drops do
+				local r1 = outer
+				local pc = make(drop, r1)
+				for _ = 1, 30 do
+					local over = HollowLayout.barkOver(tr, { pc })
+					if over <= 0 then
+						break
+					end
+					r1 -= over + 0.002
+					pc = make(drop, r1)
+				end
+				if
+					r1 > ri + 0.1
+					and HollowLayout.barkOver(tr, { pc }) <= 0
+					and not intrudes(boxes, surfacePoints(pc), nil, nil, nil, 0)
+				then
+					pc.tone = r4(-0.5 - 0.5 * rand())
+					table.insert(parts, pc)
+					break
+				end
+			end
+		end
 	end
 end
 
@@ -1138,6 +1422,8 @@ VARIANTS.knothole = function(b: Build, design: any, inside: any)
 	local tr, hl = b.trunk, b.hollow
 	local bearing = inside.hole
 	local pts, floorH, rc0 = holeRun(b, bearing)
+	local _, wallIn = wallOf(tr, floorH - 0.05)
+	b.wallIn = wallIn
 	table.insert(pts, tr.toWorld(bearing + 180, rc0 - 1.0, floorH))
 	local id = b.base + 1
 	local cav = cavityOf(tr, rc0, floorH, floorH + C.room)
@@ -1152,7 +1438,7 @@ VARIANTS.knothole = function(b: Build, design: any, inside: any)
 	)
 	b.routes[#b.routes].hint = HollowLayout.HINTS.chamber
 	chamberAt(hl.chambers, design.chambers[1], id, 1, pts[#pts])
-	tiers(b, floorH - 0.05, floorH + C.room, { { floorH, bearing } })
+	staves(b, floorH - 0.05, floorH + C.room, { { floorH, bearing } })
 	caps(b, floorH, rc0, floorH + C.room, rc0)
 	holeKnot(b, bearing, floorH + 0.9)
 	wallKnots(b, 3, floorH + 0.9, floorH + C.room - 0.6, function()
@@ -1170,6 +1456,8 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 	local knotT, _, knotB, knotH0 = HollowLayout.boughExit(b.harvest, tr, inside.knot)
 	local top = wallH - 1
 	local pts, floorH, rc0 = holeRun(b, bearing)
+	local _, wallIn = wallOf(tr, floorH - 0.05)
+	b.wallIn = wallIn
 	-- the climb's line: C.shaftIn inside the wall above it, and inside the rings round it (narrowed to the bark)
 	local rings = tierRings(tr, floorH - 0.05, top + C.room)
 	local function rho(h: number): number
@@ -1350,7 +1638,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 		end
 	end
 	local topB = bearingAt(top)
-	tiers(b, floorH - 0.05, top + C.room, { { floorH, bearing }, { knotH, knotB }, { top, topB } })
+	staves(b, floorH - 0.05, top + C.room, { { floorH, bearing }, { knotH, knotB }, { top, topB } })
 	caps(b, floorH, rc0, top + C.room, rcTop)
 	holeKnot(b, bearing, floorH + 0.9)
 	holeKnot(b, knotB, knotH + 0.85)
@@ -1376,6 +1664,8 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 	local bearing = inside.hole
 	local topH = inside.top
 	local pts, floorH, rc0 = holeRun(b, bearing)
+	local _, wallIn = wallOf(tr, floorH - 0.05)
+	b.wallIn = wallIn
 	local rings = tierRings(tr, floorH - 0.05, topH + C.room)
 	local half = Enclosure.BODY.width / 2
 	local function laneMax(h: number): number
@@ -1695,7 +1985,11 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 		if math.max(a.h, c.h) >= floorH + 0.5 then
 			local wide = if a.kind == "flat" then C.ledgeWide else 0
 			local inner0 = math.max(0.2, math.min(a.r, c.r) - half - 0.1 - 0.25 * rand() - wide)
-			local wallR = tr.bark(math.max(a.h, c.h) + C.tier) - C.wall - 0.02
+			-- (into the staves a little: a shelf grows out of the wall)
+			local wallR = if b.wallIn
+				then b.wallIn(math.max(a.h, c.h)) + 0.05
+				else tr.bark(math.max(a.h, c.h) + C.tier) - C.wall - 0.02
+			local grow = between(rand, C.shelfDeep)
 			local length = C.treadLength + 0.06 * (rand() - 0.5)
 			local rr = (a.r + c.r) / 2
 			-- (narrower from the inside, shorter, lower; at the last a plank just the body's width, off the wall)
@@ -1719,9 +2013,27 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 				local k = (1 - (length - try[2])) / 2
 				local qa = { pa[1] + (pc[1] - pa[1]) * k, pa[2] + (pc[2] - pa[2]) * k, pa[3] + (pc[3] - pa[3]) * k }
 				local qc = { pc[1] + (pa[1] - pc[1]) * k, pc[2] + (pa[2] - pc[2]) * k, pc[3] + (pa[3] - pc[3]) * k }
+				-- a round shelf (owner D33: ledges "like fungus shelves or growths rather than planks"): at most
+				-- C.shelfMax across, its outer edge on the wall, its top face the board's (the line in it)
+				local across = math.min(outer - inner, C.shelfMax)
 				local trial: { Piece } = {}
-				slab(trial, "tread", qa, qc, outer - inner, 0.3, (inner + outer) / 2 - rr, tr)
-				if place(trial[1], i - 1, j + 2) then
+				slab(trial, "tread", qa, qc, across, 0.3, outer - across / 2 - rr, tr)
+				local sl = trial[1]
+				local up = sl.yv
+				local deep = 0.3 * grow
+				local round: Piece = {
+					role = "tread",
+					shape = "Cylinder",
+					p = {
+						r4(sl.p[1] - up[1] * (deep - 0.3) / 2),
+						r4(sl.p[2] - up[2] * (deep - 0.3) / 2),
+						r4(sl.p[3] - up[3] * (deep - 0.3) / 2),
+					},
+					xv = up,
+					yv = sl.xv,
+					size = { r4(deep), r4(across), r4(across) },
+				}
+				if place(round, -1, -1) then
 					break
 				end
 			end
@@ -1751,7 +2063,7 @@ VARIANTS.spiral = function(b: Build, design: any, inside: any)
 	wallKnots(b, 10, floorH + 2, topH, function(): number
 		return 360 * rand()
 	end)
-	tiers(b, floorH - 0.05, topH + C.room, gaps)
+	staves(b, floorH - 0.05, topH + C.room, gaps)
 	caps(b, floorH, rc0, topH + C.room, rcTop)
 	holeKnot(b, bearing, floorH + 0.9)
 	holeKnot(b, endBearing, topH + 0.85)
@@ -1926,6 +2238,31 @@ function HollowLayout.build(
 		local make = VARIANTS[design.variant]
 		assert(make, `hollow {design.id}: unknown variant {design.variant}`)
 		make(b, design, inside)
+		-- where the camera may be inside it (keepCamera): slices C.viewSlice tall up the cavities, each round the trunk's
+		-- own axis at its middle and C.cameraIn inside the staves all the way up it (the cavities are upright cylinders
+		-- round one point; a trunk that bends or leans leaves the staves nearer on one side)
+		local wallIn = b.wallIn
+		if wallIn then
+			local lo, hi = math.huge, -math.huge
+			for _, c in hl.cavities do
+				lo, hi = math.min(lo, c.bottom), math.max(hi, c.top)
+			end
+			local view = {}
+			local y = lo
+			while y < hi - 1e-6 do
+				local y1 = math.min(hi, y + C.viewSlice)
+				local mx, _, mz = tr.axisAt((y + y1) / 2 - tr.foot.y)
+				local r = math.huge
+				for k = 0, 4 do
+					local hh = y + (y1 - y) * k / 4 - tr.foot.y
+					local ax, _, az = tr.axisAt(hh)
+					r = math.min(r, wallIn(hh) - math.sqrt((ax - mx) ^ 2 + (az - mz) ^ 2))
+				end
+				table.insert(view, { r4(mx), r4(mz), r4(math.max(0.05, r - C.cameraIn)), r4(y), r4(y1) })
+				y = y1
+			end
+			hl.view = view
+		end
 		local perchIds: { [number]: boolean } = {}
 		for _, r in b.routes do
 			table.insert(compiled.routes, r)
@@ -2061,6 +2398,26 @@ function HollowLayout.new(compiled: Compiled): Layout
 		local y0, y1 = c.bottom + C.cameraIn, c.top - C.cameraIn
 		return c.x + dx, if y1 > y0 then math.clamp(y, y0, y1) else (y0 + y1) / 2, c.z + dz
 	end
+	-- (x, y, z) held inside a hollow's `view` (the slice at its height, round the trunk's own axis there)
+	local function inView(h: Hollow, x: number, y: number, z: number): (number, number, number)
+		local view = h.view
+		if view == nil or #view == 0 then
+			return x, y, z
+		end
+		local sl = view[#view]
+		for _, v in view do
+			if y < v[5] then
+				sl = v
+				break
+			end
+		end
+		local dx, dz = x - sl[1], z - sl[2]
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d > sl[3] then
+			x, z = sl[1] + dx / d * sl[3], sl[2] + dz / d * sl[3]
+		end
+		return x, y, z
+	end
 	function layout.keepCamera(
 		x: number,
 		y: number,
@@ -2092,10 +2449,10 @@ function HollowLayout.new(compiled: Compiled): Layout
 				local ux, uz = hx - c.x, hz - c.z
 				local ul = math.sqrt(ux * ux + uz * uz)
 				if ul > 0.2 then
-					return keepIn(c, c.x - ux / ul * c.radius, hy - 1, c.z - uz / ul * c.radius)
+					bx, by, bz = keepIn(c, c.x - ux / ul * c.radius, hy - 1, c.z - uz / ul * c.radius)
 				end
 			end
-			return bx, by, bz
+			return inView(h, bx, by, bz)
 		end
 		return x, y, z
 	end
