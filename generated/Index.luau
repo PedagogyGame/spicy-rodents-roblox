@@ -10,7 +10,7 @@ return {
 			chunks = { "Attractions" },
 		},
 		BranchNookRoutes = {
-			count = 525,
+			count = 524,
 			chunks = { "BranchNookRoutes_01" },
 		},
 		BranchNooks = {

@@ -10,7 +10,9 @@
 -- Two modules: BranchNooks (places and trees: a record) and BranchNookRoutes (the route records, an array the emitter
 -- chunks like the harvest's routes; Shared/Data appends them to the Registry).
 -- Interface: compile(ctx) -> (Module, Module); ctx = { routes (every route record so far), forks (the canopy forks so far,
---   merged), ids ({ [id] = true }: every id so far), terrainExtensions, invariant, compare }.
+--   merged), ids ({ [id] = true }: every id so far), data (a Shared/Data over the modules compiled so far: the
+--   buildings' boxes), terrainExtensions, invariant, compare }.
+local Colliders = require("../../../src/shared/World/Colliders")
 local Height = require("../../../src/shared/World/Height")
 local Registry = require("../../../src/shared/Routes/Registry")
 local BranchNooks = require("../../../src/shared/World/BranchNooks")
@@ -20,7 +22,24 @@ local Lib = {}
 function Lib.compile(ctx: any): (any, any)
 	local reg = Registry.fromRecords(ctx.routes)
 	Height.configure(ctx.terrainExtensions)
-	local compiled = BranchNooks.plan(reg :: any, ctx.forks, Height.at)
+	-- the buildings' boxes (World/Colliders over the compiled lots, venues and the alley: ctx.data, a Shared/Data over
+	-- what is compiled so far), each grown by buildingPad, up to its peak
+	local boxes = Colliders.fromData(ctx.data)
+	local pad = BranchNooks.C.buildingPad
+	local function blocked(x: number, y: number, z: number): boolean
+		for _, b in Colliders.query(boxes, x - pad, z - pad, x + pad, z + pad) do
+			if
+				math.abs(x - b.cx) <= b.hw + pad
+				and math.abs(z - b.cz) <= b.hd + pad
+				and y >= b.y0 - 1
+				and y <= b.peak + pad
+			then
+				return true
+			end
+		end
+		return false
+	end
+	local compiled = BranchNooks.plan(reg :: any, ctx.forks, Height.at, blocked)
 	Height.configure(nil)
 	compiled.rejected = nil -- (the planner's tally of candidates left out: not data)
 

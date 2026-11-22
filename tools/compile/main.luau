@@ -27,6 +27,7 @@ local HollowTrees = require("./lib/HollowTrees")
 local TreeShapes = require("./lib/TreeShapes")
 local BranchNooks = require("./lib/BranchNooks")
 local SharedTreeShapes = require("../../src/shared/World/TreeShapes")
+local SharedData = require("../../src/shared/Data")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -567,10 +568,21 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 				allForks = SharedTreeShapes.mergeForks(allForks :: any, v.forks) :: any
 			end
 		end
+		-- (the buildings' boxes: World/Colliders reads them through a Shared/Data over what is compiled so far)
+		local values: { [string]: any } = { Lots = lots }
+		local mods: { [string]: any } = { Lots = { count = #lots, chunks = { "Lots" } } }
+		for _, m in w1.modules do
+			values[m.name] = m.value
+			mods[m.name] = { count = 1, chunks = { m.name } }
+		end
+		values.Index = { modules = mods }
 		local nooks, nookRoutes = BranchNooks.compile({
 			routes = allRoutes,
 			forks = allForks,
 			ids = ids,
+			data = SharedData.new(function(name: string): any?
+				return values[name]
+			end),
 			terrainExtensions = terrainExtensions,
 			invariant = invariant,
 			compare = compare,

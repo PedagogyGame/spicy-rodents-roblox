@@ -28,10 +28,11 @@
 --             the server and the validator never see them.
 -- Every new route: starts exactly on a sample of its bough; stays C.clear studs from every other route beyond its first
 -- C.clearFrom studs (C.clearEnclosed from a hollow's runs and perches), outside the trunk's bark, C.overGround over the
--- ground; no stretch steeper than C.maxSlope. A candidate that breaks any of these is left out (the other side of the
+-- ground, out of the buildings (C.buildingPad round their boxes); no stretch steeper than C.maxSlope. A candidate that breaks any of these is left out (the other side of the
 -- bough, another bough, or none). Seeded per trunk (Park-Miller, exact in doubles): a rebuild is the same tree.
 -- THE INTERFACE
---   BranchNooks.plan(registry, forks, heightAt) -> Compiled      (the compiler only; registry over every route so far)
+--   BranchNooks.plan(registry, forks, heightAt, blocked?) -> Compiled   (the compiler only; registry over every route so
+--                                                                  far; blocked(x, y, z): a building's box holds it)
 --   BranchNooks.new(compiled) -> Nooks                            a lookup over generated/BranchNooks.luau
 --   BranchNooks.nodules(route) -> { number }                      arc distances (studs) of a branch's knots (cached)
 --   BranchNooks.barkRadius(trunk, t) -> studs                     the bark the game takes a trunk to have at t
@@ -75,7 +76,8 @@ BranchNooks.C = table.freeze({
 	-- within stashReach of the nook's far end
 	stashUp = 0.7,
 	stashSide = 0.9,
-	stashReach = 1.8,
+	stashReach = 1.5,
+	stashMargin = 0.4, -- no other route comes within stashReach + this of a cup
 	stashHole = 0.55, -- the hole's radius
 	boughBark = 1.1, -- a bough's bark from its line (Builders/Trees: its drawn radius near the trunk)
 	-- a hangout: a flat crook from a bough at a wide fork, hangoutLen studs round the trunk; sitting from seatFrom on
@@ -103,12 +105,14 @@ BranchNooks.C = table.freeze({
 	-- the rules every new route keeps
 	clear = 2.0, -- studs from any other route's line, beyond clearFrom studs along it
 	clearFrom = 1.4,
-	clearNear = 1.2, -- ... and this much from any but its bough, everywhere
+	clearNear = 1.5, -- ... and this much from any but its bough, everywhere (over the motor's 1.2-stud automatic switch)
+	startGap = 3, -- studs from the start of a new route to any other new route
 	clearOwn = 1.8, -- from its own bough's line, at the most (its far end)
 	ownSlope = 0.55, -- ... and at least this much of the way walked from it
 	clearEnclosed = 6, -- from a hollow's runs and its perches (their hops and leaps are specced to land elsewhere)
 	barkPad = 0.9, -- outside the bark (barkRadius) this much
 	overGround = 6, -- over the ground at every sample (a walker passes under)
+	buildingPad = 1.5, -- studs round a building's box (World/Colliders) no new route comes into
 	maxSlope = 56, -- degrees (the harvest's boughs leave at 54)
 	-- nodules: knots on a branch's run path, one every noduleGap (seeded in [min, max]) studs from noduleStart past the
 	-- collar to noduleEnd before the tip
@@ -311,6 +315,7 @@ type Ctx = {
 	enclosed: Hash,
 	mine: Hash,
 	heightAt: (number, number) -> number,
+	blocked: ((x: number, y: number, z: number) -> boolean)?,
 }
 
 -- does a candidate keep every rule? (its samples, its bough and trunk)
@@ -337,6 +342,10 @@ local function keeps(ctx: Ctx, samples: { V3 }, bough: any, trunk: any): boolean
 		if p.y - ctx.heightAt(p.x, p.z) < C.overGround then
 			return no("ground")
 		end
+		local blockedAt = ctx.blocked
+		if blockedAt and blockedAt(p.x, p.y, p.z) then
+			return no("building")
+		end
 		-- outside the bark at its height
 		if p.y <= trunkTop + 1 then
 			local a, tt = trunkAt(ctx.reg, trunk, p.y)
@@ -360,9 +369,11 @@ local function keeps(ctx: Ctx, samples: { V3 }, bough: any, trunk: any): boolean
 		if de < C.clearEnclosed then
 			return no("hollow")
 		end
-		if walked >= C.clearFrom then
+		-- the other new routes: clear beyond clearFrom, and none starts within startGap of another (two starts side by
+		-- side on one bough: running back down one to its start would switch onto the other's end by itself)
+		if walked >= C.clearFrom or i == 1 then
 			local dm = nearestOther(ctx.mine, p, none)
-			if dm < C.clear then
+			if dm < (if i == 1 then C.startGap else C.clear) then
 				return no("mine")
 			end
 		end
@@ -427,8 +438,22 @@ local function outOf(reg: any, trunk: any, p: V3): { number }
 	return { r4(dx / l), r4(dz / l) }
 end
 
-function BranchNooks.plan(reg: any, forks: { any }, heightAt: (number, number) -> number): Compiled
-	local ctx: Ctx = { reg = reg, hash = {}, boughs = {}, why = {}, enclosed = {}, mine = {}, heightAt = heightAt }
+function BranchNooks.plan(
+	reg: any,
+	forks: { any },
+	heightAt: (number, number) -> number,
+	blocked: ((x: number, y: number, z: number) -> boolean)?
+): Compiled
+	local ctx: Ctx = {
+		reg = reg,
+		hash = {},
+		boughs = {},
+		why = {},
+		enclosed = {},
+		mine = {},
+		heightAt = heightAt,
+		blocked = blocked,
+	}
 	for _, r in reg:all() do
 		if r.enclosure ~= nil or r.origin == "hollow" then
 			addSamples(ctx.enclosed, r.id, reg:samples(r))
@@ -494,12 +519,13 @@ function BranchNooks.plan(reg: any, forks: { any }, heightAt: (number, number) -
 		-- the knot-hole for a cup ending at `e` (the motor's point): in the nearer wood, the trunk's bark round toward the
 		-- bough it left, or the bough's own bark beside the cup; its middle and level normal out of the wood
 		local function knotHole(b: any, e: V3, side: number): { number }
-			local y = e.y + C.lift + C.stashUp
+			local fx, fy, fz = e.x, e.y + C.lift, e.z -- the feet in the cup
+			local y = fy + C.stashUp
 			local a, ta = trunkAt(reg, trunk, y)
 			local R = BranchNooks.barkRadius(trunk, ta)
 			local ang = math.atan2(e.x - a.x, e.z - a.z) - side * C.stashSide / math.max(R, 0.5)
 			local nx, nz = math.sin(ang), math.cos(ang)
-			local tx, tz = a.x + nx * R, a.z + nz * R
+			local onTrunk = { a.x + nx * R, y, a.z + nz * R, nx, nz }
 			-- the bough: its sample nearest the cup, the bark facing the cup
 			local best, bd = nil, math.huge
 			for _, q in reg:samples(b) do
@@ -511,11 +537,18 @@ function BranchNooks.plan(reg: any, forks: { any }, heightAt: (number, number) -
 			local q = best :: V3
 			local qx, qz = e.x - q.x, e.z - q.z
 			local ql = math.sqrt(qx * qx + qz * qz)
-			if ql > 1e-6 and math.sqrt(bd) + 0.5 < level(e, a) - R then
+			local pick = onTrunk
+			if ql > 1e-6 then
 				local rb = C.boughBark
-				return { r4(q.x + qx / ql * rb), r4(q.y + C.lift * 0.6), r4(q.z + qz / ql * rb), r4(qx / ql), r4(qz / ql) }
+				local onBough = { q.x + qx / ql * rb, q.y + C.lift * 0.6, q.z + qz / ql * rb, qx / ql, qz / ql }
+				local function far(h: { number }): number
+					return (h[1] - fx) ^ 2 + (h[2] - fy) ^ 2 + (h[3] - fz) ^ 2
+				end
+				if far(onBough) < far(onTrunk) then
+					pick = onBough
+				end
 			end
-			return { r4(tx), r4(y), r4(tz), r4(nx), r4(nz) }
+			return { r4(pick[1]), r4(pick[2]), r4(pick[3]), r4(pick[4]), r4(pick[5]) }
 		end
 		local function crook(kind: string, b: any, outs: { number }, turns: { number }, len: number, sides: { number })
 			for _, out in outs do
@@ -530,14 +563,18 @@ function BranchNooks.plan(reg: any, forks: { any }, heightAt: (number, number) -
 						pts[1] = { s.x, s.y, s.z }
 						local rec = record(nextId, `{kind} off route {b.id}`, pts, C.nookSurface)
 						local smp = samplesOf(rec)
-						if keeps(ctx, smp, b, trunk) then
+						-- (a nook's cup: no other route within the stash's reach of its end, its own bough and the
+						-- trunk's axis included, so the stash is used from the cup and nowhere else)
+						local tail = smp[#smp]
+						local cupClear = kind ~= "nook" or nearestOther(ctx.hash, tail, {}) >= C.stashReach + C.stashMargin
+						if cupClear and keeps(ctx, smp, b, trunk) then
 							local e = smp[#smp]
 							local place: Place = {
 								route = rec.id,
 								kind = kind,
 								trunk = trunk.id,
 								parent = b.id,
-								parentT = r4(st),
+								parentT = st,
 								at = { r4(e.x), r4(e.y), r4(e.z) },
 								out = outOf(reg, trunk, e),
 								seatFrom = if kind == "nook" then C.nookSeatFrom else C.hangoutSeatFrom,
@@ -643,7 +680,7 @@ function BranchNooks.plan(reg: any, forks: { any }, heightAt: (number, number) -
 							kind = "spur",
 							trunk = trunk.id,
 							parent = b.id,
-							parentT = r4(st),
+							parentT = st,
 							at = { r4(e.x), r4(e.y), r4(e.z) },
 							out = outOf(reg, trunk, e),
 						})
