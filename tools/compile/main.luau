@@ -395,7 +395,7 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 		end
 	end
 	compare("lot districts", 11, #lotsPerDistrict)
-	compare("roads", 116, #roads)
+	compare("roads (116 + 8 sidewalk pieces split at street mouths, D29)", 124, #roads)
 	compare("lanes", 25, #lanes)
 	compare("cast entries", 87, #cast)
 	compare("route generators in the catalogue", 60, #catalog)

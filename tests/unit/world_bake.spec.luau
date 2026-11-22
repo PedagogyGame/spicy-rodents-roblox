@@ -1,6 +1,6 @@
 --!strict
 -- WorldGen bake tests (spike S6, W1 #7; BUILD_PLAN §6.2 "bake determinism", §6.4 place tests): the
--- Lune bake of generated/ data gives one Model per lot (243) and per road (116) plus route props,
+-- Lune bake of generated/ data gives one Model per lot (243) and per road (124) plus route props,
 -- lamps and the Skyline; the data's facing; seats on World/Height (or the harvested absolute seat);
 -- LevelOfDetail from data; the builder families (gables at the harvested eave/peak, doors with prompt
 -- placeholders, SurfaceGui signs, Beam wires, trees around their route curves, the Hospital and
@@ -60,7 +60,7 @@ return function(t)
 			end
 		end
 		t.eq(n.lot, 243)
-		t.eq(n.road, 116)
+		t.eq(n.road, 124)
 		t.eq(n.skyline, 1)
 		t.truthy(n.props >= 400, `props {n.props}`)
 		t.truthy(n.lamps >= 15, `lamp models {n.lamps}`) -- one model per street with lamps
@@ -323,7 +323,7 @@ return function(t)
 	t.test("Town Model: counts, attributes, InstanceHash survives the .rbxm round trip", function()
 		local town = Bake.run(data, factory())
 		t.eq(#town:FindFirstChild("Lots"):GetChildren(), 243)
-		t.eq(#town:FindFirstChild("Roads"):GetChildren(), 116)
+		t.eq(#town:FindFirstChild("Roads"):GetChildren(), 124)
 		t.truthy(town:FindFirstChild("Skyline") ~= nil, "Skyline")
 		t.eq(town:GetAttribute("BakeHash"), Bake.hash(plans))
 		local back = roblox.deserializeModel(roblox.serializeModel({ town }))[1]
