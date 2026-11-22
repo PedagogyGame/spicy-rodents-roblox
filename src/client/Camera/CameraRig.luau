@@ -54,6 +54,9 @@
 
 local Import = require("../Import")
 local HollowLayout = Import.shared("World/HollowLayout") :: typeof(require("../../shared/World/HollowLayout"))
+-- (its Layout and Hollow types: the module is imported through a cast, so its exported types are not in scope)
+type HollowLayout = typeof(HollowLayout.new(nil :: any))
+type Hollow = typeof(HollowLayout.new(nil :: any).hollows[1])
 
 local CameraRig = {}
 
@@ -305,6 +308,8 @@ end
 -- going out, the orbit takes over from where the eye is.
 --   hollowLook(yaw, pitch, dx, dy, invert) -> yaw, pitch: one look input (radians, as lookStep has them)
 --   hollowRecentre(yaw, pitch, idle, moving, dt, rest?) -> yaw, pitch (back towards 0 and the rest, HOLLOW.rest)
+--   hollowAt(layout, x, y, z) -> Hollow?: the hollow whose cavity holds the head (HollowLayout's contains gives its
+--   space, "hollow.H1", which hollowOfSpace turns into the Hollow; hollow() takes the id, "H1", and finds nothing)
 --   hollowRest(hollow?) -> pitch: the rest in that hollow (up a tall one; nearly level in a one-chamber tree)
 --   hollowView(hx, hy, hz, lx, lz, yaw, pitch, keep?, mx?, mz?) -> (eye x, y, z, look x, y, z, firstPerson): (mx, mz)
 --   the hollow's middle line at the head's height
@@ -392,6 +397,12 @@ function CameraRig.hollowRest(h: { cavities: { any } }?): number
 		lo, hi = math.min(lo, c.bottom), math.max(hi, c.top)
 	end
 	return if hi - lo >= H.tall then H.rest else H.restLow
+end
+
+-- the hollow the head is in, else nil: the one lookup the hollow look turns a point into a Hollow by (its rest, its
+-- middle line, its ovals, its ground hole)
+function CameraRig.hollowAt(layout: HollowLayout, x: number, y: number, z: number): Hollow?
+	return layout.hollowOfSpace(layout.contains(x, y, z))
 end
 
 function CameraRig.hollowView(
@@ -920,8 +931,9 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
 				look = if look.Magnitude > 0.05 then look.Unit else Vector3.zAxis
 				local head = cf.Position + Vector3.new(0, 0.35, 0)
-				local inHollow = hollows ~= nil and hollows.contains(head.X, head.Y, head.Z) ~= nil
-				if not inHollow or hollows == nil then
+				-- (looked up once a frame: its rest, its middle line, its ovals and its ground hole all come from it)
+				local here = if hollows then CameraRig.hollowAt(hollows, head.X, head.Y, head.Z) else nil
+				if here == nil or hollows == nil then
 					hideBody(false)
 					hideOvals(nil)
 					if next(faded) then
@@ -970,7 +982,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local layout = assert(hollows, "the hollow trees are loaded")
 				if not wasIn then
 					-- (in at the rest: up the hollow)
-					rest = CameraRig.hollowRest(layout.hollow(layout.contains(head.X, head.Y, head.Z) :: string))
+					rest = CameraRig.hollowRest(here)
 					yaw, pitch, idle = 0, rest, 0
 				end
 				-- the look: the mouse (unless the cursor is out) and the right stick
@@ -1010,15 +1022,15 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local mouth = layout.peekAt(feet.X, feet.Y - 0.35, feet.Z)
 				local wantPeek = mouth ~= nil and speed < 1
 				peekK += ((if wantPeek then 1 else 0) - peekK) * (1 - math.exp(-H.peekEase * dt))
-				local here = layout.hollow(layout.contains(head.X, head.Y, head.Z) :: string)
 				-- (the middle line of the cavity round the head)
 				local mx, mz = nil :: number?, nil :: number?
-				for _, c in (if here then here.cavities else {}) :: { any } do
+				for _, c in here.cavities do
 					if c.a == nil and head.Y >= c.bottom - 0.5 and head.Y <= c.top then
 						mx, mz = c.x, c.z
 					end
 				end
-				hideOvals(if here and shell then shell:FindFirstChild(here.id) else nil)
+				-- (the shell's model of a hollow is named by its id: Server/World/HollowShell)
+				hideOvals(if shell then shell:FindFirstChild(here.id) else nil)
 				local ex, ey, ez, vx, vy, vz, first =
 					CameraRig.hollowView(head.X, head.Y, head.Z, look.X, look.Z, yaw, pitch, layout.keepCamera, mx, mz)
 				local eye, dir = Vector3.new(ex, ey, ez), Vector3.new(vx, vy, vz)
@@ -1032,9 +1044,8 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local target = CFrame.lookAt(eye, eye + (if dir.Magnitude > 1e-3 then dir.Unit else look))
 				if not wasIn then
 					-- coming in: from just outside the ground hole the body came through, in through it
-					local m = here
 					local g: any = nil
-					for _, mm in (if m then m.mouths else {}) :: { any } do
+					for _, mm in here.mouths do
 						if
 							mm.opens == "ground"
 							and (
