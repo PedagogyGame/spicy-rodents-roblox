@@ -63,7 +63,17 @@
 --   -> boolean; :cases() -> { [id]: Case }; :feared() -> { actor } (the squirrels people are afraid of now:
 --   the rodent and infected squirrels, not those hidden down a drain); :walkRoute(x, z) -> ({ {x, z} }?, length);
 --   :sidewalkRoute(x, z) -> ({ {x, z} }?, length) (the pavements only); :shutdown(); :stats();
---   TOASTS; TICK; SINK
+--   :doctorCase(id) -> { state, x, z, aboard }?; :doctorLoad(id) -> boolean; :doctorUnload(id) -> boolean;
+--   :doctorRelease(id) (D30, below); TOASTS; TICK; SINK; DOCTOR_MAX
+-- THE DOCTORS (owner D30). With opts.doctorCall, a patient queued for an ambulance is first offered to a doctor (Server/
+-- Hospital/DoctorService: true when a doctor took the call). The call is then the doctor's (amb "doctor"): no computer
+-- ambulance and no crew go, and the patient waits on the ground (the case counts it as an ambulance on its way: the
+-- deadline is held while the doctor has it). doctorLoad: the doctor's ambulance is beside them: aboard at once
+-- (InfectionRules.pickUp: out of sight, as any loaded patient). doctorUnload: at the hospital's doors: taken in, then
+-- the beds, the treatment and the cure exactly as for the computer's ambulances. doctorRelease: the doctor let the call
+-- go (demoted, too slow, gone): a patient still waiting goes back to the head of the queue for the computer's
+-- ambulances and is never offered to a doctor again; one aboard is taken in out of sight. Whatever the doctor service
+-- does, a call is never a doctor's for more than DOCTOR_MAX seconds: then it is released here.
 -- Ids are TownAI actor ids. Positions in studs.
 
 local Import = require("../Import")
@@ -101,6 +111,8 @@ export type Opts = {
 	driverOf: ((id: number) -> any?)?, -- who plays body `id` now (any value naming the player; nil: the AI)
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
 	onFault: ((where: string, err: any) -> ())?, -- a part of a step failed (it was contained)
+	-- D30: a patient queued for an ambulance, offered to a doctor first (true: a doctor took the call); nil: no doctors
+	doctorCall: ((id: number, x: number, z: number) -> boolean)?,
 	-- the town's one Speech/SpeechRules state (Boot/Game: shared with the drains, the rafters and the overhead watch);
 	-- default its own
 	speech: any?,
@@ -113,7 +125,10 @@ type Record = {
 	biter: number?,
 	by: any?, -- who was playing the biter at the bite (driverOf's value); nil: nobody in particular
 	home: { number }, -- where the person was bitten (a townsperson walks back there when cured)
-	amb: string, -- none | queued | assigned | returning
+	amb: string, -- none | queued | assigned | returning | doctor (D30: a doctor's call)
+	aboard: boolean, -- D30: the patient is in the doctor's ambulance
+	doctorUntil: number?, -- D30: the call is released from the doctor at this time whatever happens
+	noDoctor: boolean, -- D30: a doctor let this call go: the computer's ambulances only from now on
 	vehicle: any?, -- the responder on this patient's call (only while the trip is this record's)
 	lingerUntil: number?, -- the patient is aboard: the ambulance pulls away at this time
 	trip: any?, -- that trip's route: a vehicle on any other route is no longer this record's
@@ -168,6 +183,7 @@ InfectionService.ROAD_PAD = 2 -- studs beyond the asphalt that still count as "i
 -- studs between a patient and the point of the road centreline where their ambulance stops: its lane
 -- is 7.5 studs off the centreline and the vehicle 11 studs long, so at this distance it is never on them
 InfectionService.STOP_CLEAR = 21
+InfectionService.DOCTOR_MAX = 420 -- s a call may be a doctor's at most (D30; the doctor service gives it back sooner)
 
 -- What a player holding a body is told (on screen, plain words, what to do).
 InfectionService.TOASTS = table.freeze({
@@ -212,6 +228,7 @@ export type Service = typeof(setmetatable(
 		driverOf: (id: number) -> any?,
 		serverTime: () -> number,
 		onFault: (where: string, err: any) -> (),
+		doctorCall: ((id: number, x: number, z: number) -> boolean)?,
 		now: number,
 		acc: number,
 		records: { [number]: Record },
@@ -277,6 +294,7 @@ function InfectionService.new(opts: Opts): Service
 			return world.now
 		end,
 		onFault = opts.onFault or function() end,
+		doctorCall = opts.doctorCall,
 		now = 0,
 		acc = 0,
 		records = {},
@@ -310,6 +328,8 @@ function InfectionService.new(opts: Opts): Service
 			walkIns = 0,
 			stoodDown = 0,
 			faults = 0,
+			doctorCalls = 0,
+			doctorRuns = 0,
 		},
 	}, InfectionService)
 	return self
@@ -1161,6 +1181,8 @@ local function dropAmbulance(self: Service, rec: Record)
 	rec.trip = nil
 	rec.virtual = false
 	rec.amb = "none"
+	rec.aboard = false
+	rec.doctorUntil = nil
 end
 
 local function ambulanceFact(rec: Record): string
@@ -1178,8 +1200,30 @@ local function ambulanceFact(rec: Record): string
 			return "home"
 		end
 		return "returning"
+	elseif rec.amb == "doctor" then
+		-- D30: the doctor's ambulance is on its way (the patient waits for it), or on its way in with them aboard
+		return if rec.aboard then "returning" else "assigned"
 	end
 	return rec.amb
+end
+
+-- D30: the doctor lets the call go: a patient still waiting is the computer's ambulances' (at the head of the queue,
+-- never a doctor's again); one aboard is taken in out of sight (the transit ends on the next step).
+local function releaseDoctor(self: Service, rec: Record)
+	if rec.amb ~= "doctor" then
+		return
+	end
+	rec.noDoctor = true
+	rec.doctorUntil = nil
+	if rec.aboard then
+		rec.aboard = false
+		rec.amb = "none"
+	else
+		rec.amb = "queued"
+		if table.find(self.queue, rec.id) == nil then
+			table.insert(self.queue, 1, rec.id)
+		end
+	end
 end
 
 -- The ambulance that was coming is no longer coming for this patient (something else let it go, so
@@ -1244,6 +1288,16 @@ local function stepQueue(self: Service)
 		local id = self.queue[1]
 		local rec = self.records[id]
 		if rec == nil or rec.stage == nil or rec.amb ~= "queued" then
+			table.remove(self.queue, 1)
+			continue
+		end
+		-- D30: a doctor first, if one is free (the call is theirs from now on, see the header)
+		local a = actorOf(self, id)
+		if not rec.noDoctor and self.doctorCall and a and self.doctorCall(id, a.x, a.z) then
+			rec.amb = "doctor"
+			rec.aboard = false
+			rec.doctorUntil = self.now + InfectionService.DOCTOR_MAX
+			self._stats.doctorCalls += 1
 			table.remove(self.queue, 1)
 			continue
 		end
@@ -1579,10 +1633,14 @@ local function apply(self: Service, rec: Record, effect: any)
 		-- later (stepCase). Let go in the same tick, it was turned round on the far side of the road
 		-- in the very frame the two people vanished.
 		hidePatient(self, rec)
-		if rec.amb == "assigned" and onTrip(rec) then
-			rec.lingerUntil = self.now + InfectionService.LOAD_LINGER
+		if rec.amb == "doctor" then
+			rec.aboard = true -- (D30: in the doctor's ambulance; the doctor drives it in)
+		else
+			if rec.amb == "assigned" and onTrip(rec) then
+				rec.lingerUntil = self.now + InfectionService.LOAD_LINGER
+			end
+			rec.amb = "returning"
 		end
-		rec.amb = "returning"
 	elseif kind == "abandon" then
 		self._stats.abandoned += 1
 		hidePatient(self, rec)
@@ -1747,6 +1805,11 @@ local function factsFor(self: Service, rec: Record): any
 		rec.route, rec.routeLen = route, if route then len else nil
 		inputs.routeLen = rec.routeLen
 	end
+	if rec.amb == "doctor" and not rec.aboard and (case.state == "scene" or case.state == "enroute") then
+		-- D30: the doctor's ambulance is on its way: the patient is not given up on meanwhile (if the doctor lets the
+		-- call go, the computer's ambulance gets its full time from then)
+		case.deadline = self.now + self.params.ambulanceTimeoutSecs
+	end
 	inputs.ambulance = ambulanceFact(rec)
 	if inputs.ambulance == "arrived" and (case.state == "scene" or case.state == "enroute") then
 		inputs.crewSecs = crewTime(self, rec)
@@ -1779,6 +1842,9 @@ local function stepCase(self: Service, rec: Record)
 		return
 	end
 	checkAmbulance(self, rec)
+	if rec.amb == "doctor" and rec.doctorUntil and self.now >= rec.doctorUntil then
+		releaseDoctor(self, rec) -- (D30: never a doctor's for ever)
+	end
 	if rec.lingerUntil and self.now >= rec.lingerUntil then
 		rec.lingerUntil = nil
 		if onTrip(rec) then
@@ -1789,6 +1855,13 @@ local function stepCase(self: Service, rec: Record)
 	local effects = InfectionRules.advance(rec.case, self.now, inputs, self.rand, self.params)
 	for _, e in effects do
 		apply(self, rec, e)
+	end
+	if rec.amb == "doctor" then
+		local st = rec.case.state
+		if not (st == "scene" or st == "enroute" or st == "transit") then
+			-- (D30: in the hospital's care now, or on their feet: the doctor's call is over)
+			rec.amb, rec.aboard, rec.doctorUntil = "none", false, nil
+		end
 	end
 	if inputs.controller == "player" then
 		-- A body a player holds is under no order. One given just before the hand-over (the run of a
@@ -1993,6 +2066,9 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 		by = by,
 		home = { a.x, a.z },
 		amb = "none",
+		aboard = false,
+		doctorUntil = nil,
+		noDoctor = false,
 		vehicle = nil,
 		lingerUntil = nil,
 		trip = nil,
@@ -2161,6 +2237,59 @@ function InfectionService.trafficFlags(self: Service, id: number): boolean
 	end
 	local rec = self.records[id]
 	return rec ~= nil and (InfectionRules.atScene(rec.case) or rec.case.state == "transit")
+end
+
+-- D30, the doctors (see the header) -------------------------------------------------------------------
+
+-- doctorCase(id): the patient on a doctor's call (where they are, the state, aboard or not); nil once the call is not
+-- a doctor's (closed, stood down, in the hospital's care, released).
+function InfectionService.doctorCase(
+	self: Service,
+	id: number
+): { state: string, x: number, z: number, aboard: boolean }?
+	local rec = self.records[id]
+	local a = actorOf(self, id)
+	if rec == nil or rec.amb ~= "doctor" or a == nil then
+		return nil
+	end
+	return { state = rec.case.state, x = a.x, z = a.z, aboard = rec.aboard }
+end
+
+-- doctorLoad(id): the doctor's ambulance is beside the patient: aboard (true), or nothing (false: not waiting for it).
+function InfectionService.doctorLoad(self: Service, id: number): boolean
+	local rec = self.records[id]
+	if rec == nil or rec.amb ~= "doctor" or rec.aboard then
+		return false
+	end
+	local effects = InfectionRules.pickUp(rec.case, self.now, self.params)
+	if #effects == 0 then
+		return false
+	end
+	for _, e in effects do
+		apply(self, rec, e)
+	end
+	publish(self, rec)
+	return true
+end
+
+-- doctorUnload(id): the doctor stopped at the hospital with the patient aboard: taken in (admitted on the next step,
+-- then a bed and the cure). False when nobody is aboard.
+function InfectionService.doctorUnload(self: Service, id: number): boolean
+	local rec = self.records[id]
+	if rec == nil or rec.amb ~= "doctor" or not rec.aboard then
+		return false
+	end
+	rec.amb, rec.aboard, rec.doctorUntil = "none", false, nil
+	self._stats.doctorRuns += 1
+	return true
+end
+
+-- doctorRelease(id): the doctor lets the call go (see the header). Nothing when it is not a doctor's call.
+function InfectionService.doctorRelease(self: Service, id: number)
+	local rec = self.records[id]
+	if rec then
+		releaseDoctor(self, rec)
+	end
 end
 
 function InfectionService.cases(self: Service): { [number]: any }

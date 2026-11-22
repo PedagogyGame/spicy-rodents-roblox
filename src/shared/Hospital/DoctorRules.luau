@@ -20,7 +20,7 @@
 -- blame and no pay.
 -- Ambulances the doctors leave about go back to their bays (shouldReturn): at once when left at the bays, else after
 -- returnSecs with no player within returnNear.
--- Interface: params() -> Params (Config/Tunables doctor.*); WORDS; REPUTATION; newJob(caseId, now) -> Job;
+-- Interface: params() -> Params (Config/Tunables doctor.*); WORDS; WHY; REPUTATION; newJob(caseId, now) -> Job;
 --   step(job, now, facts, params) -> { Effect }; atPatient(facts, params) -> boolean; chooseDoctor({ Free }) -> id?;
 --   shouldReturn(now, leftAt, fromBay, nearestPlayer, params) -> boolean; callWords(where?) -> string;
 --   paidWords(cents) -> string
@@ -85,6 +85,12 @@ DoctorRules.WORDS = table.freeze({
 	doctorsOnly = "Only doctors drive the ambulances. Pick Doctor from the menu (M).",
 	noAmbulance = "Every ambulance is out on a call. Wait by the hospital road for one to come back.",
 	picked = "You are a doctor. Wait for a call by the ambulances on the hospital road; a call shows on your screen.",
+}) :: { [string]: string }
+
+-- Why a doctor was demoted, as the log and RoleService.demote say it.
+DoctorRules.WHY = table.freeze({
+	demotedIgnored = "ignored a bite victim",
+	demotedAbandoned = "abandoned a patient",
 }) :: { [string]: string }
 
 -- What the reputation in the background hears of a doctor's demotion (owner D30; D30 H4 owns the reputation and
