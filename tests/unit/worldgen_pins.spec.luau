@@ -69,18 +69,21 @@ return function(t)
 				end
 			end
 		end
-		t.eq(lamps, 390)
+		-- 399 since 2026-11-22 (was 390): D29 joined the streets that stopped in the grass to the roads they lead to
+		-- (data/authored/town/roads.json), and the lamp plan lights the new stretches as it lights the rest
+		t.eq(lamps, 399)
 		-- re-pinned 2026-11-11: roads now roll with the ground across their width (World/RoadSurface, so
 		-- cars stand on the drawn asphalt), and the street lamps beside them stand on that surface; and again
 		-- the same day: the radio mast and the cell tower are a mast and a pole (Builders/Fixtures), so
 		-- the far skyline's two towers are slim; re-pinned 2026-11-18: the hollow log lot is an invisible marker
 		-- (Server/World/HollowShell draws the log), so its far massing box is its sunk foundation only
-		t.eq(Bake.fnv(table.concat(sky, "\n")), "af884146e9696e8c", "Skyline or lamps moved: re-pin only on purpose")
+		t.eq(Bake.fnv(table.concat(sky, "\n")), "a37e207bd7c39d91", "Skyline or lamps moved: re-pin only on purpose")
 		-- re-pinned 2026-11-11: the police station stands on a level site (World/Height.SITES), which
 		-- flattened the one segment of its slab road that tilted (rd_114_police_slab Seg003)
 		-- re-pinned 2026-11-21: the trees' leaf sprays are baked leaf green, not the importer's grey (owner: "make sure
 		-- they eventually populate as being green on the leaves, each tree": the part colour shows until the map arrives)
-		t.eq(Bake.fnv(table.concat(props, "\n")), "1c39aa9ba081cfa5", "props or roads moved: re-pin only on purpose")
+		-- re-pinned 2026-11-22: D29 joined streets that stopped short and trimmed strips that lay on others
+		t.eq(Bake.fnv(table.concat(props, "\n")), "4ecc359e3d52d78c", "props or roads moved: re-pin only on purpose")
 	end)
 
 	t.test("pin: the collidable massing of every lot and its first part are exactly as before", function()
