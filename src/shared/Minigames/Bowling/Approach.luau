@@ -7,7 +7,7 @@
 -- moment after. Pure: the client turns a pose into the body's root place and its joints (R15: RightShoulder,
 -- LeftHip, LeftKnee, RightHip, Waist; joint angles in radians, + swings a limb forward).
 -- Lane frame: d down-lane from the foul line.
--- Pure; Lune-tested (tests/unit/bowling_approach.spec.luau).
+-- Pure; Lune-tested (tests/unit/bowling_feel.spec.luau).
 -- Interface: TIME, FOLLOW, START_D, SLIDE_D, STEPS; pose(t) -> Pose (t seconds since the let-go; past TIME + FOLLOW
 --   the bowler stands at the line, relaxed); releaseAt() -> TIME
 
