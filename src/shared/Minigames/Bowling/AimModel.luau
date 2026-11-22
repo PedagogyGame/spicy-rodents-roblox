@@ -41,9 +41,9 @@ AimModel.HOOK_WORDS = { "a touch of", "some", "strong", "full" }
 AimModel.HELP = {
 	how = {
 		"Ten frames each. All ten pins with your first ball is a STRIKE, with two balls a SPARE.",
-		"Aim like a real bowler: pick where you STAND on the line, then the ARROW the ball rolls over. Your feet and the arrow make the angle.",
-		"HOOK spins the ball: it skids on the oily front of the lane and curls on the dry end. A hook into the POCKET (just beside the front pin) strikes most.",
-		"A straight ball works too, but only dead on the pocket. Dead centre leaves splits.",
+		"AIM like a real bowler: where you STAND, and the ARROW the ball rolls over.",
+		"HOOK spins the ball: it skids on the oily front and curls on the dry end. Hook it into the POCKET, beside the front pin.",
+		"Straight works too, but only dead on the pocket.",
 	},
 	keys = {
 		"A / D  step left / right along the line",
