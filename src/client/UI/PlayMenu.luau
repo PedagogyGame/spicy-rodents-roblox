@@ -4,7 +4,9 @@
 -- say what this is and what to press, show progress while loading, never ignore input silently):
 --   * Loading screen: the server's boot stage and progress (ReplicatedStorage BootStage, BootProgress,
 --     BootReady, BootError), then this computer's own preparation (the climbing routes), with elapsed
---     seconds; a boot error is shown in red, never a silent screen.
+--     seconds; a boot error is shown in red, never a silent screen. Owner D39: SPICY RODENT over an aerial view of
+--     the town (LOADING_IMAGE, docs/renders/loading; while it is empty the plain green screen), darkened behind the
+--     words, a slow zoom (one tween), the whole screen faded out at the end.
 --   * Menu: five big buttons (Spicy Rodent, Squirrel, Townsperson, Police, Doctor) that send
 --     PlayNet.Pick; "Back to the game" when you already have a body; M or the Menu button reopens it. Under the
 --     buttons, money and reputation together (owner D30: "checkable with money, in paused and or side screen"):
@@ -24,7 +26,7 @@
 -- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
 --   sickLine(attrs, way?) -> string? (a bitten player: what to do, under the status line; `way`
 --   { dist, words } adds how far the door is and which way), wayWords(dx, dz, lookX, lookZ) -> string,
---   markerText(dist) -> string, scaleFor(width, height) -> number, standingLine(attrs) -> string; D30, a doctor's call
+--   markerText(dist) -> string, TITLE, SUBTITLE, LOADING_IMAGE (and the zoom and fade timings), scaleFor(width, height) -> number, standingLine(attrs) -> string; D30, a doctor's call
 --   (the player attributes DoctorJob and DoctorCall, written by Server/Boot/Game from Hospital/DoctorService):
 --   jobLine(attrs, way?) -> string? (the line under the status, in the hospital's teal), jobMarkerText(job, dist) ->
 --   string (BITE VICTIM over the patient, then HOSPITAL over the doors once they are aboard). The call takes the marker
@@ -252,6 +254,16 @@ function PlayMenu.jobMarkerText(job: string, dist: number): string
 	return `{if j then j.marker else "HOSPITAL"}\n{studs(dist)} studs`
 end
 
+-- The loading screen's words (owner D39: the game is Spicy Rodent, never "Spicy Rodents").
+PlayMenu.TITLE = "SPICY RODENT"
+PlayMenu.SUBTITLE = "Loading the town"
+-- The aerial view of the town behind the loading screen (owner D39; docs/renders/loading, uploaded by the lead as an
+-- Image): "rbxassetid://<id>" once uploaded. Empty: the plain green screen, exactly as before.
+PlayMenu.LOADING_IMAGE = ""
+PlayMenu.LOADING_ZOOM = 1.03 -- the picture's slow zoom (one tween over LOADING_ZOOM_SECONDS, nothing per frame)
+PlayMenu.LOADING_ZOOM_SECONDS = 30
+PlayMenu.LOADING_FADE_SECONDS = 0.5 -- the screen fades out over this when there is a picture
+
 -- The UI scale for a viewport (pure): 1 on a 1280 x 720 screen or larger, down to 0.6 on a small one.
 function PlayMenu.scaleFor(width: number, height: number): number
 	return math.clamp(math.min(width / 1100, height / 680), 0.6, 1)
@@ -303,18 +315,82 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 	loading.Size = UDim2.fromScale(1, 1)
 	loading.BackgroundColor3 = Color3.fromRGB(34, 48, 36)
 	loading.ZIndex = 50
+	loading.ClipsDescendants = true
 	loading.Parent = gui
+	-- the aerial picture (D39): behind everything, cropped to the screen, faded in once it has arrived, then a slow
+	-- zoom (one tween); a dark band behind the words keeps them readable on any part of the picture
+	local aerial: ImageLabel? = nil
+	local shade: Frame? = nil
+	local zoom: Tween? = nil
+	if PlayMenu.LOADING_IMAGE ~= "" then
+		local TweenService = game:GetService("TweenService")
+		local img = Instance.new("ImageLabel")
+		img.Name = "Aerial"
+		img.AnchorPoint = Vector2.new(0.5, 0.5)
+		img.Position = UDim2.fromScale(0.5, 0.5)
+		img.Size = UDim2.fromScale(1, 1)
+		img.BackgroundTransparency = 1
+		img.ScaleType = Enum.ScaleType.Crop
+		img.Image = PlayMenu.LOADING_IMAGE
+		img.ImageTransparency = 1
+		img.ZIndex = 50
+		img.Parent = loading
+		local s = Instance.new("Frame")
+		s.Name = "Shade"
+		s.Size = UDim2.fromScale(1, 1)
+		s.BackgroundColor3 = Color3.fromRGB(10, 16, 12)
+		s.BackgroundTransparency = 0
+		s.BorderSizePixel = 0
+		s.ZIndex = 50
+		s.Parent = loading
+		local g = Instance.new("UIGradient")
+		g.Rotation = 90 -- top to bottom: lighter at the top and bottom, darker behind the words (0.3 to 0.6 down)
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.62),
+			NumberSequenceKeypoint.new(0.22, 0.42),
+			NumberSequenceKeypoint.new(0.45, 0.3),
+			NumberSequenceKeypoint.new(0.6, 0.34),
+			NumberSequenceKeypoint.new(0.85, 0.6),
+			NumberSequenceKeypoint.new(1, 0.5),
+		})
+		g.Parent = s
+		local function show()
+			TweenService:Create(img, TweenInfo.new(0.8), { ImageTransparency = 0 }):Play()
+			local z = TweenService:Create(
+				img,
+				TweenInfo.new(PlayMenu.LOADING_ZOOM_SECONDS, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+				{ Size = UDim2.fromScale(PlayMenu.LOADING_ZOOM, PlayMenu.LOADING_ZOOM) }
+			)
+			z:Play()
+			zoom = z
+		end
+		if img.IsLoaded then
+			show()
+		else
+			local c: RBXScriptConnection? = nil
+			c = img:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+				if img.IsLoaded and c then
+					c:Disconnect()
+					c = nil
+					show()
+				end
+			end)
+		end
+		aerial, shade = img, s
+	end
 	text(loading, {
-		Text = "SPICY RODENTS",
+		Name = "Title",
+		Text = PlayMenu.TITLE,
 		Font = Enum.Font.GothamBlack,
 		TextSize = 54,
 		TextColor3 = Color3.fromRGB(255, 120, 70),
+		TextStrokeTransparency = if aerial then 0.7 else 1,
 		Size = UDim2.new(1, -32, 0, 70),
 		Position = UDim2.new(0, 16, 0.3, 0),
 		ZIndex = 51,
 	})
 	text(loading, {
-		Text = "First playable build: loading the town",
+		Text = PlayMenu.SUBTITLE,
 		TextSize = 22,
 		Size = UDim2.new(1, -32, 0, 30),
 		Position = UDim2.new(0, 16, 0.3, 74),
@@ -852,6 +928,25 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 			bar.Size = UDim2.fromScale(1, 1)
 			stageLabel.Text = "Ready"
 			task.wait(0.3)
+			if aerial and shade then
+				-- with the picture, the whole screen fades out together (a handful of tweens, once)
+				local TweenService = game:GetService("TweenService")
+				local fade = TweenInfo.new(PlayMenu.LOADING_FADE_SECONDS)
+				if zoom then
+					zoom:Pause()
+				end
+				TweenService:Create(loading, fade, { BackgroundTransparency = 1 }):Play()
+				TweenService:Create(aerial, fade, { ImageTransparency = 1 }):Play()
+				TweenService:Create(shade, fade, { BackgroundTransparency = 1 }):Play()
+				TweenService:Create(barBack, fade, { BackgroundTransparency = 1 }):Play()
+				TweenService:Create(bar, fade, { BackgroundTransparency = 1 }):Play()
+				for _, d in loading:GetChildren() do
+					if d:IsA("TextLabel") then
+						TweenService:Create(d, fade, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+					end
+				end
+				task.wait(PlayMenu.LOADING_FADE_SECONDS)
+			end
 			loading.Visible = false
 			setOpen(true)
 			return true
