@@ -891,6 +891,9 @@ function Game.start(opts: Opts?): any
 	-- failure leaves the town without nuts and everything else running
 	local forage: any = nil
 	local showNuts: (player: any) -> () = function() end
+	-- the branch stashes (Foraging/BranchStash; started below once the hollows are up): here so the nut meter can show
+	-- the player's stash acorns too
+	local stash: any = nil
 	if hollows then
 		local okF, errF = pcall(function()
 			forage = ForageService.start({
@@ -940,12 +943,15 @@ function Game.start(opts: Opts?): any
 			or a == nil
 			or not ForageRules.forages(a.species, a.variant)
 		then
-			for _, k in { "NutsCarried", "NutsMax", "NutTree", "NutTreeName", "NutStore", "NutInside" } do
+			for _, k in { "NutsCarried", "NutsMax", "NutTree", "NutTreeName", "NutStore", "NutInside", "NutStashes" } do
 				setAttr(player, k, nil)
 			end
 			return
 		end
 		local key = claimKey(tid)
+		-- the player's stash acorns (Client/World/BranchNookView): written with the meter, not only on an E press, so a
+		-- new body or a rejoin shows the nuts the player kept (the stashes are per player, kept for the server's life)
+		setAttr(player, "NutStashes", if stash then stash:list(key) else "")
 		local own, ownMeter = nil, -1
 		local inside = ""
 		local space = hollows:spaceOf(a)
@@ -973,7 +979,6 @@ function Game.start(opts: Opts?): any
 	-- the knot-hole stashes in the branch nooks (Foraging/BranchStash; owner D34): E in a nook's cup puts the nuts carried
 	-- in, or takes some out; per player (claimKey), where the server holds the body (heldPlace). The player's holes with
 	-- nuts in show as acorns on their own screen (attribute NutStashes: "route=n,..."). A failure leaves the nooks empty
-	local stash: any = nil
 	if hollows then
 		local okB, errB = pcall(function()
 			stash = BranchStash.new({
@@ -999,8 +1004,10 @@ function Game.start(opts: Opts?): any
 		if res.text ~= "" then
 			fire(player, { kind = "notice", text = res.text })
 		end
-		setAttr(player, "NutStashes", stash:list(claimKey(tid)))
-		showNuts(player)
+		-- (a refused use changed nothing: no attribute work for it, so a flood of junk requests costs nothing here)
+		if res.ok then
+			showNuts(player) -- (the meter's count and the stash acorns, NutStashes)
+		end
 	end
 	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
 	-- that does not load leaves its drains in the bake's plain parts
@@ -1252,6 +1259,8 @@ function Game.start(opts: Opts?): any
 		setAttr(player, "PowerStage", PowerRules.stage(s.power.points))
 		local actor = possession:actorOf(player)
 		setAttr(player, "Health", if actor and isSquirrelFamily(actor) then healthOf(actor.id) else nil)
+		-- the nut meter and the stash acorns follow a new body at once, not at the next second's refresh
+		showNuts(player)
 	end
 
 	local function groundY(x: number, z: number): number

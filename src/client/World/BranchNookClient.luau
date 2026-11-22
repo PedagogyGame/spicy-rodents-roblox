@@ -14,14 +14,16 @@
 --     settles onto its haunches facing out of the crook. Getting up is Client/World/SeatGetUp's, as from any seat:
 --     R again, Space, a pad's A or Y, a move of the stick or W A S D, or its STAND button (perch() and perchUp() are
 --     its hooks); the press that gets it up is not also a leap or a grab (C.swallow), and for SeatRules.GRACE the
---     same key does not sit it down again.
+--     same key does not sit it down again. A sit press counts only if it began while this body was held and stopped
+--     where it may sit (the last frame offered "R  sit"): a press from another body, a minigame or a seat, kept
+--     while no frame ran, never sits a newly taken squirrel down.
 --   * HINTS on the way: on a bough by a nook's or hangout's way in, "E  nook" / "E  hangout"; at the way out of one,
 --     "E  back onto the branch" (the motor's own E takes the nearest route: Routes/Motion).
 -- Interface: start(opts?) -> stop(); frame(state, f, registry, now?) -> boolean (seated: give the motor no keys; f's
 --   grab, leap and the rest are cleared where they were the nook's); draw(state, registry, dt, yaw) -> (lift, roll,
 --   drop, pitch, turn); perch() -> Place?; perchUp(now?) -> boolean; press(keyName) -> boolean; tap(which);
 --   reset(); use(nooks, fire?); hints(); hintFor(nooks, registry, routeId, t, x, y, z, still) (pure); parseCounts(text);
---   WORDS; C.
+--   label(text, pad) (pure: a hint's keys on a gamepad, X for E and Y for R); WORDS; C.
 -- Engine only inside start and the remote; frame/draw run headless (tests/unit/branch_nooks_client.spec.luau).
 -- No side effects on require.
 
@@ -66,6 +68,7 @@ local seated: Place? = nil
 local satAt, stoodAt, swallowUntil = -math.huge, -math.huge, -math.huge
 local sitK = 0
 local sitPressed, stashPressed = false, false
+local sitReady = false -- the last frame offered a seat: a sit press now began while this body was held and stopped there
 local hint: { stash: string?, sit: string?, line: string? } = {}
 local lastLine: string?, lineUntil = nil, -math.huge
 local stashCounts: { [number]: number } = {}
@@ -97,6 +100,7 @@ function BranchNookClient.reset()
 	satAt, stoodAt, swallowUntil = -math.huge, -math.huge, -math.huge
 	sitK = 0
 	sitPressed, stashPressed = false, false
+	sitReady = false
 	hint = {}
 	lastLine, lineUntil = nil, -math.huge
 end
@@ -130,22 +134,34 @@ function BranchNookClient.perchUp(now: number?): boolean
 	return true
 end
 
--- press(keyName, now?): a key this module answers (R / a pad's Y: sit); true when it was taken
+-- press(keyName): a key this module answers (R / a pad's Y: sit); true when it was taken. The sit is kept for the next
+-- frame only while this body is offered a seat (sitReady): a press with no squirrel held, or on the move, is dropped
 function BranchNookClient.press(keyName: string): boolean
 	if C.sitKeys[keyName] then
-		sitPressed = true
+		sitPressed = sitReady
 		return true
 	end
 	return false
 end
 
--- tap(which): the touch buttons ("stash" | "sit")
+-- tap(which): the touch buttons ("stash" | "sit"; SIT shows only where the last frame offered a seat)
 function BranchNookClient.tap(which: string)
 	if which == "stash" then
 		stashPressed = true
 	elseif which == "sit" then
-		sitPressed = true
+		sitPressed = sitReady
 	end
+end
+
+-- label(text, pad): a hint as a gamepad shows it (the grab's E is the pad's X, the seat's R its Y: Input/InputMap,
+-- C.sitKeys); the keyboard's words otherwise
+function BranchNookClient.label(text: string?, pad: boolean): string?
+	if text == nil or not pad then
+		return text
+	end
+	local out = string.gsub(text, "^E  ", "X  ")
+	out = string.gsub(out, "^R  ", "Y  ")
+	return out
 end
 
 -- the hints for a body at its motor state (pure over the places): what E and R would do here
@@ -218,6 +234,7 @@ function BranchNookClient.frame(state: any, f: any, registry: any, now: number?)
 		satAt = t
 	end
 	sitPressed = false
+	sitReady = sit ~= nil and seated == nil
 	if seated then
 		f.leap, f.grab, f.drop, f.pounce, f.trick = false, false, false, false, false
 	end
@@ -344,18 +361,24 @@ function BranchNookClient.start(opts: { toast: ((text: string, seconds: number?)
 		conns,
 		game:GetService("RunService").Heartbeat:Connect(function()
 			local h = hint
+			-- the prompt per input, as the other hints pick it (World/SeatGetUp, UI/RideHint): a touch screen's
+			-- buttons, a gamepad's X and Y, else the keys
 			local touch = UIS.TouchEnabled and not UIS.KeyboardEnabled
-			local key = `{h.stash or ""}|{h.sit or ""}|{h.line or ""}|{touch}`
+			local okPad, last = pcall(function()
+				return UIS:GetLastInputType()
+			end)
+			local pad = okPad and last == Enum.UserInputType.Gamepad1
+			local key = `{h.stash or ""}|{h.sit or ""}|{h.line or ""}|{touch}|{pad}`
 			if key == shown then
 				return
 			end
 			shown = key
 			stashB.Visible = h.stash ~= nil
-			stashB.Text = if touch then WORDS.stashButton else h.stash or ""
+			stashB.Text = if touch then WORDS.stashButton else BranchNookClient.label(h.stash, pad) or ""
 			sitB.Visible = h.sit ~= nil
-			sitB.Text = if touch then WORDS.sitButton else h.sit or ""
+			sitB.Text = if touch then WORDS.sitButton else BranchNookClient.label(h.sit, pad) or ""
 			lineB.Visible = h.line ~= nil and not touch
-			lineB.Text = h.line or ""
+			lineB.Text = BranchNookClient.label(h.line, pad) or ""
 		end)
 	)
 	local _ = okGui

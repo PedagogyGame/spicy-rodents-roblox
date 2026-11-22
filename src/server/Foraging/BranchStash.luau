@@ -9,7 +9,9 @@
 -- Proximity only, and the server's: the squirrel must be in the cup where the server holds it (opts.placeOf: Boot/Game,
 -- MovementService.heldPlace in its strict mode, never the root its client moves): within BranchNooks.C.stashReach of
 -- the nook's far end. The client (Client/World/BranchNookClient) shows "E  stash" there and sends the nook's route id
--- over PlayNet.Stash; anything else (no such nook, too far, no place held, asked again within C.gap) is refused.
+-- over PlayNet.Stash; anything else (no such nook, too far, no place held, asked again within C.gap) is refused. The
+-- rate (C.gap) is charged before anything is looked up, and a request for no stash is refused without words. Only the
+-- nuts the body carries for this player go in (hollows:mine drops what it picked up under another holder).
 -- Interface: new(opts) -> Service; Service:use(id, routeId) -> Result; :stored(key, routeId) -> n; :list(key) -> string
 --   ("route=n,route=n": the player's non-empty holes, for the client's acorns); :clear(key); WORDS; C.
 --   Result = { ok: boolean, word: string (WORDS key), moved: number, inside: number, carried: number, text: string }
@@ -47,7 +49,7 @@ export type Result = { ok: boolean, word: string, moved: number, inside: number,
 
 export type Opts = {
 	nooks: Nooks,
-	-- the nut carrying (Foraging/HollowService: carry(id, n) -> taken; carried(id) -> n; drop(id))
+	-- the nut carrying (Foraging/HollowService: carry(id, n) -> taken; carried(id) -> n; mine(id) -> n; drop(id))
 	hollows: any,
 	placeOf: (id: number) -> (number?, number?, number?), -- the server's place for the body (nil: none it trusts)
 	keyOf: (id: number) -> Who,
@@ -120,16 +122,18 @@ function BranchStash.use(self: Service, id: number, routeId: any): Result
 	local function result(ok: boolean, word: string, moved: number, inside: number, text: string): Result
 		return { ok = ok, word = word, moved = moved, inside = inside, carried = self.hollows:carried(id), text = text }
 	end
-	local p = if type(routeId) == "number" then self.nooks.place(routeId) else nil
-	if p == nil or p.stash == nil then
-		return result(false, "none", 0, 0, BranchStash.WORDS.none)
-	end
+	-- the rate first, whatever was asked: a junk or unknown route id is charged like any use and refused quietly (no
+	-- toast), so a flood of them costs the server nothing but this
 	local t = self.now()
 	local prev = self.last[k]
 	if prev and t - prev < BranchStash.C.gap then
-		return result(false, "gap", 0, self:stored(key, p.route), "")
+		return result(false, "gap", 0, 0, "")
 	end
 	self.last[k] = t
+	local p = if type(routeId) == "number" then self.nooks.place(routeId) else nil
+	if p == nil or p.stash == nil then
+		return result(false, "none", 0, 0, "")
+	end
 	local x, y, z = self.placeOf(id)
 	local reach = BranchNooks.C.stashReach + BranchStash.C.slack
 	if x == nil or y == nil or z == nil then
@@ -145,7 +149,9 @@ function BranchStash.use(self: Service, id: number, routeId: any): Result
 		self.holes[k] = mine
 	end
 	local inside = mine[p.route] or 0
-	local held = self.hollows:carried(id)
+	-- only the nuts this player carries: what the body picked up under another holder is dropped first
+	-- (HollowService.mine: the same rule as its carry and its hollows' deposits)
+	local held = self.hollows:mine(id)
 	local cap = BranchStash.C.capacity
 	if held > 0 then
 		local put = math.min(held, cap - inside)

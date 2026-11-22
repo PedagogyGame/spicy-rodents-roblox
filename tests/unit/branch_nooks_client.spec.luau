@@ -3,12 +3,14 @@
 -- cup only, where the server holds the body), the held squirrel's keys and pose (Client/World/BranchNookClient: E at a
 -- knot-hole, R to sit by the seat rules, getting up by SeatGetUp's hooks, the nodules' settle) and what is drawn
 -- (Client/World/BranchNookArt: few parts, none solid, the feet on them), with the part counts for the report.
+local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
 local BranchNookArt = require("@client/World/BranchNookArt")
 local BranchNookClient = require("@client/World/BranchNookClient")
 local BranchNooks = require("@shared/World/BranchNooks")
 local BranchStash = require("@server/Foraging/BranchStash")
+local HollowService = require("@server/Foraging/HollowService")
 local SeatRules = require("@shared/World/SeatRules")
 local Tunables = require("@shared/Config/Tunables")
 
@@ -33,6 +35,9 @@ return function(t)
 		return {
 			held = held,
 			carried = function(_self: any, id: number): number
+				return held[id] or 0
+			end,
+			mine = function(_self: any, id: number): number
 				return held[id] or 0
 			end,
 			carry = function(_self: any, id: number, n: number): number
@@ -124,6 +129,93 @@ return function(t)
 		clock += 1
 		t.eq(stash:use(1, "not a route" :: any).word, "none")
 	end)
+
+	t.test("the stash: a junk route id is charged the rate first and refused without words", function()
+		local hollows = fakeHollows()
+		local clock = 0
+		local stash = BranchStash.new({
+			nooks = nooks,
+			hollows = hollows,
+			placeOf = function(): (number?, number?, number?)
+				return nook.at[1], nook.at[2], nook.at[3]
+			end,
+			keyOf = function(): string
+				return "player 7"
+			end,
+			now = function(): number
+				return clock
+			end,
+		})
+		hollows.held[1] = 3
+		local junk = stash:use(1, 987654321)
+		t.eq(junk.word, "none")
+		t.eq(junk.text, "", "no toast for a junk request")
+		t.eq(stash:use(1, "x" :: any).word, "gap", "the junk was charged: the next one within C.gap is the rate's")
+		t.eq(stash:use(1, nook.route).word, "gap", "and so is a real one right after")
+		t.eq(hollows:carried(1), 3)
+		clock += 1
+		t.eq(stash:use(1, nook.route).word, "stored")
+	end)
+
+	t.test("the stash: only the nuts the body carries for this player go in (HollowService's holder rule)", function()
+		local holder = "player 7"
+		local hollows = HollowService.new({
+			world = { actors = {}, actorsById = {} } :: any,
+			cover = false,
+			keyOf = function(): string
+				return holder
+			end,
+		})
+		local clock = 0
+		local stash = BranchStash.new({
+			nooks = nooks,
+			hollows = hollows,
+			placeOf = function(): (number?, number?, number?)
+				return nook.at[1], nook.at[2], nook.at[3]
+			end,
+			keyOf = function(): string
+				return holder
+			end,
+			now = function(): number
+				return clock
+			end,
+		})
+		-- player 7 picks 4 up, then the body changes hands before any hollow step drops them
+		t.eq(hollows:carry(1, 4), 4)
+		holder = "player 9"
+		local r = stash:use(1, nook.route)
+		t.eq(r.word, "empty", "player 9 cannot store player 7's nuts")
+		t.eq(stash:stored("player 9", nook.route), 0)
+		t.eq(stash:stored("player 7", nook.route), 0)
+		t.eq(hollows:carried(1), 0, "the earlier holder's nuts are dropped, as carry and step drop them")
+		-- what player 9 picks up is theirs to store
+		clock += 1
+		hollows:carry(1, 2)
+		local mine = stash:use(1, nook.route)
+		t.truthy(mine.ok and mine.moved == 2, mine.text)
+		t.eq(stash:list("player 9"), `{nook.route}=2`)
+	end)
+
+	t.test(
+		"Boot/Game: the stash acorns are written with the nut meter (a new body, a rejoin), not only on E",
+		function()
+			local src = fs.readFile("src/server/Boot/Game.luau")
+			local meter = string.find(src, "showNuts = function(player: any)", 1, true)
+			t.truthy(meter, "the nut meter")
+			local body =
+				string.sub(src, meter :: number, (string.find(src, "\n\tend\n", meter :: number, true)) :: number)
+			t.truthy(string.find(body, 'setAttr(player, "NutStashes", if stash then stash:list(key) else "")', 1, true))
+			t.truthy(
+				string.find(body, '"NutInside", "NutStashes" }', 1, true),
+				"cleared with the meter for a non-forager"
+			)
+			-- publish (a body taken, released or changed) refreshes the meter, and a refused stash use does no work
+			local pub = string.find(src, "local function publish(player: any)", 1, true) :: number
+			local pubBody = string.sub(src, pub, (string.find(src, "\n\tend\n", pub, true)) :: number)
+			t.truthy(string.find(pubBody, "showNuts(player)", 1, true))
+			t.truthy(string.find(src, "if res.ok then\n\t\t\tshowNuts(player)", 1, true))
+		end
+	)
 
 	-- a motor state on a route at t
 	local function at(routeId: number, tt: number): any
@@ -221,6 +313,7 @@ return function(t)
 			BranchNookClient.use(nooks, function()
 				sent += 1
 			end)
+			BranchNookClient.frame(at(nook.route, 1), keys(), reg, now + 4.9)
 			BranchNookClient.press("R")
 			t.eq(BranchNookClient.frame(at(nook.route, 1), keys(), reg, now + 5), true)
 			BranchNookClient.frame(at(nook.route, 1), keys({ grab = true }), reg, now + 5.1)
@@ -229,6 +322,38 @@ return function(t)
 			BranchNookClient.reset()
 		end
 	)
+
+	t.test("a stale sit press (another body, a minigame, a seat) never sits a newly taken squirrel down", function()
+		BranchNookClient.reset()
+		BranchNookClient.use(nooks, function() end)
+		-- R while no squirrel was held (the controller's stop resets the module): its first frame in a cup stays up
+		t.truthy(BranchNookClient.press("R"), "the key is still this module's")
+		t.eq(BranchNookClient.frame(at(nook.route, 1), keys(), reg, 200), false)
+		-- the SIT tap the same
+		BranchNookClient.reset()
+		BranchNookClient.tap("sit")
+		t.eq(BranchNookClient.frame(at(hangout.route, 0.9), keys(), reg, 201), false)
+		-- R on the move, then stopping in the cup: not seated by the old press
+		BranchNookClient.frame(at(nook.route, 0.5), keys({ fw = 1 }), reg, 202)
+		BranchNookClient.press("ButtonY")
+		t.eq(BranchNookClient.frame(at(nook.route, 1), keys(), reg, 202.1), false)
+		-- R once stopped there (the hint offered the seat): seated
+		t.eq(BranchNookClient.hints().sit, BranchNookClient.WORDS.sit)
+		BranchNookClient.press("ButtonY")
+		t.eq(BranchNookClient.frame(at(nook.route, 1), keys(), reg, 202.2), true)
+		BranchNookClient.reset()
+	end)
+
+	t.test("the hints per input: a gamepad's X and Y for E and R, the keys otherwise", function()
+		local W = BranchNookClient.WORDS
+		t.eq(BranchNookClient.label(W.stash, true), "X  stash")
+		t.eq(BranchNookClient.label(string.format(W.stashCount, 3), true), "X  stash (3 inside)")
+		t.eq(BranchNookClient.label(W.sit, true), "Y  sit")
+		t.eq(BranchNookClient.label(W.nook, true), "X  step into the nook")
+		t.eq(BranchNookClient.label(W.back, true), "X  back onto the branch")
+		t.eq(BranchNookClient.label(W.sit, false), W.sit)
+		t.eq(BranchNookClient.label(nil, true), nil)
+	end)
 
 	t.test("what is drawn: few parts a tree, none solid or queried, the feet on the cup and the ledge", function()
 		local totals = { parts = 0, nooks = 0, stashes = 0, hangouts = 0, spurs = 0 }
