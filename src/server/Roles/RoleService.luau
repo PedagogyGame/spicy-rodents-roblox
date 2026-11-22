@@ -11,6 +11,12 @@
 --     per candidate, offerCascade candidates, then a retry after offerRetry with fresh candidates.
 --   step(now): offer timeouts and the idle release (warn afkWarnSecs before afkSecs; input() cancels).
 --   forceRole (Role Lab): moves a player to any rung, logging when that exceeds the rung's cap.
+--   D30: take(player, rung) puts a player straight on a menu rung (Ladder.menuRungs: the hospital, as a doctor) when a
+--     slot is free (the play menu has already chosen the body: the body stays); resign(player) takes a doctor or an
+--     officer who picked something else back to the human rung; demote(player, why) is the demotion ("demoted back to
+--     human": the human rung at its lowest rank; Ladder "role.demote"). Each goes through Ladder.resolve, so a vacated
+--     hospital slot is offered as any other, and onTransition sees the rule (the town work's money penalty hangs on
+--     "role.demote").
 -- Body changes go through Possession:swap (rule 12: Possession's onHandoff wires SweptCollision and
 -- MoveValidator). Pure Luau over injected deps, so Lune drives it with PlayerLike stubs.
 -- Money: a member's purse is the town wallet's when deps.purse is given (Economy/Credits: wallet.purse, a
@@ -26,7 +32,8 @@
 -- Interface: new(deps) -> Roles; Roles:onJoin(player) -> JoinResult, onLeave(player), admittedCount(),
 --            report(event) -> {Transition}, roleOf(player) -> (rung?, subrole?), stats(player), queue(rung),
 --            reply(player, offerId, choice) -> (ok, err?), offers(), input(player, now?), step(now),
---            forceRole(player, rung) -> (ok, overCap), resetSession(winnerId?), member(userId), ctx()
+--            forceRole(player, rung) -> (ok, overCap), resetSession(winnerId?), member(userId), ctx(),
+--            take(player, rung) -> (ok, refused?), resign(player) -> boolean, demote(player, why) -> boolean
 
 local Import = require("../Import")
 local Ladder = Import.shared("Roles/Ladder") :: typeof(require("../../shared/Roles/Ladder"))
@@ -121,6 +128,9 @@ export type Roles = {
 	forceRole: (self: Roles, player: any, rung: string) -> (boolean, boolean),
 	resetSession: (self: Roles, winner: number?) -> { Transition },
 	refreshKeys: (self: Roles) -> (),
+	take: (self: Roles, player: any, rung: string) -> (boolean, string?),
+	resign: (self: Roles, player: any) -> boolean,
+	demote: (self: Roles, player: any, why: string) -> boolean,
 }
 
 local RoleService = {}
@@ -198,7 +208,7 @@ function RoleService.new(deps: Deps): Roles
 		end
 	end
 
-	local function setRung(self: Roles, m: Member, to: string, rank: string)
+	local function setRung(self: Roles, m: Member, to: string, rank: string, keepBody: boolean?)
 		local from = m.rung
 		if HUMAN_SPECIES[from] and not HUMAN_SPECIES[to] then
 			m.remembered = table.clone(m.stats) -- the human standing to return to (§6 side exits, winter)
@@ -213,7 +223,9 @@ function RoleService.new(deps: Deps): Roles
 			if to ~= "squirrel" then
 				m.infected = nil
 			end
-			moveBody(self, m, to)
+			if not keepBody then
+				moveBody(self, m, to)
+			end
 		end
 	end
 
@@ -250,12 +262,15 @@ function RoleService.new(deps: Deps): Roles
 		end
 		if m then
 			if t.to and not t.refused then
-				setRung(self, m, t.to, t.rank or "keep")
+				setRung(self, m, t.to, t.rank or "keep", t.keepBody)
 			elseif t.rank and not t.to then
 				m.stats = Ladder.applyRank(t.rank, m.stats, m.remembered)
 			end
 			if t.loseSubrole then
 				m.subrole = nil
+			end
+			if t.subrole and not t.refused then
+				m.subrole = t.subrole
 			end
 			if t.rankDelta then
 				m.stats.questScore = (m.stats.questScore or 0) + t.rankDelta
@@ -561,6 +576,39 @@ function RoleService.new(deps: Deps): Roles
 		apply(self, { rule = "lab.forceRole", player = m.id, to = rung, rank = "keep" })
 		self:refreshKeys()
 		return true, overCap
+	end
+
+	-- D30: the play menu's rung (Ladder.menuRungs), a slot permitting; the body is the menu's own choice.
+	function roles.take(self: Roles, player: any, rung: string): (boolean, string?)
+		local key = player.UserId :: number
+		if not self.members[key] then
+			return false, "not in the game"
+		end
+		local ts = resolveAndApply(self, { kind = "menu.pick", player = key, rung = rung })
+		local t = ts[1]
+		if t == nil then
+			return false, "not from the menu"
+		elseif t.refused then
+			return false, t.refused
+		end
+		return true, nil
+	end
+
+	-- D30: a doctor or an officer who picked something else is a townsperson again, standing kept.
+	function roles.resign(self: Roles, player: any): boolean
+		local key = player.UserId :: number
+		return #resolveAndApply(self, { kind = "role.resign", player = key }) > 0
+	end
+
+	-- D30: the demotion ("demoted back to human"): the human rung, lowest rank, the subrole gone, the body kept.
+	function roles.demote(self: Roles, player: any, why: string): boolean
+		local key = player.UserId :: number
+		local m = self.members[key]
+		local ok = #resolveAndApply(self, { kind = "role.demote", player = key, why = why }) > 0
+		if ok and m then
+			self.log:info(`{m.id} demoted to the human rung: {why}`)
+		end
+		return ok
 	end
 
 	function roles.resetSession(self: Roles, winner: number?): { Transition }

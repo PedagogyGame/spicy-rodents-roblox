@@ -171,6 +171,7 @@ end
 EconomyRules.PAY_WHY = table.freeze({
 	["work.completed"] = "work",
 	["gig.completed"] = "a gig",
+	["doctor.delivered"] = "a patient brought in", -- D30: a doctor's ambulance run
 })
 
 function EconomyRules.payWhy(rule: string?): string

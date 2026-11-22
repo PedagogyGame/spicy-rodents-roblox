@@ -309,7 +309,8 @@ return function(t)
 			-- (10th to 12th, 2026-11-22, owner D30: the golf cart's passenger: the cart's root twice (its side to get off on,
 			-- its network owner kept the driver's) and a person's body checked before it is put beside the cart; only
 			-- people ride, never a squirrel)
-			["Actors/DeviceService.luau"] = 12,
+			-- (13th, 2026-11-22, owner D30 doctors: poseOf reads a lent ambulance's root: a vehicle, never a body)
+			["Actors/DeviceService.luau"] = 13,
 			["Actors/Possession.luau"] = 9,
 			["Assets/HeroArt.luau"] = 3,
 			["Assets/PeopleArt.luau"] = 5,
@@ -323,7 +324,9 @@ return function(t)
 			-- a parent kept, not a place read; the body is the computer's)
 			-- (13th and 14th, 2026-11-22, owner D29: the shared vehicles' roots for Vehicles/RideBumps, never a body; a held
 			-- squirrel a shared vehicle bumped is put aside from its held place (ActorsRuntime.placeOf), its rotation kept)
-			["Boot/Game.luau"] = 14,
+			-- (15th, 2026-11-22, owner D30 doctors: a lent ambulance's pose (DeviceService poseOf: the vehicle's root), never a
+			-- body)
+			["Boot/Game.luau"] = 15,
 			-- (15th, 2026-11-22, owner D30: a held PERSON's place, for their home computer's reach and their home; never a
 			-- squirrel's)
 			["Economy/StockOptions.luau"] = 1,

@@ -38,7 +38,8 @@
 -- Nothing a client can read shows an incubating case: `tell` is nil until the symptoms show.
 -- Interface: STATES; defaults() -> Params (Config/Tunables); newCase(id, now, inputs, rand, params)
 --   -> (Case, { Effect }); advance(case, now, inputs, rand, params) -> { Effect };
---   rebite(case, now, controller?) -> { Effect }; standUp(case, now); tell(case) -> string?;
+--   rebite(case, now, controller?) -> { Effect }; standUp(case, now); pickUp(case, now, params) -> { Effect } (D30: a
+--   doctor's ambulance beside the patient); tell(case) -> string?;
 --   status(case) -> string? ("infected" | "symptoms" | "treating"); isInfected(case); biteable(case);
 --   possessable(case); atScene(case); isPatient(case); closed(case); townPercent(infected, humans)
 -- Pure. No side effects on require.
@@ -534,6 +535,17 @@ function InfectionRules.advance(case: Case, now: number, inputs: Inputs, rand: (
 		table.insert(effects, { kind = "say", situation = "patient" })
 	end
 	return effects
+end
+
+-- pickUp: a doctor's ambulance (owner D30, Server/Hospital/DoctorService) is beside a patient waiting for one: they
+-- are aboard at once (no crew walks over), and the trip in is the ambulance's transit as for any other: admitted when it
+-- is home (the doctor stops at the hospital doors) or after transitMaxSecs. Nothing for any other state.
+function InfectionRules.pickUp(case: Case, now: number, params: Params): { Effect }
+	if case.state ~= "scene" and case.state ~= "enroute" then
+		return {}
+	end
+	enter(case, "transit", now, now + params.transitMaxSecs)
+	return { { kind = "load" } }
 end
 
 -- tell: what a client may see of the case (the Med attribute). nil while nothing shows.

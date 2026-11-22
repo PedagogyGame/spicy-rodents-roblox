@@ -171,6 +171,21 @@ Tunables.tree = {
 	             treatSecs = { v = 30, unit = "s", src = "owner 2026-11-10: admitted, treated, released cured (v5.4 handoff 23.7 s)" },
 	             beds = { v = 8, src = "v5.4 has 8 patients" }, admitRadius = { v = 6, unit = "u" },
 	             dischargeSpeed = { v = 3.6, unit = "u/s", src = "the walk home after the cure" } },
+	-- the doctors (owner D30: a player picks Doctor, drives the ambulances and brings bite victims in; Shared/Hospital/
+	-- DoctorRules reads these). Distances in studs.
+	doctor = { patientCents = { v = 25, unit = "Spicy cents", src = "D30: pay per patient brought in; about two minutes' work at the hospital shift's 6c an in-game hour (30 s) is 24c" },
+	           warnSecs = { v = 60, unit = "s", src = "D30: one warning first (a call not set off for, or no headway)" },
+	           demoteSecs = { v = 90, unit = "s", src = "D30 brief: e.g. 90 s without setting off, then the demotion" },
+	           jobMaxSecs = { v = 300, unit = "s", src = "a call not reached by then goes to the computer's ambulances (no demotion)" },
+	           progressStep = { v = 8, unit = "st", src = "headway: the ambulance this much nearer its goal than it has been" },
+	           loadReach = { v = 18, unit = "st", src = "the ambulance stopped this near the patient loads them" },
+	           footReach = { v = 6, unit = "st", src = "or the doctor on foot this near, their ambulance within carryReach" },
+	           carryReach = { v = 80, unit = "st", src = "parked this near, the doctor walks the patient to it (a fenced yard)" },
+	           stopSpeed = { v = 4, unit = "st/s", src = "stopped, for loading and unloading" },
+	           unloadReach = { v = 40, unit = "st", src = "stopped this near the hospital doors (or the ambulance bays) unloads" },
+	           bayReach = { v = 30, unit = "st", src = "left this near its bay, an ambulance is parked back at once" },
+	           returnSecs = { v = 90, unit = "s", src = "an ambulance left anywhere else goes back to its bay after this" },
+	           returnNear = { v = 60, unit = "st", src = "but only with no player this near it" } },
 	-- townspeople's speech bubbles (owner 2026-11-10; Speech/SpeechRules reads these)
 	speech = { actorCooldownS = { v = 12, unit = "s", src = "v5.4 sayCooldown 8" }, townBurst = { v = 3, src = "at most this many lines per window, town-wide" },
 	           townWindowS = { v = 5, unit = "s" }, showSecs = { v = 3.5, unit = "s", src = "v5.4 bubbles live 4.6 s" },

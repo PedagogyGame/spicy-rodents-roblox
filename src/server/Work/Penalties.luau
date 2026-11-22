@@ -7,19 +7,22 @@
 --     a line on their screen, and a reputation report (kind "errand_theft").
 --   * ambulanceIgnored(player): a doctor driving the ambulance ignored a bite victim who needed picking up (the
 --     doctors' work decides that and demotes: RoleService.demote; this is only the money side). The fine, then the
---     doctor's money down to the lowest townsperson's (PenaltyRules.ambulance), a line on their screen, and a
---     reputation report (kind "ignored_victim").
+--     doctor's money down to the lowest townsperson's (PenaltyRules.ambulance) and a line on their screen. No
+--     reputation report here: the doctors' work reports it when it demotes (one report, not two).
+--   * hook(roles): hangs ambulanceIgnored on RoleService's onTransition: a "role.demote" whose why is one of
+--     AMBULANCE_WHY (Hospital/DoctorRules.WHY: "ignored a bite victim", "abandoned a patient") takes the money side
+--     from that player (the member's Player), after any hook already there.
 -- Money moves only through the town's wallet (Economy/Credits: wallet.purse(player):debit(cents, why), which takes
 -- earnings before pocket money and is logged and shown like any other change). A saved stock-option balance (the
 -- D30 stock options) is not wallet money and is never touched here.
--- Reputation: the D30 reputation work owns it (Shared/Reputation/Reputation.report, which never errors and rests each
--- kind a while, so a doctor reported here and by the doctors' work in the same moment counts once); this calls
+-- Reputation: the D30 reputation work owns it (Shared/Reputation/Reputation.report, which never errors); this calls
 -- report(player, kind, severity) inside a pcall, through deps.report when given, else through REPUTATION_MODULES
 -- (missing: nothing happens, the money penalty stands).
 -- The module-level functions (Penalties.errandStolen, Penalties.ambulanceIgnored) use the instance Boot/Game
 -- installs (Penalties.install(deps)); before that they do nothing and return 0, with a warning.
 -- Interface: new(deps) -> Instance { errandStolen(player, what?) -> cents, ambulanceIgnored(player) -> (fine, down) };
---   install(deps) -> Instance; errandStolen(player, what?); ambulanceIgnored(player); REPUTATION_MODULES; SEVERITY
+--   install(deps) -> Instance; errandStolen(player, what?); ambulanceIgnored(player); hook(roles); AMBULANCE_WHY;
+--   REPUTATION_MODULES; SEVERITY
 -- Pure over deps (a player is a Player or a PlayerLike stub with a UserId); no side effects on require.
 
 local Import = require("../Import")
@@ -32,7 +35,9 @@ local Penalties = {}
 -- where the reputation work's report(player, kind, severity) may live (shared first, then the server's)
 Penalties.REPUTATION_MODULES = table.freeze({ "Reputation/Reputation" })
 -- how bad each is on the reputation work's scale (Shared/Reputation/Reputation: 1, 2 or 3; 2 is 10 points)
-Penalties.SEVERITY = table.freeze({ errand_theft = 2, ignored_victim = 2 })
+Penalties.SEVERITY = table.freeze({ errand_theft = 2 })
+-- the demotions that are an ambulance driver's (Hospital/DoctorRules.WHY, as RoleService.demote is given them)
+Penalties.AMBULANCE_WHY = table.freeze({ ["ignored a bite victim"] = true, ["abandoned a patient"] = true })
 
 export type Deps = {
 	wallet: any, -- Economy/Credits.Wallet (purse(player), tell(player, words))
@@ -131,7 +136,6 @@ function Penalties.new(deps: Deps): Instance
 				then `, and your money is down to the lowest townsperson's ({Bank.amount(level)})`
 				else ""
 			wallet.tell(player, `A bite victim was left waiting: {Bank.amount(tookFine)} penalty{rest}.`)
-			rep(player, "ignored_victim")
 			return tookFine, tookDown
 		end,
 	}
@@ -160,6 +164,30 @@ function Penalties.ambulanceIgnored(player: any): (number, number)
 		return 0, 0
 	end
 	return (installed :: Instance).ambulanceIgnored(player)
+end
+
+-- Hang the ambulance penalty on the roles' transitions (Boot/Game, once Penalties is installed): a doctor demoted for
+-- an ignored bite victim or an abandoned patient pays the money side. Any onTransition already there runs first.
+function Penalties.hook(roles: any)
+	if roles == nil or type(roles.deps) ~= "table" then
+		return
+	end
+	local before = roles.deps.onTransition
+	roles.deps.onTransition = function(t: any)
+		if before then
+			before(t)
+		end
+		if t.rule == "role.demote" and Penalties.AMBULANCE_WHY[t.why or ""] then
+			local m = roles.members and roles.members[t.player]
+			local player = if m and m.player ~= nil then m.player else nil
+			if player ~= nil then
+				local ok, err = pcall(Penalties.ambulanceIgnored, player)
+				if not ok then
+					warn(`[Penalties] the ambulance penalty failed: {err}`)
+				end
+			end
+		end
+	end
 end
 
 return Penalties

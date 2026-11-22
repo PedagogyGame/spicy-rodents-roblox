@@ -17,8 +17,14 @@
 -- sits a person there (PlayerVehicles.board; the hidden PassengerSeat, Seat:Sit; DeviceGranted { device = "passenger" });
 -- E again gets them off on their own side (PlayerVehicles.alight; DeviceReleased "exit"). The driver keeps the network
 -- ownership; the passenger touches no control. A passenger stays aboard when the driver gets out.
+-- The doctors' ambulances (owner D30, Server/Hospital/DoctorService): `borrow` (set by Boot/Game) is asked at E when
+-- no player vehicle is within reach: a parked fleet ambulance there is lent to a doctor (the id of the player vehicle
+-- `spawn`ed in its place, which the doctor is then seated in) or the words why not; `isDoctor` lets a doctor's key turn
+-- (VehicleKinds access "doctor"). A lent ambulance carries the model attribute Siren (Client/Render/Beacons flashes
+-- its light bar) and is taken away with `remove` when it goes back to its bay; `poseOf` is where it is and who drives.
 -- Interface: start(opts) -> Service { fleet, models, interact(player, body), exitAll(player),
---   spawn(kind, x, y, z, yaw) -> id, isShared(id) -> boolean, tidy(now, nearestPlayer) -> n put back };
+--   spawn(kind, x, y, z, yaw) -> id, isShared(id) -> boolean, tidy(now, nearestPlayer) -> n put back,
+--   remove(id) -> boolean, poseOf(id) -> { x, z, speed, driver }?, borrow?, isDoctor? };
 --   pick(options) -> (id?, beside) (pure: what E takes); REACH
 -- Engine only inside the functions. No side effects on require.
 
@@ -51,6 +57,11 @@ export type Service = {
 	isShared: (self: Service, id: string) -> boolean,
 	-- (`nearestPlayer(x, z)`: studs from there to the nearest player's body)
 	tidy: (self: Service, now: number, nearestPlayer: (x: number, z: number) -> number) -> number,
+	remove: (self: Service, id: string) -> boolean,
+	poseOf: (self: Service, id: string) -> { x: number, z: number, speed: number, driver: number? }?,
+	-- D30 (Boot/Game sets them): at E with no player vehicle in reach, a parked fleet ambulance lent to a doctor
+	borrow: ((player: Player, x: number, z: number, reach: number) -> (string?, string?))?,
+	isDoctor: ((player: Player) -> boolean)?,
 }
 
 local DeviceService = {}
@@ -211,6 +222,9 @@ function DeviceService.start(opts: Opts): Service
 					d.Anchored = d == model.PrimaryPart
 				end
 			end
+			if kind == "ambulance" then
+				model:SetAttribute("Siren", true) -- (D30: out with a doctor, its light bar flashes)
+			end
 			model.Parent = parent
 			models[id] = model
 			return id
@@ -298,6 +312,14 @@ function DeviceService.start(opts: Opts): Service
 			end
 			-- (beside: the nearest is a cart someone drives, its other seat free: sit beside them)
 			local best, beside = DeviceService.pick(options)
+			if best == nil and self.borrow then
+				-- (D30: a fleet ambulance parked here, lent to a doctor: the player vehicle drawn in its place)
+				local lent, why = self.borrow(player, pos.X, pos.Z, REACH)
+				if lent == nil then
+					return false, why or "no vehicle within reach"
+				end
+				best = lent
+			end
 			if best == nil then
 				return false, "no vehicle within reach"
 			end
@@ -352,6 +374,7 @@ function DeviceService.start(opts: Opts): Service
 				human = true,
 				officer = openKeys or body:GetAttribute("Post") == "police",
 				paidRental = openKeys,
+				doctor = self.isDoctor ~= nil and self.isDoctor(player),
 			})
 			if not ok then
 				return false, reason
@@ -380,6 +403,42 @@ function DeviceService.start(opts: Opts): Service
 		end,
 		isShared = function(_s: Service, id: string): boolean
 			return shared(id)
+		end,
+		-- D30: a lent ambulance back in the traffic's bay: its driver let out, the vehicle gone
+		remove = function(s: Service, id: string): boolean
+			local v = PlayerVehicles.get(fleet, id)
+			local model: Model? = models[id]
+			if v == nil or model == nil then
+				return false
+			end
+			if v.driver ~= nil then
+				for _, p in game:GetService("Players"):GetPlayers() do
+					if p.UserId == v.driver then
+						s:interact(p)
+					end
+				end
+			end
+			if not PlayerVehicles.remove(fleet, id) then
+				return false
+			end
+			models[id] = nil
+			model:Destroy()
+			return true
+		end,
+		poseOf = function(_s: Service, id: string): { x: number, z: number, speed: number, driver: number? }?
+			local v = PlayerVehicles.get(fleet, id)
+			local model = models[id]
+			local root = if model then model.PrimaryPart else nil
+			if v == nil or root == nil then
+				return nil
+			end
+			local vel = root.AssemblyLinearVelocity
+			return {
+				x = root.Position.X,
+				z = root.Position.Z,
+				speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z),
+				driver = v.driver,
+			}
 		end,
 		-- a shared vehicle left away from its spot, untouched, with nobody near, goes quietly back (SharedRides.returnHome)
 		tidy = function(_s: Service, now: number, nearestPlayer: (x: number, z: number) -> number): number

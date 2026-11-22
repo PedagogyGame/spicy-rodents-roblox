@@ -48,6 +48,8 @@ export type Options = {
 	overhead: boolean?, -- run Server/Stealth/OverheadService (the people look up at a squirrel overhead), stepped every
 	-- rig step as Boot/Game steps it; a held squirrel's route is rig.route[id] (nil: it has sent nothing)
 	overheadRand: (() -> number)?, -- its dice (default: seeded)
+	-- D30: the sequence asks the doctors first (Server/Hospital/DoctorService call; InfectionService opts.doctorCall)
+	doctorCall: ((id: number, x: number, z: number) -> boolean)?,
 }
 
 local data: any = nil
@@ -134,6 +136,7 @@ function BiteRig.new(opts: Options?): any
 		serverTime = function(): number
 			return 5000 + rig.time
 		end,
+		doctorCall = o.doctorCall,
 	})
 	-- the next dice the sequence rolls (a bite's path and timers), ahead of the seeded ones
 	rig.dice = function(list: { number })

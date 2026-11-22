@@ -112,7 +112,7 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 		squirrel = "squirrel/normal",
 		townsperson = "human",
 		police = "human",
-		drone = "human",
+		doctor = "human",
 	}
 	local report: { [string]: any } = {}
 
@@ -179,23 +179,35 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 			r.groundGap = if down then root.Position.Y - down.Position.Y else "none"
 			check(down ~= nil and root.Position.Y - down.Position.Y < size.Y + 2, `{label}: ground gap {r.groundGap}`)
 		end
-		if choice == "police" or choice == "drone" then
+		if choice == "police" then
 			local id, d = nearestDevice(root.Position)
 			r.nearestDevice = id
 			r.deviceStuds = d
-			local want = if choice == "drone" then "drone_" else "car_"
+			local want = "car_"
 			check(id ~= nil and string.sub(id, 1, #want) == want, `{label}: E would take {id}, not a {want}`)
 			check(d < REACH, `{label}: {d} studs from the {id} (reach {REACH})`)
+		elseif choice == "doctor" and last and last.kind == "picked" then
+			-- D30: on the hospital rung, beside an ambulance parked on the hospital road (E takes it)
+			check(rt.roles:roleOf(player) == "hospital", `{label}: not on the hospital rung`)
+			local nearest = math.huge
+			for _, parked in G.traffic:parkedResponders() do
+				nearest =
+					math.min(nearest, (Vector3.new(parked.x, root.Position.Y, parked.z) - root.Position).Magnitude)
+			end
+			r.ambulanceStuds = nearest
+			check(nearest < REACH, `{label}: {nearest} studs from an ambulance (reach {REACH})`)
 		end
 	end
 
 	-- a fresh player (possess) picks every role, then a second player (swap order reversed)
 	local a = stub(9001)
-	for _, choice in { "police", "townsperson", "squirrel", "drone", "rodent" } do
+	rt.roles:onJoin(a) -- (joined as a real player is: the Doctor pick needs a member of the Ladder, D30)
+	for _, choice in { "police", "townsperson", "squirrel", "doctor", "rodent" } do
 		tryRole(a, choice, `A.{choice}`)
 	end
 	-- a second player: the town has one Spicy Rodent (A holds it), so B is refused with a clear line
 	local b = stub(9002)
+	rt.roles:onJoin(b)
 	G.remotes.Pick(b, "rodent")
 	local refusal = b.events[#b.events]
 	numbers.secondRodent = if refusal then `{refusal.kind}: {refusal.text}` else "nothing"
@@ -203,7 +215,7 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 		refusal ~= nil and refusal.kind == "refused" and string.find(refusal.text, "Spicy Rodent", 1, true) ~= nil,
 		`second rodent: {numbers.secondRodent}`
 	)
-	for _, choice in { "drone", "squirrel", "townsperson", "police" } do
+	for _, choice in { "doctor", "squirrel", "townsperson", "police" } do
 		tryRole(b, choice, `B.{choice}`)
 	end
 	-- same choice twice keeps the body

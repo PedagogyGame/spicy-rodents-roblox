@@ -102,16 +102,13 @@ function TownJobs.duties(job: Job, data: any?): { Duty }
 				-- (the cleaner's strokes along the approaches: every other one, and the same spot only once)
 				if not seen[key] then
 					seen[key] = true
-					table.insert(
-						out,
-						{
-							x = s.x,
-							y = y,
-							z = s.z,
-							hold = math.max(3, s.hold),
-							label = ACT_WORDS[s.act or ""] or "the next job",
-						}
-					)
+					table.insert(out, {
+						x = s.x,
+						y = y,
+						z = s.z,
+						hold = math.max(3, s.hold),
+						label = ACT_WORDS[s.act or ""] or "the next job",
+					})
 				end
 			end
 		end

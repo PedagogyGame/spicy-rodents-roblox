@@ -5,10 +5,11 @@
 --   * Loading screen: the server's boot stage and progress (ReplicatedStorage BootStage, BootProgress,
 --     BootReady, BootError), then this computer's own preparation (the climbing routes), with elapsed
 --     seconds; a boot error is shown in red, never a silent screen.
---   * Menu: five big buttons (Spicy Rodent, Squirrel, Townsperson, Police, Police drone) that send
+--   * Menu: five big buttons (Spicy Rodent, Squirrel, Townsperson, Police, Doctor) that send
 --     PlayNet.Pick; "Back to the game" when you already have a body; M or the Menu button reopens it. Under the
 --     buttons, money and reputation together (owner D30: "checkable with money, in paused and or side screen"):
 --     "Money  S$3.00   ·   Reputation  Good (0)" (the player attributes Cents and Reputation; standingLine).
+--     (Owner D30: Doctor took the Police drone's place: drive the ambulance and bring bite victims in.)
 --   * Help panel (top left, always visible): the keys for the current role and device.
 --   * Status (top centre): role, health bar for the rodent and squirrels, bites and Power for the rodent.
 --   * Banners: big centred messages (RUN OVER!, KICKED OUT!) and short toasts for bites, kicks, refusals.
@@ -23,7 +24,11 @@
 -- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
 --   sickLine(attrs, way?) -> string? (a bitten player: what to do, under the status line; `way`
 --   { dist, words } adds how far the door is and which way), wayWords(dx, dz, lookX, lookZ) -> string,
---   markerText(dist) -> string, scaleFor(width, height) -> number, standingLine(attrs) -> string.
+--   markerText(dist) -> string, scaleFor(width, height) -> number, standingLine(attrs) -> string; D30, a doctor's call
+--   (the player attributes DoctorJob and DoctorCall, written by Server/Boot/Game from Hospital/DoctorService):
+--   jobLine(attrs, way?) -> string? (the line under the status, in the hospital's teal), jobMarkerText(job, dist) ->
+--   string (BITE VICTIM over the patient, then HOSPITAL over the doors once they are aboard). The call takes the marker
+--   from the sick player's HOSPITAL while there is one.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
 --   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
 -- No side effects on require.
@@ -69,7 +74,13 @@ PlayMenu.CHOICES = table.freeze({
 		line = "Your patrol car is parked right next to you: press E to get in.",
 		color = { 40, 60, 140 },
 	},
-	{ id = "drone", title = "Police drone", line = "Fly over the whole town.", color = { 60, 60, 70 } },
+	-- owner D30: in the Police drone's place; the hospital's teal (never a red cross on white)
+	{
+		id = "doctor",
+		title = "Doctor",
+		line = "Drive the ambulance and bring bite victims to the hospital.",
+		color = { 30, 140, 140 },
+	},
 } :: { Choice })
 
 local CLIMB = {
@@ -118,7 +129,7 @@ function PlayMenu.helpLines(role: string?, device: string?, owner: boolean?): { 
 	elseif role == "squirrel" then
 		lines = table.clone(CLIMB)
 		table.insert(lines, "Left click  pounce")
-	elseif role == "townsperson" or role == "police" or role == "drone" then
+	elseif role == "townsperson" or role == "police" or role == "drone" or role == "doctor" then
 		lines = {
 			"WASD  walk   ·   Shift  sprint",
 			"Space  jump",
@@ -126,6 +137,11 @@ function PlayMenu.helpLines(role: string?, device: string?, owner: boolean?): { 
 			"E  get into a car or the drone next to you",
 			"V  first-person view",
 		}
+		if role == "doctor" then
+			lines[4] = "E  take an ambulance parked on the hospital road"
+			table.insert(lines, "A call shows on your screen: drive to the BITE VICTIM marker")
+			table.insert(lines, "Stop beside the patient to load them, then stop at the hospital doors")
+		end
 	else
 		lines = { "Pick who to play from the menu" }
 	end
@@ -203,8 +219,35 @@ function PlayMenu.statusLine(attrs: { [string]: any }): string
 		return "POLICE OFFICER"
 	elseif role == "drone" then
 		return "POLICE DRONE PILOT"
+	elseif role == "doctor" then
+		return "DOCTOR"
 	end
 	return "No body yet: pick one from the menu"
+end
+
+-- D30: a doctor's call on screen (the player attribute DoctorJob: "called" | "enroute" | "loaded"). `line` is what
+-- the line under the status says (the way to the goal follows it), `marker` the word over the goal.
+PlayMenu.JOB = table.freeze({
+	called = { line = "BITE VICTIM WAITING  ·  Take an ambulance (E) and drive there", marker = "BITE VICTIM" },
+	enroute = { line = "BITE VICTIM  ·  Stop beside them to load them", marker = "BITE VICTIM" },
+	loaded = { line = "PATIENT ABOARD  ·  Stop at the hospital doors", marker = "HOSPITAL" },
+}) :: { [string]: { line: string, marker: string } }
+
+function PlayMenu.jobLine(attrs: { [string]: any }, way: Way?): string?
+	local job = attrs.DoctorJob
+	local j = if type(job) == "string" then PlayMenu.JOB[job] else nil
+	if j == nil then
+		return nil
+	end
+	if way then
+		return `{j.line}: {studs(way.dist)} studs {way.words}`
+	end
+	return j.line
+end
+
+function PlayMenu.jobMarkerText(job: string, dist: number): string
+	local j = PlayMenu.JOB[job]
+	return `{if j then j.marker else "HOSPITAL"}\n{studs(dist)} studs`
 end
 
 -- The UI scale for a viewport (pure): 1 on a 1280 x 720 screen or larger, down to 0.6 on a small one.
@@ -612,7 +655,8 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 	-- the panel showed through under it (D29); it comes back as it was when the card goes
 	local underCard = false
 	local toastToken, bannerToken = 0, 0
-	local way: Way? = nil -- to the hospital door, while this player is infected
+	local way: Way? = nil -- to the hospital door, while this player is infected (or to a doctor's call, wayJob)
+	local wayJob = false -- D30: `way` leads to the doctor's call, not to the cure
 
 	local function attrs(): { [string]: any }
 		return player:GetAttributes()
@@ -623,8 +667,9 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 		local a = attrs()
 		local role = a.PlayRole :: string?
 		local lines = PlayMenu.helpLines(role, device, isOwner)
-		local title = if device == "vehicle"
-			then "Driving the patrol car"
+		local title = if device == "vehicle" and role == "doctor"
+			then "Driving the ambulance"
+			elseif device == "vehicle" then "Driving the patrol car"
 			elseif device == "drone" then "Flying the police drone"
 			else PlayMenu.statusLine(a)
 		if keysOpen then
@@ -635,8 +680,11 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 			help.Size = UDim2.fromOffset(96, 34)
 		end
 		status.Text = PlayMenu.statusLine(a)
-		local sickText = PlayMenu.sickLine(a, way)
+		-- (D30: a doctor's call first, in the hospital's teal; else a bitten player's line, in red)
+		local jobText = PlayMenu.jobLine(a, if wayJob then way else nil)
+		local sickText = jobText or PlayMenu.sickLine(a, if wayJob then nil else way)
 		sick.Text = sickText or ""
+		sick.BackgroundColor3 = if jobText then Color3.fromRGB(20, 110, 110) else Color3.fromRGB(120, 10, 10)
 		sick.Visible = sickText ~= nil and not isOpen
 		local h = a.Health :: number?
 		hpBack.Visible = h ~= nil and not isOpen
@@ -668,26 +716,40 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 		while gui.Parent do
 			local sickStatus = player:GetAttribute("Infected")
 			local door = workspace:GetAttribute("HospitalDoor")
+			local job = player:GetAttribute("DoctorJob")
+			local call = player:GetAttribute("DoctorCall")
 			local cam = workspace.CurrentCamera
 			local found: Way? = nil
-			if (sickStatus == "infected" or sickStatus == "symptoms") and typeof(door) == "Vector3" and cam then
+			-- (D30: a doctor's call is marked first: the patient, then the hospital doors once they are aboard)
+			local onJob = type(job) == "string" and typeof(call) == "Vector3"
+			local target: Vector3? = if onJob
+				then call
+				elseif (sickStatus == "infected" or sickStatus == "symptoms") and typeof(door) == "Vector3" then door
+				else nil
+			if target and cam then
 				local body = player.Character
 				local root = if body then body.PrimaryPart else nil
 				local from = if root then root.Position else cam.CFrame.Position
 				local look = cam.CFrame.LookVector
-				local dx, dz = door.X - from.X, door.Z - from.Z
+				local dx, dz = target.X - from.X, target.Z - from.Z
 				local dist = math.sqrt(dx * dx + dz * dz)
 				found = { dist = dist, words = PlayMenu.wayWords(dx, dz, look.X, look.Z) }
 				if markerAnchor.Parent == nil then
 					markerAnchor.Parent = workspace
 				end
-				markerAnchor.Position = door + Vector3.new(0, 18, 0)
-				markerLabel.Text = PlayMenu.markerText(dist)
+				markerAnchor.Position = target + Vector3.new(0, 18, 0)
+				markerLabel.Text = if onJob then PlayMenu.jobMarkerText(job, dist) else PlayMenu.markerText(dist)
+				markerLabel.BackgroundColor3 = if onJob
+					then Color3.fromRGB(20, 120, 120)
+					else Color3.fromRGB(170, 20, 20)
 			end
 			way = found
+			wayJob = onJob
 			checkCard()
 			marker.Enabled = found ~= nil and not isOpen
-			local line = PlayMenu.sickLine({ Infected = sickStatus }, found)
+			local line = if onJob
+				then PlayMenu.jobLine({ DoctorJob = job }, found)
+				else PlayMenu.sickLine({ Infected = sickStatus }, found)
 			if line ~= shown then
 				shown = line
 				refresh()

@@ -6,7 +6,9 @@
 --            :poseRecords() -> stream records; :frame(dt, now, world, net?) -> { Hit } (one server frame:
 --            step, then the pose stream's send through Traffic/PoseStream);
 --            :dispatchResponder(dest, opts?); :releaseResponder(v); :responderIdle() -> n;
---            :responderHome() -> {x, z}; :dispatchIncident(scene); :markTeleported(actorId) (HANDOFF
+--            :responderHome() -> {x, z}; :parkedResponders() -> { { vehicle, x, z, yaw } }; :reserveResponder() ->
+--            vehicle?; :unreserve(v); :borrowResponder(v) -> boolean; :returnResponder(v); :bayOf(v) -> {x, z, yaw}?
+--            (D30: a doctor drives a responder ambulance); :dispatchIncident(scene); :markTeleported(actorId) (HANDOFF
 --            rule 12); :stats(); :kinds(); :solids() -> { walls, floors } (Traffic/Solid sets, below);
 --            :cars() -> { { id, x, z, vx, vz, width, length } } (every visible vehicle and its velocity over the last
 --            tick, studs/s: what the computer's squirrels look at before they cross, Shared/Wildlife/RoadCrossing); RunOver
@@ -17,6 +19,11 @@
 -- walls are only the cars that have stood still SETTLE seconds (every client draws them there by then; a car that
 -- moves leaves the set at once), and its floors are every visible car stretched FLOOR_LAG seconds of its speed behind
 -- (where a client may still draw it under a squirrel on its roof). Both sets are refilled at the end of every tick.
+--
+-- The doctors (owner D30, Server/Hospital/DoctorService): a doctor called to a patient has an ambulance kept for them
+-- (`reserveResponder`: the computer's dispatch passes it by); at E beside a parked one it is borrowed (`borrowResponder`:
+-- out of the fleet and out of sight, phase "borrowed", while the doctor drives the player vehicle drawn in its place)
+-- and given back to its bay when the doctor is done with it (`returnResponder`: parked, in view, idle again).
 --
 -- Pure and steppable: `step(dt, world)` runs whole 1/tickHz ticks (Tunables traffic.tickHz, default 30)
 -- and carries the remainder. Each tick: (1) every vehicle's AICarMotor steps against the people and the
@@ -190,6 +197,15 @@ local BAY_GAP = st(15.2) -- 38 st from bay to bay: room to pull out past the amb
 local BAY_BEYOND = st(16.8) -- 42 st from the junction on to the arterial ambulance's bay
 local BAY_INSET = st(1.4) -- the bay's line is 3.5 st inside the road's edge
 local BAY_HOP = st(18) -- a call too close behind the bay to drive to: it pulls out this far and stands
+-- stands a vehicle in its kerbside bay, facing along the road
+local function inBay(
+	self: TrafficService,
+	v: Vehicle,
+	bay: { cx: number, cz: number, fx: number, fz: number, kerb: number }
+)
+	v.x, v.z, v.yaw = bay.cx - bay.fz * bay.kerb, bay.cz + bay.fx * bay.kerb, math.atan2(bay.fx, bay.fz)
+	v.y = self.heightAt(v.x, v.z) + st(0.04)
+end
 local function parkEmergency(self: TrafficService, roads: { any })
 	local trunk = self.records.responder_ambulance_trunk
 	local pts = trunk and trunk.path and trunk.path.points
@@ -227,8 +243,7 @@ local function parkEmergency(self: TrafficService, roads: { any })
 			if along then
 				local bay = { cx = hx + fx * along, cz = hz + fz * along, fx = fx, fz = fz, kerb = kerb }
 				self.bays[v.id] = bay
-				v.x, v.z, v.yaw = bay.cx - fz * kerb, bay.cz + fx * kerb, math.atan2(fx, fz)
-				v.y = self.heightAt(v.x, v.z) + st(0.04)
+				inBay(self, v, bay)
 				if v.class == "legacy_ambulance" then
 					-- its round: from its bay along the arterial to its far end (the record's first point)
 					local far = v.lane.poly and self.records[v.lane.id] and self.records[v.lane.id].path.points[1]
@@ -681,7 +696,7 @@ end
 -- pulls out of its own kerbside bay to start it and pulls back in at the end (LaneMath.bayRoute).
 function TrafficService.dispatchResponder(self: TrafficService, dest: { number }, opts: DispatchOpts?): Vehicle?
 	for _, v in self.vehicles do
-		if v.class == "responder" and v.phase == "idle" then
+		if v.class == "responder" and v.phase == "idle" and not v.reserved then
 			local held = if opts and opts.hold then true else nil
 			local bay = self.bays[v.id]
 			local route
@@ -710,15 +725,86 @@ function TrafficService.releaseResponder(_self: TrafficService, v: Vehicle)
 	end
 end
 
--- responderIdle(): how many responders are parked and free.
+-- responderIdle(): how many responders are parked and free (not kept for a doctor, D30).
 function TrafficService.responderIdle(self: TrafficService): number
 	local n = 0
 	for _, v in self.vehicles do
-		if v.class == "responder" and v.phase == "idle" then
+		if v.class == "responder" and v.phase == "idle" and not v.reserved then
 			n += 1
 		end
 	end
 	return n
+end
+
+-- D30, the doctors ---------------------------------------------------------------------------------
+
+-- parkedResponders(): every responder standing in its bay (kept for a doctor or not): what a doctor may take with E.
+function TrafficService.parkedResponders(
+	self: TrafficService
+): { { vehicle: Vehicle, x: number, z: number, yaw: number } }
+	local out = {}
+	for _, v in self.vehicles do
+		if v.class == "responder" and v.phase == "idle" then
+			table.insert(out, { vehicle = v, x = v.x, z = v.z, yaw = v.yaw })
+		end
+	end
+	return out
+end
+
+-- reserveResponder(): keeps a parked responder for a doctor's call (the computer's dispatch passes it by). nil when
+-- none is parked and free.
+function TrafficService.reserveResponder(self: TrafficService): Vehicle?
+	for _, v in self.vehicles do
+		if v.class == "responder" and v.phase == "idle" and not v.reserved then
+			v.reserved = true
+			return v
+		end
+	end
+	return nil
+end
+
+function TrafficService.unreserve(_self: TrafficService, v: Vehicle)
+	if v then
+		v.reserved = nil
+	end
+end
+
+-- borrowResponder(v): a doctor takes this parked responder: out of the fleet and out of sight (the doctor's player
+-- vehicle is drawn in its place). False unless it stands parked in its bay.
+function TrafficService.borrowResponder(self: TrafficService, v: Vehicle): boolean
+	if v == nil or v.class ~= "responder" or v.phase ~= "idle" then
+		return false
+	end
+	v.phase, v.route, v.held, v.reserved = "borrowed", nil, nil, nil
+	v.visible, v.speed = false, 0
+	self.jumped[v.id] = true
+	return true
+end
+
+-- returnResponder(v): a borrowed responder is back: parked in its bay, in view, free for the next call.
+function TrafficService.returnResponder(self: TrafficService, v: Vehicle)
+	if v == nil or v.phase ~= "borrowed" then
+		return
+	end
+	local bay = self.bays[v.id]
+	if bay then
+		inBay(self, v, bay)
+	end
+	v.phase, v.visible, v.speed, v.timer = "idle", true, 0, 0
+	self.jumped[v.id] = true
+end
+
+-- bayOf(v): where a responder parks (its kerbside bay), or nil without the hospital road.
+function TrafficService.bayOf(self: TrafficService, v: Vehicle): { x: number, z: number, yaw: number }?
+	local bay = v and self.bays[v.id]
+	if bay == nil then
+		return nil
+	end
+	return {
+		x = bay.cx - bay.fz * bay.kerb,
+		z = bay.cz + bay.fx * bay.kerb,
+		yaw = math.atan2(bay.fx, bay.fz),
+	}
 end
 
 -- responderHome(): where the responders' trips start from, as road routing sees it: the junction of the

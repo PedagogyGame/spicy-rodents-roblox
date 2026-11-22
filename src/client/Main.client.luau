@@ -4,9 +4,11 @@
 -- the day cycle (World/Sky), what spins (World/Spinners) and the loading screen first (UI/PlayMenu: server boot
 -- progress, then the climbing routes prepared on this computer), then the AnimationDriver over every body (D3), the
 -- traffic ghosts (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
--- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
+-- (pick Spicy Rodent, Squirrel, Townsperson, Police or Doctor; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
--- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
+-- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital); "doctor": a
+-- doctor's call, the warning (a banner) and the demotion (owner D30, Server/Hospital/DoctorService). Render/Beacons
+-- flashes the light bar of an ambulance out with a doctor.
 -- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
@@ -35,6 +37,7 @@ local PlayMenu = require("./UI/PlayMenu")
 local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
+local Beacons = require("./Render/Beacons")
 local MedicalView = require("./Render/MedicalView")
 local StanceView = require("./Render/StanceView")
 local FlatView = require("./Render/FlatView")
@@ -199,6 +202,7 @@ end)
 task.spawn(function()
 	-- the cars it draws are solid to the squirrel's motor (ClientWorld.cars) and, as parts, to a person's body
 	VehicleView.start({ cars = world.cars })
+	Beacons.start() -- (D30: an ambulance out with a doctor flashes its light bar)
 	local ghosts = VehicleView.folder()
 	if ghosts then
 		world.ignore({ ghosts })
@@ -359,7 +363,7 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 			squirrel = "You are a squirrel. Climb something!",
 			townsperson = "You are a townsperson. F kicks the rodent.",
 			police = "You are a police officer. Your patrol car is right here: press E.",
-			drone = "Police drone: launching…",
+			doctor = "You are a doctor. The ambulances are right here: wait for a call.",
 		}
 		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
@@ -386,6 +390,17 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(`CHOMP! "{msg.line}"   +{msg.delta} Power   ({msg.bites} bites)`, 2.5)
 	elseif kind == "bitten" then
 		menu.toast(`The rodent bit you! You shout: "{msg.line}"`, 2.5)
+	elseif kind == "doctor" then
+		-- a doctor's call, a warning, the demotion (D30): the ones that matter most take the middle of the screen
+		local text = tostring(msg.text)
+		if msg.demoted then
+			menu.banner("NOT A DOCTOR ANY MORE", text, 5)
+		elseif msg.banner then
+			menu.banner("DOCTOR", text, 4)
+			menu.toast(text, 6)
+		else
+			menu.toast(text, 4)
+		end
 	elseif kind == "med" then
 		-- the bite-to-hospital sequence: what is happening to you and what to do about it
 		menu.toast(tostring(msg.text), if type(msg.secs) == "number" then msg.secs else 6)
