@@ -2,15 +2,19 @@
 -- ReplicatedStorage.Shared.Vehicles.VehicleKinds
 -- Every player-enterable vehicle kind as a CarMotor parameter set plus its access rule and its
 -- placeholder interior (BUILD_PLAN §1.4 Vehicles/VehicleKinds, §1.5 Devices, §3.18; brief v2 §13a,
--- §14, §15). Kinds: car (the police patrol car), cart (golf and police carts: slow, open, in the
--- fatal fleet at low speed), bike (arcade, balance-free, not in the fleet; Q8 default), pickup and
+-- §14, §15). Kinds: car (the police patrol car), cart (the golf cart: open; one of the shared three since D29, out of
+-- the fatal fleet), bike (arcade, balance-free, not in the fleet; Q8 default), pickup and
 -- suv (keys for the top two ranked humans, `Ladder.subroles.humanDriver`), jetski (water surface,
--- rental). Logical boxes follow traffic §1 (sedan 2.35 x 4.45 x 2.04 u); the others are scaled from
+-- rental), moped and escooter (owner D29). The town's SHARED little vehicles (owner D29: 3 golf carts, 2 mopeds, 5
+-- stand-up electric scooters, Shared/Vehicles/SharedRides) are the kinds marked `shared`: anyone in a person's body
+-- rides one, no key, no rental, no police trouble (policeIgnore), and a bump never kills (Server/Vehicles/RideBumps).
+-- Logical boxes follow traffic §1 (sedan 2.35 x 4.45 x 2.04 u); the others are scaled from
 -- it. Speeds are arcade defaults in studs/s (sedan AI lanes run 6.5-9.5 u/s = 16-24 st/s, traffic §4).
 -- Every interior has a driver seat, a dash and an `EyeSocket` (first person on entry, brief v2 §14);
 -- offsets are body-local studs (+Z forward in the HTML convention; Placeholder flips at the CFrame).
 -- Until data/vehicles/kinds.json compiles, these module defaults are the source; `fromData` merges it.
--- Interface: kind(id), list(), mayDrive(kindId, ctx) -> (ok, reason), isFleet(kindId), fromData(t)
+-- Interface: kind(id), list(), mayDrive(kindId, ctx) -> (ok, reason), isFleet(kindId), isShared(kindId),
+--   policeIgnore(kindId), stands(kindId), fromData(t)
 -- Pure. No side effects on require.
 
 export type Interior = {
@@ -36,6 +40,8 @@ export type Kind = {
 	access: "anyone" | "humanDriver" | "police" | "rental",
 	fleet: boolean, -- in the fatal fleet (traffic tests squirrels against it)
 	fleetMaxSpeed: number?, -- the fleet speed cap for carts
+	shared: boolean?, -- one of the town's shared little vehicles (owner D29): anyone in a person's body, no key
+	stand: boolean?, -- the rider stands (the electric scooter): the hidden seat is a standing body's height over the deck
 	wheels: number,
 	color: { number },
 	interior: Interior,
@@ -85,22 +91,26 @@ local KINDS: { [string]: Kind } = {
 		wheels = 4,
 		color = { 0.1, 0.12, 0.2 },
 	}),
+	-- The golf cart is one of the town's shared three (owner D29); since D29 no player cart is in the fatal fleet (a
+	-- bump knocks someone aside, never more). The shared three's speeds: the scooter about a brisk run (people sprint
+	-- at 28), the cart a little quicker, the moped the quickest.
 	cart = make({
 		id = "cart",
 		motor = "car",
 		-- 6.25 tall (the traffic's carts, Traffic/Boxes, are 4.75): the drawn canopy is the top of the box, and a seated
 		-- R15's head on the bench (5.72 up) clears its underside (6.0) by 0.28 (owner check sheet BIKES_CHECK)
 		size = { 1.5 * st, 2.5 * st, 2.6 * st },
-		maxSpeed = 22,
+		maxSpeed = 26,
 		reverseSpeed = 8,
-		accel = 14,
+		accel = 15,
 		brake = 40,
 		drag = 6,
 		maxSteer = 0.65,
 		steerRate = 3,
 		wheelbase = 1.7 * st,
 		access = "anyone",
-		fleet = true,
+		shared = true,
+		fleet = false,
 		fleetMaxSpeed = 22,
 		wheels = 4,
 		color = { 0.92, 0.92, 0.88 },
@@ -178,7 +188,50 @@ local KINDS: { [string]: Kind } = {
 	}),
 }
 
-local ORDER = { "car", "cart", "bike", "pickup", "suv", "jetski" }
+-- The moped (a small motor scooter, seated: the quickest of the shared three) and the stand-up electric scooter (quick
+-- to turn, about a brisk run). Both lean into turns (the bike motor). Mild colours: a buttercream moped, a sky-blue
+-- scooter.
+KINDS.moped = make({
+	id = "moped",
+	motor = "bike",
+	size = { 1.3, 2.6, 4.0 },
+	maxSpeed = 34,
+	reverseSpeed = 4,
+	accel = 16,
+	brake = 34,
+	drag = 5,
+	maxSteer = 0.7,
+	steerRate = 3.4,
+	wheelbase = 2.65,
+	access = "anyone",
+	shared = true,
+	fleet = false,
+	wheels = 2,
+	color = { 0.93, 0.83, 0.55 },
+	open = true,
+})
+KINDS.escooter = make({
+	id = "escooter",
+	motor = "bike",
+	size = { 1.0, 3.2, 3.2 },
+	maxSpeed = 22,
+	reverseSpeed = 3,
+	accel = 18,
+	brake = 36,
+	drag = 5,
+	maxSteer = 0.85,
+	steerRate = 4.5,
+	wheelbase = 2.3,
+	access = "anyone",
+	shared = true,
+	stand = true,
+	fleet = false,
+	wheels = 2,
+	color = { 0.45, 0.68, 0.88 },
+	open = true,
+})
+
+local ORDER = { "car", "cart", "bike", "pickup", "suv", "jetski", "moped", "escooter" }
 
 local VehicleKinds = {}
 
@@ -196,6 +249,25 @@ end
 
 function VehicleKinds.isFleet(id: string): boolean
 	return VehicleKinds.kind(id).fleet
+end
+
+-- One of the town's shared little vehicles (owner D29): anyone in a person's body may ride it, nobody owns it.
+function VehicleKinds.isShared(id: string): boolean
+	local k = KINDS[id]
+	return k ~= nil and k.shared == true
+end
+
+-- Whether the police take no notice of a vehicle of this kind (owner D29: "you do not get tickets or problems with the
+-- police with them"): no ticket, no wanted level, no chase for riding a shared vehicle, whatever a police rule says of
+-- other vehicles. Any police or ticket rule asks this first.
+function VehicleKinds.policeIgnore(id: string): boolean
+	return VehicleKinds.isShared(id)
+end
+
+-- Whether the rider stands (the electric scooter): the client plays a standing clip on its seat, not the sit.
+function VehicleKinds.stands(id: string): boolean
+	local k = KINDS[id]
+	return k ~= nil and k.stand == true
 end
 
 -- Who may take the wheel (brief v2 §13a, §15; §1.5 Devices): carts and bikes anyone; pickups and

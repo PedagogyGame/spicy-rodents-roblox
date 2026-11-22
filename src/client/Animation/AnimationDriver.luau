@@ -73,7 +73,9 @@
 --   on a part-built puppet the roll and the shimmy go on its Root joint. Each move's sound plays once at the body.
 --   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
 --   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
---   seated(seatPart, ride) -> boolean (pure); medPose(med, footDrop) -> { clip, drop, flat } (pure);
+--   seated(seatPart, ride) -> boolean (pure); seatClip(vehicleKind) -> "sit" | "idle" (pure: the electric scooter's
+--   rider stands, owner D29); medOf(med, tumble) -> the patient's pose shown (pure: a body knocked over by a shared
+--   vehicle, its Tumble attribute "down", sits on the ground as a patient does); medPose(med, footDrop) -> { clip, drop, flat } (pure);
 --   taskPose(task, footDrop) -> { clip, drop, flat } (pure: a member of staff at work, the body's Task attribute);
 --   pose(med, task, footDrop) -> the one that applies (pure); gaitClip(current, pace, runAbove?) -> "walk" |
 --   "run" (pure); pace(prev, inst, dt) -> studs/s (pure); sway(med, t, seed) -> roll, pitch (pure);
@@ -90,6 +92,7 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
+local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 -- (a module reached through Import carries its values' types but not its exported type names:
 -- this is the same type, taken from a value)
 type HeroClip = typeof(HeroAssets.CLIPS.squirrel.Idle)
@@ -171,10 +174,11 @@ type Entry = {
 		base: { [any]: CFrame },
 		wrote: { [any]: CFrame },
 	}?,
-	med: any, -- the body's Med attribute (a patient's pose)
+	med: any, -- the body's Med attribute (a patient's pose), or "down" while its Tumble attribute says so (medOf)
 	task: any, -- the body's Task attribute (a member of staff at work: Shared/Attractions/AlleyStaff)
 	taskConn: RBXScriptConnection?,
 	medConn: RBXScriptConnection?,
+	tumbleConn: RBXScriptConnection?,
 	drop: number, -- studs the pose lowers the body by, now (eased)
 	pace: number, -- studs/s, smoothed more slowly than `speed`: only picks walk or run
 	legs: { any }, -- the knee and ankle joints a sitting patient's legs are straightened at
@@ -328,6 +332,23 @@ AnimationDriver.DEFAULT_CLIPS = {
 -- attribute alone is enough; nobody has checked Seat:Sit on an anchored root in the engine.
 function AnimationDriver.seated(seatPart: any, ride: any): boolean
 	return seatPart ~= nil or ride ~= nil
+end
+
+-- seatClip(vehicleKind): the clip a body on a vehicle's seat plays: "idle" (standing) on a kind whose rider stands (the
+-- electric scooter, owner D29: its hidden Seat is a standing body's height over the board, Vehicles/Placeholder
+-- SEATED.stand), else "sit".
+function AnimationDriver.seatClip(vehicleKind: any): string
+	return if type(vehicleKind) == "string" and VehicleKinds.stands(vehicleKind) then "idle" else "sit"
+end
+
+-- medOf(med, tumble): the patient's pose a body shows: its Med attribute, else "down" while its Tumble attribute is
+-- "down" (knocked over by a shared vehicle and on the ground for a moment: Server/Vehicles/RideBumps, owner D29). The
+-- same sit on the ground, legs out, as a patient's; a Med always wins.
+function AnimationDriver.medOf(med: any, tumble: any): any
+	if med ~= nil then
+		return med
+	end
+	return if tumble == "down" then "down" else nil
 end
 
 function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
@@ -888,12 +909,14 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 		end
 		local rootJoint, rootAttach = rootJointOf(model, root)
-		local medConn = model:GetAttributeChangedSignal("Med"):Connect(function()
+		local function poseChanged()
 			local e = entries[model]
 			if e then
-				e.med = model:GetAttribute("Med")
+				e.med = AnimationDriver.medOf(model:GetAttribute("Med"), model:GetAttribute("Tumble"))
 			end
-		end)
+		end
+		local medConn = model:GetAttributeChangedSignal("Med"):Connect(poseChanged)
+		local tumbleConn = model:GetAttributeChangedSignal("Tumble"):Connect(poseChanged)
 		local taskConn = model:GetAttributeChangedSignal("Task"):Connect(function()
 			local e = entries[model]
 			if e then
@@ -929,8 +952,9 @@ function AnimationDriver.start(opts: Opts): Driver
 			hero = hero,
 			mode = "ground",
 			creep = nil,
-			med = model:GetAttribute("Med"),
+			med = AnimationDriver.medOf(model:GetAttribute("Med"), model:GetAttribute("Tumble")),
 			medConn = medConn,
+			tumbleConn = tumbleConn,
 			task = model:GetAttribute("Task"),
 			taskConn = taskConn,
 			drop = 0,
@@ -991,6 +1015,9 @@ function AnimationDriver.start(opts: Opts): Driver
 			if e.medConn then
 				e.medConn:Disconnect()
 			end
+			if e.tumbleConn then
+				e.tumbleConn:Disconnect()
+			end
 			if e.taskConn then
 				e.taskConn:Disconnect()
 			end
@@ -1016,8 +1043,11 @@ function AnimationDriver.start(opts: Opts): Driver
 	local function choose(e: Entry): string
 		local set: ClipSet = clips[e.species] or {}
 		local hum = e.humanoid
-		if set.sit and AnimationDriver.seated(if hum then hum.SeatPart else nil, e.body:GetAttribute("Ride")) then
-			return "sit"
+		local seatPart = if hum then hum.SeatPart else nil
+		if set.sit and AnimationDriver.seated(seatPart, e.body:GetAttribute("Ride")) then
+			-- (the electric scooter's rider stands on its board: owner D29)
+			local ride = if seatPart and seatPart.Parent then seatPart.Parent:GetAttribute("VehicleKind") else nil
+			return if AnimationDriver.seatClip(ride) == "idle" and set.idle then "idle" else "sit"
 		end
 		-- a patient or a member of staff at work (AI bodies only: a held body keeps its own animation)
 		if (e.med ~= nil or e.task ~= nil) and e.root.Anchored then
