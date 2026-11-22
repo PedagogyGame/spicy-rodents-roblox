@@ -25,6 +25,8 @@
 -- the HUD says where it is going and how long, and E says you get off at the other end. DeviceReleased
 -- ("ride_end", "ride_left") gives the legs and the usual camera back on the platform. While the Lookout's telescope
 -- is up (Client/Rides/Telescope) E and Q are its keys.
+-- The town's shared little vehicles (owner D29): UI/RideHint shows "E  ride" by a free one within reach (on a touch
+-- screen a RIDE button, and GET OFF while riding: the same E).
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
 --   Client.flushInput(), Client.state() -> { species, variant, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing); rideTarget(mode, cabin, seat, view) -> Model?;
@@ -46,6 +48,7 @@ local MotorLink = require("../Controllers/MotorLink")
 local MotorHealth = require("../Controllers/MotorHealth")
 local SkyLiftView = require("../Rides/SkyLiftView")
 local Telescope = require("../Rides/Telescope")
+local RideHint = require("../UI/RideHint")
 
 export type Opts = {
 	bodies: Instance, -- the folder holding every body
@@ -510,7 +513,12 @@ function PossessionClient.start(opts: Opts): Client
 				toast("Flying the police drone. WASD fly, Space up, Q down, E lands.", 4)
 			else
 				stopController = Vehicle.start(m, info.kind or "car", metrics, ctx)
-				toast("Driving. W gas, S brake, A/D steer, V view, E gets out.", 4)
+				if m:GetAttribute("Shared") == true then
+					-- (owner D29: free to ride, nobody's, no police trouble)
+					toast("Riding. W go, S brake, A/D steer, V view, E gets off. Mind the people!", 4)
+				else
+					toast("Driving. W gas, S brake, A/D steer, V view, E gets out.", 4)
+				end
 			end
 			fpToggle = true -- first person on entry; V flips it (brief v2 §14)
 			applyCamera()
@@ -593,6 +601,24 @@ function PossessionClient.start(opts: Opts): Client
 			end
 		end
 	end)
+
+	-- the little prompt by a free shared vehicle, and the touch screen's RIDE and GET OFF (UI/RideHint, owner D29)
+	RideHint.start({
+		request = function()
+			if deviceRequest and body then
+				deviceRequest:FireServer("interact")
+			end
+		end,
+		state = function(): RideHint.State
+			local root = if body then body.PrimaryPart else nil
+			local m = if device then device.model else nil
+			return {
+				onFoot = device == nil and payloadNow ~= nil and payloadNow.species == "human",
+				riding = m ~= nil and m:GetAttribute("Shared") == true,
+				at = if root then root.Position else nil,
+			}
+		end,
+	})
 
 	routeReset(function()
 		metrics.resets += 1
