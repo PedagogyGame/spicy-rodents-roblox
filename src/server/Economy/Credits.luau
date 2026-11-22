@@ -68,7 +68,7 @@
 -- Cents: seq counts the account's changes, so a screen that was shown only the last of several can tell),
 -- PocketMoney (cents of pocket money given at this join, nil when none) and PassUntil (the game second the
 -- pass runs out, nil without one). Only this module writes them.
--- Pocket money: a player is given Tunables economy.pocketMoneyCents (300: S$3.00) ONCE for as long as this
+-- Pocket money: a player is given Tunables economy.pocketMoneyCents (2500: S$25.00, owner D31) ONCE for as long as this
 -- server runs, on first joining, so that there is something to spend before jobs pay. Coming back gives
 -- nothing more. Set the tunable to 0 to switch it off. It is a hand-out: it does not count toward the human
 -- queue (counted(player) is what Roles reads), and it is what a shop takes first.

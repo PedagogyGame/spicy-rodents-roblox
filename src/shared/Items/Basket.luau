@@ -13,6 +13,7 @@
 
 local ItemRules = require("./ItemRules")
 local EconomyRules = require("../Economy/EconomyRules")
+local Bank = require("../Economy/Bank")
 
 local Basket = {}
 
@@ -22,7 +23,7 @@ export type Baskets = { byKey: { [any]: { string } } }
 export type Zone = { cx: number, cy: number, cz: number, yaw: number, hx: number, hy: number, hz: number }
 
 Basket.WORDS = table.freeze({
-	took = "%s, %dc: in your basket (%dc in all). Pay at the counter.",
+	took = "%s, %s: in your basket (%s in all). Pay at the counter.", -- amounts as Economy/Bank.amount writes them
 	full = "Your hands are full: pay for what you have first.",
 	unknown = "That is not for sale.",
 	putBack = "You put %s back: pay at the counter before you leave.",
@@ -69,7 +70,7 @@ function Basket.take(b: Baskets, key: any, itemId: string): (boolean, string)
 	end
 	table.insert(list, itemId)
 	local bare = string.gsub(nameOf(itemId), "^an? ", "")
-	return true, string.format(Basket.WORDS.took, capital(bare), def.price, Basket.total(b, key))
+	return true, string.format(Basket.WORDS.took, capital(bare), Bank.amount(def.price), Bank.amount(Basket.total(b, key)))
 end
 
 function Basket.clear(b: Baskets, key: any): { string }

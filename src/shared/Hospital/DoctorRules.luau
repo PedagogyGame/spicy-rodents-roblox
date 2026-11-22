@@ -27,6 +27,7 @@
 -- Pure. No side effects on require.
 
 local Tunables = require("../Config/Tunables")
+local Bank = require("../Economy/Bank")
 
 local DoctorRules = {}
 
@@ -124,7 +125,7 @@ function DoctorRules.callWords(where: string?): string
 end
 
 function DoctorRules.paidWords(cents: number): string
-	return `Patient brought in: +{cents}c. The nurses take it from here.`
+	return `Patient brought in: +{Bank.amount(cents)}. The nurses take it from here.`
 end
 
 function DoctorRules.newJob(caseId: any, now: number): Job

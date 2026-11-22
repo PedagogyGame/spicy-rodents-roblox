@@ -5,7 +5,7 @@
 --   * A board outside each bank (built here: a sandwich board, "BANK ERRANDS", and its E prompt). A person who has
 --     no errand presses it and is given one from that bank (Errands.offer): the words on their screen name the place
 --     or the person, the time and the pay ("Take this parcel to Pepper's Corner Store. You have 9 minutes; it pays
---     14c."). Nothing is marked on the map or the screen: it pays to know the town. One errand at a time.
+--     S$8.00."). Nothing is marked on the map or the screen: it pays to know the town. One errand at a time.
 --   * The thing is carried visibly: a small prop in the carrier's right hand (welded, massless, not solid), put on
 --     the body they hold now (taken off while they are not a person, put back when they are one again).
 --   * Within DROP studs of the spot it is handed over and paid (wallet.add, "an errand"); the first time within

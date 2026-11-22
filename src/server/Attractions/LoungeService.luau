@@ -48,6 +48,7 @@
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
 local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local LoungeClassic =
 	Import.shared("Attractions/LoungeClassic") :: typeof(require("../../shared/Attractions/LoungeClassic"))
@@ -355,7 +356,7 @@ function LoungeService._prompts(self: any)
 		self:leave(player)
 	end)
 	local cents, days = self.town.pass.offer()
-	on(prompt(self.podiumPost, W.buyAction, `{cents}c for {days} in-game days`, "pass", true), "pass", function(player)
+	on(prompt(self.podiumPost, W.buyAction, `{Bank.amount(cents)} for {days} in-game days`, "pass", true), "pass", function(player)
 		self:buyPass(player)
 	end)
 	for i, seat in self.seats do
@@ -372,7 +373,7 @@ function LoungeService._prompts(self: any)
 	end
 	for i, d in LoungeClassic.DRINKS do
 		local price = EconomyRules.price(d.id) or 0
-		on(prompt(self.counterPosts[i], `{d.label} ({price}c)`, W.orderObject, d.id), "order", function(player)
+		on(prompt(self.counterPosts[i], `{d.label} ({Bank.amount(price)})`, W.orderObject, d.id), "order", function(player)
 			self:order(player, d.id)
 		end)
 	end

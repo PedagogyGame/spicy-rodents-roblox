@@ -635,7 +635,7 @@ local function walls(kit: any, root: any, data: any)
 	sign(kit, w, "SignBallShop", -23, -5, 9.2, 11.6, "PRO SHOP - BOWLING BALLS")
 	local gz, sz = L.zone("gift_shop"), L.zone("snack_bar")
 	sign(kit, w, "SignGifts", (gz.x0 + gz.x1) / 2 - 4.5, (gz.x0 + gz.x1) / 2 + 4.5, 9.2, 11.6, "GIFTS")
-	sign(kit, w, "SignSnack", (sz.x0 + sz.x1) / 2 - 10, (sz.x0 + sz.x1) / 2 + 10, 9.2, 11.6, "SNACK BAR - NACHOS 5c")
+	sign(kit, w, "SignSnack", (sz.x0 + sz.x1) / 2 - 10, (sz.x0 + sz.x1) / 2 + 10, 9.2, 11.6, "SNACK BAR - NACHOS 50c") -- owner D31: EconomyRules.PRICES.nachos
 	sign(kit, w, "SignGames", 106, 145, 9.2, 11.6, "GAMES ROOM - POOL - PINBALL - AIR HOCKEY - DARTS")
 	-- parapet and coping round the roof (the rear's are the back module's)
 	local function parapet(name: string, x0: number, x1: number, d0: number, d1: number)

@@ -536,8 +536,8 @@ function PartList.dressing(venue: any?): { Part }
 		card.signs = { { face = "Back", text = sub, tone = "stencil" } }
 		add("Lobby", "Till", x + 3.5, 3.5, z - 3.9, x + 5.5, 4.7, z - 2.4, DARK, "Metal")
 	end
-	counter(Arena.DESK.x, "PASS DESK", "20c\nFIVE DAYS", ORANGE)
-	counter(-Arena.DESK.x, "GARB SHOP", "S$1 A SET", TEAL)
+	counter(Arena.DESK.x, "PASS DESK", "S$2\nFIVE DAYS", ORANGE) -- owner D31: Contract.Rules.passCents
+	counter(-Arena.DESK.x, "GARB SHOP", "S$10 A SET", TEAL) -- owner D31: EconomyRules.PRICES.paintball_garb_set
 	-- garb on a rail against the back wall east of the east window, in both teams' colours
 	local GARB = WINDOW[2] + 4
 	for i = 0, 5 do

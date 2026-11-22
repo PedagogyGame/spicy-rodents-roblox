@@ -118,9 +118,9 @@ end
 
 -- Whole cents for an errand of this many studs.
 function Errands.pay(distance: number): number
-	local base = num("work.errandBaseCents", 4)
-	local per = num("work.errandCentsPer100", 1)
-	local most = num("work.errandMaxCents", 30)
+	local base = num("work.errandBaseCents", 200)
+	local per = num("work.errandCentsPer100", 100)
+	local most = num("work.errandMaxCents", 1500)
 	return math.floor(math.clamp(base + per * math.max(0, distance) / 100, 0, most))
 end
 

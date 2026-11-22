@@ -224,6 +224,7 @@
 --   Phase, Feel, Pose, SlotView, MatchView, CardRow, Award, EndCard, Result, Event, Extras; T (type witnesses)
 
 local Config = require("../../Paintball/Config")
+local Bank = require("../../Economy/Bank")
 
 -- The match's own phases, inside the Session's "playing" and "done" (see the header).
 export type Phase = "briefing" | "live" | "ended"
@@ -378,8 +379,8 @@ Contract.Rules = table.freeze({
 	-- a person who has not moved, turned or fired for this long of "live" is taken off ("idle") and a
 	-- bot takes the seat (decision 9)
 	idleSecs = 60,
-	-- PB-12: the pass
-	passCents = 20,
+	-- PB-12: the pass (owner D31: S$2.00; the same as Tunables economy.paintballPassCents, a spec holds it)
+	passCents = 200,
 	passDays = 5, -- in-game days
 })
 
@@ -607,7 +608,7 @@ Contract.BOTS = table.freeze({
 -- these words.
 Contract.WHY = table.freeze({
 	full = "The match is full of people: wait for the next one.",
-	pass = "You need a pass. The pass desk sells one for 20c.",
+	pass = `You need a pass. The pass desk sells one for {Bank.amount(Contract.Rules.passCents)}.`,
 	infected = "See a doctor first.",
 	closed = "The arena is closed.",
 	soon = "The next match is about to start.", -- (the door during the end card: nextMatch below has the seconds)
@@ -633,9 +634,9 @@ function Contract.textFor(why: string): string
 	return (Contract.WHY :: { [string]: string })[why] or "Not now."
 end
 
--- PB-12: "You need 20c; you have 7c".
+-- PB-12: "You need S$2.00; you have 70c" (amounts as Economy/Bank.amount writes them).
 function Contract.passShort(need: number, have: number): string
-	return `You need {need}c; you have {have}c`
+	return `You need {Bank.amount(need)}; you have {Bank.amount(have)}`
 end
 
 -- The door during the end card: "The next match starts in 7 s."
