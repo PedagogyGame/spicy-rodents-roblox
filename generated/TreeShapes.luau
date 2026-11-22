@@ -3729,7 +3729,11 @@ return {
 					},
 					trunk = { height = 50, radius = 1.1 },
 				},
+				crown = 8,
+				family = "pine",
+				height = 58,
 				label = "BALSAM FIR",
+				species = "fir",
 			},
 			black_walnut = {
 				climb = {
@@ -3749,7 +3753,11 @@ return {
 					},
 					trunk = { height = 42, lean = 1.5, leanBearing = 140, radius = 2 },
 				},
+				crown = 22,
+				family = "nut",
+				height = 68,
 				label = "BLACK WALNUT",
+				species = "walnut",
 			},
 			great_elm = {
 				climb = {
@@ -3782,7 +3790,11 @@ return {
 					},
 					trunk = { height = 170, lean = 3, leanBearing = 200, radius = 4.8 },
 				},
+				crown = 48,
+				family = "giant",
+				height = 262,
 				label = "GREAT ELM",
+				species = "elm",
 			},
 			hazel = {
 				climb = {
@@ -3792,7 +3804,11 @@ return {
 					},
 					trunk = { height = 15, lean = 1.2, leanBearing = 0, radius = 0.9 },
 				},
+				crown = 10,
+				family = "nut",
+				height = 22,
 				label = "HAZEL",
+				species = "hazel",
 			},
 			king_oak = {
 				climb = {
@@ -3818,7 +3834,11 @@ return {
 					},
 					trunk = { height = 150, lean = 4, leanBearing = 30, radius = 5.2 },
 				},
+				crown = 52,
+				family = "giant",
+				height = 248,
 				label = "KING OAK",
+				species = "oak",
 			},
 			norway_spruce = {
 				climb = {
@@ -3831,7 +3851,11 @@ return {
 					},
 					trunk = { height = 68, radius = 1.4 },
 				},
+				crown = 12,
+				family = "pine",
+				height = 78,
 				label = "NORWAY SPRUCE",
+				species = "spruce",
 			},
 			old_beech = {
 				climb = {
@@ -3848,7 +3872,11 @@ return {
 					},
 					trunk = { height = 148, lean = 2.5, leanBearing = 110, radius = 5 },
 				},
+				crown = 54,
+				family = "giant",
+				height = 244,
 				label = "OLD BEECH",
+				species = "beech",
 			},
 			pin_oak = {
 				climb = {
@@ -3860,7 +3888,11 @@ return {
 					},
 					trunk = { height = 62, radius = 1.8 },
 				},
+				crown = 17,
+				family = "nut",
+				height = 74,
 				label = "PIN OAK",
+				species = "pin_oak",
 			},
 			red_pine = {
 				climb = {
@@ -3873,7 +3905,11 @@ return {
 					},
 					trunk = { height = 92, lean = 1.2, leanBearing = 250, radius = 1.8 },
 				},
+				crown = 14,
+				family = "pine",
+				height = 105,
 				label = "RED PINE",
+				species = "red_pine",
 			},
 			shagbark_hickory = {
 				climb = {
@@ -3885,7 +3921,11 @@ return {
 					},
 					trunk = { height = 62, lean = 1, leanBearing = 15, radius = 1.8 },
 				},
+				crown = 17,
+				family = "nut",
+				height = 84,
 				label = "SHAGBARK HICKORY",
+				species = "hickory",
 			},
 			sweet_chestnut = {
 				climb = {
@@ -3897,7 +3937,11 @@ return {
 					},
 					trunk = { height = 40, lean = 2, leanBearing = 320, radius = 2.4 },
 				},
+				crown = 23,
+				family = "nut",
+				height = 72,
 				label = "SWEET CHESTNUT",
+				species = "chestnut",
 			},
 			white_oak = {
 				climb = {
@@ -3909,7 +3953,11 @@ return {
 					},
 					trunk = { height = 36, lean = 1.5, leanBearing = 220, radius = 2.4 },
 				},
+				crown = 25,
+				family = "nut",
+				height = 64,
 				label = "WHITE OAK",
+				species = "white_oak",
 			},
 			white_pine = {
 				climb = {
@@ -3923,7 +3971,11 @@ return {
 					},
 					trunk = { height = 84, lean = 0.8, leanBearing = 60, radius = 1.6 },
 				},
+				crown = 15,
+				family = "pine",
+				height = 96,
 				label = "WHITE PINE",
+				species = "white_pine",
 			},
 		},
 		trees = {

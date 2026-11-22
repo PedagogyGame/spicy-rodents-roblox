@@ -96,9 +96,39 @@ function Lib.woods(ctx: any): any?
 		return nil
 	end
 	local doc = Json.decodeFile(path)
+	-- the uploaded Models (data/art/woods.json, tools/blender/trees/publish_woods.py): per kind its asset id (nil until
+	-- the lead uploads it), its leaf sprays' part colour and its triangles
+	local art: { [string]: any } = {}
+	local artPath = ctx.repo .. "/data/art/woods.json"
+	if fs.isFile(artPath) then
+		for _, a in Json.decodeFile(artPath).kinds do
+			local id = a.assetId
+			if id == "" then
+				id = nil
+			end
+			ctx.invariant(
+				`woods art {a.kind}: an asset id is digits`,
+				id == nil or string.match(tostring(id), "^%d+$") ~= nil
+			)
+			ctx.invariant(`woods art {a.kind}: uploaded only with every promise kept`, id == nil or a.checks.ok == true)
+			art[a.kind] = {
+				assetId = if id then tostring(id) else nil,
+				leaf = a.parts.Leaves.color,
+				tris = a.tris.total,
+			}
+		end
+	end
 	local kinds = {}
 	for id, k in doc.kinds do
-		kinds[id] = { label = k.label, climb = k.climb }
+		kinds[id] = {
+			label = k.label,
+			family = k.family,
+			species = k.species,
+			height = k.height,
+			crown = k.crown,
+			climb = k.climb,
+			art = art[id],
+		}
 	end
 	local trees = {}
 	local placed = ctx.repo .. "/data/woods_placed.json"

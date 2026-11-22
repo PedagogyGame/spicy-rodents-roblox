@@ -50,7 +50,10 @@ end
 
 local function stand(g: any, kind: string, x: number, z: number, yaw: number, scale: number, share: number)
 	local k = doc.kinds[kind]
-	table.insert(placed, { kind, r2(x), r2(Height.at(x, z)), r2(z), math.floor(yaw * 1000 + 0.5) / 1000, r2(scale), g.id })
+	table.insert(
+		placed,
+		{ kind, r2(x), r2(Height.at(x, z)), r2(z), math.floor(yaw * 1000 + 0.5) / 1000, r2(scale), g.id }
+	)
 	table.insert(others, { x, z, k.crown * scale, share })
 	counts[g.id] = (counts[g.id] or 0) + 1
 	kindCounts[kind] = (kindCounts[kind] or 0) + 1

@@ -136,6 +136,7 @@ local DoctorRules = Import.shared("Hospital/DoctorRules") :: typeof(require("../
 local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
 local TreeArt = require("../Assets/TreeArt")
+local WoodsArt = require("../Assets/WoodsArt")
 local HeroArt = require("../Assets/HeroArt")
 local PinballArt = require("../Assets/PinballArt")
 local ShopArt = require("../Assets/ShopArt")
@@ -2961,6 +2962,12 @@ function Game.start(opts: Opts?): any
 				warn(`[SpicyRodents] tree art failed: {report}`)
 			end
 		end)
+	end
+
+	-- The D34 woods (Workspace.Woods: pines, nut trees and three giants, every one climbable on its routes, D35):
+	-- Assets/WoodsArt stands each at its place off the boot path, from its kind's uploaded Model (a stand-in until then)
+	if o.heartbeat ~= false then
+		WoodsArt.start(workspace)
 	end
 
 	-- The owner's Neighbourhood Shop (Workspace.Expansion.NeighbourhoodShop, addendum D12): its shell is baked;

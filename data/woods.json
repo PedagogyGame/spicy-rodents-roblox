@@ -6,7 +6,7 @@
   "seed": 20261122,
   "kinds": {
     "king_oak": {
-      "label": "KING OAK", "family": "giant", "species": "oak", "height": 232, "crown": 52,
+      "label": "KING OAK", "family": "giant", "species": "oak", "height": 248, "crown": 52,
       "climb": {
         "trunk": { "height": 150, "radius": 5.2, "lean": 4, "leanBearing": 30 },
         "boughs": [
@@ -24,7 +24,7 @@
       }
     },
     "great_elm": {
-      "label": "GREAT ELM", "family": "giant", "species": "elm", "height": 245, "crown": 48,
+      "label": "GREAT ELM", "family": "giant", "species": "elm", "height": 262, "crown": 48,
       "climb": {
         "trunk": { "height": 170, "radius": 4.8, "lean": 3, "leanBearing": 200 },
         "boughs": [
@@ -41,7 +41,7 @@
       }
     },
     "old_beech": {
-      "label": "OLD BEECH", "family": "giant", "species": "beech", "height": 228, "crown": 54,
+      "label": "OLD BEECH", "family": "giant", "species": "beech", "height": 244, "crown": 54,
       "climb": {
         "trunk": { "height": 148, "radius": 5.0, "lean": 2.5, "leanBearing": 110 },
         "boughs": [

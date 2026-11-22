@@ -46,7 +46,7 @@ WoodsPlan.C = table.freeze({
 	DOOR = 14,
 	TREE_SHARE = 0.75,
 	TREE_MIN = 22,
-	WOODS_SHARE = 0.62,
+	WOODS_SHARE = 0.5, -- the thinnest a grove may be (data/woods.json `share`: the town's 0.8, the edges' copses 0.5)
 	WOODS_MIN = 9,
 	NUT = 6,
 	ZONE = 12,
@@ -108,10 +108,10 @@ local function bounds(it: Item): (number, number, number, number)
 	if it.shape == "rect" then
 		return it.x0, it.x1, it.z0, it.z1
 	elseif it.shape == "seg" then
-		return math.min(it.ax, it.bx) - it.r, math.max(it.ax, it.bx) + it.r, math.min(it.az, it.bz) - it.r, math.max(
-			it.az,
-			it.bz
-		) + it.r
+		return math.min(it.ax, it.bx) - it.r,
+			math.max(it.ax, it.bx) + it.r,
+			math.min(it.az, it.bz) - it.r,
+			math.max(it.az, it.bz) + it.r
 	end
 	return it.ax - it.r, it.ax + it.r, it.az - it.r, it.az + it.r
 end
@@ -154,7 +154,16 @@ local function rect(what: string, x0: number, x1: number, z0: number, z1: number
 	}
 end
 
-local function seg(what: string, ax: number, az: number, bx: number, bz: number, half: number, pad: number, crown: boolean): Item
+local function seg(
+	what: string,
+	ax: number,
+	az: number,
+	bx: number,
+	bz: number,
+	half: number,
+	pad: number,
+	crown: boolean
+): Item
 	return {
 		what = what,
 		shape = "seg",

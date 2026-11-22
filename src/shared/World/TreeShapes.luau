@@ -486,11 +486,15 @@ function TreeShapes.expandWoods(woods: Woods): ({ any }, { ForkRecord }, { Woods
 			table.insert(ids, r.id)
 		end
 		table.insert(forks, fr)
-		table.insert(trees, { trunk = first, kind = t.kind, label = kind.label, routes = ids, index = i, climb = false })
+		table.insert(
+			trees,
+			{ trunk = first, kind = t.kind, label = kind.label, routes = ids, index = i, climb = false }
+		)
 	end
 	for j, cl in woods.climbs do
 		local first = woods.climbBase + (j - 1) * W.stride
-		local rs, fr = place(TreeShapes.grow(cl.climb), first, `{cl.label} climb {j}`, "woods@climb", cl.x, cl.y, cl.z, 0, 1)
+		local rs, fr =
+			place(TreeShapes.grow(cl.climb), first, `{cl.label} climb {j}`, "woods@climb", cl.x, cl.y, cl.z, 0, 1)
 		local ids = {}
 		for _, r in rs do
 			table.insert(routes, r)
