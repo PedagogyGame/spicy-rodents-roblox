@@ -62,7 +62,9 @@
 --   (Wildlife/RoadSquirrels: the computer's squirrels a car knocks flat; nil when it could not start), rideBumps
 --   (Vehicles/RideBumps: the people and squirrels in the way of the town's shared little vehicles, owner D29; nil when
 --   it could not start), cornerStore (Items/CornerStore;
---   nil without its bake), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
+--   nil without its bake; F by its kick ball on the ground kicks it, owner D30), reputation (Reputation/
+--   ReputationService: every player's reputation in the background, owner D30: the kick ball's hard hits and the shared
+--   vehicles' knocks are handed to it; the Player attribute Reputation), lounge (Attractions/LoungeService: THE GILDED ACORN; nil when it could not start),
 --   dogs (Wildlife/YardHazards: the yard dogs; nil when they could not start), clothes { saves (Persistence/
 --   PlayerSaves), wardrobe (Cosmetics/Wardrobe), giftShop (Cosmetics/GiftShop; nil without the alley) }: clothing
 --   saved between servers (D16 #25; section 6e),
