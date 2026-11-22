@@ -244,6 +244,10 @@ Tunables.tree = {
 	-- W1 additions (not in §3.8's listing): the log-only movement layer and the Net token buckets.
 	movement = { poseHistorySecs = { v = 1.0, unit = "s", src = "BUILD_PLAN §4.4 #6: the 1 s history the arena rewinds" },
 	             humanMaxSpeed = { v = 12, unit = "u/s", src = "W1 log-only cap for non-rail kinds (sprint 16 st/s x tolerance)" } },
+	-- seconds without input before a player is removed from the server (Shared/Players/IdleRules, Server/Players/IdleService)
+	idle = { anyone = { v = 900, unit = "s", src = "owner D38: \"15 minutes of inactivity, should kick you out, for any player\"" },
+	         spicyRodent = { v = 480, unit = "s", src = "owner D38: \"the spicy rodent, 8 minutes\"" },
+	         warn = { v = 60, unit = "s", src = "D38: the quiet notice a minute before" } },
 }
 -- stylua: ignore end
 

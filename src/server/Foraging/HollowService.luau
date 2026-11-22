@@ -30,7 +30,8 @@
 --     named by NAMES (the trees' data names are the town's internal ones).
 --   * Who claims: opts.keyOf(body id) (Boot/Game: the player driving it, else the computer's body), so a player's
 --     claim stays the player's when they let the body go, and the computer that takes the body back does not hold
---     it. Nuts are carried by the body: they drop when it changes hands or is knocked out (drop).
+--     it. Nuts are carried by the body: they drop when it changes hands or is knocked out (drop). A player who
+--     leaves the server loses the tree and the nuts in it (release; owner D37, Server/Players/PlaceRelease).
 --   * The claim shown on the tree: the hollow's model in Workspace.HollowTrees carries Meter (0-1), Owner (the
 --     owner's key as text, or ""), OwnerName and Claimed, and a small pennant by the ground hole shows while it is
 --     claimed.
@@ -40,6 +41,7 @@
 -- Interface: new(opts) -> Service (pure but for the cover); start(opts) -> Service (new, then the shell in the
 --   workspace); treeName(hollow) -> "the Bur Oak"; WORDS; NAMES; Service: :step(day) (once a second is plenty:
 --   deposits, visits, decay, lapses, the tree's attributes); :heldBy(key) -> hollowId? (the one tree it holds);
+--   :release(key) -> hollowId? (the player left: its tree freed and emptied, owner D37);
 --   :carry(id, n) -> taken; :carried(id) -> n; :mine(id) -> n (carried for its holder now, the rest dropped);
 --   :drop(id) (the carried nuts are lost: a knock-out; the body changing hands drops them by itself);
 --   :meter(hollowId) -> 0..1; :owner(hollowId) -> key?; :inside(id) -> hollowId?;
@@ -342,6 +344,19 @@ end
 -- the tree `key` holds now, nil for none
 function HollowService.heldBy(self: Service, key: Who): string?
 	return HollowClaim.heldBy(self.claims, key)
+end
+
+-- release(key): the player `key` left the server (owner D37): the tree it held is freed and emptied (its nuts were
+-- theirs), its part towards a claim anywhere else forgotten; the tree shows it at the next step. The tree it held,
+-- nil for none
+function HollowService.release(self: Service, key: Who): string?
+	local freed: string? = nil
+	for id, c in self.claims do
+		if HollowClaim.release(c, key) then
+			freed = id
+		end
+	end
+	return freed
 end
 
 -- once a visit: words for the squirrel in body `id` (a new word or a new tree speaks again)

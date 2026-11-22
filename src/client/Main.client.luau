@@ -7,7 +7,8 @@
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or Doctor; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital); "doctor": a
--- doctor's call, the warning (a banner) and the demotion (owner D30, Server/Hospital/DoctorService). Render/Beacons
+-- doctor's call, the warning (a banner) and the demotion (owner D30, Server/Hospital/DoctorService); "idle": the idle
+-- kick's notice a minute before (owner D38, Input/StillHere pings the server on input). Render/Beacons
 -- flashes the light bar of an ambulance out with a doctor.
 -- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
@@ -65,6 +66,7 @@ local SneakMeter = require("./UI/SneakMeter")
 local NutMeter = require("./UI/NutMeter")
 local MoveDiagPanel = require("./UI/MoveDiagPanel")
 local Telescope = require("./Rides/Telescope")
+local StillHere = require("./Input/StillHere")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -136,6 +138,30 @@ end
 pickRemote = pickR :: RemoteEvent
 local kickRemote = kickR :: RemoteEvent
 local eventRemote = eventR :: RemoteEvent
+
+-- the idle kick's "still here" ping (owner D38; Input/StillHere): the server removes a player with no input for 15
+-- minutes (8 for the Spicy Rodent), after a quiet notice (the "idle" event) that any input clears
+local idleText: string? = nil
+local stillHere: StillHere.Api? = nil
+local hereR = playNet and playNet:WaitForChild("Here", 10)
+if hereR and hereR:IsA("RemoteEvent") then
+	local here = hereR :: RemoteEvent
+	local okIdle, idleErr = pcall(function()
+		stillHere = StillHere.start({
+			send = function()
+				here:FireServer()
+			end,
+			clear = function()
+				if idleText then
+					menu.untoast(idleText)
+				end
+			end,
+		})
+	end)
+	if not okIdle then
+		warn(`Client: StillHere failed: {idleErr}`)
+	end
+end
 
 AnimationDriver.start({ container = bodies })
 -- the wallet in the corner, always (the server writes the balance on the Player: Server/Economy/Credits)
@@ -412,6 +438,22 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 	elseif kind == "notice" then
 		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
 		menu.toast(tostring(msg.text), 4)
+	elseif kind == "idle" then
+		-- the idle kick's notice (owner D38: Input/StillHere): up until any input, or the server's clear
+		if msg.clear then
+			if idleText then
+				menu.untoast(idleText)
+			end
+			if stillHere then
+				stillHere.warn(false)
+			end
+		else
+			idleText = tostring(msg.text)
+			menu.toast(idleText :: string, if type(msg.secs) == "number" then msg.secs else 60)
+			if stillHere then
+				stillHere.warn(true)
+			end
+		end
 	elseif kind == "bite" then
 		menu.toast(`CHOMP! "{msg.line}"   +{msg.delta} Power   ({msg.bites} bites)`, 2.5)
 	elseif kind == "bitten" then

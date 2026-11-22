@@ -15,8 +15,13 @@
 --      50th is turned away), the device fleet (patrol cars, carts, bikes, the drone).
 --   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Duel(verb) (the rodent's
 --      click, "pounce", and F, "feint"), StandUp() (a seated person gets up: World/SeatStand, the lounge's seats
---      first; owner D32), Stash(routeId) (E at a branch nook's knot-hole: Foraging/BranchStash; owner D34), Event
---      (server -> client: picked, refused, bite, bitten, med, hurt, died, kick, duel).
+--      first; owner D32), Stash(routeId) (E at a branch nook's knot-hole: Foraging/BranchStash; owner D34), Here()
+--      (the client's "still here" ping: Players/IdleService, owner D38), Event (server -> client: picked, refused,
+--      bite, bitten, med, hurt, died, kick, duel, idle).
+-- Idle players are removed (owner D38: Players/IdleService, stepped once a second; its evidence of input: the Here
+-- ping, every PlayNet press, the Net remotes in Shared/Players/IdleRules.INTENT, chat, a held squirrel's motor packets
+-- with a key down). A player who leaves loses their branch stashes and their hollow tree (owner D37:
+-- Players/PlaceRelease, on PlayerRemoving).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
 -- people and the player-held squirrels (RunOver kills: "RUN OVER") and the computer's squirrels out on the asphalt
 -- (RunOver knocks one flat: Wildlife/RoadSquirrels), poses stream to clients at 15 Hz
@@ -122,6 +127,9 @@ local CombatService = require("../Combat/CombatService")
 local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
 local BranchStash = require("../Foraging/BranchStash")
+local IdleService = require("../Players/IdleService")
+local PlaceRelease = require("../Players/PlaceRelease")
+local IdleRules = Import.shared("Players/IdleRules") :: typeof(require("../../shared/Players/IdleRules"))
 local BranchNooks = Import.shared("World/BranchNooks") :: typeof(require("../../shared/World/BranchNooks"))
 local ForageService = require("../Foraging/ForageService")
 local ForageRules = Import.shared("Foraging/ForageRules") :: typeof(require("../../shared/Foraging/ForageRules"))
@@ -556,6 +564,7 @@ function Game.start(opts: Opts?): any
 	local kickRemote = remote(playNet, "Kick")
 	local eventRemote = remote(playNet, "Event")
 	local duelRemote = remote(playNet, "Duel")
+	local hereRemote = remote(playNet, "Here") -- (the client's "still here" ping: Players/IdleService, owner D38)
 	local standRemote = remote(playNet, SeatRules.REMOTE)
 	-- E at a knot-hole in a branch nook (Foraging/BranchStash; owner D34): the nook's route id
 	local stashRemote = remote(playNet, "Stash")
@@ -1104,6 +1113,39 @@ function Game.start(opts: Opts?): any
 			task.delay(seconds, fn)
 		end,
 	})
+	-- the idle kick (owner D38; Players/IdleService): stepped once a second below; touch() on every piece of input
+	-- evidence. The limit follows the role held now: the Spicy Rodent's is the player picked as the rodent, or holding
+	-- the spicy body
+	local idle = IdleService.new({
+		players = function(): { any }
+			return Players:GetPlayers()
+		end,
+		now = os.clock,
+		spicy = function(player: any): boolean
+			local s = states[player]
+			if s and s.role == "rodent" then
+				return true
+			end
+			local actor = possession:actorOf(player)
+			return actor ~= nil and actor.variant == "spicy"
+		end,
+		tell = fire,
+		kick = function(player: any, text: string)
+			if typeof(player) == "Instance" and player:IsA("Player") then
+				(player :: Player):Kick(text)
+			end
+		end,
+		enabled = function(): boolean
+			return Flags.enabled("idleKick")
+		end,
+	})
+	if net then
+		net.heard = function(player: any, name: string)
+			if IdleRules.INTENT[name] then
+				idle:touch(player)
+			end
+		end
+	end
 	-- the rodent's click as a copy in its motor packet (Movement/SquirrelWire clickSeq): taken by the duel as the Duel
 	-- remote's is, the first of the two to arrive (set where the duel is)
 	local clickCopy: ((player: any, clock: number, seq: number) -> ())? = nil
@@ -1114,6 +1156,9 @@ function Game.start(opts: Opts?): any
 				return
 			end
 			local seq, epoch, snapshot = SquirrelWire.fromRecord(rec)
+			if IdleRules.motorActive(snapshot) then
+				idle:touch(player) -- (a key down or a click: D38's evidence of input)
+			end
 			local v = movement:packet(
 				actor.id,
 				actor.species,
@@ -2164,6 +2209,13 @@ function Game.start(opts: Opts?): any
 					break
 				end
 			end
+			-- idle players warned, then removed (owner D38)
+			local okIdle, errIdle = pcall(function()
+				idle:step()
+			end)
+			if not okIdle then
+				warn(`[SpicyRodents] the idle check failed this second: {errIdle}`)
+			end
 			fadeAcc = 0
 		end
 		if rafters then
@@ -2291,9 +2343,41 @@ function Game.start(opts: Opts?): any
 	table.insert(conns, stashRemote.OnServerEvent:Connect(onStash))
 	table.insert(conns, kickRemote.OnServerEvent:Connect(onKick))
 	table.insert(conns, duelRemote.OnServerEvent:Connect(onDuel))
+	-- (owner D38: every PlayNet press is input, and so is the client's Here ping and chat)
+	for _, r in { pickRemote, kickRemote, duelRemote, standRemote, stashRemote, hereRemote } do
+		table.insert(
+			conns,
+			r.OnServerEvent:Connect(function(player: Player)
+				idle:touch(player)
+			end)
+		)
+	end
+	local chats: { [Player]: RBXScriptConnection } = {}
+	local function chatty(player: Player)
+		chats[player] = player.Chatted:Connect(function()
+			idle:touch(player)
+		end)
+	end
+	for _, player in Players:GetPlayers() do
+		chatty(player)
+	end
+	table.insert(conns, Players.PlayerAdded:Connect(chatty))
 	table.insert(
 		conns,
 		Players.PlayerRemoving:Connect(function(player: Player)
+			idle:leave(player)
+			if chats[player] then
+				chats[player]:Disconnect()
+				chats[player] = nil
+			end
+			-- (owner D37: their branch stashes and their hollow tree go with them; a rejoin starts fresh)
+			local okP, errP = pcall(PlaceRelease.release, PlaceRelease.keyOf(player.UserId), {
+				stash = stash,
+				hollows = hollows,
+			})
+			if not okP then
+				warn(`[SpicyRodents] a leaving player's places were not freed: {errP}`)
+			end
 			states[player] = nil
 			persisted[player] = nil
 			sickShown[player] = nil
@@ -3159,6 +3243,9 @@ function Game.start(opts: Opts?): any
 				jobs:stop()
 			end
 			for _, c in conns do
+				c:Disconnect()
+			end
+			for _, c in chats do
 				c:Disconnect()
 			end
 		end,

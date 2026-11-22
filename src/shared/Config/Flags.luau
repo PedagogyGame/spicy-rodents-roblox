@@ -24,6 +24,10 @@ Flags.defaults = {
 	-- Studio test purchases cost nothing, so a Studio session grants no options (the receipt is answered
 	-- NotProcessedYet) unless a developer turns this on to test the grant on purpose (never in a live server)
 	stockOptionsStudio = false,
+	-- the idle kick (owner D38; Server/Players/IdleService): a player with no input for Tunables idle.anyone seconds
+	-- (idle.spicyRodent for the Spicy Rodent) is removed from the server, warned idle.warn seconds before. Off: nobody
+	-- is removed by us (Roblox's own 20-minute idle kick still applies)
+	idleKick = true,
 } :: { [string]: boolean }
 
 local state = {
