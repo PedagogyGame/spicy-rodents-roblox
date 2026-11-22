@@ -1,5 +1,7 @@
 # The hollow trees: what to look at (10 minutes)
 
+*Changed on 22 November (your D32 notes): H1's climb is no longer a spiral ramp round a post, the climbing trees have holes up their trunks with branches to jump out onto, and the camera looks around inside. See `HOLLOW_GNARL_CHECK.md`; where the two differ, that sheet is current.*
+
 Your brief (section 3) asks for twelve hollow trees a squirrel can claim, and a fallen hollow log to hide in. Addendum D6 says they run "on the same mechanics" as the ball return. They do: every hollow's inside is an enclosed squirrel run, exactly like the ball return and the storm drains.
 
 Everything below was tested without a screen, on the real squirrel controls and the real server checks. A test cannot tell me how it looks and feels, so this list is the part only you can judge. The pictures are offline renders in `docs/renders/hollows/` (remake them with `lune run tools/review/hollows.luau` and `tools/review/render.py`). The bark in them is a plain stand-in, because the Blender trees cannot be drawn offline. The `_cutaway` pictures cut the bark and the boards away on the camera's side, so you see the inside against the far wall: `h1_cutaway` the whole spiral, `h2_cutaway` and `h12_cutaway` the two climbing trees, each with a `_low` and `_top` close-up, and `log_cutaway` the log.

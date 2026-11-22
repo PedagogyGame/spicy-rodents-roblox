@@ -13,7 +13,7 @@
 --   every hole up a trunk (each tree's knotholes and its top): run up from the ground hole to it, stop, Space: the hop
 --   lands on the branch it is cut over (its link) with no frame off the rails inside a cavity or inside the bark, and
 --   the server accepts every frame; Space while still climbing past it does the same; E there takes the branch; from
---   the branch W runs out along it and S back to the bark
+--   the branch W runs out along it, S back to the bark, and E there goes back in at the hole (or takes the tree)
 --   the inside camera peeks out at every hole up a trunk (HollowLayout.peekAt) and nowhere else on the climb
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
@@ -367,6 +367,23 @@ return function(t)
 					`{h.id} {m.name}: S runs back to the bark (on {onIt.routeId} t {onIt.railT}, {atBark} studs off)`
 				)
 				t.eq(back.violations, 0)
+				-- E at the bark end takes the hole back in (the branch is the hole's link: Enclosure rule 5, both ways) or the
+				-- tree, nothing else
+				local at0 = wreg:pointAt(b0, 0.03)
+				local e0 = SquirrelMotor.new(at0.x, at0.y, at0.z)
+				e0.grounded = false
+				e0.routeId, e0.railT, e0.railDir = perch, 0.03, -1
+				local grab = BakedWorld.drive(w, e0, 20, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(0, { grab = f == 1 })
+				end, { validator = true })
+				local onto = wreg:get(e0.routeId or 0)
+				t.truthy(
+					onto ~= nil
+						and e0.routeId ~= perch
+						and (e0.routeId == m.route or layout.spaceOf(e0.routeId :: number) == nil),
+					`{h.id} {m.name}: E at the bark end takes the hole or the tree (on {e0.routeId})`
+				)
+				t.eq(grab.violations, 0)
 			end
 		end
 	end)
