@@ -8,6 +8,8 @@
 -- rental), moped and escooter (owner D29). The town's SHARED little vehicles (owner D29: 3 golf carts, 2 mopeds, 5
 -- stand-up electric scooters, Shared/Vehicles/SharedRides) are the kinds marked `shared`: anyone in a person's body
 -- rides one, no key, no rental, no police trouble (policeIgnore), and a bump never kills (Server/Vehicles/RideBumps).
+-- The ambulance (owner D30) is a doctor's alone (access "doctor"): one of the three parked on the hospital road, lent to
+-- the doctor at E (Server/Hospital/DoctorService), drawn as the traffic draws its ambulance.
 -- Logical boxes follow traffic §1 (sedan 2.35 x 4.45 x 2.04 u); the others are scaled from
 -- it. Speeds are arcade defaults in studs/s (sedan AI lanes run 6.5-9.5 u/s = 16-24 st/s, traffic §4).
 -- Every interior has a driver seat, a dash and an `EyeSocket` (first person on entry, brief v2 §14);
@@ -39,7 +41,7 @@ export type Kind = {
 	maxSteer: number, -- radians at the front wheels
 	steerRate: number, -- rad/s
 	wheelbase: number, -- studs
-	access: "anyone" | "humanDriver" | "police" | "rental",
+	access: "anyone" | "humanDriver" | "police" | "rental" | "doctor",
 	fleet: boolean, -- in the fatal fleet (traffic tests squirrels against it)
 	fleetMaxSpeed: number?, -- the fleet speed cap for carts
 	shared: boolean?, -- one of the town's shared little vehicles (owner D29): anyone in a person's body, no key
@@ -55,6 +57,7 @@ export type AccessCtx = {
 	officer: boolean?, -- the player is a police officer (police carts)
 	paidRental: boolean?, -- a jet ski rental is running
 	human: boolean?, -- only human bodies drive
+	doctor: boolean?, -- the player is a doctor on the hospital rung (D30: the ambulance)
 }
 
 local st = 2.5
@@ -235,7 +238,27 @@ KINDS.escooter = make({
 	open = true,
 })
 
-local ORDER = { "car", "cart", "bike", "pickup", "suv", "jetski", "moped", "escooter" }
+-- The ambulance (owner D30): the traffic's ambulance box (Traffic/Boxes, the sedan's), a little slower than the patrol
+-- car; in the fatal fleet as every car on the road is.
+KINDS.ambulance = make({
+	id = "ambulance",
+	motor = "car",
+	size = { 2.35 * st, 2.04 * st, 4.45 * st },
+	maxSpeed = 64,
+	reverseSpeed = 16,
+	accel = 24,
+	brake = 60,
+	drag = 7,
+	maxSteer = 0.58,
+	steerRate = 2.5,
+	wheelbase = 2.8 * st,
+	access = "doctor",
+	fleet = true,
+	wheels = 4,
+	color = { 0.94, 0.93, 0.9 },
+})
+
+local ORDER = { "car", "cart", "bike", "pickup", "suv", "jetski", "moped", "escooter", "ambulance" }
 
 local VehicleKinds = {}
 
@@ -282,7 +305,7 @@ end
 
 -- Who may take the wheel (brief v2 §13a, §15; §1.5 Devices): carts and bikes anyone; pickups and
 -- SUVs the key holders (top two ranked humans); patrol cars the key-holding officers; jet skis a
--- running rental. Only human bodies drive.
+-- running rental; the ambulance a doctor (D30). Only human bodies drive.
 function VehicleKinds.mayDrive(kindId: string, ctx: AccessCtx): (boolean, string?)
 	local k = KINDS[kindId]
 	if not k then
@@ -300,6 +323,8 @@ function VehicleKinds.mayDrive(kindId: string, ctx: AccessCtx): (boolean, string
 			return false, "police only"
 		end
 		return ctx.keyHolder == true, if ctx.keyHolder then nil else "needs the key"
+	elseif k.access == "doctor" then
+		return ctx.doctor == true, if ctx.doctor then nil else "doctors only"
 	else
 		return ctx.paidRental == true, if ctx.paidRental then nil else "rent it first"
 	end

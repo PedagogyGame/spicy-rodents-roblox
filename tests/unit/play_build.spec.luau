@@ -1,12 +1,15 @@
 --!strict
 -- First playable build (owner directive 2026-11-09): Combat/PlayRules (health 100, kick 55, the bite on
 -- contact, mild shouts, death messages), World/LightingPreset (the v5.4 golden mapping), PlayMenu's
--- pure parts (help lines per role and device, the status line) and Power through PowerRules.
+-- pure parts (help lines per role and device, the status line; D30 the Doctor choice and its call on screen) and Power
+-- through PowerRules.
 local PlayRules = require("@shared/Combat/PlayRules")
 local PowerRules = require("@shared/Rodent/PowerRules")
 local LightingPreset = require("@shared/World/LightingPreset")
 local PlayMenu = require("@client/UI/PlayMenu")
 local Game = require("@server/Boot/Game")
+local Beacons = require("@client/Render/Beacons")
+local PossessionClient = require("@client/Possession/PossessionClient")
 
 return function(t)
 	t.test("PlayRules: two kicks knock out a 100-health rodent; health never below 0", function()
@@ -89,7 +92,8 @@ return function(t)
 		for _, c in PlayMenu.CHOICES do
 			table.insert(ids, c.id)
 		end
-		t.eq(table.concat(ids, ","), "rodent,squirrel,townsperson,police,drone")
+		t.eq(table.concat(ids, ","), "rodent,squirrel,townsperson,police,doctor")
+		t.eq(table.concat(Game.CHOICES, ","), table.concat(ids, ","), "the server takes the menu's choices")
 		local function has(lines: { string }, needle: string): boolean
 			for _, l in lines do
 				if string.find(l, needle, 1, true) then
@@ -109,6 +113,45 @@ return function(t)
 		t.truthy(string.find(PlayMenu.statusLine({ PlayRole = "rodent", Bites = 3, Power = 300 }), "Bites 3", 1, true))
 		t.truthy(string.find(PlayMenu.statusLine({}), "menu", 1, true))
 	end)
+
+	t.test(
+		"D30 the Doctor choice: its line and colour (no red cross on white), its keys, its call on screen",
+		function()
+			local doctor = PlayMenu.CHOICES[5]
+			t.eq(doctor.id, "doctor")
+			t.eq(doctor.title, "Doctor")
+			t.eq(doctor.line, "Drive the ambulance and bring bite victims to the hospital.")
+			local c = doctor.color
+			t.truthy(c[2] > c[1] and c[3] > c[1], "the hospital's teal, not red")
+			local lines = PlayMenu.helpLines("doctor")
+			local all = table.concat(lines, "\n")
+			t.truthy(string.find(all, "E  take an ambulance", 1, true) ~= nil)
+			t.truthy(string.find(all, "BITE VICTIM marker", 1, true) ~= nil)
+			t.eq(PlayMenu.statusLine({ PlayRole = "doctor" }), "DOCTOR")
+			-- the line under the status and the marker follow the call: the patient, then the hospital doors
+			t.eq(PlayMenu.jobLine({}), nil)
+			t.eq(
+				PlayMenu.jobLine({ DoctorJob = "called" }),
+				"BITE VICTIM WAITING  ·  Take an ambulance (E) and drive there"
+			)
+			t.eq(
+				PlayMenu.jobLine({ DoctorJob = "enroute" }, { dist = 234, words = "to your left" }),
+				"BITE VICTIM  ·  Stop beside them to load them: 230 studs to your left"
+			)
+			t.eq(
+				PlayMenu.jobLine({ DoctorJob = "loaded" }, { dist = 41, words = "ahead" }),
+				"PATIENT ABOARD  ·  Stop at the hospital doors: 41 studs ahead"
+			)
+			t.eq(PlayMenu.jobMarkerText("called", 41), "BITE VICTIM\n41 studs")
+			t.eq(PlayMenu.jobMarkerText("loaded", 420), "HOSPITAL\n420 studs")
+			-- the ambulance's light bar takes turns; a refusal sentence from the server reads as it is
+			t.truthy(Beacons.lit(0, "A") and not Beacons.lit(0, "B"))
+			t.truthy(Beacons.lit(Beacons.PERIOD + 0.01, "B") and not Beacons.lit(Beacons.PERIOD + 0.01, "A"))
+			local sentence = "Only doctors drive the ambulances. Pick Doctor from the menu (M)."
+			t.eq(PossessionClient.reasonText(sentence), sentence)
+			t.truthy(string.find(PossessionClient.reasonText("doctors only") or "", "Pick Doctor", 1, true) ~= nil)
+		end
+	)
 
 	t.test("Game.pickOfficer: Police and Drone picks skip an officer who is a patient or already played", function()
 		local function person(name: string, police: boolean, free: boolean, possessable: boolean): any

@@ -17,7 +17,7 @@
 --            slots(rung, ctx); held(ctx, rung); policeSlots(performance); score(rung, stats);
 --            rankOrder(rung, players) -> {id}; keyHolders(subrole, players) -> {id}; candidates(take, players,
 --            exclude?) -> {id}; applyRank(policy, stats, remembered?) -> stats; resolve(event, ctx) -> {Transition};
---            vacated(transitions, ctx) -> {rung}
+--            vacated(transitions, ctx) -> {rung}; menuRungs (D30: rung -> the subrole a menu pick gives)
 
 local EconomyRules = require("../Economy/EconomyRules")
 local GigRules = require("../Gigs/GigRules")
@@ -43,7 +43,11 @@ Ladder.subroles = table.freeze({
 	drone       = { parent = "police", slots = 1, unlock = "upgrade:drone" },                               -- brief §10
 	humanDriver = { parent = "human", slots = 2, pick = "topTwoByRank", handOver = "whenParked",
 	                vehicles = { "pickup", "suv" }, undocumented = true },                                   -- brief v2 §15
+	doctor      = { parent = "hospital", slots = 5, pick = "menu", vehicles = { "ambulance" } },            -- D30
 })
+-- D30: the rungs a player may pick straight from the play menu (Client/UI/PlayMenu "Doctor"), a slot permitting, and
+-- the subrole each gives. (The police drone stays a subrole for the police later; it is no longer a menu choice.)
+Ladder.menuRungs = table.freeze({ hospital = "doctor" }) :: { [string]: string }
 Ladder.sideExits = table.freeze({
 	deer = { species = "deer", playerSlots = 5, label = "Deer" },                -- brief v2 §5
 	fox  = { species = "fox", playerSlots = 1, hidden = true, label = "Fox" },   -- Easter egg
@@ -103,6 +107,12 @@ local RULES: { { [string]: any } } = {
 	{ id = "traffic.hitPedestrian", on = "traffic.hitPedestrian", by = "police", keys = "revoke", jail = "hitPedestrianSecs",
 	  then_ = { to = "human", rank = "lowest" } },                                                             -- v2 §15 dec 14
 	{ id = "traffic.repeatOffence", on = "traffic.repeatOffence", by = "any", jail = "repeatOffenceSecs" },    -- not in offroad
+	{ id = "menu.pick", on = "menu.pick", rung = "menuRungs", to = "rung", rank = "keep", subrole = "menuRungs[rung]",
+	  keepBody = true, refused = "full" },                                                                    -- D30
+	{ id = "role.resign", on = "role.resign", rung = "hospital|police", to = "human", rank = "keep", keepBody = true }, -- D30
+	{ id = "role.demote", on = "role.demote", rung = "hospital|police", to = "human", rank = "lowest", keepBody = true }, -- D30
+	{ id = "doctor.delivered", on = "doctor.delivered", who = "doctor", pay = "fromEvent",
+	  rankDelta = "rankClass.standard+rankBySpeed" },                                                         -- D30; A2
 	{ id = "infection.criticalMass", on = "infection.criticalMass", who = "rodentPlayer", winner = true, cinematic = true }, -- §8
 	{ id = "session.reset", on = "cinematic.finished|everyoneInfected", all = true, to = "human", rank = "lowest", reset = true,
 	  except = { "winnerKeepsRodent", "infectedSquirrelsAliveKeepSquirrel" } },                                -- §8; v2 §13a
@@ -181,6 +191,9 @@ export type Transition = {
 	cinematic: boolean?,
 	reset: boolean?,
 	refused: string?,
+	subrole: string?, -- D30: the subrole the move gives (menu.pick: "doctor")
+	keepBody: boolean?, -- D30: the rung changes, the body stays (the menu chose it; a demotion keeps it)
+	why: string?, -- role.demote: what the player did (for the screen and the log)
 }
 
 local P = Ladder.params
@@ -481,6 +494,7 @@ end
 
 local STAFF = { hospital = true, police = true }
 local SIDE = { deer = true, fox = true }
+local HUMAN_SPECIES = { human = true, hospital = true, police = true }
 
 type Handler = (event: { [string]: any }, ctx: Ctx, out: { Transition }) -> ()
 
@@ -694,17 +708,86 @@ handlers["kick.landed"] = function(event, _ctx, out)
 	end
 end
 
-handlers["work.completed"] = function(event, _ctx, out)
-	local delta = P.rankClass[event.class or "standard"] or 0
-	if event.fetchSecs then
+-- the hospital fetch's points for its speed (A2: Ladder.params.rankBySpeed)
+local function speedPoints(fetchSecs: number?): number
+	if fetchSecs then
 		for _, row in P.rankBySpeed do
-			if event.fetchSecs <= row[1] then
-				delta += row[2]
-				break
+			if fetchSecs <= row[1] then
+				return row[2]
 			end
 		end
 	end
+	return 0
+end
+
+handlers["work.completed"] = function(event, _ctx, out)
+	local delta = (P.rankClass[event.class or "standard"] or 0) + speedPoints(event.fetchSecs)
 	table.insert(out, { rule = "work.completed", player = event.player, pay = event.pay or 0, rankDelta = delta })
+end
+
+-- D30: a rung straight from the play menu (Ladder.menuRungs: the hospital, as a doctor), when a slot is free. Picking
+-- it again is no change; the body is the menu's (keepBody).
+handlers["menu.pick"] = function(event, ctx, out)
+	local p = ctx.players[event.player]
+	local rung = event.rung
+	local subrole = Ladder.menuRungs[rung]
+	if not p or not subrole or not HUMAN_SPECIES[p.rung] then
+		return
+	end
+	if p.rung ~= rung and Ladder.held(ctx, rung) >= Ladder.slots(rung, ctx) then
+		table.insert(out, { rule = "menu.pick", player = p.id, refused = "full" })
+		return
+	end
+	table.insert(
+		out,
+		{ rule = "menu.pick", player = p.id, to = rung, rank = "keep", subrole = subrole, keepBody = true }
+	)
+end
+
+-- D30: a doctor (or an officer) picks something else from the menu: back to the human rung, standing kept.
+handlers["role.resign"] = function(event, ctx, out)
+	local p = ctx.players[event.player]
+	if p and STAFF[p.rung] then
+		table.insert(out, {
+			rule = "role.resign",
+			player = p.id,
+			to = "human",
+			rank = "keep",
+			loseSubrole = p.subrole,
+			keepBody = true,
+		})
+	end
+end
+
+-- D30: "if they do not do so properly they get demoted back to human": to the human rung at its lowest rank (the
+-- money penalty is the town work's, D30 H3, through the wallet); the body stays.
+handlers["role.demote"] = function(event, ctx, out)
+	local p = ctx.players[event.player]
+	if p and STAFF[p.rung] then
+		table.insert(out, {
+			rule = "role.demote",
+			player = p.id,
+			to = "human",
+			rank = "lowest",
+			loseSubrole = p.subrole,
+			keepBody = true,
+			why = event.why,
+		})
+	end
+end
+
+-- D30: a doctor brought a bite victim in: their pay (event.pay: Tunables doctor.patientCents) and the hospital fetch's
+-- rank points (a standard job, plus rankBySpeed for the seconds from the call to the patient aboard).
+handlers["doctor.delivered"] = function(event, ctx, out)
+	local p = ctx.players[event.player]
+	if p and p.rung == "hospital" then
+		table.insert(out, {
+			rule = "doctor.delivered",
+			player = p.id,
+			pay = event.pay or 0,
+			rankDelta = P.rankClass.standard + speedPoints(event.fetchSecs),
+		})
+	end
 end
 
 handlers["gig.completed"] = function(event, _ctx, out)

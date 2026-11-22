@@ -8,9 +8,9 @@
 -- A passenger (owner D30: the golf cart seats two; VehicleKinds.seats): board(f, id, who) beside a driver, alight(f,
 -- who) off again; nobody is a driver and a passenger at once, and a passenger stays aboard when the driver gets out.
 -- aboard(f, who) is either seat (a body aboard is never in a vehicle's way, cannot kick, cannot take a new body).
--- Interface: new() -> Fleet; add(f, id, kind, x, z, yaw); get(f, id); enter(f, id, driver, ctx)
---   -> (ok, reason); exit(f, driver) -> vehicleId?; vehicleOf(f, driver); board(f, id, who) -> (ok, reason);
---   alight(f, who) -> vehicleId?; passengerOf(f, who) -> vehicleId?; aboard(f, who) -> vehicleId?;
+-- Interface: new() -> Fleet; add(f, id, kind, x, z, yaw); remove(f, id) (empty only, D30's ambulances); get(f, id);
+--   enter(f, id, driver, ctx) -> (ok, reason); exit(f, driver) -> vehicleId?; vehicleOf(f, driver); board(f, id, who) ->
+--   (ok, reason); alight(f, who) -> vehicleId?; passengerOf(f, who) -> vehicleId?; aboard(f, who) -> vehicleId?;
 --   setMotion(f, id, speed);
 --   grantKeys(f, group, holders) (group "humanDriver" | "police"); keyHolder(f, id) -> driver?;
 --   check(f) -> (ok, errors)
@@ -43,6 +43,7 @@ export type EnterCtx = {
 	human: boolean?,
 	officer: boolean?,
 	paidRental: boolean?,
+	doctor: boolean?, -- D30: the ambulance
 }
 
 local PlayerVehicles = {}
@@ -92,6 +93,21 @@ function PlayerVehicles.add(f: Fleet, id: string, kind: string, x: number, z: nu
 	return v
 end
 
+-- remove(f, id): the vehicle is gone (D30: a doctor's ambulance back in the traffic's bay). Only an empty one: false
+-- while someone sits in it.
+function PlayerVehicles.remove(f: Fleet, id: string): boolean
+	local v = f.vehicles[id]
+	if v == nil or v.driver ~= nil or v.passenger ~= nil then
+		return false
+	end
+	f.vehicles[id] = nil
+	local i = table.find(f.order, id)
+	if i then
+		table.remove(f.order, i)
+	end
+	return true
+end
+
 function PlayerVehicles.get(f: Fleet, id: string): Vehicle?
 	return f.vehicles[id]
 end
@@ -132,6 +148,7 @@ function PlayerVehicles.enter(f: Fleet, id: string, driver: number, ctx: EnterCt
 		officer = ctx.officer,
 		paidRental = ctx.paidRental,
 		human = ctx.human,
+		doctor = ctx.doctor,
 	})
 	if not ok then
 		return false, reason

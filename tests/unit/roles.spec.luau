@@ -105,6 +105,50 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"D30 take/resign/demote: the doctor's slot from the menu, the body kept, the pay through the purse",
+		function()
+			local w = world()
+			for i = 1, 7 do
+				w.join(i, { activeGameDays = RANKED, activeMinutes = 40, questScore = 12 })
+			end
+			local body1 = w.possession:actorOf(w.players[1])
+			t.deepEq({ w.roles:take(w.players[1], "hospital") }, { true, nil })
+			t.deepEq({ w.roles:roleOf(w.players[1]) }, { "hospital", "doctor" })
+			t.eq(w.possession:actorOf(w.players[1]), body1, "the menu's body is kept")
+			for i = 2, 5 do
+				t.truthy((w.roles:take(w.players[i], "hospital")))
+			end
+			t.deepEq({ w.roles:take(w.players[6], "hospital") }, { false, "full" })
+			t.eq(w.roles:roleOf(w.players[6]), "human")
+			t.deepEq({ w.roles:take(w.players[1], "hospital") }, { true, nil }, "picking it again")
+			t.deepEq({ w.roles:take(w.players[6], "police") }, { false, "not from the menu" })
+			-- pay for a patient brought in lands in the member's purse under its own words
+			local m1 = w.roles:member(1) :: any
+			local before = m1.purse.cents
+			w.roles:report({ kind = "doctor.delivered", player = 1, pay = 25, fetchSecs = 20 })
+			t.eq(m1.purse.cents, before + 25)
+			t.eq(m1.stats.questScore, 12 + Ladder.params.rankClass.standard + 6)
+			-- a doctor who picks something else: a townsperson, standing kept, the slot free again
+			t.truthy(w.roles:resign(w.players[2]))
+			t.eq(w.roles:roleOf(w.players[2]), "human")
+			t.truthy(select(2, w.roles:roleOf(w.players[2])) ~= "doctor")
+			t.eq(w.roles:member(2).stats.questScore, 12)
+			t.truthy((w.roles:take(w.players[6], "hospital")))
+			-- the demotion: the human rung at its lowest rank, the body kept
+			local body3 = w.possession:actorOf(w.players[3])
+			t.truthy(w.roles:demote(w.players[3], "ignored a bite victim"))
+			t.eq(w.roles:roleOf(w.players[3]), "human")
+			t.truthy(select(2, w.roles:roleOf(w.players[3])) ~= "doctor")
+			t.eq(w.roles:member(3).stats.questScore, 0)
+			t.eq(w.roles:member(3).stats.activeMinutes, 0)
+			t.eq(w.possession:actorOf(w.players[3]), body3)
+			t.eq(w.roles:demote(w.players[3], "again"), false, "a townsperson cannot be demoted")
+			local seen = w.roles.history[#w.roles.history]
+			t.truthy(seen ~= nil)
+		end
+	)
+
 	t.test("rodent slot: offer to the top squirrel, accept; its squirrel slot is offered on", function()
 		local w = world()
 		w.join(1, { activeGameDays = RANKED })

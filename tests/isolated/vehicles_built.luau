@@ -320,7 +320,9 @@ return function(t)
 
 	t.test("a parked vehicle casts shadows from its big parts only (the body, the roof, the tyres)", function()
 		-- the town's fleet (owner D29: the two carts became the ten shared vehicles, Vehicles/SharedRides)
-		local placed = { car = 2, cart = 3, bike = 2, pickup = 1, suv = 1, jetski = 1, moped = 2, escooter = 5 }
+		-- (D30: no ambulance stands parked as a player vehicle: one is drawn only while a doctor has it out)
+		local placed =
+			{ car = 2, cart = 3, bike = 2, pickup = 1, suv = 1, jetski = 1, moped = 2, escooter = 5, ambulance = 0 }
 		local total = 0
 		for _, id in drawnKinds() do
 			local m = Placeholder.build(id, id)
