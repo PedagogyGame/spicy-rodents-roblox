@@ -672,11 +672,12 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			local driver = targets.body
 			-- and the vehicle's own parts round the eye (CameraRig.seeOut), once it is there; not the gondola's
 			local cleared: { BasePart }? = if free then {} else nil
+			local car: Instance = vehicle :: any
 			bind(function(dt: number)
 				if cleared == nil then
 					local list: { BasePart } = {}
 					local at = eye.WorldPosition
-					for _, d in vehicle:GetDescendants() do
+					for _, d in car:GetDescendants() do
 						if d:IsA("BasePart") and d.Transparency < 1 then
 							local k = CameraRig.seeOut(at, d.CFrame, d.Size, d.Material == Enum.Material.Glass)
 							if k then
@@ -735,8 +736,11 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				for _, part in hidden do
 					part.LocalTransparencyModifier = 0
 				end
-				for _, part in cleared or {} do
-					part.LocalTransparencyModifier = 0
+				local seen = cleared
+				if seen then
+					for _, part in seen do
+						part.LocalTransparencyModifier = 0
+					end
 				end
 			end
 		elseif vehicle then
