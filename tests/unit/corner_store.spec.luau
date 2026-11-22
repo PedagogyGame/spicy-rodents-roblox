@@ -240,7 +240,7 @@ return function(t)
 			for _, def in ItemRules.CATALOG do
 				onSale += if ItemRules.onSale(def.id) then 1 else 0
 			end
-			t.eq(onSale, 22, "all 22: the dog treats are back now the town has dogs (Wildlife/YardHazards)")
+			t.eq(onSale, 23, "all 23: the dog treats are back now the town has dogs, the kick ball since D30")
 			t.eq(root:GetAttribute("Items"), onSale)
 			t.truthy(items:FindFirstChild("Item_dog_treats"), "the dog treats are on the third gondola")
 			local fd = Store.FRONT_DOOR

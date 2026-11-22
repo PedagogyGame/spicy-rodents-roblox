@@ -11,6 +11,8 @@
 -- Borrowed things (Items/Lending: somebody else's frisbee caught or picked up): used with payload.lent, the loan's
 -- token, which the server's own Tool wiring passes and deps.lent.holds checks against the ledger; it may only be
 -- thrown (back), and throwing it takes nothing from anyone's inventory (the world ends the loan).
+-- The kick ball (owner D30): payload.windup is the seconds its press was held, timed by the server's own Tool wiring
+-- (Items/CornerStore.wirePress; no remote carries it), and decides a kick or a wind-up throw (Shared/Items/KickBall).
 -- Interface: new(deps) -> Service { use(player, itemId, payload?) -> (ok, why?), state(player, itemId) -> State,
 --   forget(player), putAway(player) -> { itemId } (the toggles that were on, now off) };
 --   kiteZoneAt(zones, x, z) -> "park" | "beach" | nil; WORDS
@@ -213,6 +215,7 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 		uses = s.uses,
 		night = d.night(),
 		zone = d.zoneAt(pose.x, pose.z),
+		windup = if payload and type(payload.windup) == "number" then payload.windup else nil,
 	}
 	local target: Target? = nil
 	if itemId == "water_gun" then

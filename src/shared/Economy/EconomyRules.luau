@@ -73,7 +73,7 @@ EconomyRules.NAMES = table.freeze({
 	dog_treats = "dog treats", newspaper = "a newspaper", camera = "a disposable camera", duct_tape = "duct tape",
 	whoopee_cushion = "a whoopee cushion", harmonica = "a harmonica", air_horn = "an air horn", soda = "a soda",
 	ice_cream_bar = "an ice cream bar", lawn_chair = "a lawn chair", radio = "a radio", bike_horn = "a bike horn",
-	kite = "a kite",
+	kite = "a kite", kick_ball = "a kick ball",
 })
 
 export type Item = { id: string, cents: number, name: string }

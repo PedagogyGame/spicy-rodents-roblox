@@ -20,6 +20,14 @@
 --              back (opts.lendTool), never in their inventory, and it goes home when they keep it too long, walk
 --              off with it, change body or leave. Left lying Lending.C.groundSecs it goes home; the buyer gone, at
 --              once (into their record: theirs again if they come back). The newspaper is litter: gone after 20 s.
+--              The kick ball (owner D30; Shared/Items/KickBall) is a real, bouncy ball the server owns: a click kicks
+--              it from the feet, low and fast; a held press winds up and throws it from the hand. On the ground anyone
+--              kicks it with F (kickLoose: the townsperson's kick, Boot/Game), and it stays its buyer's. While one
+--              flies hard (Conduct's hardSpeed), every frame its path is swept against the people near it
+--              (KickBall.sweep): a person it meets is knocked a little (a player's body: its Knock, never a fall; one
+--              of the computer's: the arms come up) and opts.reputation hears of it (ball(thrower, hit): Reputation/
+--              Conduct decides whether it counts, rarely); a soft one is caught as the frisbee is. The thrower is never
+--              hit by their own ball; each person once per flight.
 --   write      the chalk's filtered words on the ground in front (5 minutes; 30 in the town at most)
 --   tape       a strip of duct tape on what is ahead (5 minutes; 40 at most)
 --   place      a lawn chair (sat in at once; E folds it back up, its owner's; one each: a second folds the first; left
@@ -36,7 +44,8 @@
 --              flier (Player) carries KITE_ATTRIBUTE (Client/UI/KiteSteer plants the feet and reads the keys)
 -- Interface: start(opts) -> World { service (ItemService), use(player, id, payload?), step(), putAway(player) (a
 --   body change: toggles off, kite reeled in, borrowed things home), steer(player, x, y) -> boolean (taken),
---   kiteOf(player) -> Flight?, lending (Items/Lending's ledger), stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night) -> (brightness, range); relight(lit,
+--   kiteOf(player) -> Flight?, lending (Items/Lending's ledger), kickLoose(player) -> boolean (F by a kick ball on
+--   the ground), sweep() (the kick balls' per-frame check), stop() }; stunBody(body, now, secs); isNight(hour); beamFor(night) -> (brightness, range); relight(lit,
 --   night) -> count; chairs() -> ChairLedger; CHAIR; SOUNDS; KITE_ATTRIBUTE
 -- Engine only inside the functions; no side effects on require.
 
@@ -46,6 +55,7 @@ local Clock = Import.shared("Time/Clock") :: typeof(require("../../shared/Time/C
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local KiteFlight = Import.shared("Items/KiteFlight") :: typeof(require("../../shared/Items/KiteFlight"))
+local KickBall = Import.shared("Items/KickBall") :: typeof(require("../../shared/Items/KickBall"))
 local ItemService = require("./ItemService")
 local Lending = require("./Lending")
 -- (KiteFlight's exported types do not cross the Import cast)
@@ -99,7 +109,9 @@ export type StartOpts = {
 	heartbeat: boolean?,
 	-- a borrowed thing's Tool in `player`'s Backpack (Items/CornerStore: the shelf's model, no ItemId so it is never
 	-- counted as theirs); `use` throws it. nil: nobody else can take anything (it goes straight home)
-	lendTool: ((player: any, itemId: string, ownerName: string, use: () -> ()) -> any?)?,
+	lendTool: ((player: any, itemId: string, ownerName: string, use: (payload: { [string]: any }?) -> ()) -> any?)?,
+	-- the players' reputation (Reputation/ReputationService): a kick ball's hard hit on a person is reported to it
+	reputation: { ball: (player: any, hit: { [string]: any }) -> any }?,
 	now: (() -> number)?, -- seconds (default os.clock): the loans' and the ground's timers
 }
 
@@ -111,6 +123,8 @@ export type World = {
 	steer: (player: any, x: any, y: any) -> boolean,
 	kiteOf: (player: any) -> Flight?,
 	lending: Lending.Ledger,
+	kickLoose: (player: any) -> boolean,
+	sweep: () -> (), -- the kick balls' check, every frame on Heartbeat (a spec calls it by hand)
 	stop: () -> (),
 }
 
@@ -490,9 +504,13 @@ function ItemWorld.start(opts: StartOpts): World
 		local loan = loans.lend(who, thing, clockNow(), distBetween(who, thing.owner))
 		local token = loan.token
 		local tool = if opts.lendTool
-			then opts.lendTool(who, thing.item, thing.ownerName, function()
+			then opts.lendTool(who, thing.item, thing.ownerName, function(extra: { [string]: any }?)
 				if service then
-					service:use(who, thing.item, { lent = token })
+					local payload: { [string]: any } = { lent = token }
+					if extra and type(extra.windup) == "number" then
+						payload.windup = extra.windup -- (the kick ball's press, timed by the server's Tool wiring)
+					end
+					service:use(who, thing.item, payload)
 				end
 			end)
 			else nil
@@ -510,7 +528,17 @@ function ItemWorld.start(opts: StartOpts): World
 	end
 
 	-- things thrown and not yet picked up (each goes home after Lending.C.groundSecs, or at once with its buyer gone)
-	type Thrown = { model: Model, thing: Lending.Thing, at: number, taken: boolean, touch: RBXScriptConnection? }
+	-- (a kick ball's flight: who sent it, the wind-up, where it was last frame, who it has hit; nil when it lies still)
+	type BallFlight = { thrower: any, windup: number, last: Vector3, hit: { [any]: boolean } }
+	type Thrown = {
+		model: Model,
+		thing: Lending.Thing,
+		at: number,
+		taken: boolean,
+		touch: RBXScriptConnection?,
+		ball: BasePart?, -- the kick ball's own part (nil for anything else)
+		flight: BallFlight?,
+	}
 	local thrown: { Thrown } = {}
 
 	-- a thrown thing, flying then lying where it lands until someone picks it up; still its buyer's (Items/Lending)
@@ -559,6 +587,15 @@ function ItemWorld.start(opts: StartOpts): World
 		local m = main :: BasePart
 		local look = root.CFrame.LookVector
 		local start = root.Position + look * 2.5 + Vector3.new(0, 1.5, 0)
+		local isBall = e.item == "kick_ball"
+		if isBall then
+			-- a light, bouncy rubber ball; a kick leaves from the foot, a throw from the hand
+			local C = KickBall.C
+			m.CustomPhysicalProperties = PhysicalProperties.new(C.density, C.friction, C.elasticity)
+			if e.style == "kick" then
+				start = root.Position + Vector3.new(look.X, 0, look.Z) * 2 + Vector3.new(0, -2.2, 0)
+			end
+		end
 		model.Parent = folder
 		model:PivotTo(CFrame.new(start) * m.CFrame.Rotation)
 		m:SetNetworkOwner(nil)
@@ -590,6 +627,10 @@ function ItemWorld.start(opts: StartOpts): World
 			loans.take(loan.token)
 		end
 		local t: Thrown = { model = model, thing = thing, at = clockNow(), taken = false, touch = nil }
+		if isBall then
+			t.ball = m
+			t.flight = { thrower = player, windup = tonumber(e.windup) or 0, last = m.Position, hit = {} }
+		end
 		table.insert(thrown, t)
 		local thrower = player
 		local function give(to: any, caught: boolean)
@@ -610,11 +651,13 @@ function ItemWorld.start(opts: StartOpts): World
 		end
 		-- a person it hits in flight catches it (not the one who just threw it; its buyer catching it has it back)
 		t.touch = m.Touched:Connect(function(other: BasePart)
-			if t.taken or m.AssemblyLinearVelocity.Magnitude < 4 then
-				return
+			local speed = m.AssemblyLinearVelocity.Magnitude
+			if t.taken or speed < 4 or (isBall and KickBall.hard(speed)) then
+				return -- (a hard kick ball is no catch: it knocks, in sweepBalls)
 			end
 			local who = Players:GetPlayerFromCharacter(other:FindFirstAncestorOfClass("Model"))
-			if who and who ~= thrower then
+			local from = if t.flight then t.flight.thrower else thrower
+			if who and who ~= from then
 				local a = actorOf(who)
 				if a and a.species == "human" then
 					if userKey(who) == thing.ownerKey then
@@ -637,6 +680,121 @@ function ItemWorld.start(opts: StartOpts): World
 				give(who, false)
 			end
 		end)
+		return true
+	end
+
+	-- a hard kick ball meeting a person (every frame while one flies; Shared/Items/KickBall): a small knock, and the
+	-- thrower's reputation hears of it (Reputation/Conduct decides, rarely)
+	local function knockPerson(target: ItemService.Target, vel: Vector3)
+		local k = KickBall.stagger(vel.X, vel.Z)
+		if target.player ~= nil then
+			local a = actorOf(target.player)
+			local body = a and a.body
+			if body == nil or body:GetAttribute("Ride") ~= nil then
+				return
+			end
+			body:SetAttribute("Knock", Vector3.new(k.dx, k.secs, k.dz))
+			body:SetAttribute("KnockFall", false)
+			body:SetAttribute("KnockAt", workspace:GetServerTimeNow())
+			notify(target.player, "Ouch! A ball hit you.")
+		else
+			local actor = rt and rt.byTownId and rt.byTownId[target.id]
+			local body = actor and actor.body
+			if body then
+				body:SetAttribute("Gesture", "flinch")
+				task.delay(k.secs, function()
+					if body:GetAttribute("Gesture") == "flinch" then
+						body:SetAttribute("Gesture", nil)
+					end
+				end)
+			end
+		end
+	end
+	local function sweepBalls()
+		for _, t in thrown do
+			local f, m = t.flight, t.ball
+			if f == nil or m == nil or t.taken or m.Parent == nil then
+				continue
+			end
+			local p = m.Position
+			local vel = m.AssemblyLinearVelocity
+			local a = { x = f.last.X, y = f.last.Y, z = f.last.Z }
+			local b = { x = p.X, y = p.Y, z = p.Z }
+			f.last = p
+			local speed = vel.Magnitude
+			if speed < 4 then
+				t.flight = nil -- (lying still: a new kick starts a new flight)
+				continue
+			end
+			if not KickBall.hard(speed) then
+				continue
+			end
+			local reach = (p - Vector3.new(a.x, a.y, a.z)).Magnitude + KickBall.C.personR + 1
+			for _, target in nearby(p.X, p.Z, reach) do
+				if target.kind ~= "human" or f.hit[target.id] then
+					continue
+				end
+				if target.player ~= nil and target.player == f.thrower then
+					continue
+				end
+				-- (the feet: a person's root stands about 3 studs above them)
+				if KickBall.sweep(a, b, { x = target.x, y = target.y - 3, z = target.z }) then
+					f.hit[target.id] = true
+					knockPerson(target, vel)
+					local rep = opts.reputation
+					local from = placeOfPlayer(f.thrower)
+					if rep and present(f.thrower) then
+						local dist = if from then math.sqrt((from.X - target.x) ^ 2 + (from.Z - target.z) ^ 2) else nil
+						pcall(
+							rep.ball,
+							f.thrower,
+							{ victim = target.id, speed = speed, windup = f.windup, dist = dist }
+						)
+					end
+				end
+			end
+		end
+	end
+	-- F by a kick ball on the ground (the townsperson's kick): the nearest in reach in front goes low and fast; it is
+	-- still its buyer's, lying where it stops; its time on the ground starts again
+	local function kickLoose(player: any): boolean
+		local a = actorOf(player)
+		local root = rootOf(player)
+		if a == nil or a.species ~= "human" or root == nil then
+			return false
+		end
+		local feet = root.Position - Vector3.new(0, 3, 0)
+		local look = root.CFrame.LookVector
+		local best: Thrown?, bestD = nil, math.huge
+		local vx, vy, vz = 0, 0, 0
+		for _, t in thrown do
+			local m = t.ball
+			if m == nil or t.taken or m.Parent == nil then
+				continue
+			end
+			local p = m.Position
+			local kx, ky, kz = KickBall.groundKick(
+				{ x = p.X, y = p.Y, z = p.Z },
+				{ x = feet.X, y = feet.Y, z = feet.Z },
+				look.X,
+				look.Z
+			)
+			local d = (Vector3.new(p.X, 0, p.Z) - Vector3.new(feet.X, 0, feet.Z)).Magnitude
+			if kx ~= nil and d < bestD then
+				best, bestD = t, d
+				vx, vy, vz = kx, ky :: number, kz :: number
+			end
+		end
+		if best == nil then
+			return false
+		end
+		local b = best :: Thrown
+		local m = b.ball :: BasePart
+		m:SetNetworkOwner(nil)
+		m.AssemblyLinearVelocity = Vector3.new(vx, vy, vz)
+		b.at = clockNow()
+		b.flight = { thrower = player, windup = 0, last = m.Position, hit = {} }
+		playCue(ItemRules.CUES.kick_ball, m)
 		return true
 	end
 
@@ -1372,6 +1530,7 @@ function ItemWorld.start(opts: StartOpts): World
 		table.insert(
 			conns,
 			game:GetService("RunService").Heartbeat:Connect(function(dt: number)
+				sweepBalls() -- (nothing to do unless a kick ball is flying)
 				acc += dt
 				if acc >= 0.1 then
 					acc = 0
@@ -1408,6 +1567,8 @@ function ItemWorld.start(opts: StartOpts): World
 			return false
 		end,
 		lending = loans,
+		kickLoose = kickLoose,
+		sweep = sweepBalls,
 		kiteOf = function(player: any): Flight?
 			for _, k in kites do
 				if k.player == player and k.reel == nil then

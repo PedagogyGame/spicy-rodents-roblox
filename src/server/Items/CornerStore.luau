@@ -15,6 +15,8 @@
 --     has the basket put back, with words. A player who leaves the game has it put back; one who leaves while
 --     being served is refunded by the wallet (the handing-over fails: nobody to hand it to).
 -- What is bought is used from the hotbar: each Tool's Activated goes to Items/ItemWorld (Items/ItemService's rules).
+-- The kick ball (owner D30) is used when the press ends (Deactivated), with the seconds it was held as its wind-up,
+-- timed here on the server (wirePress): a click kicks it, a hold throws it.
 -- What is bought stays the buyer's (owner, D16 #26; Items/Lending): somebody else's frisbee caught or picked up is a
 -- borrowed Tool (lendTool: attributes LentItem and LentFrom, never ItemId, so the Inventory never counts it), put
 -- in the hand when the hand is free, to throw back.
@@ -23,8 +25,9 @@
 -- Interface: new(deps) -> Store { take(player, id) -> (ok, words), pay(player) -> (ok, words),
 --   putBack(player) -> (ok, words), step(), gone(player), basket(player) -> { id }, busy(player) -> boolean };
 --   start(opts) -> Store? (finds the bake, carves its inside, wires the prompts, steps on Heartbeat; nil without
---   the bake);
---   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; WORDS; CUES; SOUNDS; STORE (the model's
+--   the bake; its kickBall(player) is F by a kick ball on the ground);
+--   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; wirePress(tool, itemId, held, use, clock?);
+--   WINDUP_ITEMS; WORDS; CUES; SOUNDS; STORE (the model's
 --   name); REMOTE; STEER_REMOTE
 -- Engine only inside start/zoneOf/makeTool; no side effects on require.
 
@@ -86,6 +89,8 @@ export type Store = {
 	serving: { [any]: boolean },
 	shoppers: { [any]: any }, -- basket key -> player
 	stop: (() -> ())?,
+	-- F by a kick ball lying on the ground (the townsperson's kick, Boot/Game): kicked if one is in reach (start's)
+	kickBall: ((player: any) -> boolean)?,
 }
 
 local function keyOf(player: any): any
@@ -300,6 +305,48 @@ function CornerStore.heldBy(tool: Instance, player: any): boolean
 	return parent ~= nil and parent == player.Character
 end
 
+-- The things used when the press ends, with the seconds it was held (the kick ball's wind-up, owner D30).
+CornerStore.WINDUP_ITEMS = table.freeze({ kick_ball = true }) :: { [string]: boolean }
+CornerStore.WINDUP_CAP = 5 -- seconds: a press held longer is counted as this (Shared/Items/KickBall tops out sooner)
+
+-- A Tool's press, wired: `use(payload?)` on Activated, or for a WINDUP_ITEMS thing on Deactivated with
+-- { windup = seconds held } (the server's own clock: no client says how long). `held()`: the Tool is in the hand of the
+-- player it belongs to now (heldBy). An unequip mid-press drops the press. Returns the connections.
+function CornerStore.wirePress(
+	tool: any,
+	itemId: string,
+	held: () -> boolean,
+	use: (payload: { [string]: any }?) -> (),
+	clock: (() -> number)?
+): { any }
+	local now = clock or os.clock
+	if not CornerStore.WINDUP_ITEMS[itemId] then
+		return {
+			tool.Activated:Connect(function()
+				if held() then
+					use(nil)
+				end
+			end),
+		}
+	end
+	local pressedAt: number? = nil
+	return {
+		tool.Activated:Connect(function()
+			pressedAt = if held() then now() else nil
+		end),
+		tool.Deactivated:Connect(function()
+			local at = pressedAt
+			pressedAt = nil
+			if at ~= nil and held() then
+				use({ windup = math.clamp(now() - at, 0, CornerStore.WINDUP_CAP) })
+			end
+		end),
+		tool.Unequipped:Connect(function()
+			pressedAt = nil
+		end),
+	}
+end
+
 -- A Tool made from a shelf's Sample model: its first part the Handle, the rest welded to it, all light and loose.
 function CornerStore.makeTool(sample: Model, itemId: string, name: string): Tool
 	local tool = Instance.new("Tool")
@@ -374,6 +421,7 @@ export type StartOpts = {
 	fire: (player: any, payload: { [string]: any }) -> (), -- Game's notice/refused channel
 	heartbeat: boolean?,
 	terrain: boolean?, -- false: leave the terrain (a spec's place)
+	reputation: any?, -- Reputation/ReputationService: a kick ball's hard hits are reported to it (Items/ItemWorld)
 }
 
 function CornerStore.start(opts: StartOpts): Store?
@@ -425,10 +473,13 @@ function CornerStore.start(opts: StartOpts): Store?
 				return nil -- (a buyer who left: their record counts it, a Tool is made when they come back)
 			end
 			local tool = CornerStore.makeTool(sample, itemId, displayName(itemId))
-			-- using it (a click, a tap, the gamepad's trigger): Items/ItemService decides, Items/ItemWorld does
-			tool.Activated:Connect(function()
-				if items and CornerStore.heldBy(tool, player) then
-					items.use(player, itemId)
+			-- using it (a click, a tap, the gamepad's trigger; the kick ball when the press ends): Items/ItemService
+			-- decides, Items/ItemWorld does
+			CornerStore.wirePress(tool, itemId, function(): boolean
+				return CornerStore.heldBy(tool, player)
+			end, function(payload: { [string]: any }?)
+				if items then
+					items.use(player, itemId, payload)
 				end
 			end)
 			tool.Parent = backpack
@@ -509,8 +560,14 @@ function CornerStore.start(opts: StartOpts): Store?
 		zones = opts.zones,
 		dogs = opts.dogs,
 		heartbeat = opts.heartbeat,
+		reputation = opts.reputation,
 		-- somebody else's thing, borrowed to throw back (Items/Lending): its use is ItemWorld's `use`
-		lendTool = function(player: any, itemId: string, ownerName: string, use: () -> ()): any?
+		lendTool = function(
+			player: any,
+			itemId: string,
+			ownerName: string,
+			use: (payload: { [string]: any }?) -> ()
+		): any?
 			local sample = samples[itemId]
 			local backpack: Instance? = nil
 			if typeof(player) == "Instance" then
@@ -524,11 +581,9 @@ function CornerStore.start(opts: StartOpts): Store?
 			tool:SetAttribute("ItemId", nil)
 			tool:SetAttribute("LentItem", itemId)
 			tool:SetAttribute("LentFrom", ownerName)
-			tool.Activated:Connect(function()
-				if CornerStore.heldBy(tool, player) then
-					use()
-				end
-			end)
+			CornerStore.wirePress(tool, itemId, function(): boolean
+				return CornerStore.heldBy(tool, player)
+			end, use)
 			tool.Parent = backpack
 			-- in the hand at once when it is free, so a catch can be thrown straight back
 			local body = (player :: Player).Character
@@ -645,6 +700,9 @@ function CornerStore.start(opts: StartOpts): Store?
 				end
 			end)
 		)
+	end
+	store.kickBall = function(player: any): boolean
+		return items ~= nil and items.kickLoose(player)
 	end
 	store.stop = function()
 		for _, c in conns do

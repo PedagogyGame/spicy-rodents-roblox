@@ -1430,6 +1430,8 @@ function Game.start(opts: Opts?): any
 	-- alert zones and tells it of the raised leg
 	local combat: any = nil
 	local duelRules = CombatRules.params()
+	-- F by a kick ball lying in front (the corner store's, owner D30: Items/ItemWorld.kickLoose), set once it opens
+	local ballKick: ((player: any) -> boolean)? = nil
 
 	local function kick(player: any): boolean?
 		local s = stateOf(player)
@@ -1451,6 +1453,7 @@ function Game.start(opts: Opts?): any
 		end
 		local p = root.Position
 		local look = root.CFrame.LookVector
+		local kickedBall = ballKick ~= nil and ballKick(player) -- (and a squirrel in front is kicked as well)
 		if combat and townIdOf[actor.id] then
 			-- (a raised leg only when the kick was at the rodent: Combat/CombatService.heldKick)
 			combat:heldKick(townIdOf[actor.id], now, look.X, look.Z)
@@ -1472,7 +1475,9 @@ function Game.start(opts: Opts?): any
 			targets
 		)
 		if hitId == nil then
-			fire(player, { kind = "kick", hit = false })
+			if not kickedBall then
+				fire(player, { kind = "kick", hit = false })
+			end
 			return false
 		end
 		local target = byId[hitId]
@@ -2496,7 +2501,9 @@ function Game.start(opts: Opts?): any
 			fire = fire,
 			heartbeat = o.heartbeat ~= false,
 			terrain = o.terrain ~= false,
+			reputation = reputation,
 		})
+		ballKick = if cornerStore then cornerStore.kickBall else nil
 	end)
 	if not okC then
 		warn(`[SpicyRodents] the corner store failed to open: {errC}`)

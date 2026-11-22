@@ -1,5 +1,5 @@
 --!strict
--- The corner store's 22 items in use (Shared/Items/ItemRules says what each does; Server/Items/ItemService
+-- The corner store's 23 items in use (Shared/Items/ItemRules says what each does; Server/Items/ItemService
 -- applies it over fake deps that record what reaches the world): ownership, people only, cooldowns, uses used
 -- up, and each item's effect, simplest first.
 local ItemRules = require("@shared/Items/ItemRules")
@@ -101,7 +101,7 @@ local function use(r: Rig, id: string, payload: any?): (boolean, string?)
 end
 
 return function(t)
-	t.test("the rules: every one of the 22 does something (no todo left but none), and nothing is a gamble", function()
+	t.test("the rules: every one of the 23 does something (no todo left but none), and nothing is a gamble", function()
 		for _, def in ItemRules.CATALOG do
 			t.truthy(ItemRules.validate(def))
 			local fx = ItemRules.use(def, { userId = 1, zone = "park", text = "hi", targetInRange = false })
