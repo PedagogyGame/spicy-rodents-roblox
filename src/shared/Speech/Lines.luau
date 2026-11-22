@@ -18,7 +18,8 @@
 -- (Server/Stealth/OverheadService.SURFACE), the plain "overhead" lines anywhere else; no line says how it moves.
 -- An ordinary squirrel (owner D21, Server/Wildlife/TownSquirrels) frightens nobody: squirrelNear is the friendly word
 -- someone now and then has for one going by; jumpedAt is the yelp of someone it jumped right on or at (a start, never
--- an alarm: no line calls anyone or tells anyone to run).
+-- an alarm: no line calls anyone or tells anyone to run). rideClose is someone hopping out of the way of a shared little
+-- vehicle, bumped someone it bumped into (owner D29: surprised, never hurt).
 -- Interface: GROUPS { [situation]: { string } }; SITUATIONS { string } (stable order); THE_LINE;
 --   all() -> { string }; of(situation) -> { string }
 -- Pure. No side effects on require.
@@ -198,6 +199,24 @@ Lines.GROUPS = table.freeze({
 		"Hey! Not on me!",
 		"Whoa there, little guy!",
 	}),
+	-- the town's shared little vehicles (owner D29, Server/Vehicles/RideBumps): someone who hops out of the way of one ...
+	rideClose = table.freeze({
+		"Whoa! Careful!",
+		"Hey, slow down!",
+		"Coming through, are we?",
+		"Watch where you're going!",
+		"Yikes, that was close!",
+		"Easy there, speedy!",
+	}),
+	-- ... and someone it bumped into: a surprised word, never hurt
+	bumped = table.freeze({
+		"Oof!",
+		"Whoa! I'm okay, I'm okay.",
+		"Hey! Watch it!",
+		"Oops-a-daisy!",
+		"Well, that was a surprise!",
+		"Ow! Mind the people!",
+	}),
 }) :: { [string]: { string } }
 
 Lines.SITUATIONS = table.freeze({
@@ -224,6 +243,8 @@ Lines.SITUATIONS = table.freeze({
 	"overheadLost",
 	"squirrelNear",
 	"jumpedAt",
+	"rideClose",
+	"bumped",
 })
 
 function Lines.of(situation: string): { string }

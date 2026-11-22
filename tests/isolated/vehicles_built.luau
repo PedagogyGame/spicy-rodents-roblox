@@ -107,14 +107,23 @@ return function(t)
 	)
 
 	t.test("the hidden Seat the driver is put on lies on the saddle or seat the vehicle draws", function()
-		for _, pair in { { "bike", "Saddle" }, { "cart", "Seat" }, { "jetski", "Seat" } } do
+		local pairs_ = {
+			{ "bike", "Saddle" },
+			{ "cart", "Seat" },
+			{ "jetski", "Seat" },
+			{ "moped", "Seat" },
+			{ "escooter", "Board" },
+		}
+		for _, pair in pairs_ do
 			local id, drawnName = pair[1], pair[2]
 			local m = Placeholder.build(id, id)
 			local seat = m:FindFirstChild("DriverSeat") :: any
 			local drawn = child(m, drawnName, seat)
 			t.truthy(drawn, `{id} draws its {drawnName}`)
 			local s, d = seat.CFrame.Position, drawn.CFrame.Position
-			local sTop, dTop = s.Y + seat.Size.Y / 2, d.Y + drawn.Size.Y / 2
+			-- (a standing rider's Seat is a standing body's height over the board: Placeholder.SEATED.stand)
+			local lift = if VehicleKinds.stands(id) then Placeholder.SEATED.stand else 0
+			local sTop, dTop = s.Y + seat.Size.Y / 2, d.Y + drawn.Size.Y / 2 + lift
 			t.near(sTop, dTop, 0.02, `{id}: the sitter's seat top {sTop} vs the drawn {drawnName}'s {dTop}`)
 			t.truthy(
 				math.abs(s.X - d.X) <= drawn.Size.X / 2,
@@ -148,7 +157,13 @@ return function(t)
 				local ground = -k.size[2] / 2
 				local feet = top + roblox.Vector3.new(0, -S.feetBelow, -S.feetAhead)
 				t.truthy(feet.Y >= ground, `{id}: the feet ({feet.Y}) above the ground ({ground})`)
-				if not k.interior.open then
+				if VehicleKinds.stands(id) then
+					-- (owner D29) the electric scooter's rider stands: the soles on the board, the eyes a standing R15's
+					local board = child(m, "Board", seat)
+					local boardTop = board.CFrame.Position.Y + board.Size.Y / 2
+					t.near(top.Y - S.stand, boardTop, 1e-3, `{id}: the soles on the board`)
+					t.near(S.stand + S.root, 3.0, 1e-6, "a standing R15's root over its soles")
+				elseif not k.interior.open then
 					-- drive on the right (owner decision 9): the driver on the left, the side DeviceService lets them out on
 					t.truthy(top.X < -0.5, `{id}: the driver on the left (x {top.X})`)
 					local roof = child(m, "Roof", seat)
@@ -177,10 +192,16 @@ return function(t)
 					local off = math.sqrt((feet.Y - axle.Y) ^ 2 + (feet.Z - axle.Z) ^ 2)
 					t.truthy(off >= r, `bike: the feet ({off} from the axle) clear the front wheel (radius {r})`)
 				else
-					-- on the cart's floor (the tub's top) or the jet ski's deck, within half a stud
-					local floor = if id == "cart" then child(m, "Body", seat) else child(m, "Deck", seat)
+					-- on the cart's floor (the tub's top), the jet ski's deck or the moped's floorboard, within half a
+					-- stud (the moped's 0.6: its seat stands a little higher over the board, as a scooter's does)
+					local name = if id == "cart" then "Body" elseif id == "moped" then "Floor" else "Deck"
+					local floor = child(m, name, seat)
 					local floorTop = floor.CFrame.Position.Y + floor.Size.Y / 2
-					t.truthy(math.abs(feet.Y - floorTop) <= 0.5, `{id}: the feet ({feet.Y}) on the floor ({floorTop})`)
+					local within = if id == "moped" then 0.6 else 0.5
+					t.truthy(
+						math.abs(feet.Y - floorTop) <= within,
+						`{id}: the feet ({feet.Y}) on the floor ({floorTop})`
+					)
 				end
 			end
 		end
@@ -298,7 +319,8 @@ return function(t)
 	end)
 
 	t.test("a parked vehicle casts shadows from its big parts only (the body, the roof, the tyres)", function()
-		local placed = { car = 2, cart = 2, bike = 2, pickup = 1, suv = 1, jetski = 1 } -- the town's fleet
+		-- the town's fleet (owner D29: the two carts became the ten shared vehicles, Vehicles/SharedRides)
+		local placed = { car = 2, cart = 3, bike = 2, pickup = 1, suv = 1, jetski = 1, moped = 2, escooter = 5 }
 		local total = 0
 		for _, id in drawnKinds() do
 			local m = Placeholder.build(id, id)
@@ -315,6 +337,8 @@ return function(t)
 			t.eq(tyres, VehicleKinds.kind(id).wheels, `{id}: every tyre casts`)
 			total += casters * (placed[id] or 1)
 		end
-		t.truthy(total <= 60, `the parked fleet: {total} shadow casters (240 before)`)
+		-- (at most 60 before D29's ten shared vehicles: a third cart, two mopeds (cowl, seat, tyres) and five scooters
+		-- (board, tyres) bring it to 84)
+		t.truthy(total <= 90, `the parked fleet: {total} shadow casters (240 before the bikes pass)`)
 	end)
 end

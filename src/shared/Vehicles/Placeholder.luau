@@ -6,7 +6,8 @@
 -- where the first-person camera sits (brief v2 §14). The numbers come from Vehicles/VehicleKinds.
 -- The drawn vehicle is shaped in the traffic cars' style (owner playtest 2026-11-19: "bikes and things that
 -- were basic colors"): the patrol car and the golf cart as the traffic draws them (Traffic/VehiclePuppet),
--- the pickup, SUV and jet ski from VehiclePuppet's player kinds, the bike from Vehicles/RidePuppet, each
+-- the pickup, SUV and jet ski from VehiclePuppet's player kinds, the bike, the shared moped and the stand-up electric
+-- scooter (owner D29; its rider stands on the board: SEATED.stand) from Vehicles/RidePuppet, each
 -- fitted inside the VehicleKinds box (`look`); the seat and, on the open kinds, the dash are not drawn
 -- (the saddle, the bench, the seat are). A kind with no look keeps the old greybox body. Engine only
 -- (Instances) in `build`; `look` and `cockpit` are pure. Tools/placeholders (Track B) may supply richer models under
@@ -81,15 +82,30 @@ Placeholder.BIKE_SCALE = 0.88 -- the adult bicycle (5 studs long) shrunk into th
 -- A seated R15 at scale 1 in the sit clip, from the top of what it sits on (studs; approximate, not measured in the
 -- engine): its root (Client/Animation/AnimationDriver.SIT_SEAT), its eyes (Rides/SkyLift.EYE_ABOVE_SEAT), the top of
 -- its head, and its soles (below the seat top and ahead of the root: thighs level, shins down).
-Placeholder.SEATED = table.freeze({ root = 1.35, eye = 3, head = 3.6, feetBelow = 0.8, feetAhead = 1.0 })
+-- `stand`: a rider who stands (the electric scooter, owner D29) is still put on a hidden Seat (Seat:Sit) but plays a
+-- standing clip (Client/Animation/AnimationDriver): a standing R15's root is 3.0 over its soles (HipHeight 2 and half
+-- the 2-stud root) against 1.35 over a seat, so that Seat's top is 1.65 over the board and the soles land on it; the
+-- eyes stay `eye` over the Seat (1.65 + 3 = 4.65, a standing R15's).
+Placeholder.SEATED = table.freeze({ root = 1.35, eye = 3, head = 3.6, feetBelow = 0.8, feetAhead = 1.0, stand = 1.65 })
 
 -- Where the driver sits on each drawn kind: on a drawn part (`on`: its top) or under one (`under`: a seated head clears
 -- it); across: the x of a named part (`across`, the steering wheel) or the left-hand side (`left` x the box width);
 -- along: from the part's front edge (`front`), its back edge (`back`), or its middle.
-type Driver = { on: string?, under: string?, across: string?, left: number?, front: number?, back: number? }
+-- stand: the rider stands on the part (SEATED.stand over its top).
+type Driver = {
+	on: string?,
+	under: string?,
+	across: string?,
+	left: number?,
+	front: number?,
+	back: number?,
+	stand: boolean?,
+}
 -- stylua: ignore
 local DRIVERS: { [string]: Driver } = {
 	bike = { on = "Saddle" },
+	moped = { on = "Seat", back = 0.6 }, -- on the seat (the street riders' place on it)
+	escooter = { on = "Board", stand = true }, -- standing on the board
 	cart = { on = "Seat", across = "Steering", back = 0.75 }, -- the back against the seat back
 	jetski = { on = "Seat", front = 0.75 }, -- near the bars
 	car = { under = "Roof", left = 0.22, front = 0.8 }, -- VehiclePuppet's driver's side (local -X)
@@ -124,10 +140,13 @@ local CASTS: { [string]: boolean } = {
 	Console = true,
 	Seat = true,
 }
-local function bigShadows(spec: PartBuilder.ModelSpec)
+-- and on the shared moped its rear cowl, on the electric scooter its board (owner D29; the traffic cart has a Cowl too)
+local CASTS_OF: { [string]: { [string]: boolean } } = { moped = { Cowl = true }, escooter = { Board = true } }
+local function bigShadows(spec: PartBuilder.ModelSpec, kindId: string)
+	local extra = CASTS_OF[kindId] or {}
 	for i, p in spec.parts do
 		if i > 1 then
-			p.castShadow = CASTS[p.name] == true or string.match(p.name, "^Wheel%u%u?$") ~= nil
+			p.castShadow = CASTS[p.name] == true or extra[p.name] == true or string.match(p.name, "^Wheel%u%u?$") ~= nil
 		end
 	end
 end
@@ -140,6 +159,8 @@ function Placeholder.look(kindId: string, name: string?): PartBuilder.ModelSpec?
 	local spec: PartBuilder.ModelSpec
 	if kindId == "bike" then
 		spec = RidePuppet.bicycle({ scale = Placeholder.BIKE_SCALE, frame = toHex(k.color), size = box, name = name })
+	elseif kindId == "moped" or kindId == "escooter" then
+		spec = RidePuppet.sharedRide(kindId, { paint = toHex(k.color), size = box, name = name })
 	else
 		local drawn = DRAWN[kindId]
 		if drawn == nil then
@@ -150,7 +171,7 @@ function Placeholder.look(kindId: string, name: string?): PartBuilder.ModelSpec?
 		spec = VehiclePuppet.spec(drawn, { color = color, name = name, box = box })
 	end
 	spec.attachments = {}
-	bigShadows(spec)
+	bigShadows(spec, kindId)
 	return spec
 end
 
@@ -170,6 +191,9 @@ local function driverOn(kindId: string, spec: PartBuilder.ModelSpec): Cockpit?
 	local z0, z1 = ref.pos[3] - ref.size[3] / 2, ref.pos[3] + ref.size[3] / 2
 	local z = if rule.front then z0 + rule.front elseif rule.back then z1 - rule.back else ref.pos[3]
 	local top = if rule.on then ref.pos[2] + ref.size[2] / 2 else ref.pos[2] - ref.size[2] / 2 - Placeholder.SEATED.head
+	if rule.stand then
+		top += Placeholder.SEATED.stand
+	end
 	return { seat = { x, top, z }, eye = { x, top + Placeholder.SEATED.eye, z } }
 end
 

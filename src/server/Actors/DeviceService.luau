@@ -9,8 +9,12 @@
 -- Shared/Vehicles/PlayerVehicles; keys only change hands while parked. W1 has no ranks yet, so
 -- `openKeys` (default on) hands a parked vehicle's key to whoever asks; W2 wires
 -- Ladder.keyHolders through grantKeys instead.
+-- The town's shared little vehicles (owner D29, Shared/Vehicles/SharedRides: 3 golf carts, 2 mopeds, 5 electric
+-- scooters at SharedRides.SPOTS): any person rides one with E, no key changes hands (openKeys passes them by), nobody
+-- owns one; it stays where its rider got off, and `tidy` puts one back on its spot when it has been left away from it,
+-- untouched, for SharedRides.C.returnSecs with no player near it or its spot.
 -- Interface: start(opts) -> Service { fleet, models, interact(player, body), exitAll(player),
---   spawn(kind, x, y, z, yaw) -> id }
+--   spawn(kind, x, y, z, yaw) -> id, isShared(id) -> boolean, tidy(now, nearestPlayer) -> n put back }
 -- Engine only inside the functions. No side effects on require.
 
 local Import = require("../Import")
@@ -20,6 +24,7 @@ local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
 local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 local Placeholder = Import.shared("Vehicles/Placeholder") :: typeof(require("../../shared/Vehicles/Placeholder"))
+local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 
@@ -38,16 +43,20 @@ export type Service = {
 	interact: (self: Service, player: Player) -> (boolean, string?),
 	exitAll: (self: Service, player: Player) -> (),
 	spawn: (self: Service, kind: string, x: number, y: number, z: number, yaw: number) -> string,
+	isShared: (self: Service, id: string) -> boolean,
+	-- (`nearestPlayer(x, z)`: studs from there to the nearest player's body)
+	tidy: (self: Service, now: number, nearestPlayer: (x: number, z: number) -> number) -> number,
 }
 
 local DeviceService = {}
 
 local REACH = 16 -- studs from the body to the vehicle's root
 
--- Default placements (studs, HTML yaw): patrol cars at the police station, carts and bikes in the
+-- Default placements (studs, HTML yaw): patrol cars at the police station, bikes in the
 -- core, a pickup and an SUV on the east-west street that crosses the main street (z = 0; no AI lane
 -- runs on it: parked on the main street at x = -/+5.4 they stood in its two lanes, and the fleet drove
--- through them every lap), a jet ski on the river, the drone at the station.
+-- through them every lap), a jet ski on the river, the drone at the station, and the ten shared vehicles round the
+-- town (owner D29: SharedRides.SPOTS; they took the place of the two carts in the core).
 function DeviceService.defaultPlacements(data: any?): { { kind: string, x: number, z: number, yaw: number } }
 	local st = Units.st
 	local px, pz = st(-510), st(-107)
@@ -58,11 +67,9 @@ function DeviceService.defaultPlacements(data: any?): { { kind: string, x: numbe
 		end
 	end
 	local riverZ = 120
-	return {
+	local out = {
 		{ kind = "car", x = px + 20, z = pz + 30, yaw = 0 },
 		{ kind = "car", x = px + 32, z = pz + 30, yaw = 0 },
-		{ kind = "cart", x = st(-14), z = st(20), yaw = 0 },
-		{ kind = "cart", x = st(14), z = st(-20), yaw = math.pi },
 		{ kind = "bike", x = st(-13), z = st(30), yaw = 0 },
 		{ kind = "bike", x = st(13), z = st(-30), yaw = math.pi },
 		{ kind = "pickup", x = st(-24), z = st(-5.4), yaw = math.pi / 2 },
@@ -70,6 +77,10 @@ function DeviceService.defaultPlacements(data: any?): { { kind: string, x: numbe
 		{ kind = "jetski", x = st(Height.riverCenterU(riverZ)), z = st(riverZ), yaw = 0 },
 		{ kind = "drone", x = px + 10, z = pz + 18, yaw = 0 },
 	}
+	for _, p in SharedRides.placements() do
+		table.insert(out, p)
+	end
+	return out
 end
 
 local function buildDrone(name: string): Model
@@ -138,6 +149,19 @@ function DeviceService.start(opts: Opts): Service
 	local flying: { [Player]: string } = {}
 	local openKeys = opts.openKeys ~= false
 	local count = 0
+	-- the shared vehicles' spots and when each was last ridden or left (owner D29)
+	local homes: { [string]: { x: number, z: number, yaw: number } } = {}
+	local touched: { [string]: number } = {}
+	local function shared(id: string): boolean
+		local v = PlayerVehicles.get(fleet, id)
+		return v ~= nil and VehicleKinds.isShared(v.kind)
+	end
+	-- stand a vehicle on the ground at (x, z) facing yaw (the jet ski on the water)
+	local function place(model: Model, kind: string, x: number, y: number, z: number, yaw: number)
+		local half = if kind == "drone" then 0.4 else VehicleKinds.kind(kind).size[2] * 0.5
+		local gy = if kind == "jetski" then Height.WATER_Y else groundY(x, z, model)
+		model:PivotTo(Units.yawCFrame(yaw, Vector3.new(x, y ~= 0 and y or gy + half + 0.05, z)))
+	end
 
 	local self: Service
 	self = {
@@ -147,18 +171,19 @@ function DeviceService.start(opts: Opts): Service
 			count += 1
 			local id = `{kind}_{count}`
 			local model: Model
-			local half: number
 			if kind == "drone" then
 				model = buildDrone(id)
-				half = 0.4
 				drones[id] = true
 			else
 				model = Placeholder.build(kind, id)
-				half = VehicleKinds.kind(kind).size[2] * 0.5
 				PlayerVehicles.add(fleet, id, kind, x, z, yaw)
+				if VehicleKinds.isShared(kind) then
+					homes[id] = { x = x, z = z, yaw = yaw }
+					touched[id] = os.clock()
+					model:SetAttribute("Shared", true) -- (Client/UI/RideHint: "E ride" by a free one)
+				end
 			end
-			local gy = if kind == "jetski" then Height.WATER_Y else groundY(x, z, model)
-			model:PivotTo(Units.yawCFrame(yaw, Vector3.new(x, y ~= 0 and y or gy + half + 0.05, z)))
+			place(model, kind, x, y, z, yaw)
 			for _, d in model:GetDescendants() do
 				if d:IsA("BasePart") then
 					d.Anchored = d == model.PrimaryPart
@@ -186,6 +211,9 @@ function DeviceService.start(opts: Opts): Service
 				else
 					PlayerVehicles.setMotion(fleet, current, 0, root.Position.X, root.Position.Z)
 					PlayerVehicles.exit(fleet, player.UserId)
+					if touched[current] then
+						touched[current] = os.clock() -- (left here: it stays, SharedRides.returnHome)
+					end
 					local seat = model:FindFirstChild("DriverSeat") :: Seat?
 					if seat and seat.Occupant then
 						seat.Occupant.Sit = false
@@ -239,7 +267,8 @@ function DeviceService.start(opts: Opts): Service
 				return true, nil
 			end
 			local v = PlayerVehicles.get(fleet, best) :: any
-			if openKeys and v.parked and v.driver == nil then
+			-- (a shared vehicle has no key: nobody owns it, owner D29)
+			if openKeys and v.parked and v.driver == nil and not VehicleKinds.isShared(v.kind) then
 				v.key = player.UserId
 			end
 			local ok, reason = PlayerVehicles.enter(fleet, best, player.UserId, {
@@ -249,6 +278,9 @@ function DeviceService.start(opts: Opts): Service
 			})
 			if not ok then
 				return false, reason
+			end
+			if touched[best] then
+				touched[best] = os.clock()
 			end
 			root.Anchored = false
 			local seat = model:FindFirstChild("DriverSeat") :: Seat?
@@ -265,6 +297,33 @@ function DeviceService.start(opts: Opts): Service
 			if PlayerVehicles.vehicleOf(fleet, player.UserId) or flying[player] then
 				s:interact(player)
 			end
+		end,
+		isShared = function(_s: Service, id: string): boolean
+			return shared(id)
+		end,
+		-- a shared vehicle left away from its spot, untouched, with nobody near, goes quietly back (SharedRides.returnHome)
+		tidy = function(_s: Service, now: number, nearestPlayer: (x: number, z: number) -> number): number
+			local n = 0
+			for id, home in homes do
+				local v = PlayerVehicles.get(fleet, id)
+				local model = models[id]
+				local root = if model then model.PrimaryPart else nil
+				if v == nil or v.driver ~= nil or root == nil then
+					continue
+				end
+				local p = root.Position
+				local from = math.sqrt((p.X - home.x) ^ 2 + (p.Z - home.z) ^ 2)
+				local near = math.min(nearestPlayer(p.X, p.Z), nearestPlayer(home.x, home.z))
+				if SharedRides.returnHome(now, touched[id] or now, from, near) then
+					root.Anchored = true
+					root.AssemblyLinearVelocity = Vector3.zero
+					place(model :: Model, v.kind, home.x, 0, home.z, home.yaw)
+					PlayerVehicles.setMotion(fleet, id, 0, home.x, home.z, home.yaw)
+					touched[id] = now
+					n += 1
+				end
+			end
+			return n
 		end,
 	}
 	for _, p in opts.placements or DeviceService.defaultPlacements(nil) do

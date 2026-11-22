@@ -11,14 +11,17 @@
 -- footprint (its logical box, CarMotor.corners), not a square at its centre, so its nose stops at a car's side; and a
 -- move that does not take it deeper into a car it already overlaps is free (Solid.pushes: a town car drawn over it, a
 -- car that pulled up against it, never locks it in; review 2026-11-18).
+-- A shared vehicle that bumps someone (owner D29: the vehicle's BumpAt, Server/Vehicles/RideBumps) loses some of its speed:
+-- the rider feels the bump (afterBump).
 -- Interface: start(vehicle, kind, metrics, ctx) -> stop(); ctx = { world, input }; blocked(state, cars, walls) (the motor's
--- wall test)
+-- wall test); afterBump(speed, seen, stamp) -> (speed, seen)
 -- No side effects on require.
 
 local Import = require("../Import")
 local CarMotor = Import.shared("Movement/CarMotor") :: typeof(require("../../shared/Movement/CarMotor"))
 local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 local Solid = Import.shared("Traffic/Solid") :: typeof(require("../../shared/Traffic/Solid"))
+local SharedRides = Import.shared("Vehicles/SharedRides") :: typeof(require("../../shared/Vehicles/SharedRides"))
 local BodyDriver = require("./BodyDriver")
 
 local Vehicle = {}
@@ -50,6 +53,15 @@ function Vehicle.blocked(
 	end
 end
 
+-- afterBump(speed, seen, stamp) -> (speed, seen): a shared vehicle that bumped someone (Server/Vehicles/RideBumps writes
+-- the vehicle's BumpAt, owner D29): on a new stamp the rider keeps SharedRides.C.keep of the speed. Pure
+function Vehicle.afterBump(speed: number, seen: any, stamp: any): (number, any)
+	if stamp ~= nil and stamp ~= seen then
+		return speed * SharedRides.C.keep, stamp
+	end
+	return speed, seen
+end
+
 function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
 	local root = vehicle.PrimaryPart
 	if root == nil then
@@ -66,8 +78,10 @@ function Vehicle.start(vehicle: Model, kind: string, metrics: { [string]: any },
 		clamp = world.clamp,
 	}
 	metrics.vehicleKind = kind
+	local bumpSeen = vehicle:GetAttribute("BumpAt")
 	return BodyDriver.drive(root, function(dt: number)
 		local f = input:sample(BodyDriver.cameraYawHtml())
+		state.speed, bumpSeen = Vehicle.afterBump(state.speed, bumpSeen, vehicle:GetAttribute("BumpAt"))
 		CarMotor.step(state, { throttle = f.fw, steer = f.side, handbrake = f.handbrake }, dt, motorWorld)
 		metrics.vehicleSpeed = state.speed
 		local vel = Vector3.new(math.sin(state.yaw) * state.speed, state.vy, math.cos(state.yaw) * state.speed)

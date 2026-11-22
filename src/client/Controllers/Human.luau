@@ -14,9 +14,14 @@
 -- No side effects on require.
 -- A soda or an ice cream bar from the corner store (Server/Items/ItemWorld "treat") sets the body attributes TreatUntil
 -- (server time) and TreatScale: until then the pace is that much faster (treat()).
+-- Bumped by one of the town's shared little vehicles (owner D29; Server/Vehicles/RideBumps through Boot/Game): the server
+-- writes the body's Knock (a Vector3: the slide's x, the seconds down, the slide's z), KnockFall and KnockAt (server
+-- time, the trigger). The body is pushed along the slide (a small hop with it on a fall); a fall tips it over that way
+-- (PlatformStand: the body goes over as a whole) and it lies there for the seconds, then gets up (GettingUp); a stagger
+-- only pushes. The controls are off meanwhile. Never a death (Dead stays off), never a ragdoll.
 -- Interface: start(body, payload, metrics) -> stop(); speed(sprint, scale?, noSprint?) -> studs per second;
---   treat(untilTime?, scale?, now) -> multiplier;
---   WALK; SPRINT; MAX_SCALE
+--   treat(untilTime?, scale?, now) -> multiplier; knock(knock?, fall?, at?, now) -> Push? (pure);
+--   WALK; SPRINT; MAX_SCALE; KNOCK
 
 export type Metrics = { [string]: any }
 
@@ -42,6 +47,37 @@ end
 function Human.speed(sprint: boolean, scale: any, noSprint: any): number
 	local k = if type(scale) == "number" and scale == scale then math.clamp(scale, 0, Human.MAX_SCALE) else 1
 	return (if sprint and noSprint ~= true then Human.SPRINT else Human.WALK) * k
+end
+
+-- The knock (owner D29): the slide's speed is its length over `slide` seconds; a fall hops `hop` studs/s up and turns
+-- over at `tip` rad/s; a knock older than `fresh` seconds when it arrives is not played (a body handed over later).
+Human.KNOCK = table.freeze({ slide = 0.35, hop = 7, tip = 5, fresh = 1.5, minSecs = 0.3, maxSecs = 4 })
+
+export type Push = { vx: number, vy: number, vz: number, fall: boolean, secs: number, tipX: number, tipZ: number }
+
+-- knock(knock, fall, at, now): what a fresh Knock attribute does to the body: its push (studs/s), whether it falls,
+-- how long the controls are off, and the axis it tips over about (horizontal, square to the push). nil when there is
+-- none, it is stale, or it is not a knock at all (an attribute is whatever somebody wrote).
+function Human.knock(knock: any, fall: any, at: any, now: number): Push?
+	if typeof(knock) ~= "Vector3" or type(at) ~= "number" or now - at > Human.KNOCK.fresh or now < at - 1 then
+		return nil
+	end
+	local K = Human.KNOCK
+	local k = knock :: Vector3
+	local dx, dz = k.X, k.Z
+	if dx ~= dx or dz ~= dz then
+		return nil
+	end
+	local falls = fall == true
+	return {
+		vx = dx / K.slide,
+		vy = if falls then K.hop else 0,
+		vz = dz / K.slide,
+		fall = falls,
+		secs = math.clamp(if k.Y == k.Y then k.Y else 0, K.minSecs, K.maxSecs),
+		tipX = dz,
+		tipZ = -dx,
+	}
 end
 
 -- KeyCode names (Enum is not available under Lune, where the skeleton test requires this module)
@@ -102,7 +138,48 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 		end
 	end
 
+	-- bumped by a shared vehicle (owner D29): pushed, maybe over, controls off until `knockedUntil` (os.clock)
+	local knockedUntil = 0
+	local function getUp()
+		if knockedUntil > 0 then
+			knockedUntil = 0
+			if hum.PlatformStand then
+				hum.PlatformStand = false
+				hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+			end
+			if ctl and not hold then
+				ctl:Enable()
+			end
+		end
+	end
+	local function onKnock()
+		local push = Human.knock(
+			body:GetAttribute("Knock"),
+			body:GetAttribute("KnockFall"),
+			body:GetAttribute("KnockAt"),
+			workspace:GetServerTimeNow()
+		)
+		if push == nil or hum.SeatPart ~= nil then
+			return
+		end
+		endHold()
+		if ctl then
+			ctl:Disable()
+		end
+		hum:Move(Vector3.zero)
+		rootPart.AssemblyLinearVelocity = Vector3.new(push.vx, push.vy, push.vz)
+		if push.fall then
+			hum.PlatformStand = true
+			local axis = Vector3.new(push.tipX, 0, push.tipZ)
+			if axis.Magnitude > 1e-3 then
+				rootPart.AssemblyAngularVelocity = axis.Unit * Human.KNOCK.tip
+			end
+		end
+		knockedUntil = os.clock() + push.secs
+	end
+
 	local conns = {}
+	table.insert(conns, body:GetAttributeChangedSignal("KnockAt"):Connect(onKnock))
 	table.insert(
 		conns,
 		UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
@@ -118,6 +195,9 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 	table.insert(
 		conns,
 		RunService.RenderStepped:Connect(function()
+			if knockedUntil > 0 and os.clock() >= knockedUntil then
+				getUp()
+			end
 			local sprint = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 				or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 			hum.WalkSpeed = Human.speed(sprint, body:GetAttribute("MoveScale"), body:GetAttribute("NoSprint"))
@@ -144,6 +224,7 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 		end)
 	)
 	return function()
+		getUp()
 		endHold()
 		for _, c in conns do
 			c:Disconnect()
