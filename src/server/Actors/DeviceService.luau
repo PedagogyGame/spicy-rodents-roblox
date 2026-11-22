@@ -13,6 +13,10 @@
 -- scooters at SharedRides.SPOTS): any person rides one with E, no key changes hands (openKeys passes them by), nobody
 -- owns one; it stays where its rider got off, and `tidy` puts one back on its spot when it has been left away from it,
 -- untouched, for SharedRides.C.returnSecs with no player near it or its spot.
+-- The golf cart seats two (owner D30; VehicleKinds.seats): E at a cart someone drives, with its seat beside them free,
+-- sits a person there (PlayerVehicles.board; the hidden PassengerSeat, Seat:Sit; DeviceGranted { device = "passenger" });
+-- E again gets them off on their own side (PlayerVehicles.alight; DeviceReleased "exit"). The driver keeps the network
+-- ownership; the passenger touches no control. A passenger stays aboard when the driver gets out.
 -- The doctors' ambulances (owner D30, Server/Hospital/DoctorService): `borrow` (set by Boot/Game) is asked at E when
 -- no player vehicle is within reach: a parked fleet ambulance there is lent to a doctor (the id of the player vehicle
 -- `spawn`ed in its place, which the doctor is then seated in) or the words why not; `isDoctor` lets a doctor's key turn
@@ -20,7 +24,8 @@
 -- its light bar) and is taken away with `remove` when it goes back to its bay; `poseOf` is where it is and who drives.
 -- Interface: start(opts) -> Service { fleet, models, interact(player, body), exitAll(player),
 --   spawn(kind, x, y, z, yaw) -> id, isShared(id) -> boolean, tidy(now, nearestPlayer) -> n put back,
---   remove(id) -> boolean, poseOf(id) -> { x, z, speed, driver }?, borrow?, isDoctor? }
+--   remove(id) -> boolean, poseOf(id) -> { x, z, speed, driver }?, borrow?, isDoctor? };
+--   pick(options) -> (id?, beside) (pure: what E takes); REACH
 -- Engine only inside the functions. No side effects on require.
 
 local Import = require("../Import")
@@ -62,6 +67,23 @@ export type Service = {
 local DeviceService = {}
 
 local REACH = 16 -- studs from the body to the vehicle's root
+DeviceService.REACH = REACH
+
+-- A vehicle as E sees it: how far, whether it can be driven (nobody at the wheel; the drone) and whether the seat
+-- beside its driver is free (a golf cart someone drives, owner D30).
+export type Option = { id: string, d: number, free: boolean, seat: boolean }
+
+-- pick(options): what E takes, the nearest within REACH that can be driven or sat in beside its driver: its id and
+-- whether it is the seat beside (true) or the wheel (false); nil when nothing is in reach. Pure.
+function DeviceService.pick(options: { Option }): (string?, boolean)
+	local best, bestD, beside = nil, REACH, false
+	for _, o in options do
+		if o.d < bestD and (o.free or o.seat) then
+			best, bestD, beside = o.id, o.d, not o.free
+		end
+	end
+	return best, beside
+end
 
 -- Default placements (studs, HTML yaw): patrol cars at the police station, bikes in the
 -- core, a pickup and an SUV on the east-west street that crosses the main street (z = 0; no AI lane
@@ -208,9 +230,29 @@ function DeviceService.start(opts: Opts): Service
 			return id
 		end,
 		interact = function(_s: Service, player: Player): (boolean, string?)
+			local body = opts.bodyOf(player)
+			-- off the seat beside the driver (owner D30), on the passenger's own side
+			local riding = PlayerVehicles.alight(fleet, player.UserId)
+			if riding then
+				local model = models[riding]
+				local seat = if model then model:FindFirstChild("PassengerSeat") :: Seat? else nil
+				if seat and seat.Occupant then
+					seat.Occupant.Sit = false
+					local weld = seat:FindFirstChild("SeatWeld")
+					if weld then
+						weld:Destroy()
+					end
+				end
+				local root = if model then model.PrimaryPart else nil
+				if root and body and body.PrimaryPart then
+					local side = root.CFrame.RightVector * ((model :: Model):GetExtentsSize().X * 0.5 + 3)
+					body:PivotTo(CFrame.new(root.Position + side + Vector3.new(0, 3, 0)))
+				end
+				released:FireClient(player, "exit")
+				return true, nil
+			end
 			-- getting out (vehicle or drone)
 			local current = PlayerVehicles.vehicleOf(fleet, player.UserId) or flying[player]
-			local body = opts.bodyOf(player)
 			if current then
 				local model = models[current]
 				local root = model.PrimaryPart :: BasePart
@@ -251,17 +293,25 @@ function DeviceService.start(opts: Opts): Service
 				return false, "only people drive"
 			end
 			local pos = (body.PrimaryPart :: BasePart).Position
-			local best, bestD = nil, REACH
+			local options: { Option } = {}
 			for id, model in models do
 				local r = model.PrimaryPart
 				if r then
-					local d = (r.Position - pos).Magnitude
-					local free = if drones[id] then true else PlayerVehicles.get(fleet, id).driver == nil
-					if d < bestD and free then
-						best, bestD = id, d
-					end
+					local v = if drones[id] then nil else PlayerVehicles.get(fleet, id)
+					table.insert(options, {
+						id = id,
+						d = (r.Position - pos).Magnitude,
+						free = drones[id] == true or (v ~= nil and v.driver == nil),
+						seat = v ~= nil
+							and v.driver ~= nil
+							and v.passenger == nil
+							and VehicleKinds.seats(v.kind) >= 2
+							and model:FindFirstChild("PassengerSeat") ~= nil,
+					})
 				end
 			end
+			-- (beside: the nearest is a cart someone drives, its other seat free: sit beside them)
+			local best, beside = DeviceService.pick(options)
 			if best == nil and self.borrow then
 				-- (D30: a fleet ambulance parked here, lent to a doctor: the player vehicle drawn in its place)
 				local lent, why = self.borrow(player, pos.X, pos.Z, REACH)
@@ -272,6 +322,33 @@ function DeviceService.start(opts: Opts): Service
 			end
 			if best == nil then
 				return false, "no vehicle within reach"
+			end
+			if beside then
+				local model = models[best]
+				local v = PlayerVehicles.get(fleet, best) :: any
+				local ok, reason = PlayerVehicles.board(fleet, best, player.UserId)
+				if not ok then
+					return false, reason
+				end
+				if touched[best] then
+					touched[best] = os.clock()
+				end
+				local seat = model:FindFirstChild("PassengerSeat") :: Seat?
+				local humanoid = body:FindFirstChildOfClass("Humanoid")
+				if seat and humanoid then
+					body:PivotTo(seat.CFrame * CFrame.new(0, 2, 0))
+					seat:Sit(humanoid)
+				end
+				-- (the assembly stays its driver's to move: a body welded on does not take it over)
+				local root = model.PrimaryPart :: BasePart
+				local driver = game:GetService("Players"):GetPlayerByUserId(v.driver)
+				if driver then
+					pcall(function()
+						root:SetNetworkOwner(driver)
+					end)
+				end
+				granted:FireClient(player, { device = "passenger", model = model, kind = v.kind })
+				return true, nil
 			end
 			local model = models[best]
 			local root = model.PrimaryPart :: BasePart
@@ -317,6 +394,9 @@ function DeviceService.start(opts: Opts): Service
 			return true, nil
 		end,
 		exitAll = function(s: Service, player: Player)
+			if PlayerVehicles.passengerOf(fleet, player.UserId) then
+				s:interact(player) -- (off the seat beside the driver first)
+			end
 			if PlayerVehicles.vehicleOf(fleet, player.UserId) or flying[player] then
 				s:interact(player)
 			end

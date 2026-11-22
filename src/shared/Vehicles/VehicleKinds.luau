@@ -15,8 +15,10 @@
 -- Every interior has a driver seat, a dash and an `EyeSocket` (first person on entry, brief v2 §14);
 -- offsets are body-local studs (+Z forward in the HTML convention; Placeholder flips at the CFrame).
 -- Until data/vehicles/kinds.json compiles, these module defaults are the source; `fromData` merges it.
+-- The golf cart seats two (owner D30, "i would like for the golf carts to be able to seat two"): `seats` 2, a passenger
+-- beside the driver (Vehicles/PlayerVehicles.board, Server/Actors/DeviceService); every other kind seats its driver only.
 -- Interface: kind(id), list(), mayDrive(kindId, ctx) -> (ok, reason), isFleet(kindId), isShared(kindId),
---   policeIgnore(kindId), stands(kindId), fromData(t)
+--   policeIgnore(kindId), stands(kindId), seats(kindId) -> number, fromData(t)
 -- Pure. No side effects on require.
 
 export type Interior = {
@@ -44,6 +46,7 @@ export type Kind = {
 	fleetMaxSpeed: number?, -- the fleet speed cap for carts
 	shared: boolean?, -- one of the town's shared little vehicles (owner D29): anyone in a person's body, no key
 	stand: boolean?, -- the rider stands (the electric scooter): the hidden seat is a standing body's height over the deck
+	seats: number?, -- people it carries, the driver included (nil: 1); the golf cart 2 (owner D30)
 	wheels: number,
 	color: { number },
 	interior: Interior,
@@ -113,6 +116,7 @@ local KINDS: { [string]: Kind } = {
 		wheelbase = 1.7 * st,
 		access = "anyone",
 		shared = true,
+		seats = 2, -- the driver and one beside them on the bench (owner D30)
 		fleet = false,
 		fleetMaxSpeed = 22,
 		wheels = 4,
@@ -291,6 +295,12 @@ end
 function VehicleKinds.stands(id: string): boolean
 	local k = KINDS[id]
 	return k ~= nil and k.stand == true
+end
+
+-- How many it carries, the driver included: the golf cart two (owner D30), the rest one.
+function VehicleKinds.seats(id: string): number
+	local k = KINDS[id]
+	return if k and type(k.seats) == "number" then math.max(1, k.seats) else 1
 end
 
 -- Who may take the wheel (brief v2 §13a, §15; §1.5 Devices): carts and bikes anyone; pickups and

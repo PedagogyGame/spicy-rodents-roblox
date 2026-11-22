@@ -183,42 +183,45 @@ local function respondersOut(rig: any): number
 end
 
 return function(t)
-	t.test("the fleet: an ambulance kept for a doctor is passed by; borrowed it is out of sight; back in its bay", function()
-		local Data = require("@shared/Data")
-		local data = Data.default()
-		local traffic = TrafficService.new({ lanes = data:lanes(), roads = data:roads(), seed = 3 })
-		t.eq(#traffic:parkedResponders(), 3)
-		local kept = traffic:reserveResponder()
-		t.truthy(kept ~= nil)
-		t.eq(traffic:responderIdle(), 2)
-		local home = traffic:responderHome() :: { number }
-		local sent = {}
-		for _ = 1, 3 do
-			local v = traffic:dispatchResponder({ home[1] + 400, home[2] })
-			if v then
-				table.insert(sent, v)
+	t.test(
+		"the fleet: an ambulance kept for a doctor is passed by; borrowed it is out of sight; back in its bay",
+		function()
+			local Data = require("@shared/Data")
+			local data = Data.default()
+			local traffic = TrafficService.new({ lanes = data:lanes(), roads = data:roads(), seed = 3 })
+			t.eq(#traffic:parkedResponders(), 3)
+			local kept = traffic:reserveResponder()
+			t.truthy(kept ~= nil)
+			t.eq(traffic:responderIdle(), 2)
+			local home = traffic:responderHome() :: { number }
+			local sent = {}
+			for _ = 1, 3 do
+				local v = traffic:dispatchResponder({ home[1] + 400, home[2] })
+				if v then
+					table.insert(sent, v)
+				end
 			end
+			t.eq(#sent, 2, "the kept one is never sent")
+			t.truthy(table.find(sent, kept) == nil)
+			local bay = traffic:bayOf(kept) :: any
+			t.near(kept.x, bay.x, 1e-6)
+			t.truthy(traffic:borrowResponder(kept))
+			t.eq(kept.phase, "borrowed")
+			t.eq(kept.visible, false)
+			t.eq(kept.reserved, nil)
+			t.eq(traffic:borrowResponder(kept), false, "not twice")
+			traffic:step(2)
+			t.eq(kept.phase, "borrowed", "the motor leaves it alone")
+			kept.x, kept.z = 0, 0
+			traffic:returnResponder(kept)
+			t.eq(kept.phase, "idle")
+			t.eq(kept.visible, true)
+			t.near(kept.x, bay.x, 1e-6)
+			t.near(kept.z, bay.z, 1e-6)
+			traffic:unreserve(kept)
+			t.eq(kept.reserved, nil)
 		end
-		t.eq(#sent, 2, "the kept one is never sent")
-		t.truthy(table.find(sent, kept) == nil)
-		local bay = traffic:bayOf(kept) :: any
-		t.near(kept.x, bay.x, 1e-6)
-		t.truthy(traffic:borrowResponder(kept))
-		t.eq(kept.phase, "borrowed")
-		t.eq(kept.visible, false)
-		t.eq(kept.reserved, nil)
-		t.eq(traffic:borrowResponder(kept), false, "not twice")
-		traffic:step(2)
-		t.eq(kept.phase, "borrowed", "the motor leaves it alone")
-		kept.x, kept.z = 0, 0
-		traffic:returnResponder(kept)
-		t.eq(kept.phase, "idle")
-		t.eq(kept.visible, true)
-		t.near(kept.x, bay.x, 1e-6)
-		t.near(kept.z, bay.z, 1e-6)
-		traffic:unreserve(kept)
-		t.eq(kept.reserved, nil)
-	end)
+	)
 
 	t.test(
 		"a full run: the call, an ambulance at E, the drive, loaded beside the patient, in at the doors, cured, paid",

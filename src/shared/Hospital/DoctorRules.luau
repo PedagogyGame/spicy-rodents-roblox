@@ -93,9 +93,10 @@ DoctorRules.WHY = table.freeze({
 	demotedAbandoned = "abandoned a patient",
 }) :: { [string]: string }
 
--- What the reputation in the background hears of a doctor's demotion (owner D30; D30 H4 owns the reputation and
--- decides what this kind is worth: this only names it).
-DoctorRules.REPUTATION = table.freeze({ kind = "ignoredBiteVictim", severity = 1 })
+-- What the reputation in the background hears of a doctor's demotion (owner D30: Shared/Reputation/Reputation.report;
+-- Reputation/Conduct words the kind "you drove past a bite victim who needed you"): severity 2 of 3, an ignored call or
+-- an abandoned patient. The service itself rests a kind a while, so it is never a stream.
+DoctorRules.REPUTATION = table.freeze({ kind = "ignored_victim", severity = 2 })
 
 function DoctorRules.params(): Params
 	local g = Tunables.get

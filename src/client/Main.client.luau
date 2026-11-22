@@ -45,6 +45,7 @@ local GazeView = require("./Render/GazeView")
 local DuelWords = require("./UI/DuelWords")
 local SpeechBubbles = require("./UI/SpeechBubbles")
 local WalletHud = require("./UI/WalletHud")
+local StockOptionsUI = require("./UI/StockOptionsUI")
 local ItemClient = require("./UI/ItemClient")
 local KiteSteer = require("./UI/KiteSteer")
 local ClientWorld = require("./World/ClientWorld")
@@ -91,11 +92,21 @@ end
 Spinners.start()
 
 local pickRemote: RemoteEvent? = nil
-local menu = PlayMenu.start(function(choice: string)
+local stockOptions: StockOptionsUI.UI? = nil -- (the menu's "Stock options": Client/UI/StockOptionsUI, owner D30)
+local menu: PlayMenu.Menu
+menu = PlayMenu.start(function(choice: string)
 	if pickRemote then
 		pickRemote:FireServer(choice)
 	end
-end)
+end, {
+	onOptions = function()
+		if stockOptions then
+			stockOptions.open()
+		else
+			menu.toast("Spicy Stock Options are not ready yet.", 3)
+		end
+	end,
+})
 local hud = Hud.start()
 hud.set("Spicy Rodents: first playable build", "Loading the town…")
 
@@ -131,6 +142,18 @@ if not walletOk then
 	warn(`Client: WalletHud failed: {walletErr}`)
 	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
 end
+-- Spicy Stock Options: the menu's screen and the home computer's (Server/Economy/StockOptions makes the remote)
+task.spawn(function()
+	local remote = (playNet :: Instance):WaitForChild("StockOptions", 30)
+	if remote and remote:IsA("RemoteEvent") then
+		local ok, ui = pcall(StockOptionsUI.start, remote)
+		if ok then
+			stockOptions = ui
+		else
+			warn(`Client: StockOptionsUI failed: {ui}`)
+		end
+	end
+end)
 -- the squirrel's eye over the alley's lanes, or overhead in town, while people below might see it (the server's
 -- RafterService and OverheadService fill it)
 local sneakOk, sneakErr = pcall(SneakMeter.start)

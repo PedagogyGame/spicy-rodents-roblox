@@ -58,8 +58,8 @@ return function(t)
 		t.eq(p.history[#p.history].why, "c30")
 	end)
 
-	t.test("items: 22, all valid, no gambling; the water gun stub", function()
-		t.eq(#ItemRules.CATALOG, 22)
+	t.test("items: 23 (the kick ball since D30), all valid, no gambling; the water gun stub", function()
+		t.eq(#ItemRules.CATALOG, 23)
 		for _, d in ItemRules.CATALOG do
 			t.truthy(ItemRules.validate(d), d.id)
 		end

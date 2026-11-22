@@ -26,7 +26,9 @@
 -- ("ride_end", "ride_left") gives the legs and the usual camera back on the platform. While the Lookout's telescope
 -- is up (Client/Rides/Telescope) E and Q are its keys.
 -- The town's shared little vehicles (owner D29): UI/RideHint shows "E  ride" by a free one within reach (on a touch
--- screen a RIDE button, and GET OFF while riding: the same E).
+-- screen a RIDE button, and GET OFF while riding: the same E). The golf cart seats two (owner D30): DeviceGranted
+-- { device = "passenger", model, kind } sits this body beside its driver: no controller (the driver drives), the legs
+-- and jump off, the camera follows the body (V first person), and E or GET OFF gets off (DeviceReleased "exit").
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
 --   Client.flushInput(), Client.state() -> { species, variant, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing); rideTarget(mode, cabin, seat, view) -> Model?;
@@ -329,6 +331,7 @@ function PossessionClient.start(opts: Opts): Client
 				else ""
 			local title = if device and device.device == "vehicle"
 				then `Driving a {device.kind}`
+				elseif device and device.device == "passenger" then "Riding beside the driver"
 				elseif device then "Flying the police drone"
 				elseif p then (TITLES[ctx.species or ""] or `You are a {p.species}`)
 				else "Watching the town"
@@ -512,7 +515,13 @@ function PossessionClient.start(opts: Opts): Client
 			end
 			local ctx = { world = world, input = input }
 			world.ignore({ m })
-			if info.device == "drone" then
+			if info.device == "passenger" then
+				-- beside the driver (owner D30): the driver drives; this body only sits
+				toast("Riding beside the driver. V first person, E gets off.", 4)
+				fpToggle = false
+				applyCamera()
+				return
+			elseif info.device == "drone" then
 				stopController = Drone.start(m, metrics, ctx)
 				toast("Flying the police drone. WASD fly, Space up, Q down, E lands.", 4)
 			else

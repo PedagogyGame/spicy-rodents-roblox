@@ -1,15 +1,16 @@
 --!strict
--- tools/bake/corner_store/Stock: the corner store's 22 items (Shared/Items/ItemRules.CATALOG) as small plain-part
+-- tools/bake/corner_store/Stock: the corner store's 23 items (Shared/Items/ItemRules.CATALOG) as small plain-part
 -- models, each recognisable at a glance from the aisle: a red frisbee, a brown football with white laces, a
 -- bottle of bubbles with its wand, a box of chalk, a torch, a closed umbrella, a bag of peanuts, a big bag of
 -- bird seed, a box of dog treats, a folded newspaper, a yellow disposable camera, a roll of duct tape, a pink
 -- whoopee cushion, a harmonica, an air horn, a soda bottle, an ice cream bar, a folding lawn chair, a transistor
--- radio, a bike horn, a diamond kite with its tail, and an orange water gun.
+-- radio, a bike horn, a diamond kite with its tail, an orange water gun, and a red kick ball with a cream band
+-- (owner D30; its Ball is the first part, so the thrown copy is the ball itself: Items/ItemWorld).
 -- Every model stands on its origin (the bottom centre) and faces local -D at yaw 0 (Roblox +Z); `yaw` turns it
 -- about Y in Roblox's sense (pi/2 faces local +X). The parts are visual (no collision, no query): the shelf
 -- under them is the solid. The server clones a shelf's "Sample" model as the item a player carries.
 -- Interface: build(kit, parent, itemId, x, y, d, yaw) -> Model; SIZE[itemId] -> { w, h, d } (its rough box);
---   IDS (the 22 ids, in the catalogue's order).
+--   IDS (the 23 ids, in the catalogue's order).
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
 local Kit = require("../alley/Kit")
@@ -39,6 +40,7 @@ Stock.IDS = {
 	"radio",
 	"bike_horn",
 	"kite",
+	"kick_ball",
 }
 
 -- the rough box each one fills (studs: across, up, deep), for laying them out on a shelf
@@ -65,6 +67,7 @@ Stock.SIZE = {
 	radio = { 1.2, 1.1, 0.5 },
 	bike_horn = { 0.5, 0.5, 1.0 },
 	kite = { 2.2, 3.4, 0.2 },
+	kick_ball = { 1.0, 1.0, 1.0 },
 }
 
 local VISUAL = { collide = false, query = false, shadow = false }
@@ -199,6 +202,10 @@ local MODELS: { [string]: { Piece } } = {
 		P("Sail", { 0, 2.2, 0 }, { 1.6, 1.6, 0.05 }, { 230, 50, 50 }, nil, { 0, 0, math.pi / 4 }, "Fabric"),
 		P("Spar", { 0, 2.2, -0.04 }, { 0.05, 2.3, 0.04 }, { 140, 100, 60 }, nil, nil, "Wood"),
 		P("Tail", { 0, 0.6, 0 }, { 0.05, 1.2, 0.03 }, { 250, 220, 50 }),
+	},
+	kick_ball = {
+		P("Ball", { 0, 0.5, 0 }, { 1.0, 1.0, 1.0 }, { 200, 48, 40 }, "Ball", nil, "SmoothPlastic"),
+		P("Band", { 0, 0.5, 0 }, { 0.08, 1.02, 1.02 }, { 245, 232, 200 }, "Cylinder", nil, "SmoothPlastic"),
 	},
 }
 
