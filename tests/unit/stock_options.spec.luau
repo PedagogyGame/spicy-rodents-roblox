@@ -86,8 +86,7 @@ local function server(
 		end,
 		tell = function(_p: any, _w: string) end,
 		loaded = function(player: any, data: any): boolean
-			sv.stock.loaded(player, data)
-			return false
+			return sv.stock.loaded(player, data) -- (as Boot/Game chains it)
 		end,
 		log = function(_line: string) end,
 		warn = function(_line: string) end,
@@ -135,6 +134,7 @@ local function server(
 		end,
 		now = now,
 		sleep = sleep,
+		jobId = jobId,
 		warn = function(_l: string) end,
 	})
 	return sv
@@ -423,7 +423,12 @@ return function(t)
 		c.os += 1
 		local ok, words = a.stock.withdraw(ann, 30)
 		t.truthy(ok, words)
-		t.deepEq(storeAtPay, { held = 170, bought = 200, withdrawn = 30 }, "saved before the money moved")
+		t.deepEq(
+			storeAtPay,
+			{ held = 170, bought = 200, withdrawn = 0, pending = { ["A:1"] = 30 } },
+			"taken off and saved as pending before the money moved"
+		)
+		t.deepEq(a.saves:profileOf(20).data.options, { held = 170, bought = 200, withdrawn = 30 }, "paid: settled")
 		t.eq(a.wallet.balance(ann), 300 + 3000)
 		t.eq(a.stock.withdrawnHere(ann), 30)
 		t.eq(a.attrs[20].StockOptions, 170)
@@ -436,7 +441,12 @@ return function(t)
 		local no, why = a.stock.withdraw(ann, 80)
 		t.falsy(no)
 		t.eq(why, string.format(StockOptions.WORDS.tooMany, 70))
+		local soon, wait = a.stock.withdraw(ann, 70)
+		t.falsy(soon, "one withdrawal per WITHDRAW_GAP")
+		t.eq(wait, StockOptions.WORDS.wait)
+		c.os += StockOptions.WITHDRAW_GAP
 		t.truthy((a.stock.withdraw(ann, 70)))
+		c.os += StockOptions.WITHDRAW_GAP
 		local none, full = a.stock.withdraw(ann, 1)
 		t.falsy(none)
 		t.eq(full, StockOptions.WORDS.capReached)
@@ -447,11 +457,16 @@ return function(t)
 		t.eq(a.stock.withdrawnHere(ann), 100)
 		-- another server: a fresh S$100
 		depart(a, ann)
+		t.deepEq(saved(store, 20), { held = 100, bought = 200, withdrawn = 100 }, "the release wrote it settled")
 		local b = server(store, "B", c, now, sleep)
 		arrive(b, ann)
 		t.eq(b.attrs[20].StockOptions, 100)
 		t.truthy((b.stock.withdraw(ann, 100)))
-		t.deepEq(saved(store, 20), { held = 0, bought = 200, withdrawn = 200 })
+		t.deepEq(saved(store, 20), { held = 0, bought = 200, withdrawn = 100, pending = { ["B:1"] = 100 } })
+		c.t += 10
+		b.saves:step(now())
+		t.deepEq(saved(store, 20), { held = 0, bought = 200, withdrawn = 200 }, "the settled entry is saved")
+		c.os += StockOptions.WITHDRAW_GAP
 		local empty, have = b.stock.withdraw(ann, 1)
 		t.falsy(empty)
 		t.truthy(have == StockOptions.WORDS.capReached or string.find(have, "0 options", 1, true) ~= nil)
@@ -514,7 +529,7 @@ return function(t)
 		store:fail("error", 2)
 		local ok, words = a.stock.withdraw(ann, 10)
 		t.falsy(ok)
-		t.eq(words, StockOptions.WORDS.slow)
+		t.eq(words, StockOptions.WORDS.notSaved)
 		t.eq(a.wallet.balance(ann), 300, "no money")
 		t.eq(a.stock.withdrawnHere(ann), 0, "nothing counted")
 		local p = a.saves:profileOf(23)
@@ -524,7 +539,7 @@ return function(t)
 		a.wallet.add = function(_p: any, _c: number, _w: string): (boolean, string)
 			return false, "You have no wallet yet."
 		end
-		c.os += 1
+		c.os += StockOptions.WITHDRAW_GAP
 		local ok2, words2 = a.stock.withdraw(ann, 10)
 		t.falsy(ok2)
 		t.eq(words2, StockOptions.WORDS.walletRefused)
@@ -537,7 +552,7 @@ return function(t)
 		a.wallet.add = function(_p: any, _c: number, _w: string): (boolean, string)
 			error("boom")
 		end
-		c.os += 1
+		c.os += StockOptions.WITHDRAW_GAP
 		t.falsy((a.stock.withdraw(ann, 10)))
 		t.deepEq(p.data.options, { held = 20, bought = 20, withdrawn = 0 })
 	end)
@@ -567,7 +582,8 @@ return function(t)
 		t.truthy(second, "the second came while the first was saving")
 		t.falsy(second[1])
 		t.eq(second[2], StockOptions.WORDS.busy)
-		t.deepEq(saved(store, 24), { held = 15, bought = 20, withdrawn = 5 })
+		t.deepEq(saved(store, 24), { held = 15, bought = 20, withdrawn = 0, pending = { ["A:1"] = 5 } })
+		t.deepEq(sv.saves:profileOf(24).data.options, { held = 15, bought = 20, withdrawn = 5 })
 		t.eq(sv.wallet.balance(ann), 300 + 500)
 	end)
 

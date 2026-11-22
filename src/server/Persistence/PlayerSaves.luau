@@ -9,9 +9,14 @@
 -- MONEY AND RECEIPTS: when they are saved, they go into the profile this module holds (data(player), dirty), never
 -- through Persistence/Profiles.new or Economy/Receipts' own ProfileStore: those would take a second session lock
 -- on the same key from the same server, and the two would lock each other out. Real money (Economy/StockOptions:
--- a Robux receipt, a withdrawal) does not wait for step(): saveNow(player) puts one write in that player's queue at
--- once (whatever the bucket holds: it may run into debt, which later saves pay back) and yields until it is done,
--- for at most SAVE_NOW_WAIT seconds; true only when a write holding every change made before the call has landed.
+-- a Robux receipt, a withdrawal) does not wait for step(): saveNow(player, opts?) puts one write in that player's
+-- queue at once and yields until it is done, for at most SAVE_NOW_WAIT seconds; true only when a write holding every
+-- change made before the call has landed. It takes a token from the bucket: a withdrawal only takes one that is
+-- there (else (false, "budget") at once, nothing queued); a receipt (opts.receipt: Robux already paid) may take the
+-- bucket down to -DEBT and waits (within SAVE_NOW_WAIT) for it to refill past that, so real money can never starve
+-- the autosaves for long. (false, "slow") means the write is still queued or running and may yet land:
+-- opts.settle(ok, why) is then called from the player's queue once it is done (before any later job of theirs,
+-- their leave's release included), so a caller that must not guess (Economy/StockOptions' withdrawal) can wait.
 -- A player's session is in one of these states (status(player); Boot/Game shows it as the player attribute
 -- ClothesSaved):
 --   loading   the profile is on its way (play goes on meanwhile; nothing waits on it)
@@ -46,9 +51,9 @@
 -- data), and the store is told it is closing (one retry per call, no lock waits): the releases fit in CLOSE_SECONDS.
 -- Interface: new(deps) -> Saves; Saves:join(player); Saves:leave(player); Saves:dirty(player, purchase?);
 --   Saves:data(player) -> ProfileSchema.Data? (only while `saved`); Saves:profileOf(userId) -> Profile? (the same,
---   by UserId: Economy/Receipts); Saves:saveNow(player) -> (ok, err?) (yields); Saves:status(player) -> State?;
+--   by UserId: Economy/Receipts); Saves:saveNow(player, opts?) -> (ok, err?) (yields; opts { receipt?, settle? }); Saves:status(player) -> State?;
 --   Saves:step(now); Saves:closeAll(timeoutSeconds?) (yields until every release is done or the time is up);
---   Saves:busy() -> boolean; STORE; WORDS; WRITE_GAP; BUDGET_SHARE; BURST; budgetPerMinute(players) (pure);
+--   Saves:busy() -> boolean; STORE; WORDS; WRITE_GAP; BUDGET_SHARE; BURST; DEBT; budgetPerMinute(players) (pure);
 --   offError(err) -> boolean (pure)
 -- No engine but what deps hands in; no side effects on require.
 
@@ -102,6 +107,13 @@ type Session = {
 
 type Queue = { jobs: { () -> () }, running: boolean }
 
+-- saveNow's options: `receipt` (a Robux purchase: may go into the bucket's bounded debt); `settle(ok, why)`, called
+-- once a write that saveNow gave up waiting for ("slow") is done
+export type SaveNowOpts = {
+	receipt: boolean?,
+	settle: ((ok: boolean, why: string?) -> ())?,
+}
+
 export type Saves = {
 	deps: Deps,
 	profiles: ProfileStore.Store?,
@@ -115,7 +127,7 @@ export type Saves = {
 	dirty: (self: Saves, player: any, purchase: boolean?) -> (),
 	data: (self: Saves, player: any) -> ProfileSchema.Data?,
 	profileOf: (self: Saves, userId: number) -> ProfileStore.Profile?,
-	saveNow: (self: Saves, player: any) -> (boolean, string?),
+	saveNow: (self: Saves, player: any, opts: SaveNowOpts?) -> (boolean, string?),
 	status: (self: Saves, player: any) -> State?,
 	step: (self: Saves, now: number) -> (),
 	closeAll: (self: Saves, timeoutSeconds: number?) -> (),
@@ -133,6 +145,7 @@ PlayerSaves.WRITE_GAP = 6 -- seconds: at most one write of a player's profile th
 PlayerSaves.BUDGET_SHARE = 0.5 -- of the server's UpdateAsync allowance, for saves (loads and releases: the rest)
 PlayerSaves.BURST = 10 -- saves the bucket can hold in hand
 PlayerSaves.SAVE_NOW_WAIT = 20 -- seconds saveNow waits for its write before it answers (false, "slow")
+PlayerSaves.DEBT = 5 -- tokens a receipt's saveNow may take the bucket below zero (nothing else goes into debt)
 
 PlayerSaves.WORDS = table.freeze({
 	unsaved = "Your saved clothes have not loaded yet. Play on: we keep trying, and nothing you buy is lost.",
@@ -541,7 +554,7 @@ function PlayerSaves.new(deps: Deps): Saves
 	end
 
 	-- one write now, in the player's queue, and wait for it: true once every change made before the call is durable
-	function self.saveNow(me: Saves, player: any): (boolean, string?)
+	function self.saveNow(me: Saves, player: any, opts: SaveNowOpts?): (boolean, string?)
 		local s = me.sessions[keyOf(player)]
 		if s == nil or s.state ~= "saved" or s.profile == nil then
 			return false, if s then s.state else "absent"
@@ -549,13 +562,29 @@ function PlayerSaves.new(deps: Deps): Saves
 		if me.closing then
 			return false, "closing"
 		end
+		local receipt = opts ~= nil and opts.receipt == true
+		local settle = if opts then opts.settle else nil
+		-- a token: a withdrawal takes one that is there; a receipt may run the bucket down to -DEBT, and waits for
+		-- it to refill past that
+		local floor = if receipt then -PlayerSaves.DEBT else 0
+		local waited = 0
+		refill(me, me.deps.now())
+		while me.tokens - 1 < floor do
+			if not receipt or waited >= PlayerSaves.SAVE_NOW_WAIT then
+				return false, "budget"
+			end
+			me.deps.sleep(0.5)
+			waited += 0.5
+			refill(me, me.deps.now())
+			if s.left or me.closing or s.state ~= "saved" or s.profile == nil then
+				return false, if me.closing then "closing" else s.state
+			end
+		end
+		me.tokens -= 1
 		local p = s.profile :: ProfileStore.Profile
 		local want = p:markDirty()
-		local now = me.deps.now()
-		refill(me, now)
-		me.tokens -= 1 -- (real money is not made to wait: the bucket may go into debt)
-		s.lastWriteAt = now
-		local done, ok, why = false, false, nil :: string?
+		s.lastWriteAt = me.deps.now()
+		local done, ok, why, gaveUp = false, false, nil :: string?, false
 		enqueue(me, s.id, function()
 			if p.savedRevision < want then
 				if s.state == "saved" and s.profile == p and p:isActive() then
@@ -574,13 +603,23 @@ function PlayerSaves.new(deps: Deps): Saves
 			end
 			ok = p.savedRevision >= want
 			done = true
+			if gaveUp and settle then
+				local late = if ok then nil else why or "failed"
+				local called, err = pcall(function()
+					settle(ok, late)
+				end)
+				if not called then
+					shout(me, `{s.id}: settling a slow save failed: {err}`)
+				end
+			end
 		end)
-		local waited = 0
+		waited = 0
 		while not done and waited < PlayerSaves.SAVE_NOW_WAIT do
 			me.deps.sleep(0.1)
 			waited += 0.1
 		end
 		if not done then
+			gaveUp = true
 			return false, "slow"
 		end
 		return ok, if ok then nil else why or "failed"

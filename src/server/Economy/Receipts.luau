@@ -15,7 +15,11 @@
 -- ReceiptLedger.grantOptions), and the durable write is deps.save's (default profile:save(); live, PlayerSaves'
 -- saveNow, which goes through that player's one queue of DataStore calls). deps.enabled false (the Flags switch)
 -- answers NotProcessedYet to everything: Roblox keeps the receipt and offers it again later.
--- Interface: new(deps) -> Handler; handler:process(receiptInfo) -> Decision; handler.stats
+-- A credit not yet known durable is remembered by PurchaseId with the Profile OBJECT that holds it and its revision:
+-- a later offer to another Profile object (a rejoin, on this server or another) finds the ledger entry in a profile
+-- loaded from the store, so it is durable and granted, never held back by an older object's revision.
+-- Interface: new(deps) -> Handler; handler:process(receiptInfo) -> Decision; handler:forget(playerId) (the player
+--   left: their remembered credits go; their profile object is gone with them); handler.stats
 
 local Import = require("../Import")
 local Products = Import.shared("Economy/Products") :: typeof(require("../../shared/Economy/Products"))
@@ -45,11 +49,14 @@ export type Stats = {
 	unknownProduct: number,
 	saveFailed: number,
 }
+-- a credit in memory, not yet known durable: the Profile object that holds it and the revision that does
+export type Pending = { profile: ProfileStore.Profile, rev: number, playerId: number }
 export type Handler = {
 	deps: Deps,
-	pending: { [string]: number }, -- PurchaseId -> profile revision that holds the credit, until durable
+	pending: { [string]: Pending }, -- PurchaseId -> where the credit is, until it is durable
 	stats: Stats,
 	process: (self: Handler, receipt: ReceiptLedger.Receipt) -> Decision,
+	forget: (self: Handler, playerId: number) -> (),
 }
 
 local Receipts = {}
@@ -84,16 +91,22 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 		return "NotProcessedYet"
 	end
 	local id = receipt.PurchaseId
-	local key = `{profile.session}/{id}`
+	local entry: Pending? = self.pending[id]
+	if entry and entry.profile ~= profile then
+		-- another Profile object (a rejoin): what it holds was loaded from the store, so the older entry is moot
+		self.pending[id] = nil
+		entry = nil
+	end
+	local want: number
 	if ReceiptLedger.has(profile.data, id) then
-		local rev = self.pending[key]
-		if rev == nil or profile.savedRevision >= rev then
+		if entry == nil or profile.savedRevision >= entry.rev then
 			-- already durable: a redelivery or a retry after an answer that was lost
-			self.pending[key] = nil
+			self.pending[id] = nil
 			stats.duplicates += 1
 			stats.granted += 1
 			return "PurchaseGranted"
 		end
+		want = entry.rev
 	else
 		local grant: (any, ReceiptLedger.Receipt, number, number) -> (boolean, string?) = self.deps.grant
 			or ReceiptLedger.grant
@@ -102,17 +115,26 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 			stats.saveFailed += 1
 			return "NotProcessedYet"
 		end
-		self.pending[key] = profile:markDirty()
+		want = profile:markDirty()
+		self.pending[id] = { profile = profile, rev = want, playerId = receipt.PlayerId }
 		stats.credited += 1
 	end
 	local saved = save(self, profile, receipt.PlayerId)
-	if saved and profile.savedRevision >= (self.pending[key] or 0) then
-		self.pending[key] = nil
+	if saved and profile.savedRevision >= want then
+		self.pending[id] = nil
 		stats.granted += 1
 		return "PurchaseGranted"
 	end
 	stats.saveFailed += 1
 	return "NotProcessedYet"
+end
+
+local function forget(self: Handler, playerId: number)
+	for id, entry in self.pending do
+		if entry.playerId == playerId then
+			self.pending[id] = nil
+		end
+	end
 end
 
 function Receipts.new(deps: Deps): Handler
@@ -121,6 +143,7 @@ function Receipts.new(deps: Deps): Handler
 		pending = {},
 		stats = { off = 0, granted = 0, credited = 0, duplicates = 0, notReady = 0, unknownProduct = 0, saveFailed = 0 },
 		process = process,
+		forget = forget,
 	}
 end
 
