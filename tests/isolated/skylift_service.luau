@@ -897,19 +897,38 @@ return function(t)
 		return made
 	end
 
-	t.test("the Lookout lives: a host at the counter, townspeople ride up, dine at a table and ride home", function()
-		-- review: "six empty red boxes going round and a lit, furnished restaurant with nobody in it"
+	t.test("the Lookout lives: a host on his round, townspeople ride up, walk to a table, dine, ride home", function()
+		-- review: "six empty red boxes going round and a lit, furnished restaurant with nobody in it"; owner D30:
+		-- "the npcs at the top of the skylift dont move!"
 		FakeEngine.with(function()
 			local w = world({ start = 0 })
 			local made = lively(w, 12)
 			local sawRiding, sawDining, most = false, false, 0
 			local dinerChecked = false
+			local sawWalking = false -- a visitor walking at the top (not seated, not in a cabin)
+			local hostMin, hostMax = math.huge, -math.huge -- the host's spread along the venue's X
+			local hostSpots: { [string]: boolean } = {}
 			local P = SkyLift.period()
+			local place = w.svc.lookout
 			for _ = 1, math.ceil((P * 3 + SkyLiftService.DINE_MIN) / 0.5) do
 				SkyLiftFlow.step(w, 0.5, 0.5)
 				local c = w.svc:counts()
 				most = math.max(most, c.outings)
 				t.truthy(c.outings <= SkyLiftService.OUTING_MAX, `{c.outings} away at once`)
+				local host = w.svc.host
+				if host then
+					local hp = host.body:GetPivot().Position
+					local X, _, D = AlleyLayout.toLocal(place, hp.X, hp.Y, hp.Z)
+					hostMin, hostMax = math.min(hostMin, X), math.max(hostMax, X)
+					hostSpots[`{math.floor(X / 4)},{math.floor(D / 4)}`] = true
+					t.truthy(X > -20 and X < 49 and D > -46 and D < 15, `the host at {X}, {D}: off his floor`)
+				end
+				for _, d in w.svc.diners do
+					local rec = w.holds[d.body]
+					if not d.seated and rec and rec.speed > 0 then
+						sawWalking = true
+					end
+				end
 				for _, body in made do
 					local r = body:GetAttribute("Ride")
 					if r == "dine" then
@@ -930,13 +949,16 @@ return function(t)
 					end
 				end
 			end
-			t.eq(w.svc:counts().host, 1, "nobody at the counter")
-			local host = w.svc.host
-			local hp = host.body:GetPivot().Position
-			t.truthy(
-				(Vector3.new(hp.X, 0, hp.Z) - Vector3.new(w.svc.hostSpot.x, 0, w.svc.hostSpot.z)).Magnitude < 0.05,
-				"the host is not at the counter"
-			)
+			t.eq(w.svc:counts().host, 1, "no host")
+			-- the host walks his round: from the terrace's west tables to the counter, through many places
+			t.truthy(hostMax - hostMin > 30, `the host kept to {hostMin}..{hostMax} along the room`)
+			local spots = 0
+			for _ in hostSpots do
+				spots += 1
+			end
+			t.truthy(spots >= 15, `the host was seen in only {spots} places`)
+			t.truthy(w.holds[w.svc.host.body].walked > 50, "the host never walked")
+			t.truthy(sawWalking, "no visitor ever walked at the Lookout")
 			t.truthy(sawRiding, "no townsperson ever rode the lift")
 			t.truthy(sawDining, "no townsperson ever sat at a Lookout table")
 			t.truthy(most >= 2, `at most {most} away at once`)

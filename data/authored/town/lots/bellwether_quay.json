@@ -219,14 +219,14 @@
         "peakU": 17.75,
         "ridge": "z",
         "roof": "gable",
-        "sign": "FERRY & FINCH"
+        "sign": "BANK"
       },
       "routes": {
         "source": "harvest"
       },
       "seat": "absolute:8",
       "src": "v5.4 L14035",
-      "style": "Tudor half-timbered townhouse, sign 'FERRY & FINCH'",
+      "style": "Tudor half-timbered townhouse, sign 'BANK' (owner D30: one of the town's three banks; Shared/Work/Banks)",
       "v54": {
         "facing": "+X"
       }
@@ -399,14 +399,14 @@
         "peakU": 15.25,
         "ridge": "z",
         "roof": "gable",
-        "sign": "THE COBBLER"
+        "sign": "BANK"
       },
       "routes": {
         "source": "harvest"
       },
       "seat": "absolute:8",
       "src": "v5.4 L14035",
-      "style": "Tudor half-timbered townhouse, sign 'THE COBBLER'",
+      "style": "Tudor half-timbered townhouse, sign 'BANK' (owner D30: one of the town's three banks; Shared/Work/Banks)",
       "v54": {
         "facing": "+X"
       }
@@ -849,14 +849,14 @@
         "peakU": 15.2,
         "ridge": "x",
         "roof": "gable",
-        "sign": "THE COBBLER"
+        "sign": "BANK"
       },
       "routes": {
         "source": "harvest"
       },
       "seat": "absolute:8",
       "src": "v5.4 L14041",
-      "style": "Tudor half-timbered townhouse, sign 'THE COBBLER'",
+      "style": "Tudor half-timbered townhouse, sign 'BANK' (owner D30: one of the town's three banks; Shared/Work/Banks)",
       "v54": {
         "facing": "-Z"
       }

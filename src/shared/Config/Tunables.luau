@@ -210,6 +210,17 @@ Tunables.tree = {
 	            pocketMoneyCents = { v = 300, unit = "Spicy cents", src = "plan default until jobs pay: a player is given S$3.00 once per server, on first joining (every corner-store item once is 204c)" },
 	            paintballPassCents = { v = 20 }, paintballPassDays = { v = 5, unit = "game days", src = "Q2" }, garbSetCents = { v = 100 },
 	            fashionUnlockLifetimeCents = { v = 150, src = "v5.4's 150 lifetime coins gate the fashion stand (rev 4, CR3 VD-3)" } },
+	-- the town's work (owner D30): the bank errands and their pay, and the penalty for an errand's parcel kept or for
+	-- an ambulance driver who ignores a bite victim (Shared/Work/Errands, Shared/Work/PenaltyRules, Server/Work)
+	work = { penaltyCents = { v = 10000, unit = "Spicy cents", src = "owner D30: \"get penalized by losing 100 spicy bucks\" (S$100.00; the wallet never goes below nothing)" },
+	         errandBaseCents = { v = 4, unit = "Spicy cents", src = "D30 lead: an errand pays a little more than a few in-game hours at the minimum wage" },
+	         errandCentsPer100 = { v = 1, unit = "Spicy cents per 100 st", src = "D30: pay scales with the distance from the bank" },
+	         errandMaxCents = { v = 30, unit = "Spicy cents" },
+	         errandPace = { v = 5, unit = "st/s", src = "D30 lead: the time limit is the distance at an easy walk (people walk about 7-8, sprint 13+), plus the slack" },
+	         errandSlackSecs = { v = 120, unit = "s" },
+	         errandCloseStuds = { v = 45, unit = "st", src = "D30: only a gentle \"you're close\" within a short distance" },
+	         errandDropStuds = { v = 9, unit = "st", src = "how near the named door or person a parcel is handed over" },
+	         errandHomeSecs = { v = 20, unit = "s", src = "D30: a parcel taken into your own home and kept there this long is kept (stolen)" } },
 	reputation = { votesPerDay = { v = { up = 5, down = 5 }, unit = "per game day", src = "v2 §13a (Q2)" }, voteWeightClamp = { v = { 0.25, 1.5 } },
 	               cafeTickPerHour = { v = 1 }, rankGateDays = { v = "Ladder.params", src = "ladder number; not here" } },
 	paintball = { projectileSpeed = { v = 150, unit = "st/s", src = "paintball review 2026-11-13 (Contract.FEEL)" }, drop = { v = 19.6 }, magazine = { v = 5 }, lagHistorySecs = { v = 1.0 },

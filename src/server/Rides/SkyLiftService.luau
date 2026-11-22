@@ -29,6 +29,14 @@
 --     that clears itself after LUNCH_SECS; one per player). Until the wallet lands it is free, with the line
 --     "On the house today". THE ONE CHARGE GOES HERE when it does: Town.charge (see `counter`), LUNCH_CENTS = 10
 --     under the name "hilltop_lunch" (an EconomyRules.PRICES entry of the same name).
+-- The Lookout's people move (owner D30: "the npcs at the top of the skylift dont move!"): the town's brains cannot
+--   walk up there (World/WalkWay keeps every walker out of the Lookout), so this service walks the bodies it holds
+--   along the Lookout's own way on foot (Shared/Rides/LookoutLife): the host walks a round (the lectern, a table,
+--   the counter, the terrace's tables) and every townsperson on an outing walks off the arrival platform, through
+--   the hall door to a free aisle-side chair (sits there DINE_MIN..DINE_MAX seconds) or, every STROLL_EVERY-th one,
+--   to the telescope and the rail's views; then to the queue behind the boarding gate, where it takes a cabin down
+--   when nobody is by the gate. Hold.place carries the walking speed and the stop's act, so the body walks (its
+--   MoveState and Speed attributes) and stands at its work like the town's own staff.
 -- Sounds: Shared/Rides/SkyLiftSounds (licensed library sounds, nothing uploaded or synthesised): the three cues
 --   here (CUES) on their posts, and the Lookout's three loops (the fire, the dining room, the terrace) on posts of
 --   their own in Workspace.SkyLift, playing for good and heard only near (RollOffMaxDistance).
@@ -57,6 +65,7 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local SkyLift = Import.shared("Rides/SkyLift") :: typeof(require("../../shared/Rides/SkyLift"))
 local SkyLiftSounds = Import.shared("Rides/SkyLiftSounds") :: typeof(require("../../shared/Rides/SkyLiftSounds"))
+local LookoutLife = Import.shared("Rides/LookoutLife") :: typeof(require("../../shared/Rides/LookoutLife"))
 local BodyPin = require("../Movement/BodyPin")
 
 local SkyLiftService = {}
@@ -89,6 +98,7 @@ SkyLiftService.OUTING_GAP = 45 -- seconds between new outings
 SkyLiftService.OUTING_GROUP = 2 -- at most this many go up together
 SkyLiftService.DINE_MIN = 150 -- seconds at a Lookout table
 SkyLiftService.DINE_MAX = 300
+SkyLiftService.STROLL_EVERY = 3 -- every third visitor does not sit down: the telescope and the views, then home
 SkyLiftService.HOST_AFTER = 20 -- seconds after the start before the host is fetched to the counter
 SkyLiftService.ORPHAN_LAPS = 3 -- a left-behind body rides at most this many more legs before it is let off
 SkyLiftService.TELESCOPE_REACH = 1300 -- studs out along the telescope's line: where the streaming focus goes
@@ -147,8 +157,9 @@ SkyLiftService.CUES = table.freeze({
 
 -- What the service asks of the rest of the game. gameTown builds it from Boot/Game's objects; specs pass stubs.
 export type Hold = {
-	-- put the held body's pivot here (x, y, z; Roblox yaw: CFrame.Angles(0, yaw, 0))
-	place: (x: number, y: number, z: number, yaw: number) -> (),
+	-- put the held body's pivot here (x, y, z; Roblox yaw: CFrame.Angles(0, yaw, 0)), walking at `speed` studs a
+	-- second (nil: standing) and at work at `task` (the body's Task attribute; nil: none)
+	place: (x: number, y: number, z: number, yaw: number, speed: number?, task: string?) -> (),
 	-- stand it on the floor at (x, y, z) facing yaw and give it back to its brain
 	free: (x: number, y: number, z: number, yaw: number) -> (),
 }
@@ -229,7 +240,16 @@ type Ride = {
 	placedT: number?, -- the lift clock at its last placing
 	laps: number?, -- legs a left-behind body has ridden on, waiting to be let off out of sight
 }
-type Diner = { body: any, hold: Hold, chair: number, untilT: number }
+-- a townsperson on an outing at the Lookout: walking its plan (LookoutLife.plan), seated at `chair` (an index in
+-- self.chairs) while the plan holds the chair, waiting for a cabin down at its end
+type Diner = {
+	body: any,
+	hold: Hold,
+	chair: number?,
+	walker: any, -- LookoutLife.Walker (exported types do not cross the Import shim)
+	offset: number,
+	seated: boolean,
+}
 type Gate = {
 	station: string,
 	post: any,
@@ -372,7 +392,9 @@ function SkyLiftService.new(opts: Opts): any
 	self.outingCount = 0 -- bodies away on outings (riding or dining)
 	self.lastOuting = -math.huge
 	self.started = self.now()
-	self.host = nil :: { body: any, hold: Hold }?
+	self.host = nil :: { body: any, hold: Hold, walker: any, offset: number }?
+	self.visits = 0 -- outings that have reached the top (every STROLL_EVERY-th strolls)
+	self.lifeAt = nil :: number? -- the server time of the last _life step (the walkers' dt)
 	self.rand = opts.rand or math.random
 	self.conns = {} :: { any }
 	self.stopped = false
@@ -1040,11 +1062,10 @@ function SkyLiftService._alight(self: any, ride: Ride)
 	pcall(function()
 		ride.body:SetAttribute("Ride", nil)
 	end)
-	if ride.hold and ride.outing and ride.other == "summit" and self:_dine(ride) then
-		-- (an outing at the top: seated at a Lookout table; _dine took it off the ride)
-		pcall(function()
-			ride.body:SetAttribute("Ride", "dine")
-		end)
+	if ride.hold and ride.outing and ride.other == "summit" and self:_visit(ride, x, y, z) then
+		-- (an outing at the top: it walks off the platform to a table or the view; _visit took it off the ride.
+		-- Its Ride attribute is "dine" while it sits at a table, nil while it walks)
+		self:_walkVisitor(self.diners[#self.diners], 0)
 	elseif ride.hold then
 		local free = ride.hold.free
 		local fx, fy, fz, fyaw = x, y, z, yaw
@@ -1330,29 +1351,92 @@ function SkyLiftService._seatHeld(self: any, body: any, hold: Hold, station: str
 	return ride
 end
 
--- An outing arrives at the top: seated at a free Lookout chair (nobody standing on it) for a few minutes.
-function SkyLiftService._dine(self: any, ride: Ride): boolean
-	local taken: { [number]: boolean } = {}
-	for _, d in self.diners :: { Diner } do
-		taken[d.chair] = true
-	end
-	local n = #self.chairs
-	if n == 0 or ride.hold == nil then
+-- An outing arrives at the top (its body standing at (x, y, z) on the arrival platform): it walks to a free chair
+-- (a table's aisle-side chair, nobody else's and nobody on it) and sits there a few minutes, or, every
+-- STROLL_EVERY-th visitor and whenever every chair is taken, strolls to the telescope and the views; then it walks
+-- to the queue behind the boarding gate (Shared/Rides/LookoutLife.plan).
+function SkyLiftService._visit(self: any, ride: Ride, x: number, y: number, z: number): boolean
+	if ride.hold == nil then
 		return false
 	end
-	local start = math.floor(self.rand() * n)
-	for k = 0, n - 1 do
-		local i = (start + k) % n + 1
-		local c = self.chairs[i]
-		if not taken[i] and not self:_seen(Vector3.new(c.x, c.y, c.z), 2) then
-			local hold = ride.hold :: Hold
-			hold.place(c.x, c.y + SkyLiftService.ROOT_ABOVE_SEAT, c.z, c.yaw)
-			local secs = SkyLiftService.DINE_MIN + (SkyLiftService.DINE_MAX - SkyLiftService.DINE_MIN) * self.rand()
-			table.insert(self.diners, { body = ride.body, hold = hold, chair = i, untilT = self.now() + secs })
-			return true
+	local hold = ride.hold :: Hold
+	local taken: { [number]: boolean } = {}
+	for _, d in self.diners :: { Diner } do
+		if d.chair then
+			taken[d.chair] = true
 		end
 	end
-	return false
+	self.visits += 1
+	local chair: number?, tableId: string?, side: string? = nil, nil, nil
+	if self.visits % SkyLiftService.STROLL_EVERY ~= 0 then
+		-- self.chairs holds four per table in TABLES order: -X, +X, then -D ("front") and +D ("back")
+		local n = #TABLES * 2
+		local start = math.floor(self.rand() * n)
+		for k = 0, n - 1 do
+			local j = (start + k) % n
+			local ti = j // 2 + 1
+			local s = if j % 2 == 0 then "front" else "back"
+			local i = (ti - 1) * 4 + (if s == "front" then 3 else 4)
+			local c = self.chairs[i]
+			if c and not taken[i] and not self:_seen(Vector3.new(c.x, c.y, c.z), 2) then
+				chair, tableId, side = i, TABLES[ti], s
+				break
+			end
+		end
+	end
+	local secs = SkyLiftService.DINE_MIN + (SkyLiftService.DINE_MAX - SkyLiftService.DINE_MIN) * self.rand()
+	local points = LookoutLife.plan(self.lookout, {
+		from = { x, y, z },
+		tableId = tableId,
+		side = side,
+		dine = secs,
+		strollFrom = 1 + self.visits % #LookoutLife.STROLL,
+	})
+	local town = self.town :: Town
+	local offset = 3
+	if town.standOffset then
+		local ok, o = pcall(town.standOffset, ride.body)
+		if ok and type(o) == "number" then
+			offset = o
+		end
+	end
+	table.insert(self.diners, {
+		body = ride.body,
+		hold = hold,
+		chair = chair,
+		walker = LookoutLife.walker(points, LookoutLife.VISITOR_SPEED),
+		offset = offset,
+		seated = false,
+	})
+	return true
+end
+
+-- One visitor on by dt seconds: walking (its speed and the stop's act on the body), or seated on its chair (the
+-- seated root height over the seat, Ride = "dine"). Returns true once it stands in the queue for a cabin down.
+function SkyLiftService._walkVisitor(self: any, d: Diner, dt: number): boolean
+	local x, y, z, yaw, speed, act, at = LookoutLife.advance(d.walker, dt)
+	local sitting = at ~= nil and at.sit == true and d.chair ~= nil
+	if sitting and not d.seated then
+		local c = self.chairs[d.chair :: number]
+		if self:_seen(Vector3.new(c.x, c.y, c.z), 2) then
+			-- (a player is sitting there: it does not sit on them, it walks on)
+			sitting = false
+			(at :: any).hold = 0
+		end
+	end
+	if sitting then
+		local c = self.chairs[d.chair :: number]
+		d.hold.place(c.x, c.y + SkyLiftService.ROOT_ABOVE_SEAT, c.z, c.yaw, 0, nil)
+	else
+		d.hold.place(x, y + d.offset, z, yaw, speed, if act == "dine" then nil else act)
+	end
+	if sitting ~= d.seated then
+		d.seated = sitting
+		pcall(function()
+			d.body:SetAttribute("Ride", if sitting then "dine" else nil)
+		end)
+	end
+	return d.walker.done
 end
 
 -- A left-behind body arriving where a player can see the platform: it stays in its seat for the way back (the
@@ -1390,7 +1474,9 @@ function SkyLiftService._life(self: any, t: number)
 		return
 	end
 	local now = self.now()
-	-- the host, fetched once, out of sight, to stand by the counter
+	local dt = math.clamp(now - (self.lifeAt or now), 0, 0.5)
+	self.lifeAt = now
+	-- the host, fetched once, out of sight, to the lectern; then on the round (LookoutLife.HOST)
 	local hs = self.hostSpot
 	if self.host == nil and now - self.started >= SkyLiftService.HOST_AFTER then
 		if not self:_seen(Vector3.new(hs.x, hs.y, hs.z)) then
@@ -1398,24 +1484,27 @@ function SkyLiftService._life(self: any, t: number)
 			local hold = if body then town.hold(body) else nil
 			if body and hold then
 				local offset = if town.standOffset then town.standOffset(body) else 3
-				hold.place(hs.x, hs.y + offset, hs.z, hs.yaw)
-				self.host = { body = body, hold = hold }
+				local walker = LookoutLife.walker(LookoutLife.hostRound(self.lookout), LookoutLife.HOST_SPEED, true)
+				self.host = { body = body, hold = hold, walker = walker, offset = offset }
+				dt = 0
 			end
 		end
 	end
-	-- diners whose meal is over take the next cabin down, when nobody is by their table or the boarding gate
+	local host = self.host
+	if host then
+		local x, y, z, yaw, speed, act = LookoutLife.advance(host.walker, dt)
+		host.hold.place(x, y + host.offset, z, yaw, speed, act)
+	end
+	-- the visitors walk on; one in the queue behind the gate takes the next cabin down when nobody is by the gate
 	local downB, downOpen = SkyLiftService.window("summit", t)
 	local st = SkyLift.stations().summit
 	local gateSeen = self:_seen(Vector3.new(st.board.x, st.platformY, st.board.z), 60)
 	for i = #self.diners, 1, -1 do
 		local d = self.diners[i]
-		local c = self.chairs[d.chair]
-		if now >= d.untilT and downOpen and t <= downB + 1 and not gateSeen then
-			if not self:_seen(Vector3.new(c.x, c.y, c.z), 60) then
-				local ride = self:_seatHeld(d.body, d.hold, "summit", t, true)
-				if ride then
-					table.remove(self.diners, i)
-				end
+		if self:_walkVisitor(d, dt) and downOpen and t <= downB + 1 and not gateSeen then
+			local ride = self:_seatHeld(d.body, d.hold, "summit", t, true)
+			if ride then
+				table.remove(self.diners, i)
 			end
 		end
 	end
@@ -1825,15 +1914,18 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 			actor.possessable = false
 			TownAI.suspend(world, id)
 			return {
-				place = function(x: number, y: number, z: number, yaw: number)
-					-- ActorsRuntime draws an AI body's pivot at a.y - a.hip + offset, facing robloxYaw(a.yaw)
+				place = function(x: number, y: number, z: number, yaw: number, speed: number?, task: string?)
+					-- ActorsRuntime draws an AI body's pivot at a.y - a.hip + offset, facing robloxYaw(a.yaw), and writes
+					-- its MoveState and Speed from a.speed (walking at the Lookout) and its Task from a.task
 					a.x, a.z = x, z
 					a.y = y + a.hip - offset
 					a.yaw = yaw - math.pi
-					a.speed = 0
+					a.speed = speed or 0
+					a.task = task
 				end,
 				free = function(x: number, y: number, z: number, yaw: number)
 					actor.possessable = true
+					a.task = nil
 					if possession:controllerOf(actor) == "ai" then
 						TownAI.resume(world, id, x, y + a.hip, z, yaw - math.pi)
 					end

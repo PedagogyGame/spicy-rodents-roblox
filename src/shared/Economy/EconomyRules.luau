@@ -38,7 +38,17 @@ local EconomyRules = {}
 -- economy/wages.json defaults (cents per in-game hour)
 EconomyRules.WAGES = table.freeze({
 	minimum = 2,
-	jobs = table.freeze({ cashier = 2, barber_cut = 4, restock = 3, hospital_shift = 6, police_shift = 6 }),
+	jobs = table.freeze({
+		cashier = 2,
+		barber_cut = 4,
+		restock = 3,
+		hospital_shift = 6,
+		police_shift = 6,
+		-- D30: the bowling alley's and the Lookout's jobs (Shared/Work/TownJobs)
+		shoe_desk = 3,
+		lane_attendant = 3,
+		lookout_attendant = 3,
+	}),
 })
 
 -- economy/prices.json defaults (cents); items price from Items/ItemRules; the paintball pass from its tunable

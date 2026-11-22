@@ -28,7 +28,8 @@ export type World = {
 	Service: any,
 	SkyLift: any,
 	makeBody: (name: string, cf: CFrame) -> any,
-	holds: { [any]: { places: number, freed: { number }? } },
+	-- places: how often the service placed it; speed and task: the last placing's; walked: placings while walking
+	holds: { [any]: { places: number, freed: { number }?, speed: number, task: string?, walked: number } },
 	players: { any },
 	rs: any,
 	parent: any,
@@ -94,11 +95,15 @@ function SkyLiftFlow.stubTown(w: World): any
 			log(p, { kind = "deviceReleased", value = why })
 		end,
 		hold = function(body: any): any
-			local rec = { places = 0, freed = nil :: { number }? }
+			local rec = { places = 0, freed = nil :: { number }?, speed = 0, task = nil :: string?, walked = 0 }
 			w.holds[body] = rec
 			return {
-				place = function(x: number, y: number, z: number, yaw: number)
+				place = function(x: number, y: number, z: number, yaw: number, speed: number?, task: string?)
 					rec.places += 1
+					rec.speed, rec.task = speed or 0, task
+					if (speed or 0) > 0 then
+						rec.walked += 1
+					end
 					body:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
 				end,
 				free = function(x: number, y: number, z: number, yaw: number)
