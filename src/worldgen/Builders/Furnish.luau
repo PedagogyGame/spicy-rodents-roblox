@@ -25,6 +25,7 @@
 --
 -- Interface:
 --   roomKind(buildingId, roomId) -> kind;  RECIPES[kind];  FINISH[kind];  KNOBS (part budget)
+--   withExtra(recipe, extra) -> recipe (a building's own pieces after the required ones: Info.extra)
 --   layout(room, recipe, tones) -> { placed, skipped, unreached }     one room (pure, tested directly)
 --   plan(ctx, info) -> Plan;  emit(ctx, plan);  hideSpots(plan) -> { { id, room, x, z } }
 -- Pure (adds PartSpecs/ExtraSpecs to ctx.list).
@@ -1381,6 +1382,9 @@ export type Info = {
 	lanes: { { number } }?, -- the ways people walk through the building (model-local studs)
 	laneHalf: number?,
 	columns: number?, -- grid spacing of structural columns in rooms over 60 st both ways
+	-- pieces one building adds to a room's recipe, by room id, placed right after the recipe's required pieces
+	-- (Builders/Interior: the home computer's desk in a house that has no study or den)
+	extra: { [string]: { Item } }?,
 }
 export type Plan = {
 	info: Info,
@@ -1393,6 +1397,22 @@ export type Plan = {
 local FACE_WALL: { [string]: number } = { B = 1, R = 2, F = 3, L = 4 }
 
 -- Lays out every interior room of a shell. Pure.
+-- A recipe with `extra` placed right after its last required piece (before the pieces that only make the room
+-- lived-in, which are dropped first when space is short). The recipe itself is not changed.
+function Furnish.withExtra(recipe: { Item }, extra: { Item }): { Item }
+	local at = 0
+	for i, item in recipe do
+		if item.req then
+			at = i
+		end
+	end
+	local out = table.clone(recipe)
+	for k, item in extra do
+		table.insert(out, at + k, item)
+	end
+	return out
+end
+
 function Furnish.plan(ctx: Spec.LotCtx, info: Info): Plan
 	local W, D, EPS = ctx.W, ctx.D, 1e-3
 	local tones = Furniture.TONES[info.tones] or Furniture.TONES.bungalow
@@ -1507,7 +1527,12 @@ function Furnish.plan(ctx: Spec.LotCtx, info: Info): Plan
 			end
 			table.insert(rooms, room)
 			Yield.breathe() -- (engine bakes: a big room is many flood fills)
-			local res = Furnish.layout(room, Furnish.RECIPES[r.kind] or Furnish.RECIPES.generic, tones)
+			local recipe = Furnish.RECIPES[r.kind] or Furnish.RECIPES.generic
+			local extra = info.extra and info.extra[r.id]
+			if extra then
+				recipe = Furnish.withExtra(recipe, extra)
+			end
+			local res = Furnish.layout(room, recipe, tones)
 			layouts[r.id] = res
 			for _, k in res.skipped do
 				table.insert(skipped, r.id .. "." .. k)

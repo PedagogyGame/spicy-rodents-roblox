@@ -9,7 +9,9 @@
 -- floors, wall linings, a ceiling, lights, curtains, pictures). This also adds the hide spots
 -- (behind/under/inside), the defender spawn, the burglar entry and the squirrel-route sockets (template
 -- routes are W3), then the gable roof on top.
--- Interface: build(ctx) (ctx.interior is the template). Pure.
+-- Every house has a desk with a computer (the home computer, Shared/World/PlayerHomes): the study's or the den's,
+-- else one added to the bedroom (DESK_ROOM).
+-- Interface: build(ctx) (ctx.interior is the template); DESK_ROOM. Pure.
 
 local Building = require("./Building")
 local Furnish = require("./Furnish")
@@ -17,6 +19,8 @@ local Shell = require("./Shell")
 local Spec = require("../Spec")
 
 local Interior = {}
+
+Interior.DESK_ROOM = "bedroom" -- where a house without a study or a den has its desk computer
 
 -- One colour set per home (Furniture.TONES).
 local TONES: { [string]: string } = {
@@ -84,8 +88,16 @@ function Interior.build(ctx: Spec.LotCtx)
 		})
 	end
 	local infoRooms = {}
+	local hasDesk = false
 	for _, r in rooms do
 		table.insert(infoRooms, { id = r.id, kind = r.kind :: string, x0 = r.x0, x1 = r.x1, z0 = r.z0, z1 = r.z1 })
+		hasDesk = hasDesk or r.kind == "study" or r.kind == "den"
+	end
+	-- every home has a desk computer (owner D30: a player withdraws Spicy Stock Options at their home computer;
+	-- Shared/World/PlayerHomes): a house without a study or a den gets the desk in its bedroom
+	local extra: { [string]: { Furnish.Item } }? = nil
+	if not hasDesk then
+		extra = { [Interior.DESK_ROOM] = { { kind = "desk", pref = "B" } } }
 	end
 	local plan = Furnish.plan(ctx, {
 		building = "house",
@@ -100,6 +112,7 @@ function Interior.build(ctx: Spec.LotCtx)
 		grid = Shell.grid(ctx, layout),
 		pins = pins,
 		discs = {},
+		extra = extra,
 	})
 	local hides = Furnish.hideSpots(plan)
 	for _, h in hides do
