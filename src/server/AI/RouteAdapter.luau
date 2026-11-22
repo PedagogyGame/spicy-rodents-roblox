@@ -17,7 +17,15 @@ local Import = require("../Import")
 local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
 
 export type Link = { s: number, to: number, toS: number }
-export type RouteLike = { id: number, kind: string, length: number, points: { { number } }, links: { Link } }
+-- (woods: a D34 woods tree's route, Shared/World/TreeShapes: named "<LABEL> woods <i> ...")
+export type RouteLike = {
+	id: number,
+	kind: string,
+	length: number,
+	points: { { number } },
+	links: { Link },
+	woods: boolean?,
+}
 export type Adapter = {
 	routes: { RouteLike },
 	byId: (id: number) -> RouteLike?,
@@ -106,7 +114,13 @@ function RouteAdapter.new(rail: any): Adapter
 		end
 		local cum = cumulative(pts)
 		cums[route.id] = cum
-		local r = setmetatable({ id = route.id, kind = route.kind, length = cum[#cum], points = pts }, meta)
+		local r = setmetatable({
+			id = route.id,
+			kind = route.kind,
+			length = cum[#cum],
+			points = pts,
+			woods = string.find(route.name or "", " woods ", 1, true) ~= nil,
+		}, meta)
 		local like = (r :: any) :: RouteLike
 		byId[route.id] = like
 		table.insert(list, like)
