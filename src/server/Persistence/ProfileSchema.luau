@@ -8,7 +8,11 @@
 -- (Server/Economy/StockOptions); the other fields keep whatever the record holds.
 -- v2 (19 November): adds `worn`. v3 (22 November, owner D30): adds `options`, the player's Spicy Stock Options
 -- (bought with Robux, 1 option = S$1.00, withdrawn at their home computer): `held` now, `bought` and
--- `withdrawn` over the profile's life (whole options; held never exceeds bought).
+-- `withdrawn` over the profile's life (whole options; held never exceeds bought). `pending` (optional, still v3:
+-- an older v3 build keeps it as it is) holds withdrawals on their way out: withdrawal id -> options taken off
+-- `held` and saved, not yet known to be paid. Economy/StockOptions settles each one: paid, it moves to `withdrawn`;
+-- not paid, back to `held`; one found when a profile loads was left by a session that ended first (back to `held`,
+-- unless this server paid it). held + the pending options + withdrawn = bought.
 -- There is no v0: nothing wrote the "Profiles" store before v1, so a record without a numeric `schema` is
 -- broken, never a player to start afresh (ProfileStore: only an absent key is a new player).
 -- An older server (v2) reads a v3 record as newer than it knows and never writes it (PlayerSaves "corrupt"):
@@ -17,7 +21,7 @@
 
 -- (`options`: a stock options receipt, the options it granted; `cents` is then their worth in Spicy cents)
 export type ReceiptEntry = { productId: number, cents: number, at: number, playerId: number, options: number? }
-export type Options = { held: number, bought: number, withdrawn: number }
+export type Options = { held: number, bought: number, withdrawn: number, pending: { [string]: number }? }
 export type Data = {
 	schema: number,
 	wallet: { cents: number },
@@ -93,13 +97,22 @@ function ProfileSchema.validate(data: any): (boolean, string?)
 		return false, "reputation"
 	end
 	local o = data.options
-	if
-		type(o) ~= "table"
-		or not isWhole(o.held)
-		or not isWhole(o.bought)
-		or not isWhole(o.withdrawn)
-		or o.held > o.bought
-	then
+	if type(o) ~= "table" or not isWhole(o.held) or not isWhole(o.bought) or not isWhole(o.withdrawn) then
+		return false, "options"
+	end
+	local out = 0
+	if o.pending ~= nil then
+		if type(o.pending) ~= "table" then
+			return false, "options"
+		end
+		for id, n in o.pending do
+			if type(id) ~= "string" or not isWhole(n) or n < 1 then
+				return false, "options"
+			end
+			out += n
+		end
+	end
+	if o.held + out > o.bought then
 		return false, "options"
 	end
 	return true, nil

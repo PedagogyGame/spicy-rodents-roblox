@@ -2594,8 +2594,9 @@ function Game.start(opts: Opts?): any
 			end,
 			loaded = function(player: any, profileData: any): boolean
 				local changed = wardrobe ~= nil and wardrobe:loaded(player, profileData)
-				if stockOptions then
-					stockOptions.loaded(player, profileData)
+				-- (a withdrawal a previous session left unsettled is settled here: then it is written)
+				if stockOptions and stockOptions.loaded(player, profileData) then
+					changed = true
 				end
 				return changed
 			end,

@@ -29,8 +29,9 @@ local function harness(store: any, jobId: string, now: () -> number, sleep: (num
 			fn()
 		end,
 		tell = function(_p: any, _w: string) end,
-		loaded = function(_player: any, _data: any): boolean
-			return false
+		-- (as Boot/Game chains it: StockOptions settles a withdrawal a previous session left pending)
+		loaded = function(player: any, data: any): boolean
+			return h.stock.loaded(player, data)
 		end,
 		log = function(_l: string) end,
 		warn = function(_l: string) end,
@@ -131,7 +132,11 @@ return function(t)
 		local ok, words = a.stock.withdraw(ann, 100)
 		t.falsy(ok)
 		t.eq(words, StockOptions.WORDS.slow)
-		t.eq(a.saves:data(ann).options.held, 100, "restored in memory")
+		-- (fixed: not rolled back while the write may land; the options wait in a pending entry, the player busy)
+		t.eq(a.saves:data(ann).options.held, 0, "not restored while the write may still land")
+		local _wid, out = next(a.saves:data(ann).options.pending)
+		t.eq(out, 100, "pending")
+		t.eq(select(2, a.stock.withdraw(ann, 1)), StockOptions.WORDS.busy, "busy until it is settled")
 		depart(a, ann) -- the release is queued behind the hung save
 		for _, co in threads do
 			if coroutine.status(co) == "suspended" then
@@ -142,7 +147,7 @@ return function(t)
 		clockT += 200
 		local b = harness(raw, "B", now, sleep, nil)
 		arrive(b, ann)
-		t.eq(a.wallet.balance(ann), before, "nothing was paid")
+		t.eq(a.wallet.balance(ann), before, "nothing was paid (the player left before the write was known)")
 		t.eq(b.saves:data(ann).options.held, 100, "the 100 options the player was told were not taken")
 	end)
 

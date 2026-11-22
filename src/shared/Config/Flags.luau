@@ -21,6 +21,9 @@ Flags.defaults = {
 	-- computers' withdrawals. Off: nothing is sold or withdrawn and every receipt is answered NotProcessedYet, so
 	-- Roblox keeps it and offers it again once this is back on (nothing bought is lost)
 	stockOptions = true,
+	-- Studio test purchases cost nothing, so a Studio session grants no options (the receipt is answered
+	-- NotProcessedYet) unless a developer turns this on to test the grant on purpose (never in a live server)
+	stockOptionsStudio = false,
 } :: { [string]: boolean }
 
 local state = {
