@@ -397,6 +397,10 @@ function AlleyWalk.localWay(X0: number, D0: number, X1: number, D1: number): { {
 		local lx, ld = if last then last[1] else X0, if last then last[2] else D0
 		if math.abs(lx - p[1]) + math.abs(ld - p[2]) > 0.05 then
 			table.insert(out, { p[1], p[2] })
+		elseif last and p[1] == X1 and p[2] == D1 then
+			-- the goal itself a hair from the point before it (a foot on the goal's own leg): the way still ends
+			-- exactly at the goal
+			out[#out] = { X1, D1 }
 		end
 	end
 	-- both join the same leg: along it

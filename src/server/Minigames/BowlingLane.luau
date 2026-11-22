@@ -268,7 +268,7 @@ function BowlingLane.hold(self: any, body: Model?)
 		return
 	end
 	if body == nil or not self:ready() then
-		ball.Transparency = 0
+		self:_showBall(true)
 		return
 	end
 	local hand = body:FindFirstChild("RightHand") or body:FindFirstChild("Right Arm") or body.PrimaryPart
@@ -296,7 +296,21 @@ function BowlingLane.hold(self: any, body: Model?)
 	w.Parent = copy
 	copy.Parent = self.model
 	self.held = copy
-	ball.Transparency = 1
+	self:_showBall(false)
+end
+
+-- The lane's ball and its finger holes (welded to it: they turn with it) shown or hidden together.
+function BowlingLane._showBall(self: any, on: boolean)
+	local ball = self.ball :: BasePart?
+	if ball == nil then
+		return
+	end
+	ball.Transparency = if on then 0 else 1
+	for _, d in ball:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Transparency = if on then 0 else 1
+		end
+	end
 end
 
 -- Throws ----------------------------------------------------------------------------------------------------------

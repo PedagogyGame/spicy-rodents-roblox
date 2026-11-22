@@ -119,6 +119,24 @@ AlleyLayout.GAME_ROOM_D0 = AlleyLayout.FRONT_D -- the fortune teller): the hall 
 AlleyLayout.GAME_ROOM_D1 = 30 -- front and back walls' inner faces
 AlleyLayout.PARTITION_T = 0.6
 AlleyLayout.SETTEE_D = -21
+-- The walkway (owner D32: "no room for the character to walk in between the lanes ... instead of having to hop over
+-- the parts before they bowl"). As in a real house, each pair's settee is a U facing its two approaches with the
+-- scorer's console in front, and between one pair's settee and the next there is an AISLE from the concourse down
+-- to the approaches (on the line where two pairs meet, where nothing stands: the ball returns are between the two
+-- lanes of a pair). Along the back of the approaches, behind the racks, a person walks from any lane to any other.
+-- A person is WALKER_R across each way (Roblox's default body is two studs across the torso; its arms swing and it
+-- needs a little room), and tests/unit/alley_walkway.spec.luau walks that body through the baked hall.
+AlleyLayout.SETTEE_HALF = 3.9 -- each settee's half width across X (it was 4.8: a 2.8 gap a body could barely pass)
+AlleyLayout.SETTEE_ARM = 1.3 -- the depth of its two side seats
+AlleyLayout.WALKER_R = 1.25
+AlleyLayout.AISLE_W = 2 * AlleyLayout.PITCH - 2 * AlleyLayout.SETTEE_HALF -- 4.6
+
+-- The aisle between pair p and pair p + 1 (p = 1 .. PAIRS - 1): its X span (the lanes' line between them runs down
+-- its middle). The two outer aisles of the hall (beside lanes 1 and 18) are ZONES left_aisle / right_aisle.
+function AlleyLayout.aisle(p: number): (number, number)
+	local mid = AlleyLayout.pairX(p) + AlleyLayout.PITCH
+	return mid - AlleyLayout.AISLE_W / 2, mid + AlleyLayout.AISLE_W / 2
+end
 
 function AlleyLayout.laneX(i: number): number
 	return AlleyLayout.LANE1_X + (i - 1) * AlleyLayout.PITCH
