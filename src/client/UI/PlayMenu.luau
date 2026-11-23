@@ -259,7 +259,9 @@ PlayMenu.TITLE = "SPICY RODENT"
 PlayMenu.SUBTITLE = "Loading the town"
 -- The aerial view of the town behind the loading screen (owner D39; docs/renders/loading, uploaded by the lead as an
 -- Image): "rbxassetid://<id>" once uploaded. Empty: the plain green screen, exactly as before.
-PlayMenu.LOADING_IMAGE = ""
+-- the uploaded aerial (Decal 74058696275307, docs/renders/loading/la_north_to_sea_1920.jpg) through its 16:9 asset
+-- thumbnail, which works for a Decal id without looking up the image behind it
+PlayMenu.LOADING_IMAGE = "rbxthumb://type=Asset&id=74058696275307&w=768&h=432"
 PlayMenu.LOADING_ZOOM = 1.03 -- the picture's slow zoom (one tween over LOADING_ZOOM_SECONDS, nothing per frame)
 PlayMenu.LOADING_ZOOM_SECONDS = 30
 PlayMenu.LOADING_FADE_SECONDS = 0.5 -- the screen fades out over this when there is a picture

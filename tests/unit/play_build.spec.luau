@@ -117,7 +117,11 @@ return function(t)
 	t.test("D39 the loading screen: the game's name, its line, the picture's constants", function()
 		t.eq(PlayMenu.TITLE, "SPICY RODENT", "the game is Spicy Rodent (never Spicy Rodents)")
 		t.eq(PlayMenu.SUBTITLE, "Loading the town")
-		t.truthy(PlayMenu.LOADING_IMAGE == "" or string.match(PlayMenu.LOADING_IMAGE, "^rbxassetid://%d+$") ~= nil)
+		t.truthy(
+			PlayMenu.LOADING_IMAGE == ""
+				or string.match(PlayMenu.LOADING_IMAGE, "^rbxassetid://%d+$") ~= nil
+				or string.match(PlayMenu.LOADING_IMAGE, "^rbxthumb://type=Asset&id=%d+&w=768&h=432$") ~= nil
+		)
 		t.truthy(PlayMenu.LOADING_ZOOM > 1 and PlayMenu.LOADING_ZOOM <= 1.06, "a gentle zoom")
 		t.truthy(PlayMenu.LOADING_ZOOM_SECONDS >= 20)
 		t.truthy(PlayMenu.LOADING_FADE_SECONDS > 0 and PlayMenu.LOADING_FADE_SECONDS <= 1)
