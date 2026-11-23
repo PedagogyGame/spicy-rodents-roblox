@@ -216,11 +216,7 @@ local function blockPart(
 			sy = r
 			cy = seat + r / 2
 		elseif lot.type == "fence_run" then
-			-- owner D42 ("THE SQUIRRELS ARE ABLE TO WALK/RUN THROUGH THESE FENCES"): a fence stops a squirrel on the
-			-- ground as a building wall does (the client's overlap and the server's engine rays meet colliding
-			-- parts); 3 studs, so a Space leap still clears it
 			material = "WoodPlanks"
-			solid = true
 		elseif lot.type == "shelter" and string.sub((lot :: any).style or "", 1, 8) == "bark log" then
 			-- the fallen hollow log (brief v2 §3): Server/World/HollowShell draws it round its run-through
 			-- (Shared/World/HollowLayout), so the lot is only an invisible marker, nothing to stand in its way
