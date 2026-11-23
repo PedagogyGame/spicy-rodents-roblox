@@ -25,6 +25,8 @@
 
 export type Metrics = { [string]: any }
 
+local InputMap = require("../Input/InputMap")
+
 local Human = {}
 
 -- Owner 2026-11-10: people a slight bit faster, and they never run out of the ability to run (no
@@ -200,6 +202,7 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 			end
 			local sprint = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 				or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+				or InputMap.keyHeld("LeftShift") -- (the touch screen's RUN: UI/TouchButtons)
 			hum.WalkSpeed = Human.speed(sprint, body:GetAttribute("MoveScale"), body:GetAttribute("NoSprint"))
 				* Human.treat(
 					body:GetAttribute("TreatUntil"),

@@ -49,6 +49,7 @@ local WalletHud = require("./UI/WalletHud")
 local StockOptionsUI = require("./UI/StockOptionsUI")
 local ItemClient = require("./UI/ItemClient")
 local KiteSteer = require("./UI/KiteSteer")
+local TouchButtons = require("./UI/TouchButtons")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
@@ -378,12 +379,9 @@ game:GetService("RunService").Heartbeat:Connect(function()
 	end
 end)
 
-UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-	if InputMap.ignore(io, processed) then
-		return
-	end
+local function kickKey(keyName: string)
 	-- (not while a minigame is open: F and gamepad X are that game's keys then)
-	if InputMap.kicks(io.KeyCode.Name, Players.LocalPlayer:GetAttribute("InMinigame")) then
+	if InputMap.kicks(keyName, Players.LocalPlayer:GetAttribute("InMinigame")) then
 		local st = client.state()
 		if st.species == "human" and st.device == nil then
 			kickRemote:FireServer()
@@ -393,7 +391,7 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 			if duel and duel:IsA("RemoteEvent") then
 				duel:FireServer("feint")
 			end
-		elseif io.KeyCode == Enum.KeyCode.F then
+		elseif keyName == "F" then
 			menu.toast(
 				if st.device == "ride"
 					then "No kicking from a sky-lift cabin"
@@ -404,7 +402,28 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 			)
 		end
 	end
+end
+UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
+	if not InputMap.ignore(io, processed) then
+		kickKey(io.KeyCode.Name)
+	end
 end)
+InputMap.onKey(kickKey) -- (the touch screen's KICK and FEINT: UI/TouchButtons)
+
+-- the touch screen's buttons for the keys (owner D40): each press is the key's own (InputMap.tap / hold)
+TouchButtons.start({
+	state = function(): TouchButtons.Context
+		local st = client.state()
+		return TouchButtons.contextOf(st, Telescope.active(), Players.LocalPlayer:GetAttribute("InMinigame") ~= nil)
+	end,
+	telescope = function(verb: string)
+		if verb == "back" then
+			Telescope.leave()
+		else
+			Telescope.zoomBy(if verb == "zoomIn" then 1 else -1)
+		end
+	end,
+})
 
 eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 	local kind = msg.kind

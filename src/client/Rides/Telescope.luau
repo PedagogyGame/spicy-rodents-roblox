@@ -213,6 +213,14 @@ local function frame(dt: number)
 	camera.CFrame = CFrame.new(v.origin) * CFrame.Angles(0, v.bearing + v.yaw, 0) * CFrame.Angles(v.pitch, 0, 0)
 end
 
+-- zoomBy(steps): the shoulder buttons' zoom (the touch screen's + and -: UI/TouchButtons); nothing while not looking
+function Telescope.zoomBy(steps: number)
+	local v = view
+	if v then
+		v.fov = Telescope.zoom(v.fov, steps)
+	end
+end
+
 function Telescope.active(): boolean
 	return view ~= nil
 end

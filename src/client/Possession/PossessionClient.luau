@@ -574,11 +574,7 @@ function PossessionClient.start(opts: Opts): Client
 
 	-- verbs that are not motor input: E (enter / exit), V (first-person toggle)
 	local UIS = game:GetService("UserInputService")
-	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-		if InputMap.ignore(io, processed) then
-			return
-		end
-		local name = io.KeyCode.Name
+	local function onKey(name: string)
 		-- E (pad Y) enters or leaves a vehicle or the drone; only people drive, and a squirrel's E is
 		-- its grab (InputMap). F is the townsperson's kick (Client/Main, PlayNet.Kick).
 		local onFoot = payloadNow ~= nil and payloadNow.species == "human"
@@ -613,7 +609,13 @@ function PossessionClient.start(opts: Opts): Client
 				toast("Pick a body from the menu first (M)", 2)
 			end
 		end
+	end
+	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
+		if not InputMap.ignore(io, processed) then
+			onKey(io.KeyCode.Name)
+		end
 	end)
+	InputMap.onKey(onKey) -- (the touch screen's IN and VIEW: UI/TouchButtons)
 
 	-- the little prompt by a free shared vehicle, and the touch screen's RIDE and GET OFF (UI/RideHint, owner D29; GET
 	-- OFF in every vehicle and LAND on the drone since D32)
