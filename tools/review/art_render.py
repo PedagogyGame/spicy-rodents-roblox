@@ -54,20 +54,40 @@ def _dress(o, a):
     o.data.materials.append(mat)
 
 
+def _instance(a, cached, m):
+    """Another placement of a file already imported: linked copies of its meshes (no second import)."""
+    for src, world in cached:
+        o = bpy.data.objects.new(src.name, src.data)
+        bpy.context.scene.collection.objects.link(o)
+        o.matrix_world = m @ world
+        o["review_group"] = a.get("group", "attractions")
+
+
 def build(scene, g):
+    cache = {}
+    counts = {}
     for a in scene.get("art", []):
+        r = a["rot"]
+        p = a["pos"]
+        pivot = Matrix(((r[0], r[1], r[2], p[0]), (r[3], r[4], r[5], p[1]), (r[6], r[7], r[8], p[2]), (0, 0, 0, 1)))
+        m = TO_REVIEW @ pivot @ TO_ROBLOX
+        plain = a.get("only") is None and not a.get("colours") and not a.get("alpha") and not a.get("glow")
+        if plain and a["file"] in cache:
+            _instance(a, cache[a["file"]], m)
+            counts[a["file"]] += 1
+            continue
         before = set(bpy.data.objects)
         bpy.ops.import_scene.fbx(filepath=a["file"], axis_forward="Z", axis_up="Y", use_image_search=False)
         new = [o for o in bpy.data.objects if o not in before]
+        if plain:
+            bpy.context.view_layer.update()
+            cache[a["file"]] = [(o, o.matrix_world.copy()) for o in new if o.type == "MESH"]
+            counts[a["file"]] = 1
         if a.get("only") is not None:
             keep = set(a["only"])
             for o in [o for o in new if o.type == "MESH" and o.name.split(".")[0] not in keep]:
                 new.remove(o)
                 bpy.data.objects.remove(o, do_unlink=True)
-        r = a["rot"]
-        p = a["pos"]
-        pivot = Matrix(((r[0], r[1], r[2], p[0]), (r[3], r[4], r[5], p[1]), (r[6], r[7], r[8], p[2]), (0, 0, 0, 1)))
-        m = TO_REVIEW @ pivot @ TO_ROBLOX
         for o in new:
             if o.parent is None:
                 o.matrix_world = m @ o.matrix_world
@@ -80,3 +100,6 @@ def build(scene, g):
                     if mat and "Glass" in mat.name:
                         _glass(mat)
         print(f"review: art {a['file']}: {len(new)} objects", flush=True)
+    for f, n in counts.items():
+        if n > 1:
+            print(f"review: art {f}: placed {n} times (linked copies)", flush=True)

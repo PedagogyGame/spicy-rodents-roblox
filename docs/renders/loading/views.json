@@ -1,0 +1,12 @@
+{
+  "about": "Owner D39: the aerial view of the town behind the loading screen. tools/review/loading_aerial.luau writes the scene (the town, attractions, sky lift, backdrop, and the trees and woods as their uploaded FBX art); tools/review/render.py renders this view. Warm late-afternoon light, a soft sun (3 degrees), a little distance haze.",
+  "sun": {"dir": [-0.8, 0.45, 0.4], "strength": 3.4, "color": [1.0, 0.84, 0.64], "angleDeg": 3.0, "skyStrength": 1.0},
+  "defaults": {"res": "1920x1080", "samples": 48, "groups": ["town", "terrain", "attractions", "trees", "backdrop", "backdrop_terrain"]},
+  "views": [
+    {"name": "la_north_to_sea", "desc": "From high over the south fields (about 35 degrees down) north across the town grid and the river to the beach and the sea.",
+     "pos": [150, 950, -1450], "look": [450, 0, -100], "fov": 55,
+     "light": {"sun": [-0.8, 0.45, 0.4], "sunStrength": 3.6, "sunColor": [1.0, 0.82, 0.6],
+               "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.9, 0.76, 0.56], "ground": [0.5, 0.48, 0.42]},
+               "haze": {"color": [0.72, 0.72, 0.68], "start": 1500, "half": 7000, "max": 0.55}}}
+  ]
+}
