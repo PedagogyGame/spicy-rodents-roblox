@@ -118,6 +118,53 @@ function InputMap.fromMoveVector(x: number, z: number): (number, number)
 	return math.clamp(fw, -1, 1), math.clamp(side, -1, 1)
 end
 
+-- the on-screen touch buttons (UI/TouchButtons) press keys by name: tap(name) is a key's press for every listener
+-- (the sampler's edges, the E / V / F handlers that call onKey), hold(name, on) keeps it down for the sampler's held
+-- verbs and keyHeld (the person's Shift). No engine needed.
+local virtualHeld: { [string]: boolean } = {}
+local keyListeners: { [(string) -> ()]: boolean } = {}
+
+function InputMap.onKey(fn: (string) -> ()): () -> ()
+	keyListeners[fn] = true
+	return function()
+		keyListeners[fn] = nil
+	end
+end
+
+function InputMap.tap(keyName: string)
+	for fn in keyListeners do
+		fn(keyName)
+	end
+end
+
+function InputMap.hold(keyName: string, on: boolean)
+	if on then
+		virtualHeld[keyName] = true
+	else
+		virtualHeld[keyName] = nil
+	end
+end
+
+function InputMap.keyHeld(keyName: string): boolean
+	return virtualHeld[keyName] == true
+end
+
+-- stickPick(before, now, touch): a touch thumbstick's push past STICK_PICK sideways is A (-1) or D (+1) once, as
+-- the keys pick a fork; 0 otherwise (keyboards and gamepads have their own keys)
+InputMap.STICK_PICK = 0.6
+function InputMap.stickPick(before: number, now: number, touch: boolean): number
+	if not touch then
+		return 0
+	end
+	local k = InputMap.STICK_PICK
+	if now >= k and before < k then
+		return 1
+	elseif now <= -k and before > -k then
+		return -1
+	end
+	return 0
+end
+
 -- engine helpers ------------------------------------------------------------------------------------
 
 -- True while the player types in the chat bar or any TextBox (keys then belong to the text).
@@ -265,11 +312,20 @@ function InputMap.start(): Sampler
 	local ended = UserInputService.InputEnded:Connect(function(input)
 		held[codeName(input)] = nil
 	end)
+	local unTap = InputMap.onKey(function(n: string)
+		self.lastInputAt = os.clock()
+		for verb, set in nameSets do
+			if set[n] then
+				edges[verb] = true
+			end
+		end
+	end)
 
 	local typingNow = false
+	local stickSide = 0
 	local function isHeld(verb: string): boolean
 		for n in nameSets[verb] do
-			if held[n] then
+			if held[n] or virtualHeld[n] then
 				return true
 			end
 			-- poll the keyboard too: a key pressed while gameProcessed or before this sampler started
@@ -305,6 +361,17 @@ function InputMap.start(): Sampler
 			if fw ~= 0 or side ~= 0 then
 				s.lastInputAt = os.clock()
 			end
+			-- a touch screen's A or D at a fork: the thumbstick pushed past STICK_PICK sideways (once a push)
+			local okLast, last = pcall(function()
+				return UserInputService:GetLastInputType()
+			end)
+			local pick = InputMap.stickPick(stickSide, side, okLast and last == Enum.UserInputType.Touch)
+			stickSide = side
+			if pick > 0 then
+				edges.chooseRight = true
+			elseif pick < 0 then
+				edges.chooseLeft = true
+			end
 			local f: Frame = {
 				fw = fw,
 				side = side,
@@ -333,6 +400,7 @@ function InputMap.start(): Sampler
 		stop = function(_s: Sampler)
 			began:Disconnect()
 			ended:Disconnect()
+			unTap()
 		end,
 	}
 	return self
