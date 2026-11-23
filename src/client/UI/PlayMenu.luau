@@ -399,7 +399,7 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 		Position = UDim2.new(0, 16, 0.3, 0),
 		ZIndex = 51,
 	})
-	text(loading, {
+	local subtitle = text(loading, {
 		Text = PlayMenu.SUBTITLE,
 		TextSize = 22,
 		Size = UDim2.new(1, -32, 0, 30),
@@ -434,7 +434,12 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 		Size = UDim2.new(1, -32, 0, 40),
 		Position = UDim2.new(0, 16, 0.3, 222),
 		ZIndex = 51,
-	})
+	}) -- with the picture, the screen is the picture: the title and the bar only (owner: "a graphic, not words")
+	if aerial then
+		subtitle.Visible = false
+		stageLabel.Visible = false
+		elapsedLabel.Visible = false
+	end
 
 	-- help panel, status, menu button ------------------------------------------------------------
 	local help = Instance.new("Frame")
