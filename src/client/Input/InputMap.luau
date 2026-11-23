@@ -218,12 +218,36 @@ end
 
 -- Enable or disable the default character controls (Humanoid walking and jumping). Bodies driven by
 -- our own motors in a vehicle or the drone switch them off; a person on foot switches them on.
+-- On a touch screen ControlModule:Disable() also hides the thumbstick, the only way to steer there: the controls
+-- stay on (the stick keeps feeding the move vector the motors read) and the body is heldBody instead (no walk, no jump).
+local heldBody: { hum: Humanoid, walk: number, jump: number, power: number }? = nil
+local function holdBody(on: boolean)
+	if not on then
+		local char = game:GetService("Players").LocalPlayer.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum and heldBody == nil then
+			heldBody = { hum = hum, walk = hum.WalkSpeed, jump = hum.JumpHeight, power = hum.JumpPower }
+			hum.WalkSpeed, hum.JumpHeight, hum.JumpPower = 0, 0, 0
+		end
+	elseif heldBody then
+		local h = heldBody
+		heldBody = nil
+		if h.hum.Parent then
+			h.hum.WalkSpeed, h.hum.JumpHeight, h.hum.JumpPower = h.walk, h.jump, h.power
+		end
+	end
+end
+
 function InputMap.setCharacterControls(on: boolean)
+	local touch = game:GetService("UserInputService").TouchEnabled
 	task.spawn(function()
 		local c = playerControls(10)
 		if c then
 			pcall(function()
-				if on then
+				if touch then
+					c:Enable()
+					holdBody(on)
+				elseif on then
 					c:Enable()
 				else
 					c:Disable()

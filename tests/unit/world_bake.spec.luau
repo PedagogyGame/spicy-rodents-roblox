@@ -101,6 +101,20 @@ return function(t)
 		t.truthy(checked >= 115, `checked {checked}`)
 	end)
 
+	t.test("fences (owner D42): every fence run is a colliding wall a squirrel stops at, low enough to leap", function()
+		local n = 0
+		for _, lot in lots do
+			if lot.type == "fence_run" then
+				local g = part(byId[lot.id], "Greybox")
+				t.truthy(g ~= nil, lot.id)
+				t.eq(g.canCollide, true, lot.id)
+				t.truthy(g.sy <= 3.01, `{lot.id} {g.sy}`)
+				n += 1
+			end
+		end
+		t.eq(n, 4)
+	end)
+
 	t.test("seats: World/Height or the harvested absolute seat; buildings carry their data LevelOfDetail", function()
 		for _, lot in lots do
 			local p = byId[lot.id]
