@@ -333,7 +333,15 @@ function PlayMenu.start(onPick: (choice: string) -> (), extras: { onOptions: (()
 		img.Size = UDim2.fromScale(1, 1)
 		img.BackgroundTransparency = 1
 		img.ScaleType = Enum.ScaleType.Crop
-		img.Image = PlayMenu.LOADING_IMAGE
+		-- the server looks up the image behind the uploaded Decal (Server/Main, attribute LoadingImage on
+		-- ReplicatedStorage); until it arrives, the Decal's asset thumbnail
+		local RS = game:GetService("ReplicatedStorage")
+		local function pickImage()
+			local real = RS:GetAttribute("LoadingImage")
+			img.Image = if type(real) == "string" and real ~= "" then real else PlayMenu.LOADING_IMAGE
+		end
+		pickImage()
+		RS:GetAttributeChangedSignal("LoadingImage"):Connect(pickImage)
 		img.ImageTransparency = 1
 		img.ZIndex = 50
 		img.Parent = loading

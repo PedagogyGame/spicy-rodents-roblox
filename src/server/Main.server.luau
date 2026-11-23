@@ -34,3 +34,16 @@ if not ok then
 	ReplicatedStorage:SetAttribute("BootError", tostring(err))
 	ReplicatedStorage:SetAttribute("BootStage", "The server failed to start the town (see View > Output)")
 end
+
+-- the loading screen's aerial (owner D39): the image behind the uploaded Decal 74058696275307, for the clients
+-- (Client/UI/PlayMenu reads the LoadingImage attribute; the Decal's thumbnail is the fallback)
+task.spawn(function()
+	pcall(function()
+		local model = game:GetService("InsertService"):LoadAsset(74058696275307)
+		local decal = model:FindFirstChildWhichIsA("Decal", true)
+		if decal and decal.Texture ~= "" then
+			game:GetService("ReplicatedStorage"):SetAttribute("LoadingImage", decal.Texture)
+		end
+		model:Destroy()
+	end)
+end)
