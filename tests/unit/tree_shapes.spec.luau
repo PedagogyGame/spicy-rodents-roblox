@@ -448,8 +448,10 @@ return function(t)
 			t.near(cf.y - Height.at(cf.x, cf.z), sf.y - Height.at(sf.x, sf.z), 0.05)
 			local srcForks = rail.graph:forks(src.id)
 			local forks = rail.graph:forks(copy.id)
-			t.eq(#forks, #srcForks)
-			t.eq(#tree.routes, 1 + #srcForks)
+			-- (every source bough, or the ones a pruned copy keeps: D41)
+			t.eq(#forks, #tree.boughs)
+			t.truthy(#forks >= 1 and #forks <= #srcForks)
+			t.eq(#tree.routes, 1 + #forks)
 			for _, f in forks do
 				t.truthy(table.find(tree.routes, f.branch) ~= nil)
 			end

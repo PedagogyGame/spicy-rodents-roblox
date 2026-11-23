@@ -82,6 +82,11 @@ BranchNooks.C = table.freeze({
 	boughBark = 1.1, -- a bough's bark from its line (Builders/Trees: its drawn radius near the trunk)
 	-- a hangout: a flat crook from a bough at a wide fork, hangoutLen studs round the trunk; sitting from seatFrom on
 	hangoutsPerTree = 1,
+	-- trees kept calm (by trunk route name): at most these, whatever their size (owner D41: the tree by the Spicy
+	-- Rodent's start, "horrible to navigate all cluttered")
+	calm = table.freeze({
+		["planted P2 Villa Oak South trunk"] = table.freeze({ nooks = 1, hangouts = 1, spurs = 0 }),
+	}),
 	bigTree = 10, -- a tree with this many forks or more gets one more nook, hangout and spur
 	hangoutGap = 70, -- degrees: the fork's gap to the next bough round the trunk on that side
 	hangoutOuts = table.freeze({ 1.4, 2.4, 3.4 }),
@@ -509,6 +514,9 @@ function BranchNooks.plan(
 		local tree: TreeRec = { trunk = trunk.id, nooks = {}, hangouts = {}, spurs = {} }
 		local used: { [number]: boolean } = {} -- boughs that already have a nook or hangout
 		local big = if #tr.boughs >= C.bigTree then 1 else 0
+		local calm = C.calm[trunk.name]
+		local maxNooks = if calm then calm.nooks else C.nooksPerTree + big
+		local maxSpurs = if calm then calm.spurs else C.spursPerTree + big
 
 		-- a route leaving bough `b` at sample `s` (t `st`) turning `turn` degrees (signed) from its heading
 		local function curled(b: any, s: V3, st: number, turn: number, len: number, rise: number, curl: number)
@@ -594,7 +602,7 @@ function BranchNooks.plan(
 
 		-- nooks: lowest boughs first, a side drawn per bough
 		for _, bf in tr.boughs do
-			if #tree.nooks >= C.nooksPerTree + big then
+			if #tree.nooks >= maxNooks then
 				break
 			end
 			local first = if rand() < 0.5 then 1 else -1
@@ -605,7 +613,7 @@ function BranchNooks.plan(
 		end
 
 		-- hangouts: at the wider forks (the gap round the trunk to the next bough at about that height)
-		local cap = C.hangoutsPerTree + big
+		local cap = if calm then calm.hangouts else C.hangoutsPerTree + big
 		local foot = reg:foot(trunk)
 		local function bearing(f: any): number
 			return math.deg(math.atan2(f.outward.x or f.outward[1], f.outward.z or f.outward[3]))
@@ -657,7 +665,7 @@ function BranchNooks.plan(
 			return a.route.id < b.route.id
 		end)
 		for _, bf in long do
-			if #tree.spurs >= C.spursPerTree + big then
+			if #tree.spurs >= maxSpurs then
 				break
 			end
 			local b = bf.route
