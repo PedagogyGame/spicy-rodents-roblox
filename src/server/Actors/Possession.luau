@@ -41,6 +41,8 @@ export type Engine = {
 	setCharacter: (player: any, model: any?) -> (),
 	-- The body's root part (the assembly whose owner is set).
 	rootOf: (body: any) -> any,
+	-- Is the body in the town right now (a descendant of the Workspace)? Optional: absent in the specs' fakes.
+	inWorld: ((body: any) -> boolean)?,
 	-- Mark the body with its driver for clients (attribute DriverUserId; 0 = AI).
 	markDriver: (body: any, userId: number) -> (),
 	-- Moves a body to a safe pose (recovery); never changes health.
@@ -100,6 +102,9 @@ export type Service = {
 
 local Possession = {}
 
+-- What a player is told when a body can't be handed over (it just left the town, or the engine refused it).
+Possession.BUSY = "That one just slipped away. Pick again and you'll get another."
+
 -- seconds: the most often a player's Reset (recover) moves the body
 Possession.RECOVER_EVERY = 3
 
@@ -123,6 +128,9 @@ function Possession.engine(): Engine
 		end,
 		rootOf = function(body: any): any
 			return (body :: Model).PrimaryPart
+		end,
+		inWorld = function(body: any): boolean
+			return typeof(body) == "Instance" and (body :: Instance):IsDescendantOf(workspace)
 		end,
 		markDriver = function(body: any, userId: number)
 			local model = body :: Model
@@ -270,7 +278,9 @@ function Possession.new(deps: Deps): Service
 			deps.actors:setBodyMode(actor, "ai", nil)
 			actor.brain.resume(x, y, z)
 			self.stats.rolledBack += 1
-			return false, `possess failed: {err}`
+			-- (the engine's words stay in the server log; the player gets a plain line)
+			warn(`[SpicyRodents] possess rolled back: {err}`)
+			return false, Possession.BUSY
 		end
 		PossessionState.bind(self.ledger, key, actor.id)
 		self.drivers[key] = player
@@ -309,6 +319,9 @@ function Possession.new(deps: Deps): Service
 	function service.possess(self: Service, player: any, actor: Actor): (boolean, string?)
 		if not actor.possessable then
 			return refuse(self, "not possessable")
+		end
+		if engine.inWorld and not engine.inWorld(actor.body) then
+			return refuse(self, Possession.BUSY)
 		end
 		local key = keyOf(player)
 		if PossessionState.driverOf(self.ledger, actor.id) == key then

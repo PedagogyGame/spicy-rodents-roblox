@@ -342,9 +342,18 @@ function ActorsRuntime.start(opts: Opts): Runtime
 
 	-- a body the AI holds and that is possessable right now (not a patient on the ground, in an ambulance or in a
 	-- hospital bed: Infection/InfectionService); pickFree never offers a street rider (AI_ONLY)
+	-- (and whose body is in the town: a body taken out of the Workspace for a while, e.g. one gone off the map or
+	-- knocked out, can't be handed to a player; the engine refuses its network owner)
+	local function inTown(actor: any): boolean
+		local body = actor and actor.body
+		if typeof(body) ~= "Instance" then
+			return true -- (the specs' stand-in bodies)
+		end
+		return (body :: Instance):IsDescendantOf(workspace)
+	end
 	local function free(a: any): boolean
 		local actor = byTownId[a.id]
-		return actor.possessable ~= false and possession:controllerOf(actor) == "ai"
+		return actor.possessable ~= false and possession:controllerOf(actor) == "ai" and inTown(actor)
 	end
 	local function freeOf(species: string, variant: string?, near: Vector3?): any?
 		local a = ActorsRuntime.pickFree(world.actors, free, species, variant, near)
