@@ -28,6 +28,8 @@
 -- on the ground there (the copy's foot stands as high over World/Height as its source's foot does): its trunk and
 -- every bough of its canopy forks, translated, and its forks with them. The bake places the source's meshes at the
 -- copy's pivot (tools/compile lib/TreeShapes adds the art records), so the copy is the same tree, bark on its routes.
+-- `keep` (optional, source bough route ids): only those boughs are copied, a copy pruned to a few clean, well-spaced
+-- limbs (owner D41, the tree by the Spicy Rodent's start); its other drawn boughs stay decoration until a mesh of its own.
 --
 -- THE INTERFACE
 --   TreeShapes.build(doc, harvest, forks, heightAt) -> Compiled   (the compiler only)
@@ -62,7 +64,15 @@ export type BoughSpec = {
 	tier: string,
 }
 export type Reshape = { trunk: number, label: string, why: string?, big: boolean?, boughs: { BoughSpec } }
-export type Plant = { id: string, source: number, x: number, z: number, label: string, why: string? }
+export type Plant = {
+	id: string,
+	source: number,
+	x: number,
+	z: number,
+	label: string,
+	why: string?,
+	keep: { number }?,
+}
 export type Doc = { idBase: number, reshaped: { Reshape }, planted: { Plant }? }
 
 export type ForkEntry = {
@@ -288,6 +298,9 @@ function TreeShapes.build(doc: Doc, harvest: any, forks: { ForkRecord }, heightA
 		tree.trunk = copy(src)
 		local rec: ForkRecord = { trunk = tree.trunk, forks = {} }
 		for _, f in srcForks.forks do
+			if pl.keep and table.find(pl.keep, f.branch) == nil then
+				continue
+			end
 			local b = harvest:get(f.branch)
 			assert(b, `tree shapes: source fork branch {f.branch}`)
 			local id = copy(b)

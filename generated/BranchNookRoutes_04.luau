@@ -7,86 +7,6 @@
 return {
 	{
 		id = 31563,
-		name = "hangout off route 14468",
-		kind = "branch",
-		length = 4.7999,
-		origin = "branchNook",
-		points = {
-			{ 3870.9573144250835, 42.0662636974001, -2081.878622680741 },
-			{ 3871.7336, 42.0663, -2081.4996 },
-			{ 3872.7997, 42.0663, -2081.0637 },
-			{ 3874.0807, 42.0663, -2080.6583 },
-			{ 3875.4871, 42.0663, -2080.3506 },
-		},
-		sampleCount = 21,
-		surfaceRadius = 1,
-	},
-	{
-		id = 31564,
-		name = "spur off route 14466",
-		kind = "branch",
-		length = 7.0109,
-		origin = "branchNook",
-		points = {
-			{ 3884.2157781726182, 31.62195795701858, -2078.0790076759044 },
-			{ 3884.4775, 32.4282, -2076.9388 },
-			{ 3884.904, 33.2497, -2075.4384 },
-			{ 3885.5117, 33.6101, -2073.7232 },
-			{ 3886.2913, 33.422, -2071.9361 },
-		},
-		sampleCount = 21,
-		surfaceRadius = 2.025,
-	},
-	{
-		id = 31565,
-		name = "spur off route 14467",
-		kind = "branch",
-		length = 7.011,
-		origin = "branchNook",
-		points = {
-			{ 3876.064468141875, 38.781779460115075, -2097.384617151598 },
-			{ 3877.0363, 39.588, -2098.036 },
-			{ 3878.2857, 40.4095, -2098.9698 },
-			{ 3879.6712, 40.7699, -2100.1495 },
-			{ 3881.0625, 40.5818, -2101.5154 },
-		},
-		sampleCount = 21,
-		surfaceRadius = 2.025,
-	},
-	{
-		id = 31566,
-		name = "nook off route 14482",
-		kind = "branch",
-		length = 2.8159,
-		origin = "branchNook",
-		points = {
-			{ 2326.356442081428, 28.422417976267123, -2046.677828069089 },
-			{ 2325.9308, 28.3684, -2046.9475 },
-			{ 2325.3408, 28.2964, -2047.2689 },
-			{ 2324.6242, 28.2124, -2047.5864 },
-			{ 2323.8286, 28.1224, -2047.8554 },
-		},
-		sampleCount = 21,
-		surfaceRadius = 1,
-	},
-	{
-		id = 31567,
-		name = "nook off route 14483",
-		kind = "branch",
-		length = 2.816,
-		origin = "branchNook",
-		points = {
-			{ 2319.255777354545, 40.8072823114501, -2045.1368475388044 },
-			{ 2319.5273, 40.7533, -2045.5614 },
-			{ 2319.9257, 40.6813, -2046.1023 },
-			{ 2320.4406, 40.5973, -2046.6933 },
-			{ 2321.0475, 40.5073, -2047.2738 },
-		},
-		sampleCount = 21,
-		surfaceRadius = 1,
-	},
-	{
-		id = 31568,
 		name = "hangout off route 14484",
 		kind = "branch",
 		length = 4.7998,
@@ -102,7 +22,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31569,
+		id = 31564,
 		name = "nook off route 14500",
 		kind = "branch",
 		length = 2.8159,
@@ -118,7 +38,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31570,
+		id = 31565,
 		name = "nook off route 14501",
 		kind = "branch",
 		length = 2.8159,
@@ -134,7 +54,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31571,
+		id = 31566,
 		name = "hangout off route 14502",
 		kind = "branch",
 		length = 4.7999,
@@ -150,7 +70,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31572,
+		id = 31567,
 		name = "nook off route 14514",
 		kind = "branch",
 		length = 2.816,
@@ -166,7 +86,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31573,
+		id = 31568,
 		name = "nook off route 14515",
 		kind = "branch",
 		length = 2.8159,
@@ -182,7 +102,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31574,
+		id = 31569,
 		name = "hangout off route 14516",
 		kind = "branch",
 		length = 4.7999,
@@ -198,7 +118,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31575,
+		id = 31570,
 		name = "spur off route 14515",
 		kind = "branch",
 		length = 7.0109,
@@ -214,7 +134,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31576,
+		id = 31571,
 		name = "spur off route 14514",
 		kind = "branch",
 		length = 7.0109,
@@ -230,7 +150,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31577,
+		id = 31572,
 		name = "nook off route 14530",
 		kind = "branch",
 		length = 2.816,
@@ -246,7 +166,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31578,
+		id = 31573,
 		name = "nook off route 14531",
 		kind = "branch",
 		length = 2.8159,
@@ -262,7 +182,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31579,
+		id = 31574,
 		name = "hangout off route 14532",
 		kind = "branch",
 		length = 4.7998,
@@ -278,7 +198,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31580,
+		id = 31575,
 		name = "nook off route 14546",
 		kind = "branch",
 		length = 2.8159,
@@ -294,7 +214,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31581,
+		id = 31576,
 		name = "nook off route 14547",
 		kind = "branch",
 		length = 2.816,
@@ -310,7 +230,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31582,
+		id = 31577,
 		name = "hangout off route 14548",
 		kind = "branch",
 		length = 4.7999,
@@ -326,7 +246,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31583,
+		id = 31578,
 		name = "nook off route 14562",
 		kind = "branch",
 		length = 2.816,
@@ -342,7 +262,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31584,
+		id = 31579,
 		name = "nook off route 14563",
 		kind = "branch",
 		length = 2.816,
@@ -358,7 +278,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31585,
+		id = 31580,
 		name = "hangout off route 14564",
 		kind = "branch",
 		length = 4.7999,
@@ -374,7 +294,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31586,
+		id = 31581,
 		name = "nook off route 14580",
 		kind = "branch",
 		length = 2.8159,
@@ -390,7 +310,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31587,
+		id = 31582,
 		name = "nook off route 14581",
 		kind = "branch",
 		length = 2.816,
@@ -406,7 +326,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31588,
+		id = 31583,
 		name = "hangout off route 14582",
 		kind = "branch",
 		length = 4.7999,
@@ -422,7 +342,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31589,
+		id = 31584,
 		name = "spur off route 14580",
 		kind = "branch",
 		length = 7.011,
@@ -438,7 +358,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31590,
+		id = 31585,
 		name = "nook off route 14594",
 		kind = "branch",
 		length = 2.816,
@@ -454,7 +374,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31591,
+		id = 31586,
 		name = "nook off route 14595",
 		kind = "branch",
 		length = 2.816,
@@ -470,7 +390,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31592,
+		id = 31587,
 		name = "hangout off route 14596",
 		kind = "branch",
 		length = 4.7999,
@@ -486,7 +406,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31593,
+		id = 31588,
 		name = "spur off route 14595",
 		kind = "branch",
 		length = 7.011,
@@ -502,7 +422,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31594,
+		id = 31589,
 		name = "spur off route 14594",
 		kind = "branch",
 		length = 7.011,
@@ -518,7 +438,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31595,
+		id = 31590,
 		name = "nook off route 14610",
 		kind = "branch",
 		length = 2.816,
@@ -534,7 +454,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31596,
+		id = 31591,
 		name = "nook off route 14611",
 		kind = "branch",
 		length = 2.816,
@@ -550,7 +470,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31597,
+		id = 31592,
 		name = "hangout off route 14612",
 		kind = "branch",
 		length = 4.7998,
@@ -566,7 +486,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31598,
+		id = 31593,
 		name = "nook off route 14626",
 		kind = "branch",
 		length = 2.816,
@@ -582,7 +502,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31599,
+		id = 31594,
 		name = "nook off route 14627",
 		kind = "branch",
 		length = 2.816,
@@ -598,7 +518,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31600,
+		id = 31595,
 		name = "hangout off route 14628",
 		kind = "branch",
 		length = 4.7999,
@@ -614,7 +534,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31601,
+		id = 31596,
 		name = "spur off route 14626",
 		kind = "branch",
 		length = 7.0109,
@@ -630,7 +550,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31602,
+		id = 31597,
 		name = "spur off route 14627",
 		kind = "branch",
 		length = 7.011,
@@ -646,7 +566,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31603,
+		id = 31598,
 		name = "nook off route 14642",
 		kind = "branch",
 		length = 2.816,
@@ -662,7 +582,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31604,
+		id = 31599,
 		name = "nook off route 14643",
 		kind = "branch",
 		length = 2.816,
@@ -678,7 +598,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31605,
+		id = 31600,
 		name = "hangout off route 14644",
 		kind = "branch",
 		length = 4.7999,
@@ -694,7 +614,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31606,
+		id = 31601,
 		name = "nook off route 14658",
 		kind = "branch",
 		length = 2.816,
@@ -710,7 +630,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31607,
+		id = 31602,
 		name = "nook off route 14659",
 		kind = "branch",
 		length = 2.8159,
@@ -726,7 +646,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31608,
+		id = 31603,
 		name = "hangout off route 14660",
 		kind = "branch",
 		length = 4.7999,
@@ -742,7 +662,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31609,
+		id = 31604,
 		name = "nook off route 14674",
 		kind = "branch",
 		length = 2.8159,
@@ -758,7 +678,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31610,
+		id = 31605,
 		name = "nook off route 14675",
 		kind = "branch",
 		length = 2.816,
@@ -774,7 +694,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31611,
+		id = 31606,
 		name = "hangout off route 14676",
 		kind = "branch",
 		length = 4.7999,
@@ -790,7 +710,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31612,
+		id = 31607,
 		name = "spur off route 14674",
 		kind = "branch",
 		length = 7.0109,
@@ -806,7 +726,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31613,
+		id = 31608,
 		name = "spur off route 14675",
 		kind = "branch",
 		length = 7.0109,
@@ -822,7 +742,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31614,
+		id = 31609,
 		name = "nook off route 14690",
 		kind = "branch",
 		length = 2.816,
@@ -838,7 +758,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31615,
+		id = 31610,
 		name = "nook off route 14691",
 		kind = "branch",
 		length = 2.816,
@@ -854,7 +774,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31616,
+		id = 31611,
 		name = "hangout off route 14692",
 		kind = "branch",
 		length = 4.7998,
@@ -870,7 +790,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31617,
+		id = 31612,
 		name = "spur off route 14690",
 		kind = "branch",
 		length = 7.0109,
@@ -886,7 +806,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31618,
+		id = 31613,
 		name = "spur off route 14691",
 		kind = "branch",
 		length = 7.0109,
@@ -902,7 +822,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31619,
+		id = 31614,
 		name = "nook off route 14706",
 		kind = "branch",
 		length = 2.8159,
@@ -918,7 +838,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31620,
+		id = 31615,
 		name = "nook off route 14707",
 		kind = "branch",
 		length = 2.816,
@@ -934,7 +854,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31621,
+		id = 31616,
 		name = "hangout off route 14708",
 		kind = "branch",
 		length = 4.7999,
@@ -950,7 +870,7 @@ return {
 		surfaceRadius = 1,
 	},
 	{
-		id = 31622,
+		id = 31617,
 		name = "spur off route 14706",
 		kind = "branch",
 		length = 7.0109,
@@ -966,7 +886,7 @@ return {
 		surfaceRadius = 2.025,
 	},
 	{
-		id = 31623,
+		id = 31618,
 		name = "spur off route 14707",
 		kind = "branch",
 		length = 7.0109,
