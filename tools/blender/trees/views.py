@@ -10,6 +10,8 @@ are studs in Roblox axes (+Y up), local to the tree's pivot. Each camera is (loc
   collar      level with the first fork from a neighbouring perch: the junction side-on
   bough       from inside the crown, along a bough toward its tip
   crown       from the pavement side, a closer look at one side of the canopy
+  ground      the squirrel on the ground 30 studs off, looking up the tree (the owner's D41 view; from the trunk
+              alone, so a tree with fewer boughs is seen from the same place)
 """
 import math
 
@@ -73,6 +75,9 @@ def cameras(rails, H, aspect=16 / 9):
     cams["street"] = (loc, np.array([cx, top * 0.5, cz]), lens)
     loc2 = np.array([cx - math.sin(ang + 0.5) * dist * 0.5, 5.0, cz - math.cos(ang + 0.5) * dist * 0.5])
     cams["crown"] = (loc2, np.array([cx, top * 0.66, cz]), 24.0)
+    foot = trunk[0]
+    gloc = np.array([foot[0] - math.sin(ang) * 30.0, foot[1] + 2.5, foot[2] - math.cos(ang) * 30.0])
+    cams["ground"] = (gloc, np.array([foot[0], foot[1] + float(H) * 0.45, foot[2]]), 13.0)
     if not boughs:
         return cams
     # the first fork: the lowest height at which boughs leave the trunk

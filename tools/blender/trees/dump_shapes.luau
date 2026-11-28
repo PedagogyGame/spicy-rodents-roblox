@@ -4,7 +4,8 @@
 --   lune run tools/blender/trees/dump_shapes.luau [generated/TreeShapes.luau] [build/tree_shapes/shapes.json]
 -- Writes the grown boughs of the reshaped trees: routes (id, name, kind, points, surfaceRadius, trunkClearance,
 -- length: units), their samples (the game's sampleCount arc-length points, units) and per reshaped trunk the boughs
--- it gains (its canopy forks). The planted copies are not written: they wear their sources' uploaded meshes.
+-- it gains (its canopy forks), and per planted copy its trunk, label, source trunk and offset (studs: the copy is its
+-- source moved by it), so build_trees.py --planted can build a copy's own pruned mesh round its source's routes.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -22,8 +23,17 @@ end
 local function u(v: number): number
 	return math.floor(v / SPU * 1e6 + 0.5) / 1e6
 end
-local routes, samples, forks = {}, {}, {}
+local routes, samples, forks, planted = {}, {}, {}, {}
 for _, tree in compiled.trees do
+	if tree.kind == "planted" then
+		table.insert(planted, {
+			trunk = tree.trunk,
+			label = tree.label,
+			source = tree.source,
+			offset = tree.offset,
+			routes = tree.routes,
+		})
+	end
 	if tree.kind == "reshaped" then
 		local ids = {}
 		for _, id in tree.routes do
@@ -65,6 +75,7 @@ fs.writeFile(
 		routes = routes,
 		samples = samples,
 		forks = forks,
+		planted = planted,
 	}, true)
 )
-print(`{#routes} grown boughs on {#forks} trees -> {out}`)
+print(`{#routes} grown boughs on {#forks} trees, {#planted} planted copies -> {out}`)
