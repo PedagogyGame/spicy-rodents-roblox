@@ -6690,6 +6690,111 @@
     "promiseWarnings": 3,
     "hollow": "H4",
     "hollowBoardMargin": 0.139
+   },
+   "pending": {
+    "sha": "958dcb2b2aba911c",
+    "fbxBytes": 2806956,
+    "tris": {
+     "bark": 10956,
+     "leaves": 4292,
+     "fruit": 0,
+     "total": 15248
+    },
+    "routes": [
+     833,
+     836,
+     835,
+     837,
+     838,
+     839,
+     841,
+     842,
+     834,
+     840,
+     843,
+     844
+    ],
+    "parts": {
+     "Bark": {
+      "center": [
+       -0.093,
+       30.509,
+       20.204
+      ],
+      "size": [
+       41.416,
+       69.916,
+       106.001
+      ],
+      "doubleSided": false,
+      "alphaMode": "Overlay"
+     },
+     "LeavesShade": {
+      "center": [
+       -1.398,
+       42.731,
+       -0.495
+      ],
+      "size": [
+       42.444,
+       27.776,
+       36.549
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       144,
+       168,
+       85
+      ]
+     },
+     "LeavesMid": {
+      "center": [
+       -1.126,
+       44.589,
+       -0.843
+      ],
+      "size": [
+       46.479,
+       31.636,
+       42.781
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       144,
+       168,
+       85
+      ]
+     },
+     "LeavesSun": {
+      "center": [
+       -1.55,
+       48.248,
+       12.108
+      ],
+      "size": [
+       48.716,
+       38.326,
+       69.549
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       144,
+       168,
+       85
+      ]
+     }
+    },
+    "checks": {
+     "promisesBroken": 0,
+     "promiseWarnings": 3,
+     "hollow": "H4",
+     "hollowBoardMargin": 0.122
+    },
+    "fbx": "build/art/trees_refine/tree_058.fbx",
+    "state": "not uploaded"
    }
   },
   {
@@ -6926,6 +7031,112 @@
     "promiseWarnings": 2,
     "hollow": "H9",
     "hollowBoardMargin": 0.137
+   },
+   "pending": {
+    "sha": "ab27473c71eede15",
+    "fbxBytes": 2965420,
+    "tris": {
+     "bark": 11122,
+     "leaves": 4212,
+     "fruit": 0,
+     "total": 15334
+    },
+    "routes": [
+     860,
+     861,
+     862,
+     863,
+     864,
+     865,
+     866,
+     868,
+     869,
+     870,
+     867,
+     871,
+     872
+    ],
+    "parts": {
+     "Bark": {
+      "center": [
+       -34.592,
+       30.191,
+       -2.405
+      ],
+      "size": [
+       112.639,
+       69.48,
+       212.129
+      ],
+      "doubleSided": false,
+      "alphaMode": "Overlay"
+     },
+     "LeavesShade": {
+      "center": [
+       0.12,
+       40.185,
+       0.049
+      ],
+      "size": [
+       52.349,
+       27.616,
+       44.529
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       124,
+       154,
+       71
+      ]
+     },
+     "LeavesMid": {
+      "center": [
+       0.682,
+       46.888,
+       -1.115
+      ],
+      "size": [
+       55.409,
+       35.166,
+       51.237
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       124,
+       154,
+       71
+      ]
+     },
+     "LeavesSun": {
+      "center": [
+       -17.896,
+       53.404,
+       -4.002
+      ],
+      "size": [
+       93.906,
+       35.554,
+       125.833
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       124,
+       154,
+       71
+      ]
+     }
+    },
+    "checks": {
+     "promisesBroken": 0,
+     "promiseWarnings": 2,
+     "hollow": "H9",
+     "hollowBoardMargin": 0.12
+    },
+    "fbx": "build/art/trees_refine/tree_060.fbx",
+    "state": "not uploaded"
    }
   },
   {
@@ -7277,6 +7488,112 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 2
+   },
+   "pending": {
+    "sha": "d54ee6ebe620dc1d",
+    "fbxBytes": 3042220,
+    "tris": {
+     "bark": 11316,
+     "leaves": 4996,
+     "fruit": 0,
+     "total": 16312
+    },
+    "routes": [
+     900,
+     901,
+     906,
+     914,
+     903,
+     904,
+     905,
+     908,
+     909,
+     910,
+     902,
+     907,
+     911,
+     912,
+     913
+    ],
+    "parts": {
+     "Bark": {
+      "center": [
+       0.551,
+       34.355,
+       -0.349
+      ],
+      "size": [
+       45.428,
+       77.905,
+       44.242
+      ],
+      "doubleSided": false,
+      "alphaMode": "Overlay"
+     },
+     "LeavesShade": {
+      "center": [
+       -1.815,
+       40.907,
+       0.609
+      ],
+      "size": [
+       49.003,
+       30.452,
+       52.297
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       140,
+       161,
+       80
+      ]
+     },
+     "LeavesMid": {
+      "center": [
+       -2.766,
+       46.841,
+       0.649
+      ],
+      "size": [
+       53.556,
+       40.143,
+       56.965
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       140,
+       161,
+       80
+      ]
+     },
+     "LeavesSun": {
+      "center": [
+       0.076,
+       54.609,
+       1.099
+      ],
+      "size": [
+       58.294,
+       43.851,
+       57.949
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       140,
+       161,
+       80
+      ]
+     }
+    },
+    "checks": {
+     "promisesBroken": 0,
+     "promiseWarnings": 2
+    },
+    "fbx": "build/art/trees_refine/tree_063.fbx",
+    "state": "not uploaded"
    }
   },
   {
@@ -8535,6 +8852,108 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
+   },
+   "pending": {
+    "sha": "af1e339fad69e504",
+    "fbxBytes": 2824940,
+    "tris": {
+     "bark": 11033,
+     "leaves": 4628,
+     "fruit": 0,
+     "total": 15661
+    },
+    "routes": [
+     1041,
+     1046,
+     1049,
+     1042,
+     1043,
+     1045,
+     1048,
+     1044,
+     1047,
+     1050,
+     1051
+    ],
+    "parts": {
+     "Bark": {
+      "center": [
+       13.007,
+       41.32,
+       -0.222
+      ],
+      "size": [
+       101.174,
+       91.722,
+       73.572
+      ],
+      "doubleSided": false,
+      "alphaMode": "Overlay"
+     },
+     "LeavesShade": {
+      "center": [
+       -2.791,
+       59.955,
+       0.773
+      ],
+      "size": [
+       82.466,
+       34.773,
+       77.591
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     },
+     "LeavesMid": {
+      "center": [
+       -1.192,
+       63.502,
+       0.72
+      ],
+      "size": [
+       83.89,
+       41.794,
+       87.69
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     },
+     "LeavesSun": {
+      "center": [
+       -0.519,
+       68.171,
+       0.319
+      ],
+      "size": [
+       84.411,
+       51.126,
+       82.027
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     }
+    },
+    "checks": {
+     "promisesBroken": 0,
+     "promiseWarnings": 1
+    },
+    "fbx": "build/art/trees_refine/tree_074.fbx",
+    "state": "not uploaded"
    }
   },
   {
@@ -8763,6 +9182,108 @@
    "checks": {
     "promisesBroken": 0,
     "promiseWarnings": 1
+   },
+   "pending": {
+    "sha": "f61b15f0c85b9590",
+    "fbxBytes": 2814044,
+    "tris": {
+     "bark": 10974,
+     "leaves": 4480,
+     "fruit": 0,
+     "total": 15454
+    },
+    "routes": [
+     1063,
+     1068,
+     1070,
+     1071,
+     1072,
+     1064,
+     1065,
+     1067,
+     1069,
+     1066,
+     1073
+    ],
+    "parts": {
+     "Bark": {
+      "center": [
+       12.344,
+       43.594,
+       1.895
+      ],
+      "size": [
+       102.442,
+       96.363,
+       81.807
+      ],
+      "doubleSided": false,
+      "alphaMode": "Overlay"
+     },
+     "LeavesShade": {
+      "center": [
+       2.714,
+       59.324,
+       1.464
+      ],
+      "size": [
+       76.606,
+       33.545,
+       76.882
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     },
+     "LeavesMid": {
+      "center": [
+       0.302,
+       61.914,
+       1.086
+      ],
+      "size": [
+       91.135,
+       38.648,
+       86.829
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     },
+     "LeavesSun": {
+      "center": [
+       -0.227,
+       69.491,
+       2.466
+      ],
+      "size": [
+       87.71,
+       53.09,
+       90.199
+      ],
+      "doubleSided": true,
+      "alphaMode": "Transparency",
+      "color": [
+       110,
+       144,
+       74
+      ]
+     }
+    },
+    "checks": {
+     "promisesBroken": 0,
+     "promiseWarnings": 1
+    },
+    "fbx": "build/art/trees_refine/tree_076.fbx",
+    "state": "not uploaded"
    }
   },
   {
@@ -10909,6 +11430,121 @@
      ],
      "doubleSided": false,
      "alphaMode": "Overlay"
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 1
+   }
+  }
+ ],
+ "plantedNote": "planted copies (data/tree_shapes.json `planted`) with a mesh of their own (build_trees.py --planted): pivot and routes are the copy's; tools/compile lib/TreeShapes gives the copy this Model once it has an id, its source's until then. Not counted in count/totals.",
+ "planted": [
+  {
+   "id": "P2",
+   "label": "BACK LOT OAK",
+   "species": "oak",
+   "category": "named",
+   "source": 900,
+   "sourceIndex": 63,
+   "trunkRoute": 9859,
+   "routes": [
+    9859,
+    9860,
+    9861,
+    9862,
+    9863,
+    9864
+   ],
+   "pivot": [
+    -200.0,
+    0.0,
+    -200.0
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 P2 BACK LOT OAK",
+   "moderation": "not uploaded",
+   "sha": "d12b38c4da56f4f9",
+   "fbxBytes": 2778572,
+   "fbx": "build/art/trees_refine/tree_P2.fbx",
+   "tris": {
+    "bark": 7743,
+    "leaves": 2712,
+    "fruit": 0,
+    "total": 10455
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      3.116,
+      33.449,
+      0.126
+     ],
+     "size": [
+      44.371,
+      76.093,
+      46.912
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.996,
+      44.377,
+      1.569
+     ],
+     "size": [
+      48.866,
+      32.299,
+      55.11
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.523,
+      49.542,
+      0.651
+     ],
+     "size": [
+      56.694,
+      39.113,
+      53.824
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      3.735,
+      54.204,
+      1.234
+     ],
+     "size": [
+      58.838,
+      42.656,
+      60.673
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
     }
    },
    "checks": {

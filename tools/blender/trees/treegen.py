@@ -60,6 +60,26 @@ LEAF_BUDGET = 6000
 SPRAY_SCALE = {"oak": 1.45, "elm": 1.45, "sycamore": 1.45, "maple": 1.45, "willow": 1.3, "apple": 1.0}
 COLLAR = 0.14  # how much a bough swells where it leaves the trunk
 FLARE_ROOM = 0.22  # studs the bark may stand outside the climbing radius at the climb's start, fading by the flare's top
+# The slim build (opts["slim"]; BRIEF_ADDENDUM D41, owner 2026-11-28: "HORRIBLE TO NAVIGATE ALL CLUTTERED AND BRANCHES
+# TOO THICK"): the wood the squirrel does not run on steps back. A bough is about as thick as the run on it (the
+# squirrel's feet stand visualBranchLift, 1.25 studs, over the rail: bark of about that radius where it leaves the
+# trunk, tapering to `bough_tip`), the side branches along the boughs are fewer, shorter and thinner and none leave
+# a bough below the crown's floor, and the forks at a bough's end and the leader's crown limbs are fine wood. Routes,
+# trunk and every promise are as before. A planted copy's own mesh (the D41 start tree) also has a lighter crown
+# (`leaf_budget`, passed as opts["leaf_budget"] by build_trees.py --planted).
+SLIM = dict(
+    bough_r=1.05,  # a bough's radius where it leaves the trunk (before the collar), studs
+    bough_tip=0.5,  # and at its tip
+    side_spacing=1.7,  # side branches along a bough: spacing x this
+    side_len=0.72,  # their length x this
+    side_r=0.38,  # their radius where they leave, at most (studs)
+    side_floor=2.0,  # none leaves a bough lower than this under the crown's floor (min_leaf_y)
+    fork_r=0.5,  # the forks at a bough's end: the tip's radius x this
+    leader_rf=(0.3, 0.24),  # the leader's radius as a fraction of the trunk top's (tried in turn)
+    crown=-2,  # crown limbs: the species' count + this
+    crown_r=(0.2, 0.45),  # their radius where they leave (studs)
+    leaf_budget=4400,  # a planted copy's leaf sprays, triangles (LEAF_BUDGET otherwise)
+)
 
 
 # ---- data ---------------------------------------------------------------------------------------
@@ -846,9 +866,9 @@ class TreeBuilder:
             leans = [np.array([math.cos(a0), 0.0, math.sin(a0)]) for a0 in az]
             pick, done = None, False
             for length in (lead_len, 0.6 * lead_len, 0.35 * lead_len):
-                for rf in (0.46, 0.36, 0.27):
+                for rf in (SLIM["leader_rf"] if self.opts.get("slim") else (0.46, 0.36, 0.27)):
                     cands = []
-                    for ln in leans + ([] if axis_walk or rf != 0.46 else [None]):
+                    for ln in leans + ([] if axis_walk or rf != 0.46 or self.opts.get("slim") else [None]):
                         broom, froom = leader_room(ln, length, rf)
                         if froom < 0.15:
                             continue  # (it would stand on a walk's first steps)
@@ -1006,6 +1026,10 @@ class TreeBuilder:
         cap = {"named": 1.4, "outer": 1.2, "giant": 1.4, "apple": 0.62, "estate": 1.4}[cat]
         cap = min(cap, (2.0 + lift) / 2 / (1 + COLLAR))
         r_tip = max(0.5 * lift + 0.08, 0.32)
+        slim = self.opts.get("slim")
+        if slim:
+            cap = min(cap, SLIM["bough_r"])
+            r_tip = SLIM["bough_tip"]
         r_base = cap
         if kind == "bridge":
             r_base *= 0.85
@@ -1029,7 +1053,7 @@ class TreeBuilder:
             s_exit = min(float(ssd[int(np.argmax(dt > 0))]) if (dt > 0).any() else 0.0, clear)
         zone = max(2.4 * rt + 3.0, clear + 2.0) if on_trunk else 3.0  # no side branches inside it
         s0 = max(zone + 1.0, 0.2 * L)
-        spacing = par["spacing"] * self.scale * (1.9 if kind == "bridge" else 1.0)
+        spacing = par["spacing"] * self.scale * (1.9 if kind == "bridge" else 1.0) * (SLIM["side_spacing"] if slim else 1.0)
         s1 = L * (0.72 if kind == "bridge" else 0.97) - 1.0
         kids = []
         if s1 > s0 and kind != "lookout":
@@ -1741,6 +1765,7 @@ class TreeBuilder:
     def grow_all(self):
         par, rng = self.par, self.rng
         sc = self.scale
+        slim = self.opts.get("slim")
         l_near, l_tip = par["len1"]
         firsts = []
         # side branches along every bough, alternate sides, longest in the middle of the crown
@@ -1762,6 +1787,12 @@ class TreeBuilder:
                     ln *= 0.55 * (1.0 - 0.5 * u)
                 r0 = float(np.clip(math.sqrt(max(g, 0.01)), 0.16, 0.8 * rpar))
                 d = self.side_dir(t, None, side, 1)
+                if slim:
+                    ln *= SLIM["side_len"]
+                    r0 = min(r0, SLIM["side_r"])
+                    if cpt[1] < self.min_leaf_y - SLIM["side_floor"]:
+                        side = -side
+                        continue  # (no stray limb under the crown: the low runs stay clean)
                 br = self.add_branch(cpt, d, ln, r0, 1, chain, rpar, bi + u)
                 if br is not None:
                     br["bough"] = bi
@@ -1781,7 +1812,8 @@ class TreeBuilder:
                     else:
                         d = norm(t + Y * rng.uniform(-0.45, -0.25) + sidev * rng.normal(0, 0.15))
                     ln = l_tip * sc * rng.uniform(0.75, 1.1)
-                    br = self.add_branch(tipc - t * 0.4 * rtip - Y * 0.12 * rtip, d, ln, rtip * (0.7 if m == 2 else 0.6), 1, chain, rtip, bi + 1.0)
+                    rf = SLIM["fork_r"] if slim else (0.7 if m == 2 else 0.6)
+                    br = self.add_branch(tipc - t * 0.4 * rtip - Y * 0.12 * rtip, d, ln, rtip * rf, 1, chain, rtip, bi + 1.0)
                     if br is not None:
                         br["bough"] = bi
                         firsts.append(br)
@@ -1790,7 +1822,7 @@ class TreeBuilder:
             LC, LR = self.leader
             chain = self.leader_limb.chain
             sL = arclen(LC)
-            n = par["crown"] + (2 if self.cat == "giant" else 0)
+            n = par["crown"] + (2 if self.cat == "giant" else 0) + (SLIM["crown"] if slim else 0)
             c, rh, ylo, yhi = self.crown
             a0 = rng.random() * 6.28
             for q in range(n):
@@ -1803,7 +1835,8 @@ class TreeBuilder:
                 d = norm(out * math.cos(elev) + Y * math.sin(elev))
                 room = max(self.crown_top - pk[1], 6.0)
                 ln = float(np.clip(0.42 * rh * (1.0 - 0.35 * f) + 0.4 * room, 8.0, 34.0)) * rng.uniform(0.85, 1.1)
-                br = self.add_branch(pk, d, ln, float(np.clip(0.62 * rpar, 0.28, 1.0)), 1, chain, rpar, 100 + q)
+                cr = SLIM["crown_r"] if slim else (0.28, 1.0)
+                br = self.add_branch(pk, d, ln, float(np.clip(0.62 * rpar, *cr)), 1, chain, rpar, 100 + q)
                 if br is not None:
                     br["bough"] = -1
                     br["crown"] = True

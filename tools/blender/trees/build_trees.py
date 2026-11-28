@@ -7,7 +7,12 @@
   nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids 0 --render debug
 
 --ids: comma-separated trees.json indices, "review" (BUR OAK, AMERICAN ELM, SYCAMORE, a street elm, SENTINEL
-OAK, a park maple, a QUAY WILLOW, APPLE 3) or "all". Writes per tree into --out:
+OAK, a park maple, a QUAY WILLOW, APPLE 3), "all", "shapes" (the D32 reshaped trees, with --shapes) or "none".
+--slim: the D41 slim build (treegen.SLIM: boughs about as thick as their runs, little wood that is not a run).
+--planted P2[,..] (with --shapes): a planted copy's own mesh (data/tree_shapes.json `planted`): its source's tree
+with only the boughs the copy keeps, always slim, written as tree_P2.* round the source's routes and pivot (what
+check_promises.py measures) with the copy's trunk, pivot and offset under "planted" (what publish.py records).
+Writes per tree into --out:
   tree_NNN.fbx                 MeshParts Bark, LeavesShade, LeavesMid, LeavesSun (+ Apples), PBR textures embedded
   tree_NNN.json                pivot, part bounds (Roblox axes, relative to the pivot), tris, checks
   renders/tree_NNN_<view>.png  Cycles (views.py cameras: street, crown, fork, collar, junction, junction2,
@@ -437,6 +442,31 @@ def add_camera(name, loc, target, lens):
     return co
 
 
+def file_name(rec):
+    return rec.get("file") or f"tree_{rec['index']:03d}"
+
+
+def planted_recs(recs, shapes, ids):
+    """The planted copies' records: their source's record with only the kept boughs, labelled as the copy."""
+    with open(os.path.join(tg.REPO, "data", "tree_shapes.json")) as fh:
+        authored = {p["id"]: p for p in json.load(fh).get("planted", [])}
+    dumped = (shapes or {}).get("planted", [])
+    out = []
+    for pid in ids:
+        pl = authored[pid]
+        dp = next((d for d in dumped if d["label"] == pl["label"] and d["source"] == pl["source"]), None)
+        if dp is None:
+            raise SystemExit(f"planted {pid}: not in --shapes (lune run tools/blender/trees/dump_shapes.luau first)")
+        src = next(r for r in recs if r["trunk"]["id"] == pl["source"])
+        keep = pl.get("keep")
+        members = [m for m in src["members"] if keep is None or m["id"] in keep]
+        out.append(dict(src, members=members, label=pl["label"], file=f"tree_{pid}", slim=True,
+                        planted={"id": pid, "source": pl["source"], "sourceIndex": src["index"], "trunkRoute": dp["trunk"],
+                                 "offset": dp["offset"], "routes": dp["routes"],
+                                 "pivot": [round(float(a + b), 3) + 0.0 for a, b in zip(src["root"], dp["offset"])]}))
+    return out
+
+
 def render_views(tb, objs, views, out, args):
     scene = bpy.context.scene
     paths = {}
@@ -461,7 +491,7 @@ def render_views(tb, objs, views, out, args):
         else:
             continue
         scene.camera = cam
-        path = os.path.join(out, "renders", f"tree_{tb.rec['index']:03d}_{key}{('_' + args.tag) if args.tag else ''}.png")
+        path = os.path.join(out, "renders", f"{file_name(tb.rec)}_{key}{('_' + args.tag) if args.tag else ''}.png")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         scene.render.filepath = path
         t0 = time.time()
@@ -712,6 +742,8 @@ def main(argv):
     ap.add_argument("--hollows", default="", help="dump_hollows.luau's JSON: the hollow trees keep their knotholes clear")
     ap.add_argument("--shapes", default="", help="dump_shapes.luau's JSON: the D32 reshaped trees gain their grown boughs; "
                     "--ids shapes builds just those trees")
+    ap.add_argument("--slim", action="store_true", help="the D41 slim build (treegen.SLIM)")
+    ap.add_argument("--planted", default="", help="planted copies to build (data/tree_shapes.json ids, e.g. P2; needs --shapes)")
     args = ap.parse_args(argv)
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
@@ -727,26 +759,34 @@ def main(argv):
         ids = [i for i, r in enumerate(recs) if r["trunk"]["id"] in want]
     elif args.ids == "review":
         ids = REVIEW
+    elif args.ids == "none":
+        ids = []
     else:
         ids = [int(x) for x in args.ids.split(",") if x.strip()]
     cache = TexCache(out)
     knots = hollow_knots(args.hollows)
     views = [v for v in args.render.split(",") if v]
     summary = []
-    for i in ids:
-        tk = [dict(k, p=list(np.asarray(k["p"]) - recs[i]["root"])) for k in knots.get(recs[i]["trunk"]["id"], [])]
+    jobs = [dict(recs[i], slim=args.slim) for i in ids]
+    jobs += planted_recs(recs, shapes, [x.strip() for x in args.planted.split(",") if x.strip()])
+    for job in jobs:
+        i = job["index"]
+        tk = [dict(k, p=list(np.asarray(k["p"]) - job["root"])) for k in knots.get(job["trunk"]["id"], [])]
         for attempt in range(args.retries + 1):
             # (a tree that breaks a promise is grown again from another seed: its routes and trunk stay, the
             # side branches, the bark's unevenness and the leaves change)
-            rec = dict(recs[i], seed=recs[i]["seed"] + 7919 * attempt)
+            rec = dict(job, seed=job["seed"] + 7919 * attempt)
             reset_scene()
-            tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
+            opts = {"knots": tk, "slim": rec.get("slim", False)}
+            if rec.get("planted"):
+                opts["leaf_budget"] = tg.SLIM["leaf_budget"]  # (a light crown over the copy's few runs)
+            tb, objs, mats = build_tree_objects(rec, data, cache, opts)
             tb.log["knot_mouth_verts"] = open_knots(tb, objs["Bark"])
             tb.log["feet_cleared_verts"] = clear_walks(tb, objs["Bark"])
             if not args.retries:
                 break
             rep = promise_check(rec, objs, data["routes"])
-            print(f"tree {i:03d} try {attempt}: {'; '.join(rep['fail']) or 'every promise kept'}", flush=True)
+            print(f"{file_name(rec)} try {attempt}: {'; '.join(rep['fail']) or 'every promise kept'}", flush=True)
             if not rep["fail"]:
                 break
         parts = {k: bounds_roblox(o) for k, o in objs.items()}
@@ -763,8 +803,10 @@ def main(argv):
             "trunkRoute": rec["trunk"]["id"], "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]],
             "pivot": [round(float(x), 3) for x in rec["root"]], "heightStuds": round(rec["H"], 2),
             "tris": tb.tri_counts(), "parts": parts, "log": tb.log, "sha": mesh_digest(objs, mats),
-            "seed": rec["seed"],
+            "seed": rec["seed"], "slim": bool(rec.get("slim")),
         }
+        if rec.get("planted"):
+            info["planted"] = rec["planted"]
         info["tris"]["total"] = sum(info["tris"].values())
         if not args.no_checks:
             info["checks"] = alignment_checks(tb)
@@ -783,11 +825,11 @@ def main(argv):
                 objs["Bark"].data.materials[0] = clay
             info["renders"] = render_views(tb, objs, views, out, args)
         if args.fbx:
-            p = os.path.join(out, f"tree_{i:03d}.fbx")
+            p = os.path.join(out, f"{file_name(rec)}.fbx")
             export_fbx(p, objs)
             info["fbx"] = p
             info["fbxBytes"] = os.path.getsize(p)
-        with open(os.path.join(out, f"tree_{i:03d}.json"), "w") as fh:
+        with open(os.path.join(out, f"{file_name(rec)}.json"), "w") as fh:
             json.dump(info, fh, indent=1)
         line = {k: info[k] for k in ("index", "label", "tris")}
         if "checks" in info:
@@ -799,7 +841,8 @@ def main(argv):
         line["s"] = tb.log.get("build_s")
         print(json.dumps(line), flush=True)
         summary.append(info)
-    with open(os.path.join(out, f"summary_{args.ids.replace(',', '_')[:40]}.json"), "w") as fh:
+    tag = args.ids.replace(",", "_")[:40] + (f"_{args.planted.replace(',', '_')}" if args.planted else "")
+    with open(os.path.join(out, f"summary_{tag}.json"), "w") as fh:
         json.dump(summary, fh, indent=1)
 
 

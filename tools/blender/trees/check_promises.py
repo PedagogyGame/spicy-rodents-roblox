@@ -266,6 +266,8 @@ def worst(rows, key, n=3):
 def check_tree(info, parts, routes, clearance_warn=False):
     """info: the tree_NNN.json dict; parts: {name: (V Roblox world studs, F)}. Returns the report dict."""
     rep = {"index": info.get("index"), "label": info.get("label"), "fail": [], "warn": []}
+    if info.get("planted"):
+        rep["planted"] = info["planted"]["id"]
     fail, warn = rep["fail"], rep["warn"]
     trunk = routes[info["trunkRoute"]]
     members = [routes[i] for i in info["routes"] if i != info["trunkRoute"]]
@@ -595,7 +597,9 @@ def main(argv):
 
         sh.merge_routes(routes, sh.load(args.shapes))
     if args.ids:
-        files = [os.path.join(args.dir, f"tree_{int(i):03d}.json") for i in args.ids.split(",") if i.strip()]
+        # (a planted copy's own mesh, build_trees.py --planted: tree_P2.json, measured round its source's routes)
+        files = [os.path.join(args.dir, f"tree_{int(i):03d}.json" if i.strip().isdigit() else f"tree_{i.strip()}.json")
+                 for i in args.ids.split(",") if i.strip()]
     else:
         files = sorted(f for f in glob.glob(os.path.join(args.dir, "tree_*.json")) if re.search(r"tree_\d+\.json$", f))
     reports, broken = [], 0

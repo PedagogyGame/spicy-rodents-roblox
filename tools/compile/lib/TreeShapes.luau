@@ -7,10 +7,12 @@
 -- A planted tree is a copy of a tree with art: its source's art records (generated/TreeArt, the baked meshes, and
 -- generated/TreeArtNext, the uploaded v2 Model) are copied onto the copy's trunk at the copy's pivot, with the copy's
 -- routes as the ones the meshes cover (`routes` / `covers`), so the bake and Server/Assets/TreeArt place the same
--- tree there.
+-- tree there. A copy with a mesh of its own (data/art/trees_v2.json `planted`: build_trees.py --planted, the D41 start
+-- tree pruned to the boughs it keeps) takes that Model instead once it has an id; until then its source's.
 -- Invariants: route ids unique, clear of the harvest and of every other compiled id; a reshaped tree is a harvested
 -- trunk that no hollow uses (data/hollows.json: those trunks are the hollow trees' work); a planted tree's source
--- has baked art and an uploaded v2 Model.
+-- has baked art and an uploaded v2 Model; a copy's own Model is recorded for that copy (trunk, routes, pivot), within
+-- the generator's budgets, digits for an id, and has an id only with every promise kept.
 -- Interface: compile(ctx) -> Module? (nil when the file is absent); ctx.treeArt / ctx.treeArtNext: the art modules'
 -- values (lists), extended in place with the copies.
 local fs = require("@lune/fs")
@@ -18,6 +20,7 @@ local Json = require("./Json")
 local Height = require("../../../src/shared/World/Height")
 local Registry = require("../../../src/shared/Routes/Registry")
 local TreeShapes = require("../../../src/shared/World/TreeShapes")
+local TreeArtNext = require("./TreeArtNext")
 
 local Lib = {}
 
@@ -144,6 +147,54 @@ function Lib.woods(ctx: any): any?
 	return { idBase = doc.idBase, climbBase = doc.climbBase, kinds = kinds, trees = trees, climbs = cl }
 end
 
+-- ownModel(ctx, tree, rec, pivot) -> Next?: a planted copy's own Model (data/art/trees_v2.json `planted` record `rec`)
+-- as a TreeArtNext record, when it has an id; nil (the source's Model stays) without a record or an id. `pivot`: the
+-- source's pivot moved by the copy's offset, which the record's must match.
+function Lib.ownModel(ctx: any, tree: any, rec: any?, pivot: { number }): any?
+	if rec == nil then
+		return nil
+	end
+	local what = `tree shapes: planted {tree.label}'s own Model ({rec.id})`
+	ctx.invariant(what .. ": its trunk", rec.trunkRoute == tree.trunk)
+	local same = #rec.routes == #tree.routes
+	for i, id in tree.routes do
+		same = same and rec.routes[i] == id
+	end
+	ctx.invariant(what .. ": built round the copy's routes", same)
+	for k = 1, 3 do
+		ctx.invariant(what .. ": at the copy's pivot", math.abs(rec.pivot[k] - pivot[k]) < 0.01)
+	end
+	local barkBudget = if TreeArtNext.BIG_CATEGORIES[rec.category]
+		then TreeArtNext.BARK_BUDGET_BIG
+		else TreeArtNext.BARK_BUDGET
+	ctx.invariant(what .. ": bark within budget", rec.tris.bark <= barkBudget)
+	ctx.invariant(what .. ": leaves within budget", rec.tris.leaves <= TreeArtNext.LEAF_BUDGET)
+	local id = rec.assetId
+	if id == "" then
+		id = nil
+	end
+	ctx.invariant(what .. ": an asset id is digits", id == nil or string.match(tostring(id), "^%d+$") ~= nil)
+	ctx.invariant(what .. ": uploaded only with every promise kept", id == nil or rec.checks.promisesBroken == 0)
+	if id == nil then
+		return nil
+	end
+	local leaf = nil
+	for _, name in { "LeavesSun", "LeavesMid", "LeavesShade" } do
+		local part = rec.parts and rec.parts[name]
+		if part and part.color then
+			leaf = leaf or part.color
+		end
+	end
+	return {
+		trunkRoute = tree.trunk,
+		label = tree.label,
+		assetId = tostring(id),
+		pivot = { rec.pivot[1], rec.pivot[2], rec.pivot[3] },
+		tris = rec.tris.total,
+		leaf = leaf,
+	}
+end
+
 function Lib.compile(ctx: any): any?
 	local rel = "data/tree_shapes.json"
 	local path = ctx.repo .. "/" .. rel
@@ -186,9 +237,14 @@ function Lib.compile(ctx: any): any?
 	-- routes (a Model rebuilt with them: tools/blender/trees build_trees.py --shapes); the runtime swap then hides the
 	-- baked stand-ins (Server/Assets/TreeArt.hideGrown)
 	local v2Routes: { [number]: { [number]: boolean } } = {}
+	local ownBy: { [number]: any } = {}
 	local v2Path = ctx.repo .. "/data/art/trees_v2.json"
 	if fs.isFile(v2Path) then
-		for _, t in Json.decodeFile(v2Path).trees do
+		local v2 = Json.decodeFile(v2Path)
+		for _, t in v2.planted or {} do
+			ownBy[t.trunkRoute] = t
+		end
+		for _, t in v2.trees do
 			local set = {}
 			for _, id in t.routes or {} do
 				set[id] = true
@@ -226,16 +282,17 @@ function Lib.compile(ctx: any): any?
 				local function moved(p: { number }): { number }
 					return { p[1] + off[1], p[2] + off[2], p[3] + off[3] }
 				end
+				local own = Lib.ownModel(ctx, tree, ownBy[tree.trunk], moved(n.pivot))
 				local copy = table.clone(a)
 				copy.trunkRoute = tree.trunk
 				copy.label = tree.label
 				copy.pivot = moved(a.pivot)
 				copy.routes = table.clone(tree.routes)
 				table.insert(ctx.treeArt, copy)
-				local nc = table.clone(n)
+				local nc = own or table.clone(n)
 				nc.trunkRoute = tree.trunk
 				nc.label = tree.label
-				nc.pivot = moved(n.pivot)
+				nc.pivot = if own then own.pivot else moved(n.pivot)
 				nc.covers = table.clone(tree.routes)
 				table.insert(ctx.treeArtNext, nc)
 			end

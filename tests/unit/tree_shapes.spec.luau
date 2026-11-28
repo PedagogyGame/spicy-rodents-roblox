@@ -425,6 +425,11 @@ return function(t)
 		end
 	)
 
+	local ownArt: { [number]: any } = {}
+	for _, rec in serde.decode("json", fs.readFile("data/art/trees_v2.json")).planted or {} do
+		ownArt[rec.trunkRoute] = rec
+	end
+
 	t.test("the planted trees are their sources moved: routes, forks and art at the new pivot", function()
 		local art: { [number]: any } = {}
 		for _, a in require("../../generated/TreeArt") :: any do
@@ -462,9 +467,13 @@ return function(t)
 			t.near(a.pivot[2], sa.pivot[2] + off[2], 1e-6)
 			t.near(a.pivot[3], sa.pivot[3] + off[3], 1e-6)
 			t.eq(#a.routes, #tree.routes)
+			-- the source's uploaded Model, or the copy's own once that has an id (D41: data/art/trees_v2.json `planted`)
 			local n, sn = nextArt[copy.id], nextArt[src.id]
-			t.truthy(n and sn and n.assetId == sn.assetId, `{tree.label}: the source's uploaded Model`)
-			t.near(n.pivot[1], sn.pivot[1] + off[1], 1e-6)
+			local own = ownArt[copy.id]
+			local ownId = own and own.assetId
+			t.truthy(n and sn and n.assetId == (ownId or sn.assetId), `{tree.label}: its uploaded Model`)
+			t.near(n.pivot[1], sn.pivot[1] + off[1], 1e-3)
+			t.near(n.pivot[3], sn.pivot[3] + off[3], 1e-3)
 			t.eq(#n.covers, #tree.routes)
 		end
 	end)
@@ -488,6 +497,58 @@ return function(t)
 				t.eq(m.checks.promisesBroken, 0, `{tree.label}: every promise kept`)
 				t.truthy(m.tris.bark <= 8000 and m.tris.leaves <= 6000, `{tree.label}: within the tree budgets`)
 			end
+		end
+	)
+
+	t.test(
+		"D41: the start tree's own slim Model draws only the boughs it runs on, and takes over once uploaded",
+		function()
+			local p2 = nil
+			for _, tree in trees("planted") do
+				if tree.label == "BACK LOT OAK" then
+					p2 = tree
+				end
+			end
+			assert(p2, "the BACK LOT OAK is planted")
+			local rec = ownArt[p2.trunk]
+			t.truthy(rec ~= nil, "data/art/trees_v2.json planted P2")
+			t.eq(rec.id, "P2")
+			-- built round the copy's routes (its trunk and its five kept boughs), every promise kept
+			t.eq(#rec.routes, #p2.routes)
+			for i, id in p2.routes do
+				t.eq(rec.routes[i], id)
+			end
+			t.eq(#p2.routes, 6)
+			t.eq(rec.checks.promisesBroken, 0)
+			-- slim: much less wood and fewer sprays than the full source tree it replaces (17,299 triangles)
+			local v2 = serde.decode("json", fs.readFile("data/art/trees_v2.json"))
+			local src = nil
+			for _, t2 in v2.trees do
+				if t2.trunkRoute == p2.source then
+					src = t2
+				end
+			end
+			t.truthy(rec.tris.bark < 0.75 * src.tris.bark, `bark {rec.tris.bark} against {src.tris.bark}`)
+			t.truthy(rec.tris.leaves < src.tris.leaves and rec.tris.total <= 12000)
+			-- the compile step gives the copy this Model once it has an id, its source's until then
+			local TreeShapesLib = require("@tests/../tools/compile/lib/TreeShapes")
+			local broken = {}
+			local ctx = {
+				invariant = function(what: string, ok: boolean)
+					if not ok then
+						table.insert(broken, what)
+					end
+				end,
+			}
+			t.eq(TreeShapesLib.ownModel(ctx, p2, table.clone(rec), rec.pivot), nil)
+			local up = table.clone(rec)
+			up.assetId = "123456789"
+			local n = TreeShapesLib.ownModel(ctx, p2, up, rec.pivot)
+			t.truthy(n and n.assetId == "123456789" and n.trunkRoute == p2.trunk)
+			t.eq(#broken, 0)
+			-- (a record for other routes, or at another pivot, breaks the compile)
+			TreeShapesLib.ownModel(ctx, p2, up, { rec.pivot[1] + 5, rec.pivot[2], rec.pivot[3] })
+			t.eq(#broken, 1)
 		end
 	)
 
