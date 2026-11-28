@@ -14,6 +14,11 @@ For every other tree this runs
 and keeps each result in <build>/uploads/tree_NNN.json with the tree's mesh digest, so a rerun only uploads what
 changed; with no cache (a fresh clone) it reuses the id data/art/trees_v2.json records for the same digest.
 --skip-upload writes the data with the ids it already has (none before the first upload).
+A planted copy's own mesh (build_trees.py --planted P2: tree_P2.*) is recorded under "planted" by its id, with the
+copy's trunk route, pivot and routes; tools/compile lib/TreeShapes gives the copy that Model once it has an id (the
+source's Model until then). Only the planted copies built in --build change; with no tree_NNN in --build the trees
+stay as recorded:
+  python3 -I tools/blender/trees/publish.py --build build/art/trees_refine --promises build/art/trees_refine/promises.json
 
 data/art/trees_v2.json -> tools/compile (lib/TreeArtNext) -> generated/TreeArtNext.luau: Server/Assets/TreeArt
 swaps a baked tree's meshes for its v2 Model once that Model has an id. The live trees stay data/art/trees.json.
@@ -38,8 +43,17 @@ PART_ROLES = {
 }
 
 
+def key_of(info):
+    """A tree's key: its trees.json index, or a planted copy's id (P2)."""
+    return info["planted"]["id"] if info.get("planted") else info["index"]
+
+
+def file_of(key):
+    return f"tree_{key:03d}" if isinstance(key, int) else f"tree_{key}"
+
+
 def display_name(idx, label):
-    return f"SR tree v2 {idx:03d} {label}".strip()[:50]
+    return f"SR tree v2 {idx:03d} {label}".strip()[:50] if isinstance(idx, int) else f"SR tree v2 {idx} {label}".strip()[:50]
 
 
 def committed(index, digest):
@@ -47,16 +61,18 @@ def committed(index, digest):
     if not os.path.exists(OUT):
         return None
     with open(OUT) as fh:
-        for t in json.load(fh).get("trees", []):
-            if t["index"] == index and t.get("sha") == digest and t.get("assetId"):
+        doc = json.load(fh)
+        recs = doc.get("trees", []) if isinstance(index, int) else doc.get("planted", [])
+        for t in recs:
+            if (t["index"] if isinstance(index, int) else t["id"]) == index and t.get("sha") == digest and t.get("assetId"):
                 return {"assetId": t["assetId"], "moderationState": t.get("moderation"), "sourceSha": digest,
                         "name": t.get("displayName")}
     return None
 
 
 def upload(build, info, skip):
-    i, digest = info["index"], info["sha"]
-    rec_path = os.path.join(build, "uploads", f"tree_{i:03d}.json")
+    i, digest = key_of(info), info["sha"]
+    rec_path = os.path.join(build, "uploads", f"{file_of(i)}.json")
     if os.path.exists(rec_path):
         with open(rec_path) as fh:
             old = json.load(fh)
@@ -77,7 +93,7 @@ def upload(build, info, skip):
                         "--description", DESCRIPTION, "--out", rec_path], cwd=ROOT, capture_output=True, text=True,
                        timeout=1200)
     if r.returncode != 0 or not os.path.exists(rec_path):
-        sys.exit(f"upload tree {i:03d} failed:\n{r.stderr[-2000:]}")
+        sys.exit(f"upload {file_of(i)} failed:\n{r.stderr[-2000:]}")
     with open(rec_path) as fh:
         res = json.load(fh)
     res["sourceSha"] = digest
@@ -86,7 +102,7 @@ def upload(build, info, skip):
     res.pop("raw", None)
     with open(rec_path, "w") as fh:
         json.dump(res, fh, indent=2)
-    print(f"  uploaded tree {i:03d}: {res.get('assetId')} ({res.get('moderationState')}) in {res['uploadSeconds']} s",
+    print(f"  uploaded {file_of(i)}: {res.get('assetId')} ({res.get('moderationState')}) in {res['uploadSeconds']} s",
           flush=True)
     return res
 
@@ -95,7 +111,7 @@ def load_reports(path, key):
     if not path:
         return {}
     with open(path) as fh:
-        return {r[key]: r for r in json.load(fh)}
+        return {r.get("planted", r[key]) if key == "index" else r[key]: r for r in json.load(fh)}
 
 
 def main():
@@ -111,21 +127,26 @@ def main():
     a = ap.parse_args()
     build = os.path.abspath(a.build)
     infos = []
+    planted_infos = []
     for fn in sorted(os.listdir(build)):
         if fn.startswith("tree_") and fn.endswith(".json") and fn[5:8].isdigit():
             with open(os.path.join(build, fn)) as fh:
                 infos.append(json.load(fh))
+        elif fn.startswith("tree_P") and fn.endswith(".json"):
+            with open(os.path.join(build, fn)) as fh:
+                planted_infos.append(json.load(fh))
     promises = load_reports(a.promises, "index")
     hollows = {}
     for r in load_reports(a.hollows, "hollow").values():
         hollows[r["tree"]] = r
-    missing = [i["index"] for i in infos if i["index"] not in promises]
+    missing = [key_of(i) for i in infos + planted_infos if key_of(i) not in promises]
     if missing:
         sys.exit(f"not published: trees {missing} have not been checked")
-    held = {i["index"] for i in infos if promises[i["index"]]["fail"]} | {t for t, r in hollows.items() if r["fail"]}
+    held = {key_of(i) for i in infos + planted_infos if promises[key_of(i)]["fail"]}
+    held |= {t for t, r in hollows.items() if r["fail"]}
     if held:
         print(f"held back (a broken promise: never uploaded, the live tree stays): {sorted(held)}")
-    wanted = None if a.ids == "all" else {int(x) for x in a.ids.split(",") if x.strip()}
+    wanted = None if a.ids == "all" else {int(x) if x.strip().isdigit() else x.strip() for x in a.ids.split(",") if x.strip()}
     trees, totals = [], {"bark": 0, "leaves": 0, "fruit": 0, "total": 0, "fbxBytes": 0}
     for info in infos:
         i = info["index"]
@@ -151,6 +172,35 @@ def main():
             rec["checks"]["hollow"] = hollows[i]["hollow"]
             rec["checks"]["hollowBoardMargin"] = hollows[i]["min_margin"]
         trees.append(rec)
+    planted = []
+    for info in planted_infos:
+        k = key_of(info)
+        skip = a.skip_upload or (wanted is not None and k not in wanted)
+        res = {"assetId": None, "moderationState": "held: broken promise"} if k in held else upload(build, info, skip)
+        tris, pl, rep = info["tris"], info["planted"], promises[k]
+        planted.append({
+            "id": k, "label": info["label"], "species": info["species"], "category": info["category"],
+            "source": pl["source"], "sourceIndex": pl["sourceIndex"], "trunkRoute": pl["trunkRoute"],
+            "routes": pl["routes"], "pivot": pl["pivot"], "heightStuds": info["heightStuds"],
+            "assetId": res.get("assetId"), "displayName": res.get("name") or display_name(k, info["label"]),
+            "moderation": res.get("moderationState"), "sha": info["sha"], "fbxBytes": info["fbxBytes"],
+            "fbx": os.path.relpath(info["fbx"], ROOT),
+            "tris": {"bark": tris["bark"], "leaves": tris["leaves_shade"] + tris["leaves_mid"] + tris["leaves_sun"],
+                     "fruit": tris["fruit"], "total": tris["total"]},
+            "parts": info["parts"],
+            "checks": {"promisesBroken": len(rep["fail"]), "promiseWarnings": len(rep["warn"])},
+        })
+    old = {}
+    if os.path.exists(OUT):
+        with open(OUT) as fh:
+            old = json.load(fh)
+    by_p = {p["id"]: p for p in old.get("planted", [])}
+    for p in planted:
+        by_p[p["id"]] = p
+    planted = [by_p[k] for k in sorted(by_p)]
+    if not infos:
+        # (only planted copies built: the trees stay as recorded)
+        trees = old.get("trees", [])
     if a.merge:
         # only the trees in --build change; every other record stays as data/art/trees_v2.json has it. A rebuilt
         # tree that has no id yet keeps its live Model and carries the rebuilt one as "pending" (sha, fbx, routes,
@@ -192,12 +242,18 @@ def main():
         "totals": totals,
         "trees": trees,
     }
+    if planted:
+        doc["plantedNote"] = ("planted copies (data/tree_shapes.json `planted`) with a mesh of their own (build_trees.py "
+                              "--planted): pivot and routes are the copy's; tools/compile lib/TreeShapes gives the copy "
+                              "this Model once it has an id, its source's until then. Not counted in count/totals.")
+        doc["planted"] = planted
     with open(OUT, "w") as fh:
         json.dump(doc, fh, indent=1)
         fh.write("\n")
     up = sum(1 for t in trees if t["assetId"])
     print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(trees)} trees, {up} with an id; {totals['total']:,} triangles, "
-          f"{totals['fbxBytes'] / 1e6:.1f} MB of FBX")
+          f"{totals['fbxBytes'] / 1e6:.1f} MB of FBX; planted copies with their own mesh: "
+          f"{', '.join(str(p['id']) + ' ' + str(p['assetId'] or 'no id yet') for p in planted) or 'none'}")
 
 
 if __name__ == "__main__":

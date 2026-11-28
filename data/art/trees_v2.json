@@ -10916,5 +10916,120 @@
     "promiseWarnings": 1
    }
   }
+ ],
+ "plantedNote": "planted copies (data/tree_shapes.json `planted`) with a mesh of their own (build_trees.py --planted): pivot and routes are the copy's; tools/compile lib/TreeShapes gives the copy this Model once it has an id, its source's until then. Not counted in count/totals.",
+ "planted": [
+  {
+   "id": "P2",
+   "label": "BACK LOT OAK",
+   "species": "oak",
+   "category": "named",
+   "source": 900,
+   "sourceIndex": 63,
+   "trunkRoute": 9859,
+   "routes": [
+    9859,
+    9860,
+    9861,
+    9862,
+    9863,
+    9864
+   ],
+   "pivot": [
+    -200.0,
+    0.0,
+    -200.0
+   ],
+   "heightStuds": 70.0,
+   "assetId": null,
+   "displayName": "SR tree v2 P2 BACK LOT OAK",
+   "moderation": "not uploaded",
+   "sha": "d12b38c4da56f4f9",
+   "fbxBytes": 2778572,
+   "fbx": "build/art/trees_refine/tree_P2.fbx",
+   "tris": {
+    "bark": 7743,
+    "leaves": 2712,
+    "fruit": 0,
+    "total": 10455
+   },
+   "parts": {
+    "Bark": {
+     "center": [
+      3.116,
+      33.449,
+      0.126
+     ],
+     "size": [
+      44.371,
+      76.093,
+      46.912
+     ],
+     "doubleSided": false,
+     "alphaMode": "Overlay"
+    },
+    "LeavesShade": {
+     "center": [
+      1.996,
+      44.377,
+      1.569
+     ],
+     "size": [
+      48.866,
+      32.299,
+      55.11
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      1.523,
+      49.542,
+      0.651
+     ],
+     "size": [
+      56.694,
+      39.113,
+      53.824
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      3.735,
+      54.204,
+      1.234
+     ],
+     "size": [
+      58.838,
+      42.656,
+      60.673
+     ],
+     "doubleSided": true,
+     "alphaMode": "Transparency",
+     "color": [
+      140,
+      161,
+      80
+     ]
+    }
+   },
+   "checks": {
+    "promisesBroken": 0,
+    "promiseWarnings": 1
+   }
+  }
  ]
 }

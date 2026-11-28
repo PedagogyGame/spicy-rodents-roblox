@@ -463,7 +463,7 @@ def planted_recs(recs, shapes, ids):
         out.append(dict(src, members=members, label=pl["label"], file=f"tree_{pid}", slim=True,
                         planted={"id": pid, "source": pl["source"], "sourceIndex": src["index"], "trunkRoute": dp["trunk"],
                                  "offset": dp["offset"], "routes": dp["routes"],
-                                 "pivot": [round(float(a + b), 3) for a, b in zip(src["root"], dp["offset"])]}))
+                                 "pivot": [round(float(a + b), 3) + 0.0 for a, b in zip(src["root"], dp["offset"])]}))
     return out
 
 
