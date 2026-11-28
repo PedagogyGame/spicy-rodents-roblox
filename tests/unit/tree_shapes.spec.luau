@@ -540,7 +540,9 @@ return function(t)
 					end
 				end,
 			}
-			t.eq(TreeShapesLib.ownModel(ctx, p2, table.clone(rec), rec.pivot), nil)
+			local before = table.clone(rec)
+			before.assetId = nil -- (as before its upload)
+			t.eq(TreeShapesLib.ownModel(ctx, p2, before, rec.pivot), nil)
 			local up = table.clone(rec)
 			up.assetId = "123456789"
 			local n = TreeShapesLib.ownModel(ctx, p2, up, rec.pivot)

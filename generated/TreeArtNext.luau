@@ -476,11 +476,11 @@ return {
 		trunkRoute = 818,
 	},
 	{
-		assetId = "84420045411483",
+		assetId = "95224573993775",
 		label = "PUMP ELM",
 		leaf = { 144, 168, 85 },
 		pivot = { 1170, 3.686, 85 },
-		tris = 17002,
+		tris = 15248,
 		trunkRoute = 833,
 	},
 	{
@@ -491,11 +491,11 @@ return {
 		trunkRoute = 845,
 	},
 	{
-		assetId = "137776319433093",
+		assetId = "134466360851733",
 		label = "ESTATE OAK SOUTH 2",
 		leaf = { 124, 154, 71 },
 		pivot = { 415, 12.034, -817.5 },
-		tris = 17136,
+		tris = 15334,
 		trunkRoute = 860,
 	},
 	{
@@ -513,11 +513,11 @@ return {
 		trunkRoute = 888,
 	},
 	{
-		assetId = "101174529674815",
+		assetId = "93959685592766",
 		label = "VILLA OAK SOUTH",
 		leaf = { 140, 161, 80 },
 		pivot = { 942.5, 0.659, -885 },
-		tris = 17299,
+		tris = 16312,
 		trunkRoute = 900,
 	},
 	{
@@ -599,11 +599,11 @@ return {
 		trunkRoute = 1032,
 	},
 	{
-		assetId = "87801702513970",
+		assetId = "102025627573336",
 		label = "WESTSIDE STREET ELM 1",
 		leaf = { 110, 144, 74 },
 		pivot = { -820, 15.611, -225 },
-		tris = 17053,
+		tris = 15661,
 		trunkRoute = 1041,
 	},
 	{
@@ -615,11 +615,11 @@ return {
 		trunkRoute = 1052,
 	},
 	{
-		assetId = "103920169834184",
+		assetId = "137996448665487",
 		label = "WESTSIDE STREET ELM 3",
 		leaf = { 110, 144, 74 },
 		pivot = { -820, 10.519, 250 },
-		tris = 17016,
+		tris = 15454,
 		trunkRoute = 1063,
 	},
 	{
@@ -776,12 +776,12 @@ return {
 		trunkRoute = 9850,
 	},
 	{
-		assetId = "101174529674815",
+		assetId = "130804203301288",
 		covers = { 9859, 9860, 9861, 9862, 9863, 9864 },
 		label = "BACK LOT OAK",
 		leaf = { 140, 161, 80 },
-		pivot = { -200, 0.000300000000000078, -200 },
-		tris = 17299,
+		pivot = { -200, 0, -200 },
+		tris = 10455,
 		trunkRoute = 9859,
 	},
 	{

@@ -1,6 +1,6 @@
 # Compile report: authored data -> `generated/`
 
-Generated 2026-11-23T00:53:11.391833047+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
+Generated 2026-11-28T02:46:45.873067462+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
 
 ## Inputs
 
@@ -109,7 +109,7 @@ Generated 2026-11-23T00:53:11.391833047+00:00 by `tools/compile` (Lune lune 0.11
 | hollows with insides, the log among them | 13 | 13 | match |  |
 | tree art models (data/art/tree_meshes.json) | 95 | 95 | match |  |
 | tree art v2 models (data/art/trees_v2.json) | 95 | 95 | match |  |
-| tree art v2 triangles (data/art/trees_v2.json totals) | 1331132 | 1331132 | match |  |
+| tree art v2 triangles (data/art/trees_v2.json totals) | 1323635 | 1323635 | match |  |
 | shop art meshes (his metadata: mesh_objects) | 355 | 355 | match |  |
 | shop art triangles (his metadata: triangle_count) | 41264 | 41264 | match |  |
 
@@ -134,7 +134,7 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 ## Validation and invariants
 
 - Schema validation: 24 file(s), 0 error(s).
-- Invariants checked: 22468, failed: 0.
+- Invariants checked: 22477, failed: 0.
 - warning: 8 lane(s) reference no road id (yard glides, verges, templated routes): kept with roadNote only
 - warning: duplicate cast names (ids disambiguated with their source line): Avery, Sam
 
@@ -142,43 +142,43 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 
 | module | records | bytes | require (ms, Lune) | source |
 |---|---|---|---|---|
-| Lots | 243 | 190558 | 6.5 | data/authored/town/lots/*.json |
-| Roads | 116 | 44060 | 1.6 | data/authored/town/roads.json |
-| Lanes | 25 | 18253 | 1.1 | data/authored/town/lanes.json |
+| Lots | 243 | 190558 | 5.5 | data/authored/town/lots/*.json |
+| Roads | 116 | 44060 | 1.4 | data/authored/town/roads.json |
+| Lanes | 25 | 18253 | 1.0 | data/authored/town/lanes.json |
 | Cast | 87 | 71807 | 1.6 | data/authored/cast/cast.json |
-| RoutesCatalog | 60 | 41830 | 1.2 | data/authored/routes/catalog.json |
-| Wildlife | 95 | 61201 | 3.5 | data/authored/wildlife/*.json |
-| Routes_01 | 391 | 204760 | 11.0 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_02 | 447 | 204694 | 8.5 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_03 | 413 | 205046 | 8.7 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_04 | 81 | 36112 | 2.0 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Forks | 95 | 193316 | 9.9 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| LotTypes | 0 | 23067 | 1.7 | data/authored/lot_types.json |
-| Interiors | 0 | 11610 | 1.2 | data/interiors/*.json |
-| Buildings | 0 | 6132 | 0.9 | data/buildings/*.json |
-| HarvestPatches | 0 | 12240 | 0.7 | data/harvest_patches.json |
-| Population | 0 | 3471 | 0.6 | data/population.json |
-| Hollows | 0 | 8052 | 0.8 | data/hollows.json |
-| TerrainExtensions | 0 | 2379 | 0.1 | data/terrain_extensions.json |
-| Lighting | 0 | 1163 | 0.5 | data/authored/town/lighting.json |
-| Attractions | 33 | 60360 | 3.3 | data/attractions.json |
-| Sewers | 6 | 46279 | 3.7 | data/sewers.json |
+| RoutesCatalog | 60 | 41830 | 1.1 | data/authored/routes/catalog.json |
+| Wildlife | 95 | 61201 | 3.2 | data/authored/wildlife/*.json |
+| Routes_01 | 391 | 204760 | 9.1 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_02 | 447 | 204694 | 7.8 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_03 | 413 | 205046 | 7.7 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_04 | 81 | 36112 | 1.5 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Forks | 95 | 193316 | 7.3 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| LotTypes | 0 | 23067 | 1.2 | data/authored/lot_types.json |
+| Interiors | 0 | 11610 | 0.8 | data/interiors/*.json |
+| Buildings | 0 | 6132 | 0.6 | data/buildings/*.json |
+| HarvestPatches | 0 | 12240 | 0.4 | data/harvest_patches.json |
+| Population | 0 | 3471 | 0.5 | data/population.json |
+| Hollows | 0 | 8052 | 0.6 | data/hollows.json |
+| TerrainExtensions | 0 | 2379 | 0.0 | data/terrain_extensions.json |
+| Lighting | 0 | 1163 | 0.3 | data/authored/town/lighting.json |
+| Attractions | 33 | 60360 | 2.2 | data/attractions.json |
+| Sewers | 6 | 46279 | 2.7 | data/sewers.json |
 | Expansion | 47 | 144240 | 0.1 | data/expansion.json |
-| HollowTrees | 24 | 178363 | 13.2 | data/hollows.json |
-| TreeArt | 98 | 182432 | 8.7 | data/art/tree_meshes.json |
-| TreeArtNext | 98 | 16921 | 1.6 | data/art/trees_v2.json |
-| TreeShapes | 75 | 124330 | 9.2 | data/tree_shapes.json |
-| LampPosts | 308 | 220985 | 15.8 | data/lamp_posts.json |
-| BranchNooks | 1618 | 403774 | 38.5 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) |
-| BranchNookRoutes_01 | 528 | 205355 | 16.9 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 1 of 4) |
-| BranchNookRoutes_02 | 518 | 204983 | 16.6 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 2 of 4) |
-| BranchNookRoutes_03 | 516 | 205145 | 22.1 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 3 of 4) |
-| BranchNookRoutes_04 | 56 | 22891 | 1.7 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 4 of 4) |
-| ShopArt | 445 | 68298 | 5.2 | data/art/neighbourhood_shop.json |
-| PinballArt | 107 | 26856 | 2.0 | data/art/pinball.json |
-| Index | 1 | 2385 | 0.1 | tools/compile (module list, counts and the harvest pin) |
+| HollowTrees | 24 | 178363 | 14.6 | data/hollows.json |
+| TreeArt | 98 | 182432 | 9.1 | data/art/tree_meshes.json |
+| TreeArtNext | 98 | 16902 | 1.1 | data/art/trees_v2.json |
+| TreeShapes | 75 | 124330 | 5.7 | data/tree_shapes.json |
+| LampPosts | 308 | 220985 | 8.0 | data/lamp_posts.json |
+| BranchNooks | 1618 | 403774 | 22.6 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) |
+| BranchNookRoutes_01 | 528 | 205355 | 8.2 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 1 of 4) |
+| BranchNookRoutes_02 | 518 | 204983 | 8.0 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 2 of 4) |
+| BranchNookRoutes_03 | 516 | 205145 | 8.0 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 3 of 4) |
+| BranchNookRoutes_04 | 56 | 22891 | 1.0 | every compiled route and canopy fork (Shared/World/BranchNooks plans them) (chunk 4 of 4) |
+| ShopArt | 445 | 68298 | 3.5 | data/art/neighbourhood_shop.json |
+| PinballArt | 107 | 26856 | 1.5 | data/art/pinball.json |
+| Index | 1 | 2385 | 0.0 | tools/compile (module list, counts and the harvest pin) |
 
-Total 35 files, 3453348 bytes; largest BranchNooks (403774 bytes, 38.5 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
+Total 35 files, 3453329 bytes; largest BranchNooks (403774 bytes, 22.6 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
 
 ## Notes for the lead
 

@@ -85,7 +85,11 @@ return function(t)
 		-- re-pinned 2026-11-22: D29 joined streets that stopped short and trimmed strips that lay on others
 		-- re-pinned 2026-11-22: D32 tree shapes (data/tree_shapes.json): grown boughs on ten trees, three planted trees,
 		-- and the invisible bark proxies under a tree mesh in pieces of up to 24 studs (Builders/Trees.PROXY_PIECE)
-		t.eq(Bake.fnv(table.concat(props, "\n")), "1a51e886fdc3d2c0", "props or roads moved: re-pin only on purpose")
+		t.eq(
+			Bake.fnv(table.concat(props, "\n")),
+			"04ac3aa9f61fcf33",
+			"props or roads moved: re-pin only on purpose (D41: the start tree keeps 5 boughs)"
+		)
 	end)
 
 	t.test("pin: the collidable massing of every lot and its first part are exactly as before", function()
