@@ -777,7 +777,10 @@ def main(argv):
             # side branches, the bark's unevenness and the leaves change)
             rec = dict(job, seed=job["seed"] + 7919 * attempt)
             reset_scene()
-            tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk, "slim": rec.get("slim", False)})
+            opts = {"knots": tk, "slim": rec.get("slim", False)}
+            if rec.get("planted"):
+                opts["leaf_budget"] = tg.SLIM["leaf_budget"]  # (a light crown over the copy's few runs)
+            tb, objs, mats = build_tree_objects(rec, data, cache, opts)
             tb.log["knot_mouth_verts"] = open_knots(tb, objs["Bark"])
             tb.log["feet_cleared_verts"] = clear_walks(tb, objs["Bark"])
             if not args.retries:

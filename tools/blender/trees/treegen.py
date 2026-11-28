@@ -64,8 +64,9 @@ FLARE_ROOM = 0.22  # studs the bark may stand outside the climbing radius at the
 # TOO THICK"): the wood the squirrel does not run on steps back. A bough is about as thick as the run on it (the
 # squirrel's feet stand visualBranchLift, 1.25 studs, over the rail: bark of about that radius where it leaves the
 # trunk, tapering to `bough_tip`), the side branches along the boughs are fewer, shorter and thinner and none leave
-# a bough below the crown's floor, the forks at a bough's end and the leader's crown limbs are fine wood, and the
-# crown carries fewer sprays. Routes, trunk and every promise are as before.
+# a bough below the crown's floor, and the forks at a bough's end and the leader's crown limbs are fine wood. Routes,
+# trunk and every promise are as before. A planted copy's own mesh (the D41 start tree) also has a lighter crown
+# (`leaf_budget`, passed as opts["leaf_budget"] by build_trees.py --planted).
 SLIM = dict(
     bough_r=1.05,  # a bough's radius where it leaves the trunk (before the collar), studs
     bough_tip=0.5,  # and at its tip
@@ -77,7 +78,7 @@ SLIM = dict(
     leader_rf=(0.3, 0.24),  # the leader's radius as a fraction of the trunk top's (tried in turn)
     crown=-2,  # crown limbs: the species' count + this
     crown_r=(0.2, 0.45),  # their radius where they leave (studs)
-    leaf_budget=4400,  # triangles of leaf sprays (LEAF_BUDGET otherwise)
+    leaf_budget=4400,  # a planted copy's leaf sprays, triangles (LEAF_BUDGET otherwise)
 )
 
 
@@ -658,9 +659,7 @@ class TreeBuilder:
     def __init__(self, rec, data, opts=None):
         self.rec = rec
         self.data = data
-        self.opts = dict(opts or {})
-        if self.opts.get("slim"):
-            self.opts.setdefault("leaf_budget", SLIM["leaf_budget"])
+        self.opts = opts or {}
         self.rng = np.random.default_rng(rec["seed"])
         self.root = rec["root"]
         self.H = rec["H"]
